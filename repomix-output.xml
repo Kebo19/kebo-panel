@@ -1,0 +1,3694 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.gitignore
+AGENTS.md
+app/favicon.ico
+app/globals.css
+app/kasa/page.tsx
+app/layout.tsx
+app/login/page.tsx
+app/page.tsx
+app/personeller/[id]/page.tsx
+app/personeller/page.tsx
+app/personeller/yeni/page.tsx
+app/profil/page.tsx
+app/raporlar/[id]/page.tsx
+app/raporlar/page.tsx
+CLAUDE.md
+components.json
+components/Sidebar.tsx
+components/Topbar.tsx
+components/ui/button.tsx
+components/ui/card.tsx
+components/ui/input.tsx
+eslint.config.mjs
+lib/resportStorage.ts
+lib/supabase.ts
+lib/utils.ts
+next.config.ts
+package.json
+postcss.config.mjs
+public/file.svg
+public/globe.svg
+public/next.svg
+public/vercel.svg
+public/window.svg
+README.md
+tsconfig.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path=".gitignore">
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+</file>
+
+<file path="AGENTS.md">
+<!-- BEGIN:nextjs-agent-rules -->
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+<!-- END:nextjs-agent-rules -->
+</file>
+
+<file path="app/globals.css">
+@import "tailwindcss";
+
+:root {
+  --background: #07090d;
+  --foreground: #ffffff;
+
+  --card: #111315;
+  --card-foreground: #ffffff;
+
+  --popover: #111315;
+  --popover-foreground: #ffffff;
+
+  --primary: #f97316;
+  --primary-foreground: #000000;
+
+  --secondary: #1a1d21;
+  --secondary-foreground: #ffffff;
+
+  --muted: #16181c;
+  --muted-foreground: #9ca3af;
+
+  --accent: #f97316;
+  --accent-foreground: #000000;
+
+  --border: rgba(255,255,255,0.08);
+  --input: rgba(255,255,255,0.08);
+  --ring: #f97316;
+
+  --radius: 1rem;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  background: #07090d;
+}
+
+body {
+  background: #07090d;
+  color: white;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+input {
+  color: white !important;
+}
+
+input::placeholder {
+  color: #6b7280 !important;
+}
+
+button {
+  cursor: pointer;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}.kebo-input {
+  background: #0d1117 !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  height: 48px !important;
+  border-radius: 14px !important;
+  color: white !important;
+}
+</file>
+
+<file path="app/kasa/page.tsx">
+"use client";
+
+import Topbar from "@/components/Topbar";
+
+export default function KasaPage() {
+  return (
+    <main className="min-h-screen bg-[#07090d] text-white p-4">
+      <Topbar />
+
+      <div className="max-w-7xl mx-auto">
+
+        <div className="mb-8">
+          <h1 className="text-4xl font-black">
+            Kasa Yönetimi
+          </h1>
+
+          <p className="text-gray-400 mt-2">
+            Finans ve kasa kontrol merkezi
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
+
+          <div className="bg-[#111315] rounded-3xl p-5">
+            <p className="text-gray-500 text-xs">
+              Kasa Nakit
+            </p>
+
+            <h2 className="text-3xl font-black mt-2">
+              0 ₺
+            </h2>
+          </div>
+
+          <div className="bg-[#111315] rounded-3xl p-5">
+            <p className="text-gray-500 text-xs">
+              TEB
+            </p>
+
+            <h2 className="text-3xl font-black mt-2">
+              0 ₺
+            </h2>
+          </div>
+
+          <div className="bg-[#111315] rounded-3xl p-5">
+            <p className="text-gray-500 text-xs">
+              VakıfBank
+            </p>
+
+            <h2 className="text-3xl font-black mt-2">
+              0 ₺
+            </h2>
+          </div>
+
+          <div className="bg-[#111315] rounded-3xl p-5">
+            <p className="text-gray-500 text-xs">
+              Enpara
+            </p>
+
+            <h2 className="text-3xl font-black mt-2">
+              0 ₺
+            </h2>
+          </div>
+
+          <div className="bg-gradient-to-br from-orange-500 to-orange-700 rounded-3xl p-5 text-black">
+            <p className="text-xs font-bold">
+              Toplam Varlık
+            </p>
+
+            <h2 className="text-3xl font-black mt-2">
+              0 ₺
+            </h2>
+          </div>
+
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mb-6">
+
+          <div className="bg-[#111315] rounded-3xl p-6">
+            <p className="text-green-400 text-sm">
+              Bugünkü Gelir
+            </p>
+
+            <h2 className="text-4xl font-black mt-3">
+              0 ₺
+            </h2>
+          </div>
+
+          <div className="bg-[#111315] rounded-3xl p-6">
+            <p className="text-red-400 text-sm">
+              Bugünkü Gider
+            </p>
+
+            <h2 className="text-4xl font-black mt-3">
+              0 ₺
+            </h2>
+          </div>
+
+        </div>
+
+        <div className="grid xl:grid-cols-2 gap-4">
+
+          <div className="bg-[#111315] rounded-3xl p-6">
+            <h2 className="text-2xl font-black mb-4">
+              Gelir Ekle
+            </h2>
+
+            <button className="w-full h-12 rounded-2xl bg-green-500 text-black font-black">
+              Yeni Gelir Kaydı
+            </button>
+          </div>
+
+          <div className="bg-[#111315] rounded-3xl p-6">
+            <h2 className="text-2xl font-black mb-4">
+              Gider Ekle
+            </h2>
+
+            <button className="w-full h-12 rounded-2xl bg-red-500 text-black font-black">
+              Yeni Gider Kaydı
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+  );
+}
+</file>
+
+<file path="app/layout.tsx">
+import "./globals.css";
+
+import type { Metadata } from "next";
+
+import Sidebar from "@/components/Sidebar";
+
+export const metadata: Metadata = {
+  title: "KEBO ERP",
+  description: "Premium Restaurant ERP Management System",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="tr" suppressHydrationWarning>
+      <body
+        className="min-h-screen bg-[#07090d] text-white antialiased"
+        suppressHydrationWarning
+      >
+        <div className="flex min-h-screen">
+          <Sidebar />
+
+          <main className="flex-1 xl:ml-[290px] overflow-x-hidden">
+            {children}
+          </main>
+        </div>
+      </body>
+    </html>
+  );
+}
+</file>
+
+<file path="app/login/page.tsx">
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+
+export default function LoginPage() {
+  const router = useRouter();
+
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorText, setErrorText] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function login() {
+    try {
+      setLoading(true);
+      setErrorText("");
+
+      console.log("LOGIN TIKLANDI");
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*");
+
+      console.log("SUPABASE DATA:", data);
+      console.log("SUPABASE ERROR:", error);
+
+      if (error) {
+        setErrorText(
+          JSON.stringify(error)
+        );
+        setLoading(false);
+        return;
+      }
+
+      const user = data?.find(
+        (x) =>
+          x.email === username.trim() &&
+          x.password === password.trim()
+      );
+
+      console.log("BULUNAN USER:", user);
+
+      if (!user) {
+        setErrorText(
+          "Kullanıcı adı veya şifre hatalı"
+        );
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem(
+        "kebo_user",
+        JSON.stringify(user)
+      );
+
+      router.push("/");
+    } catch (err) {
+      console.error(err);
+      setErrorText(
+        "Beklenmeyen hata oluştu"
+      );
+    }
+
+    setLoading(false);
+  }
+
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-[#07090d] text-white">
+
+      <div className="w-full max-w-md bg-[#111315] border border-white/10 rounded-3xl p-8">
+
+        <h1 className="text-3xl font-black text-center mb-8">
+          KEBO YÖNETİM PANELİ
+        </h1>
+
+        <div className="space-y-4">
+
+          <input
+            value={username}
+            onChange={(e) =>
+              setUsername(e.target.value)
+            }
+            placeholder="Kullanıcı Adı"
+            className="w-full h-12 px-4 rounded-xl bg-[#0d1117] border border-white/10"
+          />
+
+          <input
+            type="password"
+            value={password}
+            onChange={(e) =>
+              setPassword(e.target.value)
+            }
+            placeholder="Şifre"
+            className="w-full h-12 px-4 rounded-xl bg-[#0d1117] border border-white/10"
+          />
+
+          {errorText && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl text-sm">
+              {errorText}
+            </div>
+          )}
+
+          <button
+            onClick={login}
+            disabled={loading}
+            className="w-full h-12 bg-orange-500 text-black font-black rounded-xl"
+          >
+            {loading
+              ? "Kontrol Ediliyor..."
+              : "Panele Giriş Yap"}
+          </button>
+
+        </div>
+
+      </div>
+
+    </main>
+  );
+}
+</file>
+
+<file path="app/page.tsx">
+"use client";
+
+import { useEffect, useState } from "react";
+
+import Link from "next/link";
+
+import { useRouter } from "next/navigation";
+
+import { supabase } from "@/lib/supabase";
+
+import Topbar from "@/components/Topbar";
+
+import { Card } from "@/components/ui/card";
+
+import {
+  Wallet,
+  TrendingUp,
+  Users,
+  Bike,
+  CalendarDays,
+  ArrowUpRight,
+  Receipt,
+  Globe,
+  Truck,
+} from "lucide-react";
+
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  Tooltip,
+  CartesianGrid,
+  AreaChart,
+  Area,
+} from "recharts";
+
+export default function DashboardPage() {
+
+  const router = useRouter();
+
+  const [reports, setReports] =
+    useState<any[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [userData, setUserData] =
+  useState<any>(null);
+
+const [authorized, setAuthorized] =
+  useState(false);
+
+   
+useEffect(() => {
+
+  const userString =
+    localStorage.getItem("kebo_user");
+
+  if (!userString) {
+
+    window.location.href = "/login";
+
+    return;
+  }
+
+  try {
+
+    const user =
+      JSON.parse(userString);
+
+    if (!user) {
+
+      localStorage.removeItem("kebo_user");
+
+      window.location.href = "/login";
+
+      return;
+    }
+
+    setUserData(user);
+
+    setAuthorized(true);
+
+    getDashboardData();
+
+  } catch {
+
+    localStorage.removeItem("kebo_user");
+
+    window.location.href = "/login";
+
+  }
+
+}, []);
+
+  async function getDashboardData() {
+
+    const { data } =
+      await supabase
+        .from("daily_reports")
+        .select("*")
+        .order("report_date", {
+          ascending: true,
+        });
+
+    setReports(data || []);
+
+    setLoading(false);
+  }
+
+  const totalKasa =
+    reports.reduce((total, report) => {
+
+      return (
+        total +
+        Number(report.total_online || 0) +
+        Number(report.total_door || 0) +
+        Number(report.cash || 0) +
+        Number(report.credit_card || 0)
+      );
+
+    }, 0);
+
+  const totalExpense =
+    reports.reduce((total, report) => {
+
+      return (
+        total +
+        Number(report.expense_amount || 0)
+      );
+
+    }, 0);
+
+  const totalOnline =
+    reports.reduce((total, report) => {
+
+      return (
+        total +
+        Number(report.total_online || 0)
+      );
+
+    }, 0);
+
+  const totalDoor =
+    reports.reduce((total, report) => {
+
+      return (
+        total +
+        Number(report.total_door || 0)
+      );
+
+    }, 0);
+
+  const chartData =
+    reports.map((report) => ({
+
+      date:
+        report.report_date,
+
+      ciro:
+        Number(report.total_online || 0) +
+        Number(report.total_door || 0),
+
+      kasa:
+        Number(report.cash || 0) +
+        Number(report.credit_card || 0),
+
+    }));
+if (!authorized) {
+  return null;
+}
+  if (loading) {
+
+    return (
+
+      <main className="min-h-screen bg-[#07090d] text-white flex items-center justify-center">
+
+        <div className="text-center">
+
+          <div className="w-14 h-14 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+
+          <p className="text-sm text-gray-400 mt-4">
+            Dashboard yükleniyor...
+          </p>
+
+        </div>
+
+      </main>
+
+    );
+  }
+
+  return (
+
+    <main className="min-h-screen bg-[#07090d] text-white p-4">
+
+      <Topbar />
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-5">
+
+        <Card className="xl:col-span-2 bg-gradient-to-br from-orange-500 to-orange-700 border-0 rounded-3xl p-7 text-black overflow-hidden relative">
+
+          <div className="absolute right-[-50px] top-[-50px] w-[250px] h-[250px] rounded-full bg-white/10"></div>
+
+          <div className="relative z-10">
+
+            <p className="text-[10px] uppercase tracking-[0.3em] font-black opacity-70">
+              KEBO ERP
+            </p>
+
+            <h1 className="text-5xl font-black mt-3 leading-tight">
+              Hoş Geldin
+              <br />
+              {userData?.full_name || "Yönetici"}
+            </h1>
+
+            <p className="text-sm mt-4 opacity-80 max-w-lg">
+              Günlük operasyon, finans ve personel yönetimi tek panelde.
+            </p>
+
+          </div>
+
+        </Card>
+
+        <Card className="bg-[#111315] border border-white/5 rounded-3xl p-6">
+
+          <p className="text-orange-400 text-[10px] uppercase tracking-[0.3em] font-black">
+            Bugün
+          </p>
+
+          <h2 className="text-3xl font-black mt-3">
+            {new Date().toLocaleDateString("tr-TR")}
+          </h2>
+
+          <p className="text-gray-500 text-sm mt-2">
+            Sistem aktif durumda
+          </p>
+
+          <div className="mt-8 space-y-3">
+
+            <div className="bg-[#0d1117] rounded-2xl p-4 flex items-center justify-between">
+
+              <div>
+
+                <p className="text-xs text-gray-500">
+                  Aktif Kullanıcı
+                </p>
+
+                <h2 className="font-black mt-1">
+                  {userData?.role || "admin"}
+                </h2>
+
+              </div>
+
+              <Users
+                size={22}
+                className="text-orange-400"
+              />
+
+            </div>
+
+            <div className="bg-[#0d1117] rounded-2xl p-4 flex items-center justify-between">
+
+              <div>
+
+                <p className="text-xs text-gray-500">
+                  Günlük Rapor
+                </p>
+
+                <h2 className="font-black mt-1">
+                  {reports.length}
+                </h2>
+
+              </div>
+
+              <CalendarDays
+                size={22}
+                className="text-green-400"
+              />
+
+            </div>
+
+          </div>
+
+        </Card>
+
+      </div>
+
+      {/* QUICK ACTIONS */}
+
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
+
+        <Link href="/kasa">
+
+          <Card className="bg-[#111315] border border-white/5 rounded-3xl p-5 hover:border-orange-500/40 hover:bg-[#15181d] transition-all duration-300 cursor-pointer group">
+
+            <div className="flex items-center justify-between">
+
+              <div>
+
+                <p className="text-[10px] uppercase tracking-[0.25em] text-gray-500 font-black">
+                  Hızlı İşlem
+                </p>
+
+                <h2 className="text-2xl font-black mt-3">
+                  Yeni Rapor
+                </h2>
+
+              </div>
+
+              <div className="w-14 h-14 rounded-2xl bg-orange-500/20 flex items-center justify-center group-hover:bg-orange-500 transition-all">
+
+                <Receipt
+                  size={24}
+                  className="text-orange-400 group-hover:text-black"
+                />
+
+              </div>
+
+            </div>
+
+          </Card>
+
+        </Link>
+
+        <Link href="/genel-kasa">
+
+          <Card className="bg-[#111315] border border-white/5 rounded-3xl p-5 hover:border-green-500/40 hover:bg-[#15181d] transition-all duration-300 cursor-pointer group">
+
+            <div className="flex items-center justify-between">
+
+              <div>
+
+                <p className="text-[10px] uppercase tracking-[0.25em] text-gray-500 font-black">
+                  Finans
+                </p>
+
+                <h2 className="text-2xl font-black mt-3">
+                  Genel Kasa
+                </h2>
+
+              </div>
+
+              <div className="w-14 h-14 rounded-2xl bg-green-500/20 flex items-center justify-center group-hover:bg-green-500 transition-all">
+
+                <Wallet
+                  size={24}
+                  className="text-green-400 group-hover:text-black"
+                />
+
+              </div>
+
+            </div>
+
+          </Card>
+
+        </Link>
+
+        <Link href="/personeller/mutfak">
+
+          <Card className="bg-[#111315] border border-white/5 rounded-3xl p-5 hover:border-blue-500/40 hover:bg-[#15181d] transition-all duration-300 cursor-pointer group">
+
+            <div className="flex items-center justify-between">
+
+              <div>
+
+                <p className="text-[10px] uppercase tracking-[0.25em] text-gray-500 font-black">
+                  Personel
+                </p>
+
+                <h2 className="text-2xl font-black mt-3">
+                  Personeller
+                </h2>
+
+              </div>
+
+              <div className="w-14 h-14 rounded-2xl bg-blue-500/20 flex items-center justify-center group-hover:bg-blue-500 transition-all">
+
+                <Users
+                  size={24}
+                  className="text-blue-400 group-hover:text-black"
+                />
+
+              </div>
+
+            </div>
+
+          </Card>
+
+        </Link>
+
+        <Link href="/performans">
+
+          <Card className="bg-[#111315] border border-white/5 rounded-3xl p-5 hover:border-purple-500/40 hover:bg-[#15181d] transition-all duration-300 cursor-pointer group">
+
+            <div className="flex items-center justify-between">
+
+              <div>
+
+                <p className="text-[10px] uppercase tracking-[0.25em] text-gray-500 font-black">
+                  Analiz
+                </p>
+
+                <h2 className="text-2xl font-black mt-3">
+                  Performans
+                </h2>
+
+              </div>
+
+              <div className="w-14 h-14 rounded-2xl bg-purple-500/20 flex items-center justify-center group-hover:bg-purple-500 transition-all">
+
+                <TrendingUp
+                  size={24}
+                  className="text-purple-400 group-hover:text-black"
+                />
+
+              </div>
+
+            </div>
+
+          </Card>
+
+        </Link>
+
+      </div>
+
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+
+        <Card className="p-5">
+
+          <p className="text-gray-400 text-[10px] uppercase">
+            Toplam Kasa
+          </p>
+
+          <h2 className="text-3xl font-black mt-2">
+            {totalKasa} ₺
+          </h2>
+
+        </Card>
+
+        <Card className="p-5">
+
+          <p className="text-gray-400 text-[10px] uppercase">
+            Online Satış
+          </p>
+
+          <h2 className="text-3xl font-black mt-2">
+            {totalOnline} ₺
+          </h2>
+
+        </Card>
+
+        <Card className="p-5">
+
+          <p className="text-gray-400 text-[10px] uppercase">
+            Kapıda Ödeme
+          </p>
+
+          <h2 className="text-3xl font-black mt-2">
+            {totalDoor} ₺
+          </h2>
+
+        </Card>
+
+        <Card className="p-5">
+
+          <p className="text-gray-400 text-[10px] uppercase">
+            Toplam Gider
+          </p>
+
+          <h2 className="text-3xl font-black mt-2">
+            {totalExpense} ₺
+          </h2>
+
+        </Card>
+
+      </div>
+
+    </main>
+
+  );
+}
+</file>
+
+<file path="app/personeller/[id]/page.tsx">
+"use client";
+
+import { useEffect, useState } from "react";
+
+import Link from "next/link";
+
+import { useParams } from "next/navigation";
+
+import Topbar from "@/components/Topbar";
+
+import { Card } from "@/components/ui/card";
+
+import { Input } from "@/components/ui/input";
+
+import {
+  ArrowLeft,
+  Phone,
+  CreditCard,
+  Landmark,
+  Users,
+  CalendarDays,
+  FileText,
+  Wallet,
+  Save,
+} from "lucide-react";
+
+export default function PersonelDetayPage() {
+
+  const params = useParams();
+
+  const [person, setPerson] =
+    useState<any>(null);
+
+  useEffect(() => {
+
+    const saved =
+      localStorage.getItem(
+        `person-${params.id}`
+      );
+
+    if (saved) {
+
+      setPerson(JSON.parse(saved));
+
+    } else {
+
+      setPerson({
+        id: params.id,
+        name: "Ahmet Kaya",
+        phone: "0555 555 55 55",
+        tc: "12345678910",
+        iban: "0001 2000 0000 1234 5678 90",
+        department: "Mutfak",
+        salary: "38.000 ₺",
+        startDate: "2024-03-12",
+        exitDate: "",
+        status: "Aktif",
+        note: "Akşam vardiyasında görev alıyor.",
+      });
+
+    }
+
+  }, [params.id]);
+
+  function handleSave() {
+
+    if (!person) return;
+
+    if (person.exitDate) {
+
+      const confirmed =
+        window.confirm(
+          "Bu personel Ayrılan Personeller bölümüne taşınacaktır. Onaylıyor musunuz?"
+        );
+
+      if (!confirmed) return;
+
+      const updatedPerson = {
+        ...person,
+        status: "İşten Ayrıldı",
+      };
+
+      setPerson(updatedPerson);
+
+      localStorage.setItem(
+        `person-${person.id}`,
+        JSON.stringify(updatedPerson)
+      );
+
+      window.location.href =
+        "/personeller?tab=ayrilan";
+
+      return;
+    }
+
+    localStorage.setItem(
+      `person-${person.id}`,
+      JSON.stringify(person)
+    );
+
+    alert("Değişiklikler kaydedildi.");
+  }
+
+  if (!person) return null;
+
+  return (
+
+    <main className="min-h-screen bg-[#07090d] text-white p-4">
+
+      <Topbar />
+
+      <div className="flex items-center justify-between mb-6">
+
+        <div>
+
+          <Link
+            href="/personeller"
+            className="
+              inline-flex
+              items-center
+              gap-2
+              text-gray-400
+              hover:text-white
+              transition-all
+              mb-4
+            "
+          >
+
+            <ArrowLeft size={18} />
+
+            Personellere Dön
+
+          </Link>
+
+          <p className="text-orange-400 text-[10px] uppercase tracking-[0.3em] font-black">
+            KEBO ERP
+          </p>
+
+          <h1 className="text-5xl font-black mt-3">
+            {person.name}
+          </h1>
+
+        </div>
+
+        <div
+          className={`
+            px-5
+            h-12
+            rounded-2xl
+            font-black
+            flex
+            items-center
+            justify-center
+
+            ${
+              person.status === "Aktif"
+                ? "bg-green-500 text-black"
+                : "bg-red-500 text-white"
+            }
+          `}
+        >
+
+          {person.status}
+
+        </div>
+
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+
+        <InfoCard
+          icon={
+            <Phone
+              size={22}
+              className="text-orange-400"
+            />
+          }
+          title="Telefon"
+        >
+
+          <Input
+            value={person.phone}
+            onChange={(e) =>
+              setPerson({
+                ...person,
+                phone: e.target.value,
+              })
+            }
+          />
+
+        </InfoCard>
+
+        <InfoCard
+          icon={
+            <CreditCard
+              size={22}
+              className="text-blue-400"
+            />
+          }
+          title="TC Kimlik No"
+        >
+
+          <Input
+            value={person.tc}
+            onChange={(e) =>
+              setPerson({
+                ...person,
+                tc: e.target.value,
+              })
+            }
+          />
+
+        </InfoCard>
+
+        <InfoCard
+          icon={
+            <Landmark
+              size={22}
+              className="text-green-400"
+            />
+          }
+          title="IBAN"
+        >
+
+          <div className="relative">
+
+            <div
+              className="
+                absolute
+                left-4
+                top-1/2
+                -translate-y-1/2
+                text-gray-400
+                font-black
+                z-10
+              "
+            >
+              TR
+            </div>
+
+            <Input
+              value={person.iban}
+              onChange={(e) =>
+                setPerson({
+                  ...person,
+                  iban: e.target.value,
+                })
+              }
+              className="pl-14"
+            />
+
+          </div>
+
+        </InfoCard>
+
+        <InfoCard
+          icon={
+            <Users
+              size={22}
+              className="text-purple-400"
+            />
+          }
+          title="Departman"
+        >
+
+          <select
+            value={person.department}
+            onChange={(e) =>
+              setPerson({
+                ...person,
+                department: e.target.value,
+              })
+            }
+            className="
+              w-full
+              h-14
+              rounded-2xl
+              bg-[#0d1117]
+              border
+              border-white/5
+              px-4
+              text-white
+              outline-none
+            "
+          >
+
+            <option>
+              Mutfak
+            </option>
+
+            <option>
+              Banko
+            </option>
+
+            <option>
+              Kurye
+            </option>
+
+            <option>
+              Temizlik
+            </option>
+
+          </select>
+
+        </InfoCard>
+
+        <InfoCard
+          icon={
+            <CalendarDays
+              size={22}
+              className="text-pink-400"
+            />
+          }
+          title="İşe Giriş Tarihi"
+        >
+
+          <Input
+            type="date"
+            value={person.startDate}
+            onChange={(e) =>
+              setPerson({
+                ...person,
+                startDate: e.target.value,
+              })
+            }
+          />
+
+        </InfoCard>
+
+        <InfoCard
+          icon={
+            <Wallet
+              size={22}
+              className="text-yellow-400"
+            />
+          }
+          title="Maaş"
+        >
+
+          <Input
+            value={person.salary}
+            onChange={(e) =>
+              setPerson({
+                ...person,
+                salary: e.target.value,
+              })
+            }
+          />
+
+        </InfoCard>
+
+      </div>
+
+      <Card className="bg-[#111315] border border-white/5 rounded-3xl p-6 mt-5">
+
+        <div className="flex items-center gap-3 mb-5">
+
+          <div className="w-12 h-12 rounded-2xl bg-[#0d1117] flex items-center justify-center">
+
+            <FileText
+              size={22}
+              className="text-orange-400"
+            />
+
+          </div>
+
+          <div>
+
+            <p className="text-gray-500 text-xs">
+              Personel Notu
+            </p>
+
+            <h2 className="text-2xl font-black">
+              Açıklama
+            </h2>
+
+          </div>
+
+        </div>
+
+        <textarea
+          value={person.note}
+          onChange={(e) =>
+            setPerson({
+              ...person,
+              note: e.target.value,
+            })
+          }
+          className="
+            w-full
+            h-32
+            rounded-2xl
+            bg-[#0d1117]
+            border
+            border-white/5
+            p-4
+            text-white
+            outline-none
+            resize-none
+          "
+        />
+
+      </Card>
+
+      <Card className="bg-[#111315] border border-white/5 rounded-3xl p-6 mt-5">
+
+        <div className="flex items-center gap-3 mb-5">
+
+          <div className="w-12 h-12 rounded-2xl bg-[#0d1117] flex items-center justify-center">
+
+            <CalendarDays
+              size={22}
+              className="text-red-400"
+            />
+
+          </div>
+
+          <div>
+
+            <p className="text-gray-500 text-xs">
+              Personel Durumu
+            </p>
+
+            <h2 className="text-2xl font-black">
+              İşten Çıkış Tarihi
+            </h2>
+
+          </div>
+
+        </div>
+
+        <Input
+          type="date"
+          value={person.exitDate || ""}
+          onChange={(e) =>
+            setPerson({
+              ...person,
+              exitDate: e.target.value,
+            })
+          }
+        />
+
+        {
+          person.exitDate && (
+
+            <p className="text-sm text-red-400 mt-3">
+
+              İşten Ayrılma Tarihi: {
+
+                new Date(person.exitDate)
+                  .toLocaleDateString("tr-TR")
+
+              }
+
+            </p>
+
+          )
+        }
+
+      </Card>
+
+      <button
+        onClick={handleSave}
+        className="
+          w-full
+          h-14
+          rounded-2xl
+          bg-orange-500
+          text-black
+          font-black
+          flex
+          items-center
+          justify-center
+          gap-3
+          mt-5
+          hover:scale-[1.01]
+          transition-all
+        "
+      >
+
+        <Save size={20} />
+
+        Değişiklikleri Kaydet
+
+      </button>
+
+    </main>
+
+  );
+}
+
+function InfoCard({
+  icon,
+  title,
+  children,
+}: any) {
+
+  return (
+
+    <Card className="bg-[#111315] border border-white/5 rounded-3xl p-5">
+
+      <div className="flex items-center gap-4 mb-5">
+
+        <div className="w-14 h-14 rounded-2xl bg-[#0d1117] flex items-center justify-center">
+
+          {icon}
+
+        </div>
+
+        <div>
+
+          <p className="text-xs text-gray-500">
+            {title}
+          </p>
+
+          <h2 className="text-2xl font-black mt-1">
+            {title}
+          </h2>
+
+        </div>
+
+      </div>
+
+      {children}
+
+    </Card>
+
+  );
+}
+</file>
+
+<file path="app/personeller/page.tsx">
+"use client";
+
+import Link from "next/link";
+
+import { useEffect, useMemo, useState } from "react";
+
+import { useSearchParams } from "next/navigation";
+
+import Topbar from "@/components/Topbar";
+
+import { Card } from "@/components/ui/card";
+
+import { Input } from "@/components/ui/input";
+
+import {
+  ChefHat,
+  Bike,
+  Sparkles,
+  Store,
+  Plus,
+  ChevronDown,
+  X,
+} from "lucide-react";
+
+const initialPersonnel = {
+  mutfak: [],
+
+  banko: [],
+
+  kurye: [],
+
+  temizlik: [],
+};
+
+export default function PersonellerPage() {
+
+  const searchParams =
+    useSearchParams();
+
+  const [tab, setTab] =
+    useState(
+      searchParams.get("tab") === "ayrilan"
+        ? "ayrilan"
+        : "aktif"
+    );
+
+  const [showModal, setShowModal] =
+    useState(false);
+
+  const [allPersonnel, setAllPersonnel] =
+    useState<any>(initialPersonnel);
+
+  const [openSections, setOpenSections] =
+    useState<any>({
+      mutfak: true,
+      banko: false,
+      kurye: false,
+      temizlik: false,
+    });
+
+  const [form, setForm] =
+    useState({
+      id: Date.now(),
+
+      name: "",
+
+      phone: "",
+
+      tc: "",
+
+      iban: "",
+
+      salary: "",
+
+      department: "mutfak",
+
+      startDate: "",
+
+      status: "Aktif",
+
+      note: "",
+    });
+
+  useEffect(() => {
+
+    const savedPersonnel =
+      localStorage.getItem(
+        "allPersonnel"
+      );
+
+    if (savedPersonnel) {
+
+      setAllPersonnel(
+        JSON.parse(savedPersonnel)
+      );
+
+    }
+
+  }, []);
+
+  useEffect(() => {
+
+    localStorage.setItem(
+      "allPersonnel",
+      JSON.stringify(allPersonnel)
+    );
+
+  }, [allPersonnel]);
+
+  const filteredPersonnel =
+    Object.fromEntries(
+
+      Object.entries(
+        allPersonnel
+      ).map(([key, value]: any) => [
+
+        key,
+
+        value.filter((person: any) =>
+
+          tab === "aktif"
+            ? person.status !== "İşten Ayrıldı"
+            : person.status === "İşten Ayrıldı"
+
+        ),
+
+      ])
+
+    );
+
+  function toggleSection(section: string) {
+
+    setOpenSections((prev: any) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  }
+
+  function addPersonnel() {
+
+    if (!form.name) return;
+
+    const updated = {
+      ...allPersonnel,
+
+      [form.department]: [
+        ...allPersonnel[
+          form.department
+        ],
+
+        form,
+      ],
+    };
+
+    setAllPersonnel(updated);
+
+    setShowModal(false);
+
+    setForm({
+      id: Date.now(),
+
+      name: "",
+
+      phone: "",
+
+      tc: "",
+
+      iban: "",
+
+      salary: "",
+
+      department: "mutfak",
+
+      startDate: "",
+
+      status: "Aktif",
+
+      note: "",
+    });
+  }
+
+  return (
+
+    <main className="min-h-screen bg-[#07090d] text-white p-4">
+
+      <Topbar />
+
+      <div className="flex items-center justify-between mb-6">
+
+        <div>
+
+          <p className="text-orange-400 text-[10px] uppercase tracking-[0.3em] font-black">
+            KEBO ERP
+          </p>
+
+          <h1 className="text-5xl font-black mt-3">
+            Personeller
+          </h1>
+
+        </div>
+
+        <button
+          onClick={() => setShowModal(true)}
+          className="
+            h-14
+            px-6
+            rounded-2xl
+            bg-orange-500
+            text-black
+            font-black
+            flex
+            items-center
+            gap-3
+          "
+        >
+
+          <Plus size={20} />
+
+          Personel Ekle
+
+        </button>
+
+      </div>
+
+      <div className="flex gap-3 mb-6">
+
+        <button
+          onClick={() => setTab("aktif")}
+          className={`
+            h-12
+            px-5
+            rounded-2xl
+            font-black
+            transition-all
+
+            ${
+              tab === "aktif"
+                ? "bg-orange-500 text-black"
+                : "bg-[#111315] text-white"
+            }
+          `}
+        >
+          Aktif Personeller
+        </button>
+
+        <button
+          onClick={() => setTab("ayrilan")}
+          className={`
+            h-12
+            px-5
+            rounded-2xl
+            font-black
+            transition-all
+
+            ${
+              tab === "ayrilan"
+                ? "bg-orange-500 text-black"
+                : "bg-[#111315] text-white"
+            }
+          `}
+        >
+          Ayrılan Personeller
+        </button>
+
+      </div>
+
+      <div className="space-y-5">
+
+        <PersonnelSection
+          title="Mutfak"
+          sectionKey="mutfak"
+          icon={
+            <ChefHat
+              size={22}
+              className="text-orange-400"
+            />
+          }
+          open={openSections.mutfak}
+          toggle={toggleSection}
+          personnel={filteredPersonnel.mutfak}
+        />
+
+        <PersonnelSection
+          title="Banko"
+          sectionKey="banko"
+          icon={
+            <Store
+              size={22}
+              className="text-blue-400"
+            />
+          }
+          open={openSections.banko}
+          toggle={toggleSection}
+          personnel={filteredPersonnel.banko}
+        />
+
+        <PersonnelSection
+          title="Kurye"
+          sectionKey="kurye"
+          icon={
+            <Bike
+              size={22}
+              className="text-green-400"
+            />
+          }
+          open={openSections.kurye}
+          toggle={toggleSection}
+          personnel={filteredPersonnel.kurye}
+        />
+
+        <PersonnelSection
+          title="Temizlik"
+          sectionKey="temizlik"
+          icon={
+            <Sparkles
+              size={22}
+              className="text-purple-400"
+            />
+          }
+          open={openSections.temizlik}
+          toggle={toggleSection}
+          personnel={filteredPersonnel.temizlik}
+        />
+
+      </div>
+
+      {
+        showModal && (
+
+          <div
+            className="
+              fixed
+              inset-0
+              bg-black/70
+              backdrop-blur-sm
+              flex
+              items-center
+              justify-center
+              z-50
+              p-4
+            "
+          >
+
+            <Card className="bg-[#111315] border border-white/5 rounded-3xl p-6 w-full max-w-2xl">
+
+              <div className="flex items-center justify-between mb-6">
+
+                <div>
+
+                  <p className="text-orange-400 text-[10px] uppercase tracking-[0.3em] font-black">
+                    PERSONEL
+                  </p>
+
+                  <h2 className="text-3xl font-black mt-2">
+                    Personel Ekle
+                  </h2>
+
+                </div>
+
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="
+                    w-12
+                    h-12
+                    rounded-2xl
+                    bg-[#0d1117]
+                    flex
+                    items-center
+                    justify-center
+                  "
+                >
+
+                  <X size={20} />
+
+                </button>
+
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+
+                <Input
+                  placeholder="Ad Soyad"
+                  value={form.name}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      name: e.target.value,
+                    })
+                  }
+                />
+
+                <Input
+                  placeholder="Telefon"
+                  value={form.phone}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      phone: e.target.value,
+                    })
+                  }
+                />
+
+                <Input
+                  placeholder="TC Kimlik No"
+                  value={form.tc}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      tc: e.target.value,
+                    })
+                  }
+                />
+
+                <div className="relative">
+
+                  <div
+                    className="
+                      absolute
+                      left-4
+                      top-1/2
+                      -translate-y-1/2
+                      text-gray-400
+                      font-black
+                      z-10
+                    "
+                  >
+                    TR
+                  </div>
+
+                  <Input
+                    placeholder="0001 2000 0000 1234 5678 90"
+                    value={form.iban}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        iban: e.target.value,
+                      })
+                    }
+                    className="pl-14"
+                  />
+
+                </div>
+
+                <Input
+                  placeholder="Maaş"
+                  value={form.salary}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      salary: e.target.value,
+                    })
+                  }
+                />
+
+                <select
+                  value={form.department}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      department: e.target.value,
+                    })
+                  }
+                  className="
+                    w-full
+                    h-14
+                    rounded-2xl
+                    bg-[#0d1117]
+                    border
+                    border-white/5
+                    px-4
+                    text-white
+                    outline-none
+                  "
+                >
+
+                  <option value="mutfak">
+                    Mutfak
+                  </option>
+
+                  <option value="banko">
+                    Banko
+                  </option>
+
+                  <option value="kurye">
+                    Kurye
+                  </option>
+
+                  <option value="temizlik">
+                    Temizlik
+                  </option>
+
+                </select>
+
+                <Input
+                  type="date"
+                  value={form.startDate}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      startDate: e.target.value,
+                    })
+                  }
+                />
+
+                <select
+                  value={form.status}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      status: e.target.value,
+                    })
+                  }
+                  className="
+                    w-full
+                    h-14
+                    rounded-2xl
+                    bg-[#0d1117]
+                    border
+                    border-white/5
+                    px-4
+                    text-white
+                    outline-none
+                  "
+                >
+
+                  <option value="Aktif">
+                    Aktif
+                  </option>
+
+                  <option value="İşten Ayrıldı">
+                    İşten Ayrıldı
+                  </option>
+
+                </select>
+
+              </div>
+
+              <textarea
+                placeholder="Notlar"
+                value={form.note}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    note: e.target.value,
+                  })
+                }
+                className="
+                  w-full
+                  h-32
+                  rounded-2xl
+                  bg-[#0d1117]
+                  border
+                  border-white/5
+                  p-4
+                  text-white
+                  outline-none
+                  resize-none
+                  mt-4
+                "
+              />
+
+              <button
+                onClick={addPersonnel}
+                className="
+                  w-full
+                  h-14
+                  rounded-2xl
+                  bg-orange-500
+                  text-black
+                  font-black
+                  mt-4
+                "
+              >
+
+                Personeli Kaydet
+
+              </button>
+
+            </Card>
+
+          </div>
+
+        )
+      }
+
+    </main>
+
+  );
+}
+
+function PersonnelSection({
+  title,
+  icon,
+  personnel,
+  open,
+  toggle,
+  sectionKey,
+}: any) {
+
+  const sortedPersonnel =
+    useMemo(() => {
+
+      return [...personnel].sort(
+        (a, b) =>
+          a.name.localeCompare(
+            b.name,
+            "tr"
+          )
+      );
+
+    }, [personnel]);
+
+  return (
+
+    <Card className="bg-[#111315] border border-white/5 rounded-3xl overflow-hidden">
+
+      <button
+        onClick={() =>
+          toggle(sectionKey)
+        }
+        className="
+          w-full
+          p-5
+          flex
+          items-center
+          justify-between
+          hover:bg-white/5
+          transition-all
+        "
+      >
+
+        <div className="flex items-center gap-4">
+
+          <div
+            className="
+              w-14
+              h-14
+              rounded-2xl
+              bg-[#0d1117]
+              flex
+              items-center
+              justify-center
+            "
+          >
+
+            {icon}
+
+          </div>
+
+          <div className="text-left">
+
+            <p className="text-xs text-gray-500">
+              Departman
+            </p>
+
+            <h2 className="text-3xl font-black">
+              {title}
+            </h2>
+
+          </div>
+
+        </div>
+
+        <ChevronDown
+          size={24}
+          className={`
+            transition-all
+            duration-300
+            ${
+              open
+                ? "rotate-180"
+                : ""
+            }
+          `}
+        />
+
+      </button>
+
+      {
+        open && (
+
+          <div className="px-5 pb-5">
+
+            <div className="space-y-3">
+
+              {
+                sortedPersonnel.length === 0 && (
+
+                  <div
+                    className="
+                      bg-[#0d1117]
+                      rounded-2xl
+                      p-5
+                      text-center
+                      text-gray-500
+                    "
+                  >
+
+                    Personel bulunamadı
+
+                  </div>
+
+                )
+              }
+
+              {
+                sortedPersonnel.map(
+                  (person: any) => (
+
+                    <Link
+                      key={person.id}
+                      href={`/personeller/${person.id}`}
+                    >
+
+                      <div
+                        className="
+                          bg-[#0d1117]
+                          rounded-2xl
+                          p-4
+                          flex
+                          items-center
+                          justify-between
+                          hover:bg-[#161b22]
+                          transition-all
+                          cursor-pointer
+                        "
+                      >
+
+                        <div>
+
+                          <h2 className="font-black text-xl">
+                            {person.name}
+                          </h2>
+
+                          <p className="text-sm text-gray-500 mt-1">
+                            {person.phone}
+                          </p>
+
+                        </div>
+
+                        <div className="text-right">
+
+                          <p className="text-xs text-gray-500">
+                            Durum
+                          </p>
+
+                          <h2
+                            className={`
+                              font-black
+                              mt-1
+                              text-lg
+
+                              ${
+                                person.status ===
+                                "İşten Ayrıldı"
+                                  ? "text-red-400"
+                                  : "text-green-400"
+                              }
+                            `}
+                          >
+                            {person.status}
+                          </h2>
+
+                        </div>
+
+                      </div>
+
+                    </Link>
+
+                  )
+                )
+              }
+
+            </div>
+
+          </div>
+
+        )
+      }
+
+    </Card>
+
+  );
+}
+</file>
+
+<file path="app/personeller/yeni/page.tsx">
+"use client";
+
+import { useState } from "react";
+import { supabase } from "@/lib/supabase";
+
+export default function YeniPersonelPage() {
+  const [fullName, setFullName] = useState("");
+  const [department, setDepartment] = useState("");
+  const [tc, setTc] = useState("");
+  const [iban, setIban] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [startDate, setStartDate] = useState("");
+
+  async function savePersonel() {
+    const { error } = await supabase.from("personnels").insert([
+      {
+        full_name: fullName,
+        department,
+        tc,
+        iban,
+        birth_date: birthDate,
+        start_date: startDate,
+      },
+    ]);
+
+    if (error) {
+      alert(JSON.stringify(error));
+      return;
+    }
+
+    alert("Personel kaydedildi");
+
+    setFullName("");
+    setDepartment("");
+    setTc("");
+    setIban("");
+    setBirthDate("");
+    setStartDate("");
+  }
+
+  return (
+    <main className="min-h-screen bg-[#0f0f0f] text-white pb-32">
+      <div className="px-5 pt-10">
+        <p className="text-orange-500 text-sm font-medium">PERSONEL EKLE</p>
+        <h1 className="text-3xl font-bold mt-1">Yeni Personel</h1>
+      </div>
+
+      <div className="px-5 mt-6 space-y-5">
+        <div className="bg-[#1a1a1a] rounded-3xl p-5">
+          <p className="text-sm text-gray-500">Ad Soyad</p>
+          <input
+            type="text"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Ad Soyad"
+            className="w-full bg-[#2a2a2a] mt-3 rounded-2xl p-4 outline-none"
+          />
+        </div>
+
+        <div className="bg-[#1a1a1a] rounded-3xl p-5">
+          <p className="text-sm text-gray-500">Bölüm</p>
+          <select
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+            className="w-full bg-[#2a2a2a] mt-3 rounded-2xl p-4 outline-none"
+          >
+            <option value="">Bölüm Seç</option>
+            <option value="Kurye">Kurye</option>
+            <option value="Mutfak">Mutfak</option>
+            <option value="Banko">Banko</option>
+            <option value="Müdür">Müdür</option>
+          </select>
+        </div>
+
+        <div className="bg-[#1a1a1a] rounded-3xl p-5">
+          <p className="text-sm text-gray-500">TC Kimlik</p>
+          <input
+            type="text"
+            value={tc}
+            onChange={(e) => setTc(e.target.value)}
+            placeholder="TC Kimlik"
+            className="w-full bg-[#2a2a2a] mt-3 rounded-2xl p-4 outline-none"
+          />
+        </div>
+
+        <div className="bg-[#1a1a1a] rounded-3xl p-5">
+          <p className="text-sm text-gray-500">IBAN</p>
+          <input
+            type="text"
+            value={iban}
+            onChange={(e) => setIban(e.target.value)}
+            placeholder="IBAN"
+            className="w-full bg-[#2a2a2a] mt-3 rounded-2xl p-4 outline-none"
+          />
+        </div>
+
+        <div className="bg-[#1a1a1a] rounded-3xl p-5">
+          <p className="text-sm text-gray-500">Doğum Tarihi</p>
+          <input
+            type="date"
+            value={birthDate}
+            onChange={(e) => setBirthDate(e.target.value)}
+            className="w-full bg-[#2a2a2a] mt-3 rounded-2xl p-4 outline-none"
+          />
+        </div>
+
+        <div className="bg-[#1a1a1a] rounded-3xl p-5">
+          <p className="text-sm text-gray-500">İşe Başlama Tarihi</p>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="w-full bg-[#2a2a2a] mt-3 rounded-2xl p-4 outline-none"
+          />
+        </div>
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 bg-[#111111] border-t border-[#2a2a2a] p-5">
+        <button
+          onClick={savePersonel}
+          className="w-full bg-orange-500 py-5 rounded-2xl text-xl font-bold"
+        >
+          Personeli Kaydet
+        </button>
+      </div>
+    </main>
+  );
+}
+</file>
+
+<file path="app/profil/page.tsx">
+export default function ProfilPage() {
+  return (
+    <main className="min-h-screen bg-[#111111] text-white p-5">
+
+      <h1 className="text-3xl font-bold pt-5">
+        Profil
+      </h1>
+
+      <div className="mt-6 bg-[#1c1c1c] rounded-2xl p-5">
+
+        <p className="text-gray-400">
+          Kullanıcı
+        </p>
+
+        <h2 className="text-2xl font-bold mt-2">
+          Murat Can Çömüz
+        </h2>
+
+        <p className="text-gray-500 mt-2">
+          Yetki: Ortak
+        </p>
+
+      </div>
+
+    </main>
+  );
+}
+</file>
+
+<file path="app/raporlar/[id]/page.tsx">
+"use client";
+
+import { useEffect, useState } from "react";
+
+import Link from "next/link";
+
+import { useParams } from "next/navigation";
+
+import { supabase } from "@/lib/supabase";
+
+import { Card } from "@/components/ui/card";
+
+import {
+  Globe,
+  Truck,
+  CreditCard,
+  Receipt,
+  User,
+  Wallet,
+  ArrowLeft,
+  CalendarDays,
+  TrendingUp,
+  BadgeDollarSign,
+} from "lucide-react";
+
+export default function ReportDetailPage() {
+
+  const params = useParams();
+
+  const reportId =
+    Array.isArray(params.id)
+      ? params.id[0]
+      : params.id;
+
+  const [report, setReport] =
+    useState<any>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [errorText, setErrorText] =
+    useState("");
+
+  async function getReport() {
+
+    if (!reportId) {
+
+      setErrorText("Rapor ID bulunamadı");
+
+      setLoading(false);
+
+      return;
+    }
+
+    const { data, error } =
+      await supabase
+        .from("daily_reports")
+        .select("*")
+        .eq("id", Number(reportId))
+        .limit(1);
+
+    if (error) {
+
+      setErrorText(
+        JSON.stringify(error, null, 2)
+      );
+
+      setLoading(false);
+
+      return;
+    }
+
+    if (!data || data.length === 0) {
+
+      setErrorText(
+        "Rapor bulunamadı"
+      );
+
+      setLoading(false);
+
+      return;
+    }
+
+    setReport(data[0]);
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    getReport();
+  }, [reportId]);
+
+  if (loading) {
+
+    return (
+
+      <main className="min-h-screen bg-[#07090d] text-white flex items-center justify-center">
+
+        <div className="text-center">
+
+          <div className="w-14 h-14 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+
+          <p className="text-sm text-gray-400 mt-4">
+            Rapor yükleniyor...
+          </p>
+
+        </div>
+
+      </main>
+
+    );
+  }
+
+  if (errorText) {
+
+    return (
+
+      <main className="min-h-screen bg-[#07090d] text-white flex items-center justify-center p-6">
+
+        <Card className="bg-[#111315] border border-red-500/30 rounded-2xl p-6 max-w-2xl w-full">
+
+          <h1 className="text-3xl font-black text-red-400">
+            HATA
+          </h1>
+
+          <pre className="text-sm text-gray-300 mt-5 whitespace-pre-wrap overflow-auto">
+            {errorText}
+          </pre>
+
+        </Card>
+
+      </main>
+
+    );
+  }
+
+  const totalKasa =
+    Number(report.total_online || 0) +
+    Number(report.total_door || 0) +
+    Number(report.cash || 0) +
+    Number(report.credit_card || 0) +
+    Number(report.edenred || 0);
+
+  const totalSales =
+    Number(report.total_online || 0) +
+    Number(report.total_door || 0);
+
+  return (
+
+    <main className="min-h-screen bg-[#07090d] text-white p-4">
+
+      {/* TOPBAR */}
+
+      <div className="flex flex-col xl:flex-row gap-4 xl:items-center xl:justify-between mb-6">
+
+        <div>
+
+          <Link
+            href="/raporlar"
+            className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-orange-400 transition-all"
+          >
+
+            <ArrowLeft size={16} />
+
+            Raporlara Dön
+
+          </Link>
+
+          <p className="text-orange-400 text-[10px] uppercase tracking-[0.3em] font-bold mt-4">
+            RAPOR DETAYI
+          </p>
+
+          <h1 className="text-4xl font-black mt-1">
+            {report.report_date}
+          </h1>
+
+        </div>
+
+        <Card className="bg-orange-500 border-0 rounded-2xl px-6 py-5 text-black">
+
+          <p className="text-[10px] uppercase font-black opacity-70">
+            Toplam Kasa
+          </p>
+
+          <h2 className="text-4xl font-black mt-1">
+            {totalKasa} ₺
+          </h2>
+
+        </Card>
+
+      </div>
+
+      {/* KPI */}
+
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
+
+        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-4">
+
+          <div className="flex items-center justify-between">
+
+            <div>
+
+              <p className="text-[10px] text-gray-400 uppercase">
+                Günlük Ciro
+              </p>
+
+              <h2 className="text-3xl font-black mt-2">
+                {totalSales} ₺
+              </h2>
+
+            </div>
+
+            <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+
+              <TrendingUp
+                size={20}
+                className="text-green-400"
+              />
+
+            </div>
+
+          </div>
+
+        </Card>
+
+        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-4">
+
+          <div className="flex items-center justify-between">
+
+            <div>
+
+              <p className="text-[10px] text-gray-400 uppercase">
+                Nakit
+              </p>
+
+              <h2 className="text-3xl font-black mt-2">
+                {report.cash || 0} ₺
+              </h2>
+
+            </div>
+
+            <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+
+              <Wallet
+                size={20}
+                className="text-blue-400"
+              />
+
+            </div>
+
+          </div>
+
+        </Card>
+
+        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-4">
+
+          <div className="flex items-center justify-between">
+
+            <div>
+
+              <p className="text-[10px] text-gray-400 uppercase">
+                Kart
+              </p>
+
+              <h2 className="text-3xl font-black mt-2">
+                {report.credit_card || 0} ₺
+              </h2>
+
+            </div>
+
+            <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center">
+
+              <CreditCard
+                size={20}
+                className="text-orange-400"
+              />
+
+            </div>
+
+          </div>
+
+        </Card>
+
+        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-4">
+
+          <div className="flex items-center justify-between">
+
+            <div>
+
+              <p className="text-[10px] text-gray-400 uppercase">
+                Gider
+              </p>
+
+              <h2 className="text-3xl font-black mt-2">
+                {report.expense_amount || 0} ₺
+              </h2>
+
+            </div>
+
+            <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center">
+
+              <Receipt
+                size={20}
+                className="text-red-400"
+              />
+
+            </div>
+
+          </div>
+
+        </Card>
+
+      </div>
+
+      {/* CONTENT */}
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+
+        {/* ONLINE */}
+
+        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-5">
+
+          <div className="flex items-center gap-2 mb-5">
+
+            <Globe
+              size={18}
+              className="text-orange-400"
+            />
+
+            <h2 className="text-xl font-black">
+              Online Satışlar
+            </h2>
+
+          </div>
+
+          <div className="space-y-3 text-sm">
+
+            <div className="flex items-center justify-between">
+              <span className="text-gray-400">
+                Online Toplam
+              </span>
+
+              <span className="font-black text-lg">
+                {report.total_online || 0} ₺
+              </span>
+            </div>
+
+          </div>
+
+        </Card>
+
+        {/* KAPIDA */}
+
+        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-5">
+
+          <div className="flex items-center gap-2 mb-5">
+
+            <Truck
+              size={18}
+              className="text-green-400"
+            />
+
+            <h2 className="text-xl font-black">
+              Kapıda Ödeme
+            </h2>
+
+          </div>
+
+          <div className="space-y-3 text-sm">
+
+            <div className="flex items-center justify-between">
+              <span className="text-gray-400">
+                Kapıda Toplam
+              </span>
+
+              <span className="font-black text-lg">
+                {report.total_door || 0} ₺
+              </span>
+            </div>
+
+          </div>
+
+        </Card>
+
+        {/* ÖDEME */}
+
+        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-5">
+
+          <div className="flex items-center gap-2 mb-5">
+
+            <BadgeDollarSign
+              size={18}
+              className="text-blue-400"
+            />
+
+            <h2 className="text-xl font-black">
+              Ödeme Tipleri
+            </h2>
+
+          </div>
+
+          <div className="space-y-4">
+
+            <div className="bg-[#0d1117] rounded-xl p-4 flex items-center justify-between">
+
+              <span className="text-gray-400">
+                Nakit
+              </span>
+
+              <span className="font-black text-lg">
+                {report.cash || 0} ₺
+              </span>
+
+            </div>
+
+            <div className="bg-[#0d1117] rounded-xl p-4 flex items-center justify-between">
+
+              <span className="text-gray-400">
+                Kredi Kartı
+              </span>
+
+              <span className="font-black text-lg">
+                {report.credit_card || 0} ₺
+              </span>
+
+            </div>
+
+            <div className="bg-[#0d1117] rounded-xl p-4 flex items-center justify-between">
+
+              <span className="text-gray-400">
+                Edenred
+              </span>
+
+              <span className="font-black text-lg">
+                {report.edenred || 0} ₺
+              </span>
+
+            </div>
+
+          </div>
+
+        </Card>
+
+        {/* GIDER */}
+
+        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-5">
+
+          <div className="flex items-center gap-2 mb-5">
+
+            <Receipt
+              size={18}
+              className="text-red-400"
+            />
+
+            <h2 className="text-xl font-black">
+              Gider Detayı
+            </h2>
+
+          </div>
+
+          <div className="space-y-4">
+
+            <div className="bg-[#0d1117] rounded-xl p-4">
+
+              <p className="text-xs text-gray-500 uppercase">
+                Gider Türü
+              </p>
+
+              <h2 className="text-lg font-black mt-2">
+                {report.expense_type || "-"}
+              </h2>
+
+            </div>
+
+            <div className="bg-[#0d1117] rounded-xl p-4">
+
+              <p className="text-xs text-gray-500 uppercase">
+                Açıklama
+              </p>
+
+              <h2 className="text-lg font-black mt-2">
+                {report.expense_note || "-"}
+              </h2>
+
+            </div>
+
+          </div>
+
+        </Card>
+
+      </div>
+
+      {/* FOOTER */}
+
+      <Card className="bg-[#111315] border border-white/5 rounded-2xl p-5 mt-5">
+
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+
+          <div className="flex items-center gap-4">
+
+            <div className="w-14 h-14 rounded-2xl bg-orange-500/20 flex items-center justify-center">
+
+              <User
+                size={22}
+                className="text-orange-400"
+              />
+
+            </div>
+
+            <div>
+
+              <p className="text-xs text-gray-500 uppercase">
+                Raporu Oluşturan
+              </p>
+
+              <h2 className="text-2xl font-black mt-1">
+                {report.created_by || "-"}
+              </h2>
+
+            </div>
+
+          </div>
+
+          <div className="flex items-center gap-3">
+
+            <CalendarDays
+              size={16}
+              className="text-gray-500"
+            />
+
+            <p className="text-sm text-gray-400">
+              {report.report_date}
+            </p>
+
+          </div>
+
+        </div>
+
+      </Card>
+
+    </main>
+  );
+}
+</file>
+
+<file path="app/raporlar/page.tsx">
+export default function Home() {
+  return (
+    <div
+      style={{
+        background: "black",
+        color: "white",
+        minHeight: "100vh",
+        padding: 40,
+      }}
+    >
+      KEBO ERP TEST
+    </div>
+  );
+}
+</file>
+
+<file path="CLAUDE.md">
+@AGENTS.md
+</file>
+
+<file path="components.json">
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "radix-nova",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "rtl": false,
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "menuColor": "default",
+  "menuAccent": "subtle",
+  "registries": {}
+}
+</file>
+
+<file path="components/Sidebar.tsx">
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+
+import {
+  LayoutDashboard,
+  Wallet,
+  Users,
+  Settings,
+  Receipt,
+  LogOut,
+  Building2,
+  ShieldCheck,
+  Package,
+  Landmark,
+  BarChart3,
+} from "lucide-react";
+
+export default function Sidebar() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const [user, setUser] =
+    useState<any>(null);
+
+  useEffect(() => {
+    const storedUser =
+      localStorage.getItem("kebo_user");
+
+    if (storedUser) {
+      setUser(
+        JSON.parse(storedUser)
+      );
+    }
+  }, []);
+
+  if (pathname === "/login") {
+    return null;
+  }
+
+  const ownerMenu = [
+    {
+      title: "Ana Sayfa",
+      href: "/",
+      icon: LayoutDashboard,
+    },
+    {
+      title: "Kasa",
+      href: "/kasa",
+      icon: Wallet,
+    },
+    {
+      title: "Personeller",
+      href: "/personeller",
+      icon: Users,
+    },
+    {
+      title: "Stok",
+      href: "/stok",
+      icon: Package,
+    },
+    {
+      title: "Finans",
+      href: "/finans",
+      icon: Landmark,
+    },
+    {
+      title: "Raporlar",
+      href: "/raporlar",
+      icon: BarChart3,
+    },
+    {
+      title: "Ayarlar",
+      href: "/ayarlar",
+      icon: Settings,
+    },
+  ];
+
+  const managerMenu = [
+    {
+      title: "Ana Sayfa",
+      href: "/",
+      icon: LayoutDashboard,
+    },
+    {
+      title: "Kasa",
+      href: "/kasa",
+      icon: Wallet,
+    },
+    {
+      title: "Personeller",
+      href: "/personeller",
+      icon: Users,
+    },
+    {
+      title: "Raporlar",
+      href: "/raporlar",
+      icon: Receipt,
+    },
+  ];
+
+  const menu =
+    user?.role === "manager"
+      ? managerMenu
+      : ownerMenu;
+
+  function logout() {
+    localStorage.removeItem(
+      "kebo_user"
+    );
+
+    router.push("/login");
+  }
+
+  return (
+    <aside
+      className="
+        hidden
+        xl:flex
+        flex-col
+        w-[290px]
+        h-screen
+        bg-[#0d1117]
+        border-r
+        border-white/5
+        fixed
+        left-0
+        top-0
+        p-5
+        z-50
+      "
+    >
+      <div
+        className="
+          bg-gradient-to-br
+          from-orange-500
+          to-orange-700
+          rounded-3xl
+          p-6
+          text-black
+        "
+      >
+        <p className="text-[10px] uppercase tracking-[0.3em] font-black opacity-70">
+          KEBO
+        </p>
+
+        <h1 className="text-3xl font-black mt-3 leading-tight">
+          Yönetim
+          <br />
+          Paneli
+        </h1>
+
+        <div className="mt-5 flex items-center gap-2 text-sm font-bold">
+          <Building2 size={16} />
+          Çorum Merkez
+        </div>
+      </div>
+
+      <div className="mt-8 space-y-2 overflow-y-auto">
+        {menu.map((item, index) => {
+          const Icon = item.icon;
+
+          const active =
+            pathname === item.href;
+
+          return (
+            <Link
+              key={index}
+              href={item.href}
+            >
+              <div
+                className={`
+                  flex
+                  items-center
+                  gap-4
+                  px-5
+                  py-4
+                  rounded-2xl
+                  transition-all
+                  duration-300
+
+                  ${
+                    active
+                      ? "bg-orange-500 text-black"
+                      : "hover:bg-white/5 text-white"
+                  }
+                `}
+              >
+                <Icon size={20} />
+
+                <span className="font-bold text-sm">
+                  {item.title}
+                </span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="mt-auto space-y-3">
+        <div
+          className="
+            bg-[#111315]
+            border
+            border-white/5
+            rounded-3xl
+            p-5
+          "
+        >
+          <p className="text-gray-500 text-xs">
+            Kullanıcı
+          </p>
+
+          <div className="flex items-center gap-2 mt-3">
+            <ShieldCheck
+              size={18}
+              className="text-green-500"
+            />
+
+            <div>
+              <p className="font-black text-sm">
+                {user?.full_name ||
+                  "Kullanıcı"}
+              </p>
+
+              <p className="text-xs text-gray-400">
+                {user?.role ===
+                "manager"
+                  ? "Müdür"
+                  : "Ortak"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="
+            bg-[#111315]
+            border
+            border-white/5
+            rounded-3xl
+            p-5
+          "
+        >
+          <p className="text-gray-500 text-xs">
+            Sistem Durumu
+          </p>
+
+          <div className="flex items-center gap-2 mt-3">
+            <div className="w-3 h-3 rounded-full bg-green-500" />
+
+            <p className="font-black">
+              Sistem Aktif
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={logout}
+          className="
+            w-full
+            flex
+            items-center
+            justify-center
+            gap-2
+            bg-red-500/15
+            hover:bg-red-500/25
+            text-red-400
+            py-3
+            rounded-2xl
+            font-bold
+            transition-all
+          "
+        >
+          <LogOut size={18} />
+          Çıkış Yap
+        </button>
+      </div>
+    </aside>
+  );
+}
+</file>
+
+<file path="components/Topbar.tsx">
+export default function Topbar() {
+  return <div style={{ height: 20 }} />;
+}
+</file>
+
+<file path="components/ui/button.tsx">
+import * as React from "react";
+
+export function Button({
+  children,
+  className = "",
+  type = "button",
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type={type}
+      className={`transition-all duration-300 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+</file>
+
+<file path="components/ui/card.tsx">
+import * as React from "react";
+
+export function Card({
+  children,
+  className = "",
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={`bg-[#111315] border border-white/5 rounded-[28px] ${className}`}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
+</file>
+
+<file path="components/ui/input.tsx">
+import * as React from "react";
+
+export function Input({
+  className = "",
+  type = "text",
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      type={type}
+      className={`bg-[#0d1117] border border-white/5 h-12 rounded-2xl px-4 text-white outline-none focus:border-orange-500/50 transition-all duration-300 ${className}`}
+      {...props}
+    />
+  );
+}
+</file>
+
+<file path="eslint.config.mjs">
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
+  // Override default ignores of eslint-config-next.
+  globalIgnores([
+    // Default ignores of eslint-config-next:
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
+]);
+
+export default eslintConfig;
+</file>
+
+<file path="lib/resportStorage.ts">
+```ts
+export const REPORT_KEY = "kebo-reports";
+
+export const getReports = () => {
+  if (typeof window === "undefined")
+    return [];
+
+  try {
+    const data =
+      localStorage.getItem(REPORT_KEY);
+
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const saveReports = (
+  reports: any[]
+) => {
+  localStorage.setItem(
+    REPORT_KEY,
+    JSON.stringify(reports)
+  );
+};
+
+export const getReportByDate = (
+  date: string
+) => {
+  const reports = getReports();
+
+  return reports.find(
+    (r: any) => r.date === date
+  );
+};
+
+export const saveReport = (
+  report: any
+) => {
+  const reports = getReports();
+
+  const existingIndex =
+    reports.findIndex(
+      (r: any) =>
+        r.date === report.date
+    );
+
+  if (existingIndex >= 0) {
+    reports[existingIndex] = report;
+  } else {
+    reports.push(report);
+  }
+
+  saveReports(reports);
+};
+
+export const getLastReportDate =
+  () => {
+    const reports = getReports();
+
+    if (!reports.length) return null;
+
+    return reports.sort(
+      (a: any, b: any) =>
+        new Date(b.date).getTime() -
+        new Date(a.date).getTime()
+    )[0].date;
+  };
+```
+</file>
+
+<file path="lib/supabase.ts">
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL!;
+
+const supabaseAnonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+export const supabase = createClient(
+  supabaseUrl,
+  supabaseAnonKey,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
+);
+</file>
+
+<file path="lib/utils.ts">
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+</file>
+
+<file path="next.config.ts">
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  /* config options here */
+};
+
+export default nextConfig;
+</file>
+
+<file path="package.json">
+{
+  "name": "kebo-panel",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.40.0",
+    "lucide-react": "^1.16.0",
+    "next": "16.2.6",
+    "postcss": "^8.5.15",
+    "radix-ui": "^1.4.3",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "recharts": "^3.8.1",
+    "shadcn": "^4.8.2",
+    "tailwind-merge": "^3.6.0",
+    "tw-animate-css": "^1.4.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^5"
+  }
+}
+</file>
+
+<file path="postcss.config.mjs">
+const config = {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+
+export default config;
+</file>
+
+<file path="public/file.svg">
+<svg fill="none" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M14.5 13.5V5.41a1 1 0 0 0-.3-.7L9.8.29A1 1 0 0 0 9.08 0H1.5v13.5A2.5 2.5 0 0 0 4 16h8a2.5 2.5 0 0 0 2.5-2.5m-1.5 0v-7H8v-5H3v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1M9.5 5V2.12L12.38 5zM5.13 5h-.62v1.25h2.12V5zm-.62 3h7.12v1.25H4.5zm.62 3h-.62v1.25h7.12V11z" clip-rule="evenodd" fill="#666" fill-rule="evenodd"/></svg>
+</file>
+
+<file path="public/globe.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><g clip-path="url(#a)"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.27 14.1a6.5 6.5 0 0 0 3.67-3.45q-1.24.21-2.7.34-.31 1.83-.97 3.1M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.48-1.52a7 7 0 0 1-.96 0H7.5a4 4 0 0 1-.84-1.32q-.38-.89-.63-2.08a40 40 0 0 0 3.92 0q-.25 1.2-.63 2.08a4 4 0 0 1-.84 1.31zm2.94-4.76q1.66-.15 2.95-.43a7 7 0 0 0 0-2.58q-1.3-.27-2.95-.43a18 18 0 0 1 0 3.44m-1.27-3.54a17 17 0 0 1 0 3.64 39 39 0 0 1-4.3 0 17 17 0 0 1 0-3.64 39 39 0 0 1 4.3 0m1.1-1.17q1.45.13 2.69.34a6.5 6.5 0 0 0-3.67-3.44q.65 1.26.98 3.1M8.48 1.5l.01.02q.41.37.84 1.31.38.89.63 2.08a40 40 0 0 0-3.92 0q.25-1.2.63-2.08a4 4 0 0 1 .85-1.32 7 7 0 0 1 .96 0m-2.75.4a6.5 6.5 0 0 0-3.67 3.44 29 29 0 0 1 2.7-.34q.31-1.83.97-3.1M4.58 6.28q-1.66.16-2.95.43a7 7 0 0 0 0 2.58q1.3.27 2.95.43a18 18 0 0 1 0-3.44m.17 4.71q-1.45-.12-2.69-.34a6.5 6.5 0 0 0 3.67 3.44q-.65-1.27-.98-3.1" fill="#666"/></g><defs><clipPath id="a"><path fill="#fff" d="M0 0h16v16H0z"/></clipPath></defs></svg>
+</file>
+
+<file path="public/next.svg">
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 394 80"><path fill="#000" d="M262 0h68.5v12.7h-27.2v66.6h-13.6V12.7H262V0ZM149 0v12.7H94v20.4h44.3v12.6H94v21h55v12.6H80.5V0h68.7zm34.3 0h-17.8l63.8 79.4h17.9l-32-39.7 32-39.6h-17.9l-23 28.6-23-28.6zm18.3 56.7-9-11-27.1 33.7h17.8l18.3-22.7z"/><path fill="#000" d="M81 79.3 17 0H0v79.3h13.6V17l50.2 62.3H81Zm252.6-.4c-1 0-1.8-.4-2.5-1s-1.1-1.6-1.1-2.6.3-1.8 1-2.5 1.6-1 2.6-1 1.8.3 2.5 1a3.4 3.4 0 0 1 .6 4.3 3.7 3.7 0 0 1-3 1.8zm23.2-33.5h6v23.3c0 2.1-.4 4-1.3 5.5a9.1 9.1 0 0 1-3.8 3.5c-1.6.8-3.5 1.3-5.7 1.3-2 0-3.7-.4-5.3-1s-2.8-1.8-3.7-3.2c-.9-1.3-1.4-3-1.4-5h6c.1.8.3 1.6.7 2.2s1 1.2 1.6 1.5c.7.4 1.5.5 2.4.5 1 0 1.8-.2 2.4-.6a4 4 0 0 0 1.6-1.8c.3-.8.5-1.8.5-3V45.5zm30.9 9.1a4.4 4.4 0 0 0-2-3.3 7.5 7.5 0 0 0-4.3-1.1c-1.3 0-2.4.2-3.3.5-.9.4-1.6 1-2 1.6a3.5 3.5 0 0 0-.3 4c.3.5.7.9 1.3 1.2l1.8 1 2 .5 3.2.8c1.3.3 2.5.7 3.7 1.2a13 13 0 0 1 3.2 1.8 8.1 8.1 0 0 1 3 6.5c0 2-.5 3.7-1.5 5.1a10 10 0 0 1-4.4 3.5c-1.8.8-4.1 1.2-6.8 1.2-2.6 0-4.9-.4-6.8-1.2-2-.8-3.4-2-4.5-3.5a10 10 0 0 1-1.7-5.6h6a5 5 0 0 0 3.5 4.6c1 .4 2.2.6 3.4.6 1.3 0 2.5-.2 3.5-.6 1-.4 1.8-1 2.4-1.7a4 4 0 0 0 .8-2.4c0-.9-.2-1.6-.7-2.2a11 11 0 0 0-2.1-1.4l-3.2-1-3.8-1c-2.8-.7-5-1.7-6.6-3.2a7.2 7.2 0 0 1-2.4-5.7 8 8 0 0 1 1.7-5 10 10 0 0 1 4.3-3.5c2-.8 4-1.2 6.4-1.2 2.3 0 4.4.4 6.2 1.2 1.8.8 3.2 2 4.3 3.4 1 1.4 1.5 3 1.5 5h-5.8z"/></svg>
+</file>
+
+<file path="public/vercel.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1155 1000"><path d="m577.3 0 577.4 1000H0z" fill="#fff"/></svg>
+</file>
+
+<file path="public/window.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5h13v10a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM0 1h16v11.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5zm3.75 4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M7 4.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5" fill="#666"/></svg>
+</file>
+
+<file path="README.md">
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules"]
+}
+</file>
+
+</files>
