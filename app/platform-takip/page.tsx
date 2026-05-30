@@ -590,7 +590,7 @@ export default function PlatformTahsilatPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           {k.durum !== "tamamlandi" && (
-                            <button onClick={() => { setTahsilatFormAcik(k.id); setTGerceklesenTarih(bugunStr()); setTGerceklesenTutar(String(k.satis_tutari)); setTKesinti(""); }}
+                            <button onClick={() => { setTahsilatFormAcik(k.id); setTSatirlar([{ id: Date.now(), tarih: bugunStr(), tutar: String(k.satis_tutari), kesinti: "", aciklama: "" }]); setTDurum("tamamlandi"); }}
                               className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap">
                               Tahsilat İşle
                             </button>
