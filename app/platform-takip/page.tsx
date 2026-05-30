@@ -329,7 +329,7 @@ export default function PlatformTahsilatPage() {
       toplamKesinti += k.kesinti_tutari || 0;
       if (k.durum !== "tamamlandi") {
         bekleyenAdet++;
-        if (new Date(k.beklened_odeme_tarihi) < new Date()) gecmisAdet++;
+        if (new Date(k.beklenen_odeme_tarihi) < new Date()) gecmisAdet++;
       }
     });
     const bekleyenTutar = filtreliKayitlar.filter(k => k.durum !== "tamamlandi").reduce((s, k) => s + k.satis_tutari, 0);
