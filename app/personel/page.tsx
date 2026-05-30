@@ -2,23 +2,26 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   ChefHat, Bike, Sparkles, Store, Plus, ChevronDown,
-  Users, Search, RefreshCw, UserCheck, UserX,
-  Calendar, ShieldCheck
+  Users, Search, RefreshCw, Loader2, UserCheck, UserX,
+  Phone, Wallet, Calendar, ShieldCheck
 } from "lucide-react";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
 interface Personel {
   id: string;
-  full_name: string;
-  department?: string;
-  start_date?: string;
-  leave_date?: string;
-  role?: string;
+  isim: string;
+  telefon?: string;
+  departman?: string;
+  maas?: number;
+  ise_giris_tarihi?: string;
+  isten_cikis_tarihi?: string;
+  durum: "aktif" | "ayrildi";
 }
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -28,16 +31,16 @@ const DEPARTMANLAR = [
   { key: "Banko",    label: "Banko",    icon: Store,     color: "text-blue-400",   bg: "bg-blue-500/10",   border: "border-blue-500/20"   },
   { key: "Kurye",    label: "Kurye",    icon: Bike,      color: "text-emerald-400",bg: "bg-emerald-500/10",border: "border-emerald-500/20" },
   { key: "Temizlik", label: "Temizlik", icon: Sparkles,  color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20"  },
-  { key: "Yönetim",  label: "Yönetim",  icon: ShieldCheck,color:"text-amber-400",   bg: "bg-amber-500/10",   border: "border-amber-500/20"    },
+  { key: "Yönetim",  label: "Yönetim",  icon: ShieldCheck,color:"text-amber-400",  bg: "bg-amber-500/10",  border: "border-amber-500/20"   },
   { key: "Diğer",    label: "Diğer",    icon: Users,     color: "text-gray-400",   bg: "bg-gray-500/10",   border: "border-gray-500/20"    },
 ];
 
+const fmt = (v: number) => new Intl.NumberFormat("tr-TR").format(v);
 const fmtTarih = (t?: string) => {
   if (!t) return null;
   const [y, m, d] = t.split("-");
   return `${d}.${m}.${y}`;
 };
-
 const calismaSuresi = (t?: string) => {
   if (!t) return null;
   const ay = Math.floor((Date.now() - new Date(t).getTime()) / (1000 * 60 * 60 * 24 * 30));
@@ -49,41 +52,47 @@ const calismaSuresi = (t?: string) => {
 // ─── PERSONEL KARTI ───────────────────────────────────────────────────────────
 
 function PersonelKart({ personel }: { personel: Personel }) {
-  const isAyrildi = !!personel.leave_date;
-
   return (
-    <Link href={`/personel/${personel.id}`}>
+    <Link href={`/personeller/${personel.id}`}>
       <div className="bg-[#080b14] border border-[#1a2236] hover:border-[#2a3550] rounded-xl p-4 flex items-center justify-between gap-3 transition-colors group cursor-pointer">
         <div className="flex items-center gap-3 min-w-0">
           {/* Avatar */}
           <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 text-xs font-bold text-blue-400">
-            {personel.full_name ? personel.full_name.split(" ").map(n => n[0]).slice(0, 2).join("") : "P"}
+            {personel.isim.split(" ").map(n => n[0]).slice(0, 2).join("")}
           </div>
           <div className="min-w-0">
             <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors truncate">
-              {personel.full_name}
+              {personel.isim}
             </p>
             <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-              {personel.start_date && (
+              {personel.telefon && (
                 <span className="text-[11px] text-gray-600 flex items-center gap-1">
-                  <Calendar size={9} />{calismaSuresi(personel.start_date)}
+                  <Phone size={9} />{personel.telefon}
                 </span>
               )}
-              {isAyrildi && (
+              {personel.ise_giris_tarihi && (
+                <span className="text-[11px] text-gray-600 flex items-center gap-1">
+                  <Calendar size={9} />{calismaSuresi(personel.ise_giris_tarihi)}
+                </span>
+              )}
+              {personel.durum === "ayrildi" && personel.isten_cikis_tarihi && (
                 <span className="text-[11px] text-red-500/70">
-                  Çıkış: {fmtTarih(personel.leave_date)}
+                  Çıkış: {fmtTarih(personel.isten_cikis_tarihi)}
                 </span>
               )}
             </div>
           </div>
         </div>
         <div className="text-right shrink-0">
-          <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-lg ${
-            !isAyrildi
+          {personel.maas ? (
+            <p className="text-xs font-bold text-emerald-400">₺{fmt(personel.maas)}</p>
+          ) : null}
+          <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-lg ${
+            personel.durum === "aktif"
               ? "bg-emerald-500/10 text-emerald-400"
               : "bg-red-500/10 text-red-400"
           }`}>
-            {!isAyrildi ? "Aktif" : "Ayrıldı"}
+            {personel.durum === "aktif" ? "Aktif" : "Ayrıldı"}
           </span>
         </div>
       </div>
@@ -139,15 +148,13 @@ function DepartmanBolum({
 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
-export default function PersonellerPage() {
-  const searchParams = useSearchParams();
+function PersonellerPageInner() {
+  const router = useRouter();
   const supabase = createClient();
 
   const [personeller, setPersoneller] = useState<Personel[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"aktif" | "ayrildi">(
-    searchParams.get("tab") === "ayrildi" ? "ayrildi" : "aktif"
-  );
+  const [tab, setTab] = useState<"aktif" | "ayrildi">("aktif");
   const [aramaMetni, setAramaMetni] = useState("");
   const [acikBolumler, setAcikBolumler] = useState<Record<string, boolean>>({
     Mutfak: true, Banko: true, Kurye: true, Temizlik: false, Yönetim: false, Diğer: false,
@@ -157,15 +164,10 @@ export default function PersonellerPage() {
   const veriCek = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from("personnels")
-      .select("id, full_name, department, start_date, leave_date, role")
-      .order("full_name");
-    
-    if (!error && data) {
-      setPersoneller(data as Personel[]);
-    } else if (error) {
-      console.error("Veritabanı bağlantı hatası:", error.message);
-    }
+      .from("personeller")
+      .select("id,isim,telefon,departman,maas,ise_giris_tarihi,isten_cikis_tarihi,durum")
+      .order("isim");
+    if (!error && data) setPersoneller(data as Personel[]);
     setLoading(false);
   }, []);
 
@@ -174,14 +176,12 @@ export default function PersonellerPage() {
   // ── Filtrelenmiş + arama ──
   const filtreliPersoneller = useMemo(() => {
     return personeller.filter(p => {
-      const isAktif = !p.leave_date;
-      if (tab === "aktif" && !isAktif) return false;
-      if (tab === "ayrildi" && isAktif) return false;
-
+      if (p.durum !== tab) return false;
       if (aramaMetni) {
         const q = aramaMetni.toLowerCase();
-        return p.full_name?.toLowerCase().includes(q) ||
-          p.department?.toLowerCase().includes(q);
+        return p.isim.toLowerCase().includes(q) ||
+          p.departman?.toLowerCase().includes(q) ||
+          p.telefon?.includes(q);
       }
       return true;
     });
@@ -192,15 +192,15 @@ export default function PersonellerPage() {
     const map: Record<string, Personel[]> = {};
     DEPARTMANLAR.forEach(d => { map[d.key] = []; });
     filtreliPersoneller.forEach(p => {
-      const dept = p.department || "Diğer";
+      const dept = p.departman || "Diğer";
       if (!map[dept]) map[dept] = [];
       map[dept].push(p);
     });
     return map;
   }, [filtreliPersoneller]);
 
-  const aktifSayisi = personeller.filter(p => !p.leave_date).length;
-  const ayrilanSayisi = personeller.filter(p => !!p.leave_date).length;
+  const aktifSayisi = personeller.filter(p => p.durum === "aktif").length;
+  const ayrilanSayisi = personeller.filter(p => p.durum === "ayrildi").length;
 
   if (loading) return (
     <div className="min-h-screen bg-[#060810] flex items-center justify-center">
@@ -230,7 +230,7 @@ export default function PersonellerPage() {
               className="p-2 text-gray-600 hover:text-white border border-[#1a2236] hover:border-[#2a3550] rounded-xl transition-colors">
               <RefreshCw size={14} />
             </button>
-            <Link href="/personel/yeni"
+            <Link href="/personeller/yeni"
               className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-colors shadow-lg shadow-blue-900/20">
               <Plus size={14} /> Personel Ekle
             </Link>
@@ -274,7 +274,7 @@ export default function PersonellerPage() {
           <div className="relative flex-1">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
             <input value={aramaMetni} onChange={e => setAramaMetni(e.target.value)}
-              placeholder="İsim veya departman ara..."
+              placeholder="İsim, departman veya telefon ara..."
               className="w-full bg-[#0c0f1a] border border-[#1a2236] text-white text-xs h-9 pl-9 pr-3 rounded-xl outline-none focus:border-blue-500/40 placeholder:text-gray-700" />
           </div>
         </div>
@@ -290,14 +290,12 @@ export default function PersonellerPage() {
                 Personel bulunamadı
               </div>
             ) : (
-              <div className="space-y-2">
-                {filtreliPersoneller.map(p => <PersonelKart key={p.id} personel={p} />)}
-              </div>
+              filtreliPersoneller.map(p => <PersonelKart key={p.id} personel={p} />)
             )}
           </div>
         )}
 
-        {/* ── DEPARTMAN BÖLÜMLERİ ── */}
+        {/* ── DEPARTMAN BÖLÜMLERI ── */}
         {!aramaMetni && (
           <div className="space-y-3">
             {DEPARTMANLAR.map(dept => (
@@ -318,5 +316,13 @@ export default function PersonellerPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function PersonellerPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#060810] flex items-center justify-center"><div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"/></div>}>
+      <PersonellerPageInner />
+    </Suspense>
   );
 }
