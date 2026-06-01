@@ -565,7 +565,7 @@ export default function RaporlarPage() {
     const {data:tumTarihler} = await supabase.from("gunluk_raporlar").select("tarih");
     setMevcutTarihler(new Set((tumTarihler||[]).map((r:any)=>r.tarih)));
 
-    const {data:personelData} = await supabase.from("personeller").select("isim").eq("aktif",true).order("isim");
+    const {data:personelData} = await supabase.from("personeller").select("isim").eq("durum","aktif").eq("departman","Kurye").order("isim");
     if (personelData?.length) setPersonelListesi(personelData.map((p:any)=>p.isim));
 
     const ayNum=parseInt(secilenAy), yilNum=parseInt(secilenYil);
