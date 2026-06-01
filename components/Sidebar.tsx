@@ -43,7 +43,7 @@ export default function Sidebar() {
     ...(isAdmin ? [{ name: "Kasa", icon: Wallet, href: "/kasa" }] : []),
     ...(isAdmin ? [{ name: "Platform", icon: TrendingUp, href: "/platform-takip" }] : []),
     { name: "Personel", icon: Users, href: "/personel" },
-    { name: "Raporlar", icon: PieChart, href: "/rapor-analiz" },
+    { name: "Raporlar", icon: PieChart, href: "/raporlar" },
     { name: "Ayarlar", icon: Settings, href: "/ayarlar" },
   ];
 
@@ -157,32 +157,18 @@ export default function Sidebar() {
       )}
 
       {/* ─── MOBİL BOTTOM NAV ─── */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c0f1a]/96 backdrop-blur-xl border-t border-[#1a2236]">
-        <div className="flex items-center justify-around px-1 pt-2 pb-safe-area-inset-bottom pb-2">
-          {bottomNavItems.map((item) => {
-            const active = isActive(item.href);
-            return (
-              <Link key={item.name} href={item.href}
-                className="flex flex-col items-center gap-1 flex-1 py-1">
-                <div className={cn(
-                  "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
-                  active ? "bg-blue-600 shadow-md shadow-blue-900/40" : ""
-                )}>
-                  <item.icon className={cn("h-5 w-5 transition-colors",
-                    active ? "text-white" : "text-gray-600"
-                  )} />
-                </div>
-                <span className={cn(
-                  "text-[10px] font-medium leading-none",
-                  active ? "text-blue-400" : "text-gray-600"
-                )}>
-                  {item.name}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0c0f1a]/96 backdrop-blur-xl border-t border-[#1a2236] px-2 h-16 flex items-center justify-around">
+        {bottomNavItems.map((item) => (
+          <Link key={item.name} href={item.href}
+            className={cn(
+              "flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all",
+              isActive(item.href) ? "text-blue-400" : "text-gray-600"
+            )}>
+            <item.icon className="h-5 w-5" />
+            <span className="text-[9px] font-bold uppercase tracking-wider">{item.name}</span>
+          </Link>
+        ))}
+      </div>
     </>
   );
 }
