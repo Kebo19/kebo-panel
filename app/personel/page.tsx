@@ -27,12 +27,12 @@ interface Personel {
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
 const DEPARTMANLAR = [
-  { key: "Mutfak",   label: "Mutfak",   icon: ChefHat,   color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
-  { key: "Banko",    label: "Banko",    icon: Store,     color: "text-blue-400",   bg: "bg-blue-500/10",   border: "border-blue-500/20"   },
-  { key: "Kurye",    label: "Kurye",    icon: Bike,      color: "text-emerald-400",bg: "bg-emerald-500/10",border: "border-emerald-500/20" },
-  { key: "Temizlik", label: "Temizlik", icon: Sparkles,  color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20"  },
-  { key: "Yönetim",  label: "Yönetim",  icon: ShieldCheck,color:"text-amber-400",  bg: "bg-amber-500/10",  border: "border-amber-500/20"   },
-  { key: "Diğer",    label: "Diğer",    icon: Users,     color: "text-gray-400",   bg: "bg-gray-500/10",   border: "border-gray-500/20"    },
+  { key: "Mutfak",   label: "Mutfak",   icon: ChefHat,    color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
+  { key: "Banko",    label: "Banko",    icon: Store,      color: "text-blue-400",   bg: "bg-blue-500/10",   border: "border-blue-500/20"   },
+  { key: "Kurye",    label: "Kurye",    icon: Bike,       color: "text-emerald-400",bg: "bg-emerald-500/10",border: "border-emerald-500/20" },
+  { key: "Temizlik", label: "Temizlik", icon: Sparkles,   color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20"  },
+  { key: "Yönetim",  label: "Yönetim",  icon: ShieldCheck,color: "text-amber-400",  bg: "bg-amber-500/10",  border: "border-amber-500/20"   },
+  { key: "Diğer",    label: "Diğer",    icon: Users,      color: "text-gray-400",   bg: "bg-gray-500/10",   border: "border-gray-500/20"    },
 ];
 
 const fmt = (v: number) => new Intl.NumberFormat("tr-TR").format(v);
@@ -53,10 +53,9 @@ const calismaSuresi = (t?: string) => {
 
 function PersonelKart({ personel }: { personel: Personel }) {
   return (
-    <Link href={`/personeller/${personel.id}`}>
+    <Link href={`/personel/${personel.id}`}>
       <div className="bg-[#080b14] border border-[#1a2236] hover:border-[#2a3550] rounded-xl p-4 flex items-center justify-between gap-3 transition-colors group cursor-pointer">
         <div className="flex items-center gap-3 min-w-0">
-          {/* Avatar */}
           <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 text-xs font-bold text-blue-400">
             {personel.isim.split(" ").map(n => n[0]).slice(0, 2).join("")}
           </div>
@@ -160,7 +159,6 @@ function PersonellerPageInner() {
     Mutfak: true, Banko: true, Kurye: true, Temizlik: false, Yönetim: false, Diğer: false,
   });
 
-  // ── Veri çek ──
   const veriCek = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -173,7 +171,6 @@ function PersonellerPageInner() {
 
   useEffect(() => { veriCek(); }, [veriCek]);
 
-  // ── Filtrelenmiş + arama ──
   const filtreliPersoneller = useMemo(() => {
     return personeller.filter(p => {
       if (p.durum !== tab) return false;
@@ -187,7 +184,6 @@ function PersonellerPageInner() {
     });
   }, [personeller, tab, aramaMetni]);
 
-  // Departmana göre grupla
   const gruplar = useMemo(() => {
     const map: Record<string, Personel[]> = {};
     DEPARTMANLAR.forEach(d => { map[d.key] = []; });
@@ -230,7 +226,7 @@ function PersonellerPageInner() {
               className="p-2 text-gray-600 hover:text-white border border-[#1a2236] hover:border-[#2a3550] rounded-xl transition-colors">
               <RefreshCw size={14} />
             </button>
-            <Link href="/personeller/yeni"
+            <Link href="/personel/yeni"
               className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-colors shadow-lg shadow-blue-900/20">
               <Plus size={14} /> Personel Ekle
             </Link>
@@ -242,7 +238,6 @@ function PersonellerPageInner() {
 
         {/* ── TAB + ARAMA ── */}
         <div className="flex flex-col sm:flex-row gap-3">
-          {/* Tab */}
           <div className="flex gap-1 bg-[#0c0f1a] border border-[#1a2236] rounded-xl p-1">
             <button onClick={() => setTab("aktif")}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
@@ -270,7 +265,6 @@ function PersonellerPageInner() {
             </button>
           </div>
 
-          {/* Arama */}
           <div className="relative flex-1">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
             <input value={aramaMetni} onChange={e => setAramaMetni(e.target.value)}
@@ -310,7 +304,6 @@ function PersonellerPageInner() {
           </div>
         )}
 
-        {/* Footer */}
         <p className="text-center text-[10px] text-gray-700 py-2">
           KEBO ERP · Toplam {personeller.length} personel kaydı
         </p>
