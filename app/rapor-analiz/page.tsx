@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
   BarChart3, Calendar, RefreshCw, Bot, Send, Loader2,
   ArrowUpRight, ArrowDownRight, Wallet, Package, TrendingUp,
@@ -92,7 +93,7 @@ export default function RaporAnalizPage() {
   const [mesajlar, setMesajlar] = useState<ChatMesaj[]>([]);
   const [soru, setSoru] = useState("");
   const [aiYukleniyor, setAiYukleniyor] = useState(false);
-  const [otomatikAnaliz, setOtomatikAnaliz] = useState("");
+  const [otomatikAnaliz, setOtomatikAnaliz] = useState<any>(null); // State objeye dönüştürüldü
   const [analizYukleniyor, setAnalizYukleniyor] = useState(false);
 
   // Yetki
@@ -127,7 +128,7 @@ export default function RaporAnalizPage() {
     if (data) setRaporlar(data as GunlukRapor[]);
     if (onceki) setOncekiRaporlar(onceki as GunlukRapor[]);
     setYukleniyor(false);
-    setOtomatikAnaliz("");
+    setOtomatikAnaliz(null); // String yerine null yapıldı
   }, [baslangic, bitis, oncekiAralik]);
 
   useEffect(() => { if (yetkili) veriCek(); }, [yetkili, veriCek]);
@@ -188,7 +189,7 @@ export default function RaporAnalizPage() {
     };
   }, [raporlar, oncekiRaporlar, seciliPlatformlar, odemeFiltre]);
 
-  // AI Analiz
+  // AI Analiz (Grafik ve Aksiyon Desteği İle Geliştirildi)
   const analizYap = async () => {
     if (!raporlar.length) return;
     setAnalizYukleniyor(true);
@@ -198,19 +199,33 @@ Günlük ort: ₺${fmt(stats.gunlukOrt)} | Önceki dönem brüt: ₺${fmt(stats.
 Platformlar: ${Object.entries(stats.platformlar).filter(([, v]) => v > 0).map(([k, v]) => `${k}: ₺${fmt(v)}`).join(", ")}
 Kasa: Nakit ₺${fmt(stats.kasaNakit)}, POS ₺${fmt(stats.kasaPos)}, Edenred ₺${fmt(stats.kasaEdenred)}
 En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.enIyi.toplam_ciro) : "-"}`;
+    
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-api-key": process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || "", 
+          "anthropic-version": "2023-06-01" 
+        },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514", max_tokens: 1000,
-          system: "Sen KEBO ERP iş analistisisin. Türkçe, madde madde, emoji ile kısa iş raporu yaz. Gerçek rakamları kullan.",
+          model: "claude-3-5-sonnet-20240620",
+          max_tokens: 1000,
+          system: `Sen KEBO ERP iş analistisisin. SADECE şu JSON formatında cevap ver ve ASLA fazladan metin yazma: 
+          {
+            "analysis": "Buraya türkçe, madde madde, emoji ile kısa iş raporu yaz. Gerçek rakamları kullan.",
+            "chartData": [{"name": "Platform veya Kategori Adı", "deger": 0}],
+            "action": {"type": "info", "description": "Önerilen aksiyon metni (örn: Giderleri incele)"}
+          }`,
           messages: [{ role: "user", content: `Analiz et:\n${ozet}` }],
         }),
       });
       const d = await res.json();
-      setOtomatikAnaliz(d.content?.[0]?.text || "Analiz alınamadı.");
-    } catch { setOtomatikAnaliz("Hata oluştu."); }
+      const cleaned = d.content?.[0]?.text.replace(/```json/g, "").replace(/```/g, "") || "";
+      setOtomatikAnaliz(JSON.parse(cleaned));
+    } catch { 
+      setOtomatikAnaliz({ analysis: "Analiz sırasında bir hata oluştu veya veriler alınamadı.", chartData: [], action: { type: "none" } }); 
+    }
     setAnalizYukleniyor(false);
   };
 
@@ -224,9 +239,13 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-api-key": process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || "",
+          "anthropic-version": "2023-06-01"
+        },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514", max_tokens: 1000,
+          model: "claude-3-5-sonnet-20240620", max_tokens: 1000,
           system: `KEBO ERP danışmanısın. Türkçe, kısa cevap ver. Veri: ${baglamOzet}`,
           messages: liste.map(m => ({ role: m.rol, content: m.icerik })),
         }),
@@ -598,9 +617,30 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
               <div className="p-5">
                 {analizYukleniyor
                   ? <div className="flex items-center gap-3 text-gray-500 text-sm"><Loader2 size={16} className="animate-spin" /> Analiz ediliyor...</div>
-                  : otomatikAnaliz
-                    ? <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{otomatikAnaliz}</p>
-                    : <p className="text-sm text-gray-600">Seçili dönem ve filtreler için AI analizi almak için "Analiz Et"e tıklayın.</p>
+                  : otomatikAnaliz ? (
+                    <div className="space-y-5">
+                      <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{otomatikAnaliz.analysis || "Analiz tamamlandı."}</p>
+                      
+                      {otomatikAnaliz.chartData && otomatikAnaliz.chartData.length > 0 && (
+                        <div className="h-[200px] w-full mt-4">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={otomatikAnaliz.chartData}>
+                              <XAxis dataKey="name" stroke="#666" fontSize={10} tickLine={false} axisLine={false} />
+                              <Tooltip contentStyle={{backgroundColor: '#0c0f1a', borderColor: '#1a2236', color: '#fff'}} itemStyle={{color: '#3b82f6'}} />
+                              <Bar dataKey="deger" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+
+                      {otomatikAnaliz.action && otomatikAnaliz.action.type !== "none" && (
+                        <button onClick={() => alert("Aksiyon Tetiklendi: " + otomatikAnaliz.action.description)} 
+                          className="w-full bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white py-2.5 rounded-xl text-xs font-bold transition-colors mt-2">
+                          {otomatikAnaliz.action.description}
+                        </button>
+                      )}
+                    </div>
+                  ) : <p className="text-sm text-gray-600">Seçili dönem ve filtreler için AI analizi almak için "Analiz Et"e tıklayın.</p>
                 }
               </div>
             </div>
