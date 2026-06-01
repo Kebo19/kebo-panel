@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard, Wallet, ClipboardList, Users, Settings, LogOut,
-  Utensils, PieChart, TrendingUp, Menu, X
+  Utensils, BarChart3, TrendingUp, Menu, X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -40,10 +40,10 @@ export default function Sidebar() {
   const menuItems = [
     ...(isAdmin ? [{ name: "Anasayfa", icon: LayoutDashboard, href: "/" }] : []),
     { name: "Kasa Raporu", icon: ClipboardList, href: "/raporlar" },
+    ...(isAdmin ? [{ name: "Rapor Analizi", icon: BarChart3, href: "/rapor-analiz" }] : []),
     ...(isAdmin ? [{ name: "Kasa", icon: Wallet, href: "/kasa" }] : []),
     ...(isAdmin ? [{ name: "Platform", icon: TrendingUp, href: "/platform-takip" }] : []),
     { name: "Personel", icon: Users, href: "/personel" },
-    { name: "Raporlar", icon: PieChart, href: "/raporlar" },
     { name: "Ayarlar", icon: Settings, href: "/ayarlar" },
   ];
 
@@ -89,7 +89,7 @@ export default function Sidebar() {
           ))}
         </nav>
         <div className="p-3 border-t border-[#1a2236]">
-          <p className="px-3 pb-3 mb-1 text-[10px] text-gray-600 uppercase tracking-widest font-semibold border-b border-[#1a2236] mb-2">
+          <p className="px-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold border-b border-[#1a2236] pb-3 mb-2">
             {isAdmin ? "Yönetici" : "Şube Müdürü"}
           </p>
           <button onClick={handleSignOut}

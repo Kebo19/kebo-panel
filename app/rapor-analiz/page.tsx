@@ -3,9 +3,9 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  TrendingUp, TrendingDown, BarChart3, PieChart, Calendar,
-  RefreshCw, Bot, Send, Loader2, ChevronDown, ArrowUpRight,
-  ArrowDownRight, Minus, Wallet, Package, AlertTriangle
+  BarChart3, Calendar, RefreshCw, Bot, Send, Loader2,
+  ArrowUpRight, ArrowDownRight, Wallet, Package, TrendingUp,
+  TrendingDown, PieChart, Filter, ChevronDown, AlertTriangle, X
 } from "lucide-react";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -19,15 +19,17 @@ interface GunlukRapor {
   kurye_raporlari?: any[];
 }
 
-interface ChatMesaj {
-  rol: "user" | "assistant";
-  icerik: string;
-}
+interface ChatMesaj { rol: "user" | "assistant"; icerik: string; }
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
+// ─── RAPOR TÜRLERİ ────────────────────────────────────────────────────────────
 
-const fmt = (v: number) => new Intl.NumberFormat("tr-TR").format(Math.round(v));
-const fmtTarih = (t: string) => { if (!t) return ""; const [y, m, d] = t.split("-"); return `${d}.${m}.${y}`; };
+const RAPOR_TURLERI = [
+  { key: "genel", label: "Genel Özet", desc: "Brüt/net ciro, gider, paket toplamları" },
+  { key: "platform", label: "Platform Detayı", desc: "Her platformun online + kapıda satışları ayrı ayrı" },
+  { key: "kasa", label: "Kasa Dağılımı", desc: "Nakit, POS, Edenred ödeme yöntemleri" },
+  { key: "gunluk", label: "Gün Gün Liste", desc: "Seçilen tarih aralığında her günün detayı" },
+  { key: "karsilastirma", label: "Platform Karşılaştırma", desc: "Platformları yan yana karşılaştır" },
+];
 
 const PLATFORM_COLORS: Record<string, string> = {
   Yemeksepeti: "#FF6B35", Getir: "#8B5CF6", Trendyol: "#F97316", Migros: "#10B981", "Alo Paket": "#3B82F6",
@@ -35,15 +37,27 @@ const PLATFORM_COLORS: Record<string, string> = {
 
 const PATRONLAR = ["murat@kebo.com", "bulent@kebo.com"];
 
-// ─── TREND BADGE ──────────────────────────────────────────────────────────────
+// ─── PLATFORM KOLONLARI ───────────────────────────────────────────────────────
+
+const PLATFORM_KOLON = {
+  Yemeksepeti: { online: "os_yemeksepeti", kapida: "ko_yemeksepeti" },
+  Getir: { online: "os_getir", kapida: "ko_getir" },
+  Trendyol: { online: "os_trendyol", kapida: "ko_trendyol" },
+  Migros: { online: "os_migros", kapida: "ko_migros" },
+  "Alo Paket": { online: null, kapida: "ko_alo_paket" },
+};
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+const fmt = (v: number) => new Intl.NumberFormat("tr-TR").format(Math.round(v));
+const fmtTarih = (t: string) => { if (!t) return ""; const [y, m, d] = t.split("-"); return `${d}.${m}.${y}`; };
 
 function TrendBadge({ value, prev }: { value: number; prev: number }) {
-  if (prev === 0) return null;
+  if (!prev) return null;
   const pct = ((value - prev) / prev) * 100;
-  const up = pct >= 0;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${up ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
-      {up ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${pct >= 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
+      {pct >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
       {Math.abs(pct).toFixed(1)}%
     </span>
   );
@@ -55,11 +69,25 @@ export default function RaporAnalizPage() {
   const supabase = createClient();
   const [yetkili, setYetkili] = useState(false);
   const [yetkiYukleniyor, setYetkiYukleniyor] = useState(true);
+
+  // Filtre state
+  const [baslangic, setBaslangic] = useState(() => {
+    const d = new Date(); d.setDate(1);
+    return d.toISOString().split("T")[0];
+  });
+  const [bitis, setBitis] = useState(() => new Date().toISOString().split("T")[0]);
+  const [raporTuru, setRaporTuru] = useState("genel");
+
+  // Platform filtresi
+  const [seciliPlatformlar, setSeciliPlatformlar] = useState<string[]>(["Yemeksepeti", "Getir", "Trendyol", "Migros", "Alo Paket"]);
+  const [odemeFiltre, setOdemeFiltre] = useState<"hepsi" | "online" | "kapida">("hepsi");
+
+  // Veri state
   const [raporlar, setRaporlar] = useState<GunlukRapor[]>([]);
+  const [oncekiRaporlar, setOncekiRaporlar] = useState<GunlukRapor[]>([]);
   const [yukleniyor, setYukleniyor] = useState(false);
-  const [donem, setDonem] = useState<"hafta" | "ay" | "3ay" | "ozel">("ay");
-  const [baslangic, setBaslangic] = useState("");
-  const [bitis, setBitis] = useState("");
+
+  // AI state
   const [chatAcik, setChatAcik] = useState(false);
   const [mesajlar, setMesajlar] = useState<ChatMesaj[]>([]);
   const [soru, setSoru] = useState("");
@@ -67,253 +95,257 @@ export default function RaporAnalizPage() {
   const [otomatikAnaliz, setOtomatikAnaliz] = useState("");
   const [analizYukleniyor, setAnalizYukleniyor] = useState(false);
 
-  // Yetki kontrolü
+  // Yetki
   useEffect(() => {
-    const kontrol = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email && PATRONLAR.includes(user.email.toLowerCase())) {
-        setYetkili(true);
-      }
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email && PATRONLAR.includes(user.email.toLowerCase())) setYetkili(true);
       setYetkiYukleniyor(false);
-    };
-    kontrol();
+    });
   }, []);
-
-  // Tarih aralığı hesapla
-  const tarihAraligi = useMemo(() => {
-    const bugun = new Date();
-    const fmt = (d: Date) => d.toISOString().split("T")[0];
-    if (donem === "hafta") {
-      const bas = new Date(bugun); bas.setDate(bugun.getDate() - 7);
-      return { bas: fmt(bas), bit: fmt(bugun) };
-    }
-    if (donem === "ay") {
-      const bas = new Date(bugun); bas.setDate(bugun.getDate() - 30);
-      return { bas: fmt(bas), bit: fmt(bugun) };
-    }
-    if (donem === "3ay") {
-      const bas = new Date(bugun); bas.setDate(bugun.getDate() - 90);
-      return { bas: fmt(bas), bit: fmt(bugun) };
-    }
-    return { bas: baslangic, bit: bitis };
-  }, [donem, baslangic, bitis]);
 
   // Önceki dönem aralığı
   const oncekiAralik = useMemo(() => {
-    if (!tarihAraligi.bas || !tarihAraligi.bit) return null;
-    const bas = new Date(tarihAraligi.bas);
-    const bit = new Date(tarihAraligi.bit);
-    const gun = Math.round((bit.getTime() - bas.getTime()) / (1000 * 60 * 60 * 24));
-    const oncekiBit = new Date(bas); oncekiBit.setDate(bas.getDate() - 1);
-    const oncekiBas = new Date(oncekiBit); oncekiBas.setDate(oncekiBit.getDate() - gun);
+    if (!baslangic || !bitis) return null;
+    const bas = new Date(baslangic), bit = new Date(bitis);
+    const gun = Math.round((bit.getTime() - bas.getTime()) / 86400000);
+    const ob = new Date(bas); ob.setDate(bas.getDate() - gun - 1);
+    const obit = new Date(bas); obit.setDate(bas.getDate() - 1);
     const f = (d: Date) => d.toISOString().split("T")[0];
-    return { bas: f(oncekiBas), bit: f(oncekiBit) };
-  }, [tarihAraligi]);
+    return { bas: f(ob), bit: f(obit) };
+  }, [baslangic, bitis]);
 
   // Veri çek
   const veriCek = useCallback(async () => {
-    if (!tarihAraligi.bas || !tarihAraligi.bit) return;
+    if (!baslangic || !bitis) return;
     setYukleniyor(true);
-    const { data } = await supabase
-      .from("gunluk_raporlar")
-      .select("*")
-      .gte("tarih", tarihAraligi.bas)
-      .lte("tarih", tarihAraligi.bit)
-      .order("tarih");
+    const [{ data }, { data: onceki }] = await Promise.all([
+      supabase.from("gunluk_raporlar").select("*").gte("tarih", baslangic).lte("tarih", bitis).order("tarih"),
+      oncekiAralik
+        ? supabase.from("gunluk_raporlar").select("*").gte("tarih", oncekiAralik.bas).lte("tarih", oncekiAralik.bit)
+        : Promise.resolve({ data: [] }),
+    ]);
     if (data) setRaporlar(data as GunlukRapor[]);
+    if (onceki) setOncekiRaporlar(onceki as GunlukRapor[]);
     setYukleniyor(false);
-  }, [tarihAraligi]);
+    setOtomatikAnaliz("");
+  }, [baslangic, bitis, oncekiAralik]);
 
-  useEffect(() => { veriCek(); }, [veriCek]);
-
-  // Önceki dönem verisi
-  const [oncekiRaporlar, setOncekiRaporlar] = useState<GunlukRapor[]>([]);
-  useEffect(() => {
-    if (!oncekiAralik) return;
-    supabase.from("gunluk_raporlar").select("*")
-      .gte("tarih", oncekiAralik.bas).lte("tarih", oncekiAralik.bit)
-      .then(({ data }) => { if (data) setOncekiRaporlar(data as GunlukRapor[]); });
-  }, [oncekiAralik]);
+  useEffect(() => { if (yetkili) veriCek(); }, [yetkili, veriCek]);
 
   // Hesaplamalar
   const stats = useMemo(() => {
-    const toplam = (arr: GunlukRapor[]) => arr.reduce((s, r) => s + (r.toplam_ciro || 0), 0);
-    const gider = (arr: GunlukRapor[]) => arr.reduce((s, r) => s + (r.gunluk_gider || 0) + (r.iade_tutar || 0), 0);
-    const paket = (arr: GunlukRapor[]) => arr.reduce((s, r) => s + (r.kurye_raporlari?.reduce((ks: number, k: any) => ks + (parseInt(k.paketSayisi) || 0), 0) || 0), 0);
+    const sum = (arr: GunlukRapor[], key: keyof GunlukRapor) =>
+      arr.reduce((s, r) => s + ((r[key] as number) || 0), 0);
 
-    const brutCiro = toplam(raporlar);
-    const toplamGider = gider(raporlar);
-    const netCiro = brutCiro - toplamGider;
-    const toplamPaket = paket(raporlar);
-    const gunSayisi = raporlar.length;
-    const gunlukOrt = gunSayisi > 0 ? brutCiro / gunSayisi : 0;
-
-    const oncBrut = toplam(oncekiRaporlar);
-    const oncNet = oncBrut - gider(oncekiRaporlar);
-
-    const platformlar = {
-      Yemeksepeti: raporlar.reduce((s, r) => s + (r.os_yemeksepeti || 0) + (r.ko_yemeksepeti || 0), 0),
-      Getir: raporlar.reduce((s, r) => s + (r.os_getir || 0) + (r.ko_getir || 0), 0),
-      Trendyol: raporlar.reduce((s, r) => s + (r.os_trendyol || 0) + (r.ko_trendyol || 0), 0),
-      Migros: raporlar.reduce((s, r) => s + (r.os_migros || 0) + (r.ko_migros || 0), 0),
-      "Alo Paket": raporlar.reduce((s, r) => s + (r.ko_alo_paket || 0), 0),
+    const platformToplam = (arr: GunlukRapor[], platform: string, tur: "hepsi" | "online" | "kapida") => {
+      const kol = PLATFORM_KOLON[platform as keyof typeof PLATFORM_KOLON];
+      if (!kol) return 0;
+      let toplam = 0;
+      if ((tur === "hepsi" || tur === "online") && kol.online)
+        toplam += arr.reduce((s, r) => s + ((r[kol.online as keyof GunlukRapor] as number) || 0), 0);
+      if ((tur === "hepsi" || tur === "kapida") && kol.kapida)
+        toplam += arr.reduce((s, r) => s + ((r[kol.kapida as keyof GunlukRapor] as number) || 0), 0);
+      return toplam;
     };
+
+    const brutCiro = sum(raporlar, "toplam_ciro");
+    const toplamGider = sum(raporlar, "gunluk_gider") + sum(raporlar, "iade_tutar");
+    const netCiro = brutCiro - toplamGider;
+    const paket = raporlar.reduce((s, r) => s + (r.kurye_raporlari?.reduce((ks: number, k: any) => ks + (parseInt(k.paketSayisi) || 0), 0) || 0), 0);
+    const oncBrut = sum(oncekiRaporlar, "toplam_ciro");
+    const oncNet = oncBrut - sum(oncekiRaporlar, "gunluk_gider") - sum(oncekiRaporlar, "iade_tutar");
+
+    const platformlar = Object.fromEntries(
+      Object.keys(PLATFORM_KOLON).map(p => [p, platformToplam(raporlar, p, odemeFiltre)])
+    );
     const toplamPlatform = Object.values(platformlar).reduce((s, v) => s + v, 0);
 
-    const kasaNakit = raporlar.reduce((s, r) => s + (r.kasa_nakit || 0), 0);
-    const kasaPos = raporlar.reduce((s, r) => s + (r.kasa_pos || 0), 0);
-    const kasaEdenred = raporlar.reduce((s, r) => s + (r.kasa_edenred || 0), 0);
-
-    const enIyiGun = [...raporlar].sort((a, b) => (b.toplam_ciro || 0) - (a.toplam_ciro || 0))[0];
-    const enKotuGun = [...raporlar].sort((a, b) => (a.toplam_ciro || 0) - (b.toplam_ciro || 0))[0];
+    const gunlukDetay = raporlar.map(r => {
+      const secilenPlatformToplam = seciliPlatformlar.reduce((s, p) => s + platformToplam([r], p, odemeFiltre), 0);
+      const paket = r.kurye_raporlari?.reduce((s: number, k: any) => s + (parseInt(k.paketSayisi) || 0), 0) || 0;
+      return {
+        tarih: r.tarih,
+        brutCiro: r.toplam_ciro || 0,
+        net: (r.toplam_ciro || 0) - (r.gunluk_gider || 0) - (r.iade_tutar || 0),
+        gider: (r.gunluk_gider || 0) + (r.iade_tutar || 0),
+        secilenPlatform: secilenPlatformToplam,
+        paket,
+        platformDetay: Object.fromEntries(Object.keys(PLATFORM_KOLON).map(p => [p, platformToplam([r], p, odemeFiltre)])),
+      };
+    });
 
     return {
-      brutCiro, netCiro, toplamGider, toplamPaket, gunSayisi, gunlukOrt,
-      oncBrut, oncNet, platformlar, toplamPlatform,
-      kasaNakit, kasaPos, kasaEdenred, enIyiGun, enKotuGun,
+      brutCiro, netCiro, toplamGider, paket, oncBrut, oncNet,
+      kasaNakit: sum(raporlar, "kasa_nakit"),
+      kasaPos: sum(raporlar, "kasa_pos"),
+      kasaEdenred: sum(raporlar, "kasa_edenred"),
+      platformlar, toplamPlatform,
+      gunlukDetay,
+      gunSayisi: raporlar.length,
+      gunlukOrt: raporlar.length > 0 ? brutCiro / raporlar.length : 0,
+      enIyi: [...raporlar].sort((a, b) => (b.toplam_ciro || 0) - (a.toplam_ciro || 0))[0],
+      enKotu: [...raporlar].sort((a, b) => (a.toplam_ciro || 0) - (b.toplam_ciro || 0))[0],
     };
-  }, [raporlar, oncekiRaporlar]);
+  }, [raporlar, oncekiRaporlar, seciliPlatformlar, odemeFiltre]);
 
-  // Otomatik AI analizi
-  const analizYap = useCallback(async () => {
-    if (raporlar.length === 0) return;
+  // AI Analiz
+  const analizYap = async () => {
+    if (!raporlar.length) return;
     setAnalizYukleniyor(true);
-    const ozet = `
-KEBO ERP İş Analizi:
-- Dönem: ${fmtTarih(tarihAraligi.bas)} - ${fmtTarih(tarihAraligi.bit)}
-- Rapor günü: ${stats.gunSayisi}
-- Brüt ciro: ₺${fmt(stats.brutCiro)}
-- Net ciro: ₺${fmt(stats.netCiro)}
-- Toplam gider: ₺${fmt(stats.toplamGider)}
-- Günlük ortalama: ₺${fmt(stats.gunlukOrt)}
-- Önceki dönem brüt: ₺${fmt(stats.oncBrut)}
-- Platform dağılımı: ${Object.entries(stats.platformlar).filter(([, v]) => v > 0).map(([k, v]) => `${k}: ₺${fmt(v)}`).join(", ")}
-- Kasa: Nakit ₺${fmt(stats.kasaNakit)}, POS ₺${fmt(stats.kasaPos)}, Edenred ₺${fmt(stats.kasaEdenred)}
-- En iyi gün: ${stats.enIyiGun ? fmtTarih(stats.enIyiGun.tarih) + " ₺" + fmt(stats.enIyiGun.toplam_ciro) : "-"}
-- En kötü gün: ${stats.enKotuGun ? fmtTarih(stats.enKotuGun.tarih) + " ₺" + fmt(stats.enKotuGun.toplam_ciro) : "-"}
-    `.trim();
-
+    const ozet = `Dönem: ${fmtTarih(baslangic)}-${fmtTarih(bitis)} | ${stats.gunSayisi} gün
+Brüt: ₺${fmt(stats.brutCiro)} | Net: ₺${fmt(stats.netCiro)} | Gider: ₺${fmt(stats.toplamGider)}
+Günlük ort: ₺${fmt(stats.gunlukOrt)} | Önceki dönem brüt: ₺${fmt(stats.oncBrut)}
+Platformlar: ${Object.entries(stats.platformlar).filter(([, v]) => v > 0).map(([k, v]) => `${k}: ₺${fmt(v)}`).join(", ")}
+Kasa: Nakit ₺${fmt(stats.kasaNakit)}, POS ₺${fmt(stats.kasaPos)}, Edenred ₺${fmt(stats.kasaEdenred)}
+En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.enIyi.toplam_ciro) : "-"}`;
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          system: "Sen KEBO ERP sisteminin iş analistisisin. Türkçe, kısa ve net iş raporu yaz. Madde madde yaz. Emoji kullan. Gerçek rakamlarla konuş.",
-          messages: [{ role: "user", content: `Bu verileri analiz et ve iş raporu yaz:\n\n${ozet}` }],
+          model: "claude-sonnet-4-20250514", max_tokens: 1000,
+          system: "Sen KEBO ERP iş analistisisin. Türkçe, madde madde, emoji ile kısa iş raporu yaz. Gerçek rakamları kullan.",
+          messages: [{ role: "user", content: `Analiz et:\n${ozet}` }],
         }),
       });
-      const data = await res.json();
-      setOtomatikAnaliz(data.content?.[0]?.text || "Analiz alınamadı.");
-    } catch {
-      setOtomatikAnaliz("Analiz sırasında hata oluştu.");
-    }
+      const d = await res.json();
+      setOtomatikAnaliz(d.content?.[0]?.text || "Analiz alınamadı.");
+    } catch { setOtomatikAnaliz("Hata oluştu."); }
     setAnalizYukleniyor(false);
-  }, [raporlar, stats, tarihAraligi]);
+  };
 
-  // Chat gönder
+  // Chat
   const chatGonder = async () => {
     if (!soru.trim() || aiYukleniyor) return;
-    const yeniMesaj: ChatMesaj = { rol: "user", icerik: soru };
-    const guncelMesajlar = [...mesajlar, yeniMesaj];
-    setMesajlar(guncelMesajlar);
-    setSoru("");
-    setAiYukleniyor(true);
-
-    const baglamOzet = `
-Mevcut dönem verileri:
-- Brüt ciro: ₺${fmt(stats.brutCiro)}, Net: ₺${fmt(stats.netCiro)}
-- Platform: ${Object.entries(stats.platformlar).filter(([, v]) => v > 0).map(([k, v]) => `${k}: ₺${fmt(v)}`).join(", ")}
-- Günlük ort: ₺${fmt(stats.gunlukOrt)}, Gider: ₺${fmt(stats.toplamGider)}
-    `.trim();
-
+    const yeni: ChatMesaj = { rol: "user", icerik: soru };
+    const liste = [...mesajlar, yeni];
+    setMesajlar(liste); setSoru(""); setAiYukleniyor(true);
+    const baglamOzet = `Brüt: ₺${fmt(stats.brutCiro)}, Net: ₺${fmt(stats.netCiro)}, Platformlar: ${Object.entries(stats.platformlar).filter(([, v]) => v > 0).map(([k, v]) => `${k}: ₺${fmt(v)}`).join(", ")}`;
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          system: `Sen KEBO ERP iş danışmanısın. Türkçe konuş. Kısa ve net cevap ver. Veri bağlamı:\n${baglamOzet}`,
-          messages: guncelMesajlar.map(m => ({ role: m.rol, content: m.icerik })),
+          model: "claude-sonnet-4-20250514", max_tokens: 1000,
+          system: `KEBO ERP danışmanısın. Türkçe, kısa cevap ver. Veri: ${baglamOzet}`,
+          messages: liste.map(m => ({ role: m.rol, content: m.icerik })),
         }),
       });
-      const data = await res.json();
-      const cevap = data.content?.[0]?.text || "Cevap alınamadı.";
-      setMesajlar(prev => [...prev, { rol: "assistant", icerik: cevap }]);
-    } catch {
-      setMesajlar(prev => [...prev, { rol: "assistant", icerik: "Bağlantı hatası oluştu." }]);
-    }
+      const d = await res.json();
+      setMesajlar(prev => [...prev, { rol: "assistant", icerik: d.content?.[0]?.text || "Cevap alınamadı." }]);
+    } catch { setMesajlar(prev => [...prev, { rol: "assistant", icerik: "Bağlantı hatası." }]); }
     setAiYukleniyor(false);
   };
 
-  // Yetki yok
-  if (yetkiYukleniyor) return (
-    <div className="min-h-screen bg-[#060810] flex items-center justify-center">
-      <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-    </div>
-  );
-
+  if (yetkiYukleniyor) return <div className="min-h-screen bg-[#060810] flex items-center justify-center"><div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>;
   if (!yetkili) return (
-    <div className="min-h-screen bg-[#060810] flex items-center justify-center text-center p-6">
-      <div className="bg-[#0c0f1a] border border-red-500/20 rounded-2xl p-8 max-w-sm">
+    <div className="min-h-screen bg-[#060810] flex items-center justify-center p-6">
+      <div className="bg-[#0c0f1a] border border-red-500/20 rounded-2xl p-8 max-w-sm text-center">
         <AlertTriangle className="h-10 w-10 text-red-400 mx-auto mb-4" />
         <h1 className="text-white font-black text-lg mb-2">Erişim Kısıtlı</h1>
-        <p className="text-gray-500 text-sm">Bu sayfa yalnızca yöneticiler tarafından görüntülenebilir.</p>
+        <p className="text-gray-500 text-sm">Yalnızca yöneticiler görebilir.</p>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#060810] text-white font-sans antialiased pb-10">
+    <div className="min-h-screen bg-[#060810] text-white font-sans antialiased pb-20">
 
-      {/* ── HEADER ── */}
+      {/* HEADER */}
       <div className="sticky top-0 z-40 border-b border-[#0f1624] bg-[#060810]/95 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center">
               <BarChart3 className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-black tracking-tight text-white leading-none">Rapor Analizi</h1>
-              <p className="text-[10px] text-gray-600 leading-none mt-0.5">{stats.gunSayisi} günlük veri</p>
+              <h1 className="text-sm font-black text-white leading-none">Rapor Analizi</h1>
+              <p className="text-[10px] text-gray-600 mt-0.5">{stats.gunSayisi} günlük veri · {fmtTarih(baslangic)} – {fmtTarih(bitis)}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={veriCek} disabled={yukleniyor}
-              className="p-2 text-gray-600 hover:text-white border border-[#1a2236] rounded-xl transition-colors">
+          <div className="flex gap-2">
+            <button onClick={veriCek} disabled={yukleniyor} className="p-2 text-gray-600 hover:text-white border border-[#1a2236] rounded-xl transition-colors">
               <RefreshCw size={14} className={yukleniyor ? "animate-spin" : ""} />
             </button>
             <button onClick={() => setChatAcik(!chatAcik)}
               className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-colors ${chatAcik ? "bg-blue-600 text-white" : "border border-[#1a2236] text-gray-400 hover:text-white"}`}>
-              <Bot size={14} /> AI Danışman
+              <Bot size={14} /> AI
             </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-5">
+      <div className="max-w-6xl mx-auto px-4 py-5 space-y-5">
 
-        {/* ── DÖNEM SEÇİCİ ── */}
-        <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-4">
-          <div className="flex flex-wrap gap-2 items-center">
-            {(["hafta", "ay", "3ay", "ozel"] as const).map(d => (
-              <button key={d} onClick={() => setDonem(d)}
-                className={`text-xs font-bold px-4 py-2 rounded-xl transition-colors ${donem === d ? "bg-blue-600 text-white" : "bg-white/5 text-gray-400 hover:text-white"}`}>
-                {d === "hafta" ? "Son 7 Gün" : d === "ay" ? "Son 30 Gün" : d === "3ay" ? "Son 90 Gün" : "Özel Aralık"}
-              </button>
-            ))}
-            {donem === "ozel" && (
-              <div className="flex items-center gap-2 mt-2 sm:mt-0">
-                <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)}
-                  className="bg-[#080b14] border border-[#1a2236] text-white text-xs h-9 px-3 rounded-xl outline-none focus:border-blue-500/40" />
-                <span className="text-gray-600 text-xs">—</span>
-                <input type="date" value={bitis} onChange={e => setBitis(e.target.value)}
-                  className="bg-[#080b14] border border-[#1a2236] text-white text-xs h-9 px-3 rounded-xl outline-none focus:border-blue-500/40" />
-              </div>
-            )}
+        {/* ── FİLTRE PANELİ ── */}
+        <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-5 space-y-4">
+          <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><Filter size={11} /> Rapor Filtresi</p>
+
+          {/* Tarih aralığı */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <div>
+              <p className="text-[10px] text-gray-600 mb-1.5 uppercase tracking-widest">Başlangıç</p>
+              <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)}
+                className="bg-[#080b14] border border-[#1a2236] text-white text-xs h-9 px-3 rounded-xl outline-none focus:border-blue-500/40" />
+            </div>
+            <div>
+              <p className="text-[10px] text-gray-600 mb-1.5 uppercase tracking-widest">Bitiş</p>
+              <input type="date" value={bitis} onChange={e => setBitis(e.target.value)}
+                className="bg-[#080b14] border border-[#1a2236] text-white text-xs h-9 px-3 rounded-xl outline-none focus:border-blue-500/40" />
+            </div>
+            {/* Hızlı seçim */}
+            <div className="flex gap-1.5 flex-wrap mt-4 sm:mt-0">
+              {[
+                { label: "Bu ay", fn: () => { const d = new Date(); d.setDate(1); setBaslangic(d.toISOString().split("T")[0]); setBitis(new Date().toISOString().split("T")[0]); } },
+                { label: "Son 7 gün", fn: () => { const d = new Date(); d.setDate(d.getDate() - 7); setBaslangic(d.toISOString().split("T")[0]); setBitis(new Date().toISOString().split("T")[0]); } },
+                { label: "Son 30 gün", fn: () => { const d = new Date(); d.setDate(d.getDate() - 30); setBaslangic(d.toISOString().split("T")[0]); setBitis(new Date().toISOString().split("T")[0]); } },
+                { label: "Son 90 gün", fn: () => { const d = new Date(); d.setDate(d.getDate() - 90); setBaslangic(d.toISOString().split("T")[0]); setBitis(new Date().toISOString().split("T")[0]); } },
+              ].map(b => (
+                <button key={b.label} onClick={b.fn}
+                  className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-blue-600 hover:text-white transition-colors">
+                  {b.label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Rapor türü */}
+          <div>
+            <p className="text-[10px] text-gray-600 mb-2 uppercase tracking-widest">Rapor Türü</p>
+            <div className="flex flex-wrap gap-2">
+              {RAPOR_TURLERI.map(t => (
+                <button key={t.key} onClick={() => setRaporTuru(t.key)}
+                  className={`text-xs font-bold px-4 py-2 rounded-xl transition-colors ${raporTuru === t.key ? "bg-blue-600 text-white" : "bg-white/5 text-gray-400 hover:text-white"}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-gray-600 mt-2">{RAPOR_TURLERI.find(t => t.key === raporTuru)?.desc}</p>
+          </div>
+
+          {/* Platform filtresi (platform raporu seçilince) */}
+          {(raporTuru === "platform" || raporTuru === "gunluk" || raporTuru === "karsilastirma") && (
+            <div>
+              <p className="text-[10px] text-gray-600 mb-2 uppercase tracking-widest">Platformlar</p>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {Object.keys(PLATFORM_KOLON).map(p => (
+                  <button key={p} onClick={() => setSeciliPlatformlar(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-colors border ${seciliPlatformlar.includes(p) ? "text-white border-transparent" : "bg-white/5 text-gray-500 border-[#1a2236]"}`}
+                    style={seciliPlatformlar.includes(p) ? { backgroundColor: PLATFORM_COLORS[p] } : {}}>
+                    {p}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                {(["hepsi", "online", "kapida"] as const).map(o => (
+                  <button key={o} onClick={() => setOdemeFiltre(o)}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-colors ${odemeFiltre === o ? "bg-emerald-600 text-white" : "bg-white/5 text-gray-400 hover:text-white"}`}>
+                    {o === "hepsi" ? "Online + Kapıda" : o === "online" ? "Sadece Online" : "Sadece Kapıda"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {yukleniyor ? (
@@ -322,179 +354,241 @@ Mevcut dönem verileri:
           </div>
         ) : raporlar.length === 0 ? (
           <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl py-16 text-center text-gray-600 text-sm">
-            Bu dönemde rapor bulunamadı.
+            Bu tarih aralığında rapor bulunamadı.
           </div>
         ) : (
           <>
-            {/* ── KPI KARTLARI ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {[
-                { label: "Brüt Ciro", value: `₺${fmt(stats.brutCiro)}`, prev: stats.oncBrut, color: "#60A5FA", icon: <TrendingUp size={14} /> },
-                { label: "Net Ciro", value: `₺${fmt(stats.netCiro)}`, prev: stats.oncNet, color: "#34D399", icon: <Wallet size={14} /> },
-                { label: "Toplam Gider", value: `₺${fmt(stats.toplamGider)}`, prev: 0, color: "#F87171", icon: <TrendingDown size={14} /> },
-                { label: "Toplam Paket", value: fmt(stats.toplamPaket), prev: 0, color: "#A78BFA", icon: <Package size={14} /> },
-              ].map(k => (
-                <div key={k.label} className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-4 hover:border-[#2a3550] transition-colors">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium">{k.label}</p>
-                    <span style={{ color: k.color }}>{k.icon}</span>
+            {/* ── GENEL ÖZET ── */}
+            {raporTuru === "genel" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {[
+                    { label: "Brüt Ciro", value: stats.brutCiro, prev: stats.oncBrut, color: "#60A5FA" },
+                    { label: "Net Ciro", value: stats.netCiro, prev: stats.oncNet, color: "#34D399" },
+                    { label: "Toplam Gider", value: stats.toplamGider, prev: 0, color: "#F87171" },
+                    { label: "Günlük Ortalama", value: stats.gunlukOrt, prev: 0, color: "#FBBF24" },
+                  ].map(k => (
+                    <div key={k.label} className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-4">
+                      <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">{k.label}</p>
+                      <p className="text-xl font-black" style={{ color: k.color }}>₺{fmt(k.value)}</p>
+                      {k.prev > 0 && <div className="mt-1"><TrendBadge value={k.value} prev={k.prev} /></div>}
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-4">
+                    <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">Toplam Paket</p>
+                    <p className="text-xl font-black text-purple-400">{fmt(stats.paket)}</p>
                   </div>
-                  <p className="text-xl font-black" style={{ color: k.color }}>{k.value}</p>
-                  {k.prev > 0 && (
-                    <div className="mt-1">
-                      <TrendBadge value={k.label === "Brüt Ciro" ? stats.brutCiro : stats.netCiro} prev={k.prev} />
+                  {stats.enIyi && (
+                    <div className="bg-[#0c0f1a] border border-emerald-500/20 rounded-2xl p-4">
+                      <p className="text-[10px] text-emerald-400 uppercase tracking-widest mb-1">En İyi Gün</p>
+                      <p className="text-sm font-bold text-white">{fmtTarih(stats.enIyi.tarih)}</p>
+                      <p className="text-lg font-black text-emerald-400">₺{fmt(stats.enIyi.toplam_ciro)}</p>
+                    </div>
+                  )}
+                  {stats.enKotu && (
+                    <div className="bg-[#0c0f1a] border border-red-500/20 rounded-2xl p-4">
+                      <p className="text-[10px] text-red-400 uppercase tracking-widest mb-1">En Düşük Gün</p>
+                      <p className="text-sm font-bold text-white">{fmtTarih(stats.enKotu.tarih)}</p>
+                      <p className="text-lg font-black text-red-400">₺{fmt(stats.enKotu.toplam_ciro)}</p>
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
-
-            {/* ── PLATFORM DAĞILIMI ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-5">
-                <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-4 flex items-center gap-1.5">
-                  <PieChart size={12} /> Platform Gelir Dağılımı
-                </p>
-                <div className="space-y-3">
-                  {Object.entries(stats.platformlar).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).map(([label, value]) => {
-                    const pct = stats.toplamPlatform > 0 ? (value / stats.toplamPlatform) * 100 : 0;
-                    return (
-                      <div key={label}>
-                        <div className="flex justify-between items-center mb-1.5">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[label] }} />
-                            <span className="text-xs text-gray-300 font-medium">{label}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs font-black text-white">₺{fmt(value)}</span>
-                            <span className="text-[10px] text-gray-600 w-8 text-right">{Math.round(pct)}%</span>
-                          </div>
-                        </div>
-                        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-700"
-                            style={{ width: `${pct}%`, backgroundColor: PLATFORM_COLORS[label] }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {stats.toplamPlatform === 0 && <p className="text-xs text-gray-600 text-center py-4">Platform verisi yok</p>}
-                </div>
               </div>
+            )}
 
-              {/* ── KASA DAĞILIMI ── */}
-              <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-5">
-                <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-4 flex items-center gap-1.5">
-                  <Wallet size={12} /> Kasa Ödeme Dağılımı
-                </p>
-                <div className="space-y-3">
-                  {[
-                    { label: "Nakit", value: stats.kasaNakit, color: "#34D399" },
-                    { label: "POS / Kredi Kartı", value: stats.kasaPos, color: "#60A5FA" },
-                    { label: "Edenred", value: stats.kasaEdenred, color: "#FBBF24" },
-                  ].map(item => {
-                    const toplam = stats.kasaNakit + stats.kasaPos + stats.kasaEdenred;
-                    const pct = toplam > 0 ? (item.value / toplam) * 100 : 0;
-                    return (
-                      <div key={item.label}>
-                        <div className="flex justify-between items-center mb-1.5">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                            <span className="text-xs text-gray-300 font-medium">{item.label}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs font-black text-white">₺{fmt(item.value)}</span>
-                            <span className="text-[10px] text-gray-600 w-8 text-right">{Math.round(pct)}%</span>
-                          </div>
-                        </div>
-                        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-700"
-                            style={{ width: `${pct}%`, backgroundColor: item.color }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Özet istatistikler */}
-                <div className="mt-4 pt-4 border-t border-[#1a2236] grid grid-cols-2 gap-3">
-                  <div className="bg-[#080b14] rounded-xl p-3">
-                    <p className="text-[10px] text-gray-600 uppercase tracking-widest">Günlük Ortalama</p>
-                    <p className="text-sm font-black text-blue-400 mt-1">₺{fmt(stats.gunlukOrt)}</p>
-                  </div>
-                  <div className="bg-[#080b14] rounded-xl p-3">
-                    <p className="text-[10px] text-gray-600 uppercase tracking-widest">Rapor Günü</p>
-                    <p className="text-sm font-black text-purple-400 mt-1">{stats.gunSayisi} gün</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ── EN İYİ / EN KÖTÜ GÜN ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {stats.enIyiGun && (
-                <div className="bg-[#0c0f1a] border border-emerald-500/20 rounded-2xl p-4">
-                  <p className="text-[10px] text-emerald-400 uppercase tracking-widest font-bold mb-2 flex items-center gap-1.5">
-                    <ArrowUpRight size={12} /> En İyi Gün
-                  </p>
-                  <p className="text-lg font-black text-white">{fmtTarih(stats.enIyiGun.tarih)}</p>
-                  <p className="text-2xl font-black text-emerald-400">₺{fmt(stats.enIyiGun.toplam_ciro)}</p>
-                </div>
-              )}
-              {stats.enKotuGun && (
-                <div className="bg-[#0c0f1a] border border-red-500/20 rounded-2xl p-4">
-                  <p className="text-[10px] text-red-400 uppercase tracking-widest font-bold mb-2 flex items-center gap-1.5">
-                    <ArrowDownRight size={12} /> En Düşük Gün
-                  </p>
-                  <p className="text-lg font-black text-white">{fmtTarih(stats.enKotuGun.tarih)}</p>
-                  <p className="text-2xl font-black text-red-400">₺{fmt(stats.enKotuGun.toplam_ciro)}</p>
-                </div>
-              )}
-            </div>
-
-            {/* ── GÜNLÜK DETAY TABLOSU ── */}
-            <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl overflow-hidden">
-              <div className="px-5 py-3 border-b border-[#1a2236]">
-                <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium flex items-center gap-1.5">
-                  <Calendar size={12} /> Günlük Detay
-                </p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-[#1a2236]">
-                      {["Tarih", "Brüt Ciro", "Gider", "Net", "YS", "Getir", "Trendyol", "Paket"].map(h => (
-                        <th key={h} className="text-left px-4 py-2.5 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#0f1624]">
-                    {[...raporlar].sort((a, b) => b.tarih.localeCompare(a.tarih)).map(r => {
-                      const net = (r.toplam_ciro || 0) - (r.gunluk_gider || 0) - (r.iade_tutar || 0);
-                      const paket = r.kurye_raporlari?.reduce((s: number, k: any) => s + (parseInt(k.paketSayisi) || 0), 0) || 0;
+            {/* ── PLATFORM DETAYI ── */}
+            {raporTuru === "platform" && (
+              <div className="space-y-4">
+                <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-5">
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-4 flex items-center gap-1.5"><PieChart size={12} /> Platform Gelir Dağılımı · {odemeFiltre === "online" ? "Online" : odemeFiltre === "kapida" ? "Kapıda Ödeme" : "Tümü"}</p>
+                  <div className="space-y-4">
+                    {seciliPlatformlar.map(p => {
+                      const kol = PLATFORM_KOLON[p as keyof typeof PLATFORM_KOLON];
+                      const online = kol?.online ? raporlar.reduce((s, r) => s + ((r[kol.online as keyof GunlukRapor] as number) || 0), 0) : 0;
+                      const kapida = kol?.kapida ? raporlar.reduce((s, r) => s + ((r[kol.kapida as keyof GunlukRapor] as number) || 0), 0) : 0;
+                      const toplam = (odemeFiltre === "online" ? online : odemeFiltre === "kapida" ? kapida : online + kapida);
+                      const pct = stats.toplamPlatform > 0 ? (toplam / stats.toplamPlatform) * 100 : 0;
                       return (
-                        <tr key={r.id} className="hover:bg-white/[0.02] transition-colors">
-                          <td className="px-4 py-2.5 text-gray-300 font-medium">{fmtTarih(r.tarih)}</td>
-                          <td className="px-4 py-2.5 text-blue-400 font-bold">₺{fmt(r.toplam_ciro || 0)}</td>
-                          <td className="px-4 py-2.5 text-red-400">₺{fmt((r.gunluk_gider || 0) + (r.iade_tutar || 0))}</td>
-                          <td className={`px-4 py-2.5 font-bold ${net >= 0 ? "text-emerald-400" : "text-red-400"}`}>₺{fmt(net)}</td>
-                          <td className="px-4 py-2.5 text-gray-400">₺{fmt((r.os_yemeksepeti || 0) + (r.ko_yemeksepeti || 0))}</td>
-                          <td className="px-4 py-2.5 text-gray-400">₺{fmt((r.os_getir || 0) + (r.ko_getir || 0))}</td>
-                          <td className="px-4 py-2.5 text-gray-400">₺{fmt((r.os_trendyol || 0) + (r.ko_trendyol || 0))}</td>
-                          <td className="px-4 py-2.5 text-purple-400">{paket}</td>
-                        </tr>
+                        <div key={p} className="bg-[#080b14] rounded-xl border border-[#1a2236] p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p] }} />
+                              <span className="text-sm font-bold text-white">{p}</span>
+                            </div>
+                            <span className="text-lg font-black" style={{ color: PLATFORM_COLORS[p] }}>₺{fmt(toplam)}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3 mb-3">
+                            <div className="text-center">
+                              <p className="text-[10px] text-gray-600 uppercase tracking-widest">Online</p>
+                              <p className="text-sm font-bold text-blue-400">₺{fmt(online)}</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-[10px] text-gray-600 uppercase tracking-widest">Kapıda</p>
+                              <p className="text-sm font-bold text-orange-400">₺{fmt(kapida)}</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-[10px] text-gray-600 uppercase tracking-widest">Pay</p>
+                              <p className="text-sm font-bold text-gray-300">{Math.round(pct)}%</p>
+                            </div>
+                          </div>
+                          <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: PLATFORM_COLORS[p] }} />
+                          </div>
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-[#1a2236] flex justify-between">
+                    <span className="text-xs text-gray-600">Seçili Platform Toplamı</span>
+                    <span className="text-sm font-black text-white">₺{fmt(stats.toplamPlatform)}</span>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* ── OTOMATİK ANALİZ ── */}
+            {/* ── KASA DAĞILIMI ── */}
+            {raporTuru === "kasa" && (
+              <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-5 space-y-4">
+                <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><Wallet size={12} /> Kasa Ödeme Dağılımı</p>
+                {[
+                  { label: "Nakit", value: stats.kasaNakit, color: "#34D399" },
+                  { label: "POS / Kredi Kartı", value: stats.kasaPos, color: "#60A5FA" },
+                  { label: "Edenred", value: stats.kasaEdenred, color: "#FBBF24" },
+                ].map(item => {
+                  const toplam = stats.kasaNakit + stats.kasaPos + stats.kasaEdenred;
+                  const pct = toplam > 0 ? (item.value / toplam) * 100 : 0;
+                  return (
+                    <div key={item.label} className="bg-[#080b14] rounded-xl border border-[#1a2236] p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-bold text-white">{item.label}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-500">{Math.round(pct)}%</span>
+                          <span className="text-lg font-black" style={{ color: item.color }}>₺{fmt(item.value)}</span>
+                        </div>
+                      </div>
+                      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: item.color }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="pt-3 border-t border-[#1a2236] flex justify-between">
+                  <span className="text-xs text-gray-600">Kasa Toplamı</span>
+                  <span className="text-sm font-black text-white">₺{fmt(stats.kasaNakit + stats.kasaPos + stats.kasaEdenred)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* ── GÜN GÜN LİSTE ── */}
+            {raporTuru === "gunluk" && (
+              <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-[#1a2236] flex items-center justify-between">
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5">
+                    <Calendar size={11} /> Gün Gün Liste · {seciliPlatformlar.join(", ")} · {odemeFiltre === "online" ? "Online" : odemeFiltre === "kapida" ? "Kapıda" : "Tümü"}
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[#1a2236]">
+                        {["Tarih", "Brüt Ciro", "Net", "Gider", ...seciliPlatformlar, "Paket"].map(h => (
+                          <th key={h} className="text-left px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#0f1624]">
+                      {stats.gunlukDetay.map(g => (
+                        <tr key={g.tarih} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="px-4 py-3 text-gray-300 font-medium whitespace-nowrap">{fmtTarih(g.tarih)}</td>
+                          <td className="px-4 py-3 text-blue-400 font-bold">₺{fmt(g.brutCiro)}</td>
+                          <td className={`px-4 py-3 font-bold ${g.net >= 0 ? "text-emerald-400" : "text-red-400"}`}>₺{fmt(g.net)}</td>
+                          <td className="px-4 py-3 text-red-400">₺{fmt(g.gider)}</td>
+                          {seciliPlatformlar.map(p => (
+                            <td key={p} className="px-4 py-3 font-bold whitespace-nowrap" style={{ color: PLATFORM_COLORS[p] }}>
+                              ₺{fmt(g.platformDetay[p] || 0)}
+                            </td>
+                          ))}
+                          <td className="px-4 py-3 text-purple-400">{g.paket}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-[#1a2236] bg-[#080b14]">
+                        <td className="px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-bold">TOPLAM</td>
+                        <td className="px-4 py-3 text-blue-400 font-black">₺{fmt(stats.brutCiro)}</td>
+                        <td className="px-4 py-3 text-emerald-400 font-black">₺{fmt(stats.netCiro)}</td>
+                        <td className="px-4 py-3 text-red-400 font-black">₺{fmt(stats.toplamGider)}</td>
+                        {seciliPlatformlar.map(p => (
+                          <td key={p} className="px-4 py-3 font-black whitespace-nowrap" style={{ color: PLATFORM_COLORS[p] }}>
+                            ₺{fmt(stats.platformlar[p] || 0)}
+                          </td>
+                        ))}
+                        <td className="px-4 py-3 text-purple-400 font-black">{fmt(stats.paket)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ── PLATFORM KARŞILAŞTIRMA ── */}
+            {raporTuru === "karsilastirma" && (
+              <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-[#1a2236]">
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><BarChart3 size={11} /> Platform Karşılaştırma</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[#1a2236]">
+                        {["Platform", "Online Satış", "Kapıda Ödeme", "Toplam", "Pay %"].map(h => (
+                          <th key={h} className="text-left px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#0f1624]">
+                      {seciliPlatformlar.map(p => {
+                        const kol = PLATFORM_KOLON[p as keyof typeof PLATFORM_KOLON];
+                        const online = kol?.online ? raporlar.reduce((s, r) => s + ((r[kol.online as keyof GunlukRapor] as number) || 0), 0) : 0;
+                        const kapida = kol?.kapida ? raporlar.reduce((s, r) => s + ((r[kol.kapida as keyof GunlukRapor] as number) || 0), 0) : 0;
+                        const toplam = online + kapida;
+                        const pct = stats.toplamPlatform > 0 ? ((toplam / stats.toplamPlatform) * 100).toFixed(1) : "0";
+                        return (
+                          <tr key={p} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p] }} />
+                                <span className="font-bold text-white">{p}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-blue-400 font-bold">₺{fmt(online)}</td>
+                            <td className="px-4 py-3 text-orange-400 font-bold">₺{fmt(kapida)}</td>
+                            <td className="px-4 py-3 font-black" style={{ color: PLATFORM_COLORS[p] }}>₺{fmt(toplam)}</td>
+                            <td className="px-4 py-3 text-gray-400">{pct}%</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-[#1a2236] bg-[#080b14]">
+                        <td className="px-4 py-3 text-[10px] text-gray-600 font-bold uppercase tracking-widest">TOPLAM</td>
+                        <td className="px-4 py-3 text-blue-400 font-black">₺{fmt(seciliPlatformlar.reduce((s, p) => { const kol = PLATFORM_KOLON[p as keyof typeof PLATFORM_KOLON]; return s + (kol?.online ? raporlar.reduce((rs, r) => rs + ((r[kol.online as keyof GunlukRapor] as number) || 0), 0) : 0); }, 0))}</td>
+                        <td className="px-4 py-3 text-orange-400 font-black">₺{fmt(seciliPlatformlar.reduce((s, p) => { const kol = PLATFORM_KOLON[p as keyof typeof PLATFORM_KOLON]; return s + (kol?.kapida ? raporlar.reduce((rs, r) => rs + ((r[kol.kapida as keyof GunlukRapor] as number) || 0), 0) : 0); }, 0))}</td>
+                        <td className="px-4 py-3 text-white font-black">₺{fmt(stats.toplamPlatform)}</td>
+                        <td className="px-4 py-3 text-gray-400">100%</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ── AI ANALİZ ── */}
             <div className="bg-[#0c0f1a] border border-blue-500/20 rounded-2xl overflow-hidden">
               <div className="px-5 py-4 border-b border-[#1a2236] flex items-center justify-between">
-                <p className="text-[10px] text-blue-400 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                  <Bot size={12} /> AI İş Raporu
-                </p>
+                <p className="text-[10px] text-blue-400 uppercase tracking-widest font-bold flex items-center gap-1.5"><Bot size={12} /> AI İş Raporu</p>
                 <button onClick={analizYap} disabled={analizYukleniyor}
                   className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors">
                   {analizYukleniyor ? <Loader2 size={12} className="animate-spin" /> : <Bot size={12} />}
@@ -502,40 +596,35 @@ Mevcut dönem verileri:
                 </button>
               </div>
               <div className="p-5">
-                {analizYukleniyor ? (
-                  <div className="flex items-center gap-3 text-gray-500 text-sm">
-                    <Loader2 size={16} className="animate-spin" /> Veriler analiz ediliyor...
-                  </div>
-                ) : otomatikAnaliz ? (
-                  <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{otomatikAnaliz}</p>
-                ) : (
-                  <p className="text-sm text-gray-600">Dönem verilerinin yapay zeka analizini görmek için "Analiz Et" butonuna tıklayın.</p>
-                )}
+                {analizYukleniyor
+                  ? <div className="flex items-center gap-3 text-gray-500 text-sm"><Loader2 size={16} className="animate-spin" /> Analiz ediliyor...</div>
+                  : otomatikAnaliz
+                    ? <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{otomatikAnaliz}</p>
+                    : <p className="text-sm text-gray-600">Seçili dönem ve filtreler için AI analizi almak için "Analiz Et"e tıklayın.</p>
+                }
               </div>
             </div>
           </>
         )}
       </div>
 
-      {/* ── AI CHAT PANELİ ── */}
+      {/* AI CHAT */}
       {chatAcik && (
-        <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 w-full sm:w-96 bg-[#0c0f1a] border border-[#1a2236] sm:rounded-2xl shadow-2xl z-50 flex flex-col" style={{ height: "480px" }}>
+        <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 w-full sm:w-96 bg-[#0c0f1a] border border-[#1a2236] sm:rounded-2xl shadow-2xl z-50 flex flex-col" style={{ height: 480 }}>
           <div className="px-4 py-3 border-b border-[#1a2236] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bot size={14} className="text-blue-400" />
               <span className="text-xs font-bold text-white">AI Danışman</span>
-              <span className="text-[10px] text-gray-600 bg-white/5 px-2 py-0.5 rounded-full">KEBO ERP</span>
             </div>
-            <button onClick={() => setChatAcik(false)} className="text-gray-600 hover:text-white transition-colors text-lg leading-none">×</button>
+            <button onClick={() => setChatAcik(false)} className="text-gray-600 hover:text-white text-lg leading-none">×</button>
           </div>
-
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {mesajlar.length === 0 && (
-              <div className="text-center text-gray-600 text-xs py-8">
-                <Bot size={24} className="mx-auto mb-2 text-gray-700" />
-                Merhaba! Dönem verileriniz hakkında soru sorabilirsiniz.
+              <div className="text-center text-gray-600 text-xs py-6">
+                <Bot size={22} className="mx-auto mb-2 text-gray-700" />
+                Verileriniz hakkında soru sorun.
                 <div className="mt-3 space-y-1">
-                  {["En çok satan platform hangisi?", "Bu ay giderler ne kadar?", "Performansı nasıl değerlendirirsin?"].map(s => (
+                  {["En çok kazandıran platform hangisi?", "Bu dönem nasıl geçti?", "Giderler ne kadar yükselmiş?"].map(s => (
                     <button key={s} onClick={() => setSoru(s)}
                       className="block w-full text-left text-[11px] text-blue-400/70 hover:text-blue-400 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/10 px-3 py-1.5 rounded-lg transition-colors">
                       {s}
@@ -559,12 +648,9 @@ Mevcut dönem verileri:
               </div>
             )}
           </div>
-
           <div className="p-3 border-t border-[#1a2236] flex gap-2">
-            <input value={soru} onChange={e => setSoru(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && chatGonder()}
-              placeholder="Soru sorun..."
-              className="flex-1 bg-[#080b14] border border-[#1a2236] text-white text-xs h-9 px-3 rounded-xl outline-none focus:border-blue-500/40 placeholder:text-gray-700" />
+            <input value={soru} onChange={e => setSoru(e.target.value)} onKeyDown={e => e.key === "Enter" && chatGonder()}
+              placeholder="Soru sorun..." className="flex-1 bg-[#080b14] border border-[#1a2236] text-white text-xs h-9 px-3 rounded-xl outline-none focus:border-blue-500/40 placeholder:text-gray-700" />
             <button onClick={chatGonder} disabled={aiYukleniyor || !soru.trim()}
               className="w-9 h-9 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-xl flex items-center justify-center transition-colors">
               <Send size={13} className="text-white" />
