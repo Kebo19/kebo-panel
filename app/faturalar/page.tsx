@@ -72,7 +72,9 @@ export default function FaturalarPage() {
     setXlsYukleniyor(true);
 
     try {
-      const text = await file.text();
+      const buffer = await file.arrayBuffer();
+const decoder = new TextDecoder("utf-16le");
+const text = decoder.decode(buffer).replace(/^\uFEFF/, "");
       const parser = new DOMParser();
       const doc = parser.parseFromString(text, "text/html");
       const rows = doc.querySelectorAll("tbody tr");
