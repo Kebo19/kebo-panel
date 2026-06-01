@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
   BarChart3, Calendar, RefreshCw, Bot, Send, Loader2,
   ArrowUpRight, ArrowDownRight, Wallet, Package, TrendingUp,
   TrendingDown, PieChart, Filter, ChevronDown, AlertTriangle, X
 } from "lucide-react";
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -93,7 +93,7 @@ export default function RaporAnalizPage() {
   const [mesajlar, setMesajlar] = useState<ChatMesaj[]>([]);
   const [soru, setSoru] = useState("");
   const [aiYukleniyor, setAiYukleniyor] = useState(false);
-  const [otomatikAnaliz, setOtomatikAnaliz] = useState<any>(null); // State objeye dönüştürüldü
+  const [otomatikAnaliz, setOtomatikAnaliz] = useState<any>(null);
   const [analizYukleniyor, setAnalizYukleniyor] = useState(false);
 
   // Yetki
@@ -128,7 +128,7 @@ export default function RaporAnalizPage() {
     if (data) setRaporlar(data as GunlukRapor[]);
     if (onceki) setOncekiRaporlar(onceki as GunlukRapor[]);
     setYukleniyor(false);
-    setOtomatikAnaliz(null); // String yerine null yapıldı
+    setOtomatikAnaliz(null);
   }, [baslangic, bitis, oncekiAralik]);
 
   useEffect(() => { if (yetkili) veriCek(); }, [yetkili, veriCek]);
@@ -189,7 +189,7 @@ export default function RaporAnalizPage() {
     };
   }, [raporlar, oncekiRaporlar, seciliPlatformlar, odemeFiltre]);
 
-  // AI Analiz (Grafik ve Aksiyon Desteği İle Geliştirildi)
+  // AI Analiz
   const analizYap = async () => {
     if (!raporlar.length) return;
     setAnalizYukleniyor(true);
@@ -205,11 +205,12 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "x-api-key": process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || "", 
-          "anthropic-version": "2023-06-01" 
+          "x-api-key": process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || "",
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true"
         },
         body: JSON.stringify({
-          model: "claude-3-5-sonnet-20240620",
+          model: "claude-3-5-sonnet-20240620", 
           max_tokens: 1000,
           system: `Sen KEBO ERP iş analistisisin. SADECE şu JSON formatında cevap ver ve ASLA fazladan metin yazma: 
           {
@@ -220,11 +221,14 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
           messages: [{ role: "user", content: `Analiz et:\n${ozet}` }],
         }),
       });
+      
+      if (!res.ok) throw new Error("API Hatası");
       const d = await res.json();
-      const cleaned = d.content?.[0]?.text.replace(/```json/g, "").replace(/```/g, "") || "";
+      const cleaned = d.content?.[0]?.text.replace(/```json/g, "").replace(/
+```/g, "") || "";
       setOtomatikAnaliz(JSON.parse(cleaned));
     } catch { 
-      setOtomatikAnaliz({ analysis: "Analiz sırasında bir hata oluştu veya veriler alınamadı.", chartData: [], action: { type: "none" } }); 
+      setOtomatikAnaliz({ analysis: "Analiz sırasında bir hata oluştu veya bağlantı kurulamadı. Lütfen API anahtarınızı kontrol edin.", chartData: [], action: { type: "none", description: "" } }); 
     }
     setAnalizYukleniyor(false);
   };
@@ -242,7 +246,8 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
         headers: { 
           "Content-Type": "application/json",
           "x-api-key": process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || "",
-          "anthropic-version": "2023-06-01"
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true"
         },
         body: JSON.stringify({
           model: "claude-3-5-sonnet-20240620", max_tokens: 1000,
@@ -250,9 +255,11 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
           messages: liste.map(m => ({ role: m.rol, content: m.icerik })),
         }),
       });
+      
+      if (!res.ok) throw new Error("API Hatası");
       const d = await res.json();
       setMesajlar(prev => [...prev, { rol: "assistant", icerik: d.content?.[0]?.text || "Cevap alınamadı." }]);
-    } catch { setMesajlar(prev => [...prev, { rol: "assistant", icerik: "Bağlantı hatası." }]); }
+    } catch { setMesajlar(prev => [...prev, { rol: "assistant", icerik: "Bağlantı hatası. Lütfen API ayarlarınızı kontrol edin." }]); }
     setAiYukleniyor(false);
   };
 
@@ -260,7 +267,7 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
   if (!yetkili) return (
     <div className="min-h-screen bg-[#060810] flex items-center justify-center p-6">
       <div className="bg-[#0c0f1a] border border-red-500/20 rounded-2xl p-8 max-w-sm text-center">
-        <AlertTriangle className="h-10 w-10 text-red-400 mx-auto mb-4" />
+        <AlertTriangle className="h-10 w-10 text-red-400 mx-auto mb-4"/>
         <h1 className="text-white font-black text-lg mb-2">Erişim Kısıtlı</h1>
         <p className="text-gray-500 text-sm">Yalnızca yöneticiler görebilir.</p>
       </div>
@@ -270,12 +277,12 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
   return (
     <div className="min-h-screen bg-[#060810] text-white font-sans antialiased pb-20">
 
-      {/* HEADER */}
+      
       <div className="sticky top-0 z-40 border-b border-[#0f1624] bg-[#060810]/95 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center">
-              <BarChart3 className="h-4 w-4 text-white" />
+              <BarChart3 className="h-4 w-4 text-white"/>
             </div>
             <div>
               <h1 className="text-sm font-black text-white leading-none">Rapor Analizi</h1>
@@ -284,11 +291,11 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
           </div>
           <div className="flex gap-2">
             <button onClick={veriCek} disabled={yukleniyor} className="p-2 text-gray-600 hover:text-white border border-[#1a2236] rounded-xl transition-colors">
-              <RefreshCw size={14} className={yukleniyor ? "animate-spin" : ""} />
+              <RefreshCw size="{14}" className="{yukleniyor" ? "animate-spin" : ""}/>
             </button>
             <button onClick={() => setChatAcik(!chatAcik)}
               className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-colors ${chatAcik ? "bg-blue-600 text-white" : "border border-[#1a2236] text-gray-400 hover:text-white"}`}>
-              <Bot size={14} /> AI
+              <Bot size="{14}"/> AI
             </button>
           </div>
         </div>
@@ -296,11 +303,11 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
 
       <div className="max-w-6xl mx-auto px-4 py-5 space-y-5">
 
-        {/* ── FİLTRE PANELİ ── */}
+        
         <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-5 space-y-4">
-          <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><Filter size={11} /> Rapor Filtresi</p>
+          <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><Filter size="{11}"/> Rapor Filtresi</p>
 
-          {/* Tarih aralığı */}
+          
           <div className="flex flex-wrap gap-3 items-center">
             <div>
               <p className="text-[10px] text-gray-600 mb-1.5 uppercase tracking-widest">Başlangıç</p>
@@ -312,7 +319,7 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
               <input type="date" value={bitis} onChange={e => setBitis(e.target.value)}
                 className="bg-[#080b14] border border-[#1a2236] text-white text-xs h-9 px-3 rounded-xl outline-none focus:border-blue-500/40" />
             </div>
-            {/* Hızlı seçim */}
+            
             <div className="flex gap-1.5 flex-wrap mt-4 sm:mt-0">
               {[
                 { label: "Bu ay", fn: () => { const d = new Date(); d.setDate(1); setBaslangic(d.toISOString().split("T")[0]); setBitis(new Date().toISOString().split("T")[0]); } },
@@ -328,7 +335,7 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
             </div>
           </div>
 
-          {/* Rapor türü */}
+          
           <div>
             <p className="text-[10px] text-gray-600 mb-2 uppercase tracking-widest">Rapor Türü</p>
             <div className="flex flex-wrap gap-2">
@@ -342,7 +349,7 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
             <p className="text-[11px] text-gray-600 mt-2">{RAPOR_TURLERI.find(t => t.key === raporTuru)?.desc}</p>
           </div>
 
-          {/* Platform filtresi (platform raporu seçilince) */}
+          
           {(raporTuru === "platform" || raporTuru === "gunluk" || raporTuru === "karsilastirma") && (
             <div>
               <p className="text-[10px] text-gray-600 mb-2 uppercase tracking-widest">Platformlar</p>
@@ -377,7 +384,7 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
           </div>
         ) : (
           <>
-            {/* ── GENEL ÖZET ── */}
+            
             {raporTuru === "genel" && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -390,7 +397,7 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
                     <div key={k.label} className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-4">
                       <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">{k.label}</p>
                       <p className="text-xl font-black" style={{ color: k.color }}>₺{fmt(k.value)}</p>
-                      {k.prev > 0 && <div className="mt-1"><TrendBadge value={k.value} prev={k.prev} /></div>}
+                      {k.prev > 0 && <div className="mt-1"><TrendBadge value="{k.value}" prev="{k.prev}"/></div>}
                     </div>
                   ))}
                 </div>
@@ -417,11 +424,11 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
               </div>
             )}
 
-            {/* ── PLATFORM DETAYI ── */}
+            
             {raporTuru === "platform" && (
               <div className="space-y-4">
                 <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-5">
-                  <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-4 flex items-center gap-1.5"><PieChart size={12} /> Platform Gelir Dağılımı · {odemeFiltre === "online" ? "Online" : odemeFiltre === "kapida" ? "Kapıda Ödeme" : "Tümü"}</p>
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-4 flex items-center gap-1.5"><PieChart size="{12}"/> Platform Gelir Dağılımı · {odemeFiltre === "online" ? "Online" : odemeFiltre === "kapida" ? "Kapıda Ödeme" : "Tümü"}</p>
                   <div className="space-y-4">
                     {seciliPlatformlar.map(p => {
                       const kol = PLATFORM_KOLON[p as keyof typeof PLATFORM_KOLON];
@@ -467,10 +474,10 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
               </div>
             )}
 
-            {/* ── KASA DAĞILIMI ── */}
+            
             {raporTuru === "kasa" && (
               <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-5 space-y-4">
-                <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><Wallet size={12} /> Kasa Ödeme Dağılımı</p>
+                <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><Wallet size="{12}"/> Kasa Ödeme Dağılımı</p>
                 {[
                   { label: "Nakit", value: stats.kasaNakit, color: "#34D399" },
                   { label: "POS / Kredi Kartı", value: stats.kasaPos, color: "#60A5FA" },
@@ -500,12 +507,12 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
               </div>
             )}
 
-            {/* ── GÜN GÜN LİSTE ── */}
+            
             {raporTuru === "gunluk" && (
               <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl overflow-hidden">
                 <div className="px-5 py-3 border-b border-[#1a2236] flex items-center justify-between">
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5">
-                    <Calendar size={11} /> Gün Gün Liste · {seciliPlatformlar.join(", ")} · {odemeFiltre === "online" ? "Online" : odemeFiltre === "kapida" ? "Kapıda" : "Tümü"}
+                    <Calendar size="{11}"/> Gün Gün Liste · {seciliPlatformlar.join(", ")} · {odemeFiltre === "online" ? "Online" : odemeFiltre === "kapida" ? "Kapıda" : "Tümü"}
                   </p>
                 </div>
                 <div className="overflow-x-auto">
@@ -552,11 +559,11 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
               </div>
             )}
 
-            {/* ── PLATFORM KARŞILAŞTIRMA ── */}
+            
             {raporTuru === "karsilastirma" && (
               <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl overflow-hidden">
                 <div className="px-5 py-3 border-b border-[#1a2236]">
-                  <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><BarChart3 size={11} /> Platform Karşılaştırma</p>
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><BarChart3 size="{11}"/> Platform Karşılaştırma</p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
@@ -604,19 +611,19 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
               </div>
             )}
 
-            {/* ── AI ANALİZ ── */}
+            
             <div className="bg-[#0c0f1a] border border-blue-500/20 rounded-2xl overflow-hidden">
               <div className="px-5 py-4 border-b border-[#1a2236] flex items-center justify-between">
-                <p className="text-[10px] text-blue-400 uppercase tracking-widest font-bold flex items-center gap-1.5"><Bot size={12} /> AI İş Raporu</p>
+                <p className="text-[10px] text-blue-400 uppercase tracking-widest font-bold flex items-center gap-1.5"><Bot size="{12}"/> AI İş Raporu</p>
                 <button onClick={analizYap} disabled={analizYukleniyor}
                   className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors">
-                  {analizYukleniyor ? <Loader2 size={12} className="animate-spin" /> : <Bot size={12} />}
+                  {analizYukleniyor ? <Loader2 size="{12}" className="animate-spin"/> : <Bot size="{12}"/>}
                   {otomatikAnaliz ? "Yenile" : "Analiz Et"}
                 </button>
               </div>
               <div className="p-5">
                 {analizYukleniyor
-                  ? <div className="flex items-center gap-3 text-gray-500 text-sm"><Loader2 size={16} className="animate-spin" /> Analiz ediliyor...</div>
+                  ? <div className="flex items-center gap-3 text-gray-500 text-sm"><Loader2 size="{16}" className="animate-spin"/> Analiz ediliyor...</div>
                   : otomatikAnaliz ? (
                     <div className="space-y-5">
                       <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{otomatikAnaliz.analysis || "Analiz tamamlandı."}</p>
@@ -624,10 +631,10 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
                       {otomatikAnaliz.chartData && otomatikAnaliz.chartData.length > 0 && (
                         <div className="h-[200px] w-full mt-4">
                           <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={otomatikAnaliz.chartData}>
-                              <XAxis dataKey="name" stroke="#666" fontSize={10} tickLine={false} axisLine={false} />
-                              <Tooltip contentStyle={{backgroundColor: '#0c0f1a', borderColor: '#1a2236', color: '#fff'}} itemStyle={{color: '#3b82f6'}} />
-                              <Bar dataKey="deger" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                            <BarChart data="{otomatikAnaliz.chartData}">
+                              <XAxis dataKey="name" stroke="#666" fontSize="{10}" tickLine="{false}" axisLine="{false}"/>
+                              <Tooltip contentStyle="{{backgroundColor:" '#0c0f1a', borderColor: '#1a2236', color: '#fff'}} itemStyle="{{color:" '#3b82f6'}} cursor="{{fill:" '#1a2236'}}/>
+                              <Bar dataKey="deger" fill="#3b82f6" radius="{[4," 4, 0, 0]}/>
                             </BarChart>
                           </ResponsiveContainer>
                         </div>
@@ -648,12 +655,12 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
         )}
       </div>
 
-      {/* AI CHAT */}
+      
       {chatAcik && (
         <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 w-full sm:w-96 bg-[#0c0f1a] border border-[#1a2236] sm:rounded-2xl shadow-2xl z-50 flex flex-col" style={{ height: 480 }}>
           <div className="px-4 py-3 border-b border-[#1a2236] flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Bot size={14} className="text-blue-400" />
+              <Bot size="{14}" className="text-blue-400"/>
               <span className="text-xs font-bold text-white">AI Danışman</span>
             </div>
             <button onClick={() => setChatAcik(false)} className="text-gray-600 hover:text-white text-lg leading-none">×</button>
@@ -661,7 +668,7 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {mesajlar.length === 0 && (
               <div className="text-center text-gray-600 text-xs py-6">
-                <Bot size={22} className="mx-auto mb-2 text-gray-700" />
+                <Bot size="{22}" className="mx-auto mb-2 text-gray-700"/>
                 Verileriniz hakkında soru sorun.
                 <div className="mt-3 space-y-1">
                   {["En çok kazandıran platform hangisi?", "Bu dönem nasıl geçti?", "Giderler ne kadar yükselmiş?"].map(s => (
@@ -683,7 +690,7 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
             {aiYukleniyor && (
               <div className="flex justify-start">
                 <div className="bg-[#080b14] border border-[#1a2236] rounded-xl px-3 py-2">
-                  <Loader2 size={12} className="animate-spin text-blue-400" />
+                  <Loader2 size="{12}" className="animate-spin text-blue-400"/>
                 </div>
               </div>
             )}
@@ -693,7 +700,7 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
               placeholder="Soru sorun..." className="flex-1 bg-[#080b14] border border-[#1a2236] text-white text-xs h-9 px-3 rounded-xl outline-none focus:border-blue-500/40 placeholder:text-gray-700" />
             <button onClick={chatGonder} disabled={aiYukleniyor || !soru.trim()}
               className="w-9 h-9 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-xl flex items-center justify-center transition-colors">
-              <Send size={13} className="text-white" />
+              <Send size="{13}" className="text-white"/>
             </button>
           </div>
         </div>
