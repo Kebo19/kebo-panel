@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard, Wallet, ClipboardList, Users, Settings, LogOut,
-  Utensils, BarChart3, TrendingUp, Menu, X
+  Utensils, BarChart3, TrendingUp, Menu, X, Building2, FileText, ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,7 @@ export default function Sidebar() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [drawerAcik, setDrawerAcik] = useState(false);
+  const [kasaAcik, setKasaAcik] = useState(false);
 
   useEffect(() => {
     const yetkiKontrol = async () => {
@@ -31,6 +32,13 @@ export default function Sidebar() {
 
   useEffect(() => { setDrawerAcik(false); }, [pathname]);
 
+  // Kasa alt menüsü açık kalsın eğer alt sayfalardaysa
+  useEffect(() => {
+    if (pathname.startsWith("/kasa") || pathname.startsWith("/cariler") || pathname.startsWith("/faturalar")) {
+      setKasaAcik(true);
+    }
+  }, [pathname]);
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push("/login");
@@ -41,16 +49,29 @@ export default function Sidebar() {
     ...(isAdmin ? [{ name: "Anasayfa", icon: LayoutDashboard, href: "/" }] : []),
     { name: "Kasa Raporu", icon: ClipboardList, href: "/raporlar" },
     ...(isAdmin ? [{ name: "Rapor Analizi", icon: BarChart3, href: "/rapor-analiz" }] : []),
-    ...(isAdmin ? [{ name: "Kasa", icon: Wallet, href: "/kasa" }] : []),
-    ...(isAdmin ? [{ name: "Platform", icon: TrendingUp, href: "/platform-takip" }] : []),
     { name: "Personel", icon: Users, href: "/personel" },
     { name: "Ayarlar", icon: Settings, href: "/ayarlar" },
   ];
 
-  const bottomNavItems = menuItems.slice(0, 5);
+  const kasaAltMenuler = [
+    { name: "Kasa", icon: Wallet, href: "/kasa" },
+    { name: "Platform", icon: TrendingUp, href: "/platform-takip" },
+    { name: "Cariler", icon: Building2, href: "/cariler" },
+    { name: "Faturalar", icon: FileText, href: "/faturalar" },
+  ];
+
+  const bottomNavItems = [
+    ...(isAdmin ? [{ name: "Anasayfa", icon: LayoutDashboard, href: "/" }] : []),
+    { name: "Kasa Raporu", icon: ClipboardList, href: "/raporlar" },
+    { name: "Personel", icon: Users, href: "/personel" },
+    { name: "Rapor", icon: BarChart3, href: "/rapor-analiz" },
+    { name: "Ayarlar", icon: Settings, href: "/ayarlar" },
+  ].slice(0, 5);
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
+
+  const kasaGrubuAktif = kasaAltMenuler.some(m => isActive(m.href));
 
   if (loading) return (
     <>
@@ -72,6 +93,7 @@ export default function Sidebar() {
             KEBO<span className="text-blue-500">.</span>ERP
           </span>
         </div>
+
         <nav className="flex-1 p-3 space-y-1 mt-2 overflow-y-auto">
           {menuItems.map((item) => (
             <Link key={item.name} href={item.href}
@@ -87,7 +109,46 @@ export default function Sidebar() {
               <span className="font-medium">{item.name}</span>
             </Link>
           ))}
+
+          {/* ── KASA GRUBU ── */}
+          {isAdmin && (
+            <div>
+              <button onClick={() => setKasaAcik(!kasaAcik)}
+                className={cn(
+                  "w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all text-sm group",
+                  kasaGrubuAktif
+                    ? "bg-blue-600/20 text-blue-400"
+                    : "text-gray-500 hover:bg-white/5 hover:text-white"
+                )}>
+                <div className="flex items-center gap-3">
+                  <Wallet className={cn("h-4 w-4 shrink-0", kasaGrubuAktif ? "text-blue-400" : "text-gray-600 group-hover:text-blue-400")} />
+                  <span className="font-medium">Kasa & Finans</span>
+                </div>
+                <ChevronDown size={13} className={cn("transition-transform duration-200", kasaAcik ? "rotate-180" : "")} />
+              </button>
+
+              {kasaAcik && (
+                <div className="ml-4 mt-1 space-y-1 border-l border-[#1a2236] pl-3">
+                  {kasaAltMenuler.map(item => (
+                    <Link key={item.name} href={item.href}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm group",
+                        isActive(item.href)
+                          ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
+                          : "text-gray-500 hover:bg-white/5 hover:text-white"
+                      )}>
+                      <item.icon className={cn("h-3.5 w-3.5 shrink-0",
+                        isActive(item.href) ? "text-white" : "text-gray-600 group-hover:text-blue-400"
+                      )} />
+                      <span className="font-medium text-xs">{item.name}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
+
         <div className="p-3 border-t border-[#1a2236]">
           <p className="px-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold border-b border-[#1a2236] pb-3 mb-2">
             {isAdmin ? "Yönetici" : "Şube Müdürü"}
@@ -134,16 +195,38 @@ export default function Sidebar() {
                 <Link key={item.name} href={item.href}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all text-sm",
-                    isActive(item.href)
-                      ? "bg-blue-600 text-white"
-                      : "text-gray-400 hover:bg-white/5 hover:text-white"
+                    isActive(item.href) ? "bg-blue-600 text-white" : "text-gray-400 hover:bg-white/5 hover:text-white"
                   )}>
-                  <item.icon className={cn("h-5 w-5 shrink-0",
-                    isActive(item.href) ? "text-white" : "text-gray-600"
-                  )} />
+                  <item.icon className={cn("h-5 w-5 shrink-0", isActive(item.href) ? "text-white" : "text-gray-600")} />
                   <span className="font-medium">{item.name}</span>
                 </Link>
               ))}
+              {isAdmin && (
+                <div>
+                  <button onClick={() => setKasaAcik(!kasaAcik)}
+                    className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                    <div className="flex items-center gap-3">
+                      <Wallet className="h-5 w-5 shrink-0 text-gray-600" />
+                      <span className="font-medium">Kasa & Finans</span>
+                    </div>
+                    <ChevronDown size={13} className={cn("transition-transform", kasaAcik ? "rotate-180" : "")} />
+                  </button>
+                  {kasaAcik && (
+                    <div className="ml-4 border-l border-[#1a2236] pl-3 space-y-1">
+                      {kasaAltMenuler.map(item => (
+                        <Link key={item.name} href={item.href}
+                          className={cn(
+                            "flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm",
+                            isActive(item.href) ? "bg-blue-600 text-white" : "text-gray-400 hover:bg-white/5 hover:text-white"
+                          )}>
+                          <item.icon className={cn("h-4 w-4 shrink-0", isActive(item.href) ? "text-white" : "text-gray-600")} />
+                          <span className="font-medium text-xs">{item.name}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </nav>
             <div className="p-3 border-t border-[#1a2236]">
               <button onClick={handleSignOut}
