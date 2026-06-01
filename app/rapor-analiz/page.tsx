@@ -201,13 +201,10 @@ Kasa: Nakit ₺${fmt(stats.kasaNakit)}, POS ₺${fmt(stats.kasaPos)}, Edenred �
 En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.enIyi.toplam_ciro) : "-"}`;
     
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      // YENİ GÜNCELLEME: İsteği artık bizim oluşturduğumuz backend dosyasına (route.ts) atıyoruz
+      const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "x-api-key": process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || "", 
-          "anthropic-version": "2023-06-01" 
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-3-5-sonnet-20240620",
           max_tokens: 1000,
@@ -223,11 +220,10 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
       
       if (!res.ok) throw new Error("API Hatası");
       const d = await res.json();
-      // Derleme hatasını çözen regex güncellemesi:
       const cleaned = d.content?.[0]?.text.replace(/[\`]{3}json/g, "").replace(/[\`]{3}/g, "") || "";
       setOtomatikAnaliz(JSON.parse(cleaned));
     } catch { 
-      setOtomatikAnaliz({ analysis: "Analiz sırasında bir hata oluştu veya veriler alınamadı.", chartData: [], action: { type: "none" } }); 
+      setOtomatikAnaliz({ analysis: "Analiz sırasında bir hata oluştu veya bağlantı kurulamadı. Lütfen API ayarlarınızı kontrol edin.", chartData: [], action: { type: "none", description: "" } }); 
     }
     setAnalizYukleniyor(false);
   };
@@ -240,14 +236,10 @@ En iyi gün: ${stats.enIyi ? fmtTarih(stats.enIyi.tarih) + " ₺" + fmt(stats.en
     setMesajlar(liste); setSoru(""); setAiYukleniyor(true);
     const baglamOzet = `Brüt: ₺${fmt(stats.brutCiro)}, Net: ₺${fmt(stats.netCiro)}, Platformlar: ${Object.entries(stats.platformlar).filter(([, v]) => v > 0).map(([k, v]) => `${k}: ₺${fmt(v)}`).join(", ")}`;
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      // YENİ GÜNCELLEME: İsteği artık bizim oluşturduğumuz backend dosyasına (route.ts) atıyoruz
+      const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "x-api-key": process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || "",
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-3-5-sonnet-20240620", max_tokens: 1000,
           system: `KEBO ERP danışmanısın. Türkçe, kısa cevap ver. Veri: ${baglamOzet}`,
