@@ -658,4 +658,3 @@ export default function PersonelDetayPage() {
       )}
     </div>
   );
-}

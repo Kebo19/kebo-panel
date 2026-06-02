@@ -11,21 +11,36 @@ import {
   Phone, Wallet, Calendar, ShieldCheck
 } from "lucide-react";
 
+// ─── TYPES ────────────────────────────────────────────────────────────────────
+
 interface Personel {
-  id: string; isim: string; telefon?: string; departman?: string; maas?: number;
-  ise_giris_tarihi?: string; isten_cikis_tarihi?: string; durum: "aktif" | "ayrildi";
+  id: string;
+  isim: string;
+  telefon?: string;
+  departman?: string;
+  maas?: number;
+  ise_giris_tarihi?: string;
+  isten_cikis_tarihi?: string;
+  durum: "aktif" | "ayrildi";
 }
 
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+
 const DEPARTMANLAR = [
-  { key: "Mutfak", label: "Mutfak", icon: ChefHat, color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
-  { key: "Banko", label: "Banko", icon: Store, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
-  { key: "Kurye", label: "Kurye", icon: Bike, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-  { key: "Temizlik", label: "Temizlik", icon: Sparkles, color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
-  { key: "Yönetim", label: "Yönetim", icon: ShieldCheck, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
-  { key: "Diğer", label: "Diğer", icon: Users, color: "text-gray-400", bg: "bg-gray-500/10", border: "border-gray-500/20" },
+  { key: "Mutfak",   label: "Mutfak",   icon: ChefHat,    color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
+  { key: "Banko",    label: "Banko",    icon: Store,      color: "text-blue-400",   bg: "bg-blue-500/10",   border: "border-blue-500/20"   },
+  { key: "Kurye",    label: "Kurye",    icon: Bike,       color: "text-emerald-400",bg: "bg-emerald-500/10",border: "border-emerald-500/20" },
+  { key: "Temizlik", label: "Temizlik", icon: Sparkles,   color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20"  },
+  { key: "Yönetim",  label: "Yönetim",  icon: ShieldCheck,color: "text-amber-400",  bg: "bg-amber-500/10",  border: "border-amber-500/20"   },
+  { key: "Diğer",    label: "Diğer",    icon: Users,      color: "text-gray-400",   bg: "bg-gray-500/10",   border: "border-gray-500/20"    },
 ];
 
 const fmt = (v: number) => new Intl.NumberFormat("tr-TR").format(v);
+const fmtTarih = (t?: string) => {
+  if (!t) return null;
+  const [y, m, d] = t.split("-");
+  return `${d}.${m}.${y}`;
+};
 const calismaSuresi = (t?: string) => {
   if (!t) return null;
   const ay = Math.floor((Date.now() - new Date(t).getTime()) / (1000 * 60 * 60 * 24 * 30));
@@ -33,6 +48,8 @@ const calismaSuresi = (t?: string) => {
   if (ay < 12) return `${ay} ay`;
   return `${Math.floor(ay / 12)} yıl ${ay % 12} ay`;
 };
+
+// ─── PERSONEL KARTI ───────────────────────────────────────────────────────────
 
 function PersonelKart({ personel }: { personel: Personel }) {
   return (
@@ -43,16 +60,37 @@ function PersonelKart({ personel }: { personel: Personel }) {
             {personel.isim.split(" ").map(n => n[0]).slice(0, 2).join("")}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors truncate">{personel.isim}</p>
+            <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors truncate">
+              {personel.isim}
+            </p>
             <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-              {personel.telefon && <span className="text-[11px] text-gray-600 flex items-center gap-1"><Phone size={9} />{personel.telefon}</span>}
-              {personel.ise_giris_tarihi && <span className="text-[11px] text-gray-600 flex items-center gap-1"><Calendar size={9} />{calismaSuresi(personel.ise_giris_tarihi)}</span>}
+              {personel.telefon && (
+                <span className="text-[11px] text-gray-600 flex items-center gap-1">
+                  <Phone size={9} />{personel.telefon}
+                </span>
+              )}
+              {personel.ise_giris_tarihi && (
+                <span className="text-[11px] text-gray-600 flex items-center gap-1">
+                  <Calendar size={9} />{calismaSuresi(personel.ise_giris_tarihi)}
+                </span>
+              )}
+              {personel.durum === "ayrildi" && personel.isten_cikis_tarihi && (
+                <span className="text-[11px] text-red-500/70">
+                  Çıkış: {fmtTarih(personel.isten_cikis_tarihi)}
+                </span>
+              )}
             </div>
           </div>
         </div>
         <div className="text-right shrink-0">
-          {personel.maas ? <p className="text-xs font-bold text-emerald-400">₺{fmt(personel.maas)}</p> : null}
-          <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-lg ${personel.durum === "aktif" ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
+          {personel.maas ? (
+            <p className="text-xs font-bold text-emerald-400">₺{fmt(personel.maas)}</p>
+          ) : null}
+          <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-lg ${
+            personel.durum === "aktif"
+              ? "bg-emerald-500/10 text-emerald-400"
+              : "bg-red-500/10 text-red-400"
+          }`}>
             {personel.durum === "aktif" ? "Aktif" : "Ayrıldı"}
           </span>
         </div>
@@ -61,36 +99,58 @@ function PersonelKart({ personel }: { personel: Personel }) {
   );
 }
 
-function DepartmanBolum({ dept, personeller, acik, onToggle }: {
-  dept: typeof DEPARTMANLAR[0]; personeller: Personel[]; acik: boolean; onToggle: () => void;
+// ─── DEPARTMAN BÖLÜMÜ ─────────────────────────────────────────────────────────
+
+function DepartmanBolum({
+  dept, personeller, acik, onToggle,
+}: {
+  dept: typeof DEPARTMANLAR[0];
+  personeller: Personel[];
+  acik: boolean;
+  onToggle: () => void;
 }) {
   const Icon = dept.icon;
   return (
     <div className={`rounded-2xl border overflow-hidden ${dept.border} bg-[#0c0f1a]`}>
-      <button onClick={onToggle} className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.02] transition-colors">
+      <button onClick={onToggle}
+        className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.02] transition-colors">
         <div className="flex items-center gap-3">
           <div className={`w-8 h-8 rounded-xl ${dept.bg} flex items-center justify-center`}>
             <Icon size={15} className={dept.color} />
           </div>
-          <p className={`text-xs font-bold ${dept.color} uppercase tracking-wider`}>{dept.label}</p>
-          <span className="text-[11px] text-gray-600 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">{personeller.length} kişi</span>
+          <div className="text-left">
+            <p className={`text-xs font-bold ${dept.color} uppercase tracking-wider`}>{dept.label}</p>
+          </div>
+          <span className="text-[11px] text-gray-600 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
+            {personeller.length} kişi
+          </span>
         </div>
         <ChevronDown size={15} className={`text-gray-600 transition-transform duration-300 ${acik ? "rotate-180" : ""}`} />
       </button>
+
       {acik && (
         <div className="px-4 pb-4 space-y-2 border-t border-[#1a2236]">
-          {personeller.length === 0
-            ? <div className="py-6 text-center text-gray-600 text-xs uppercase tracking-widest">Bu departmanda personel yok</div>
-            : <div className="pt-3 space-y-2">{personeller.map(p => <PersonelKart key={p.id} personel={p} />)}</div>
-          }
+          {personeller.length === 0 ? (
+            <div className="py-6 text-center text-gray-600 text-xs uppercase tracking-widest">
+              Bu departmanda personel yok
+            </div>
+          ) : (
+            <div className="pt-3 space-y-2">
+              {personeller.map(p => <PersonelKart key={p.id} personel={p} />)}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
+// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
+
 function PersonellerPageInner() {
+  const router = useRouter();
   const supabase = createClient();
+
   const [personeller, setPersoneller] = useState<Personel[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"aktif" | "ayrildi">("aktif");
@@ -103,7 +163,7 @@ function PersonellerPageInner() {
     setLoading(true);
     const { data, error } = await supabase
       .from("personeller")
-      .select("id, isim, telefon, departman, maas, ise_giris_tarihi, isten_cikis_tarihi, durum")
+      .select("id,isim,telefon,departman,maas,ise_giris_tarihi,isten_cikis_tarihi,durum")
       .order("isim");
     if (!error && data) setPersoneller(data as Personel[]);
     setLoading(false);
@@ -116,7 +176,9 @@ function PersonellerPageInner() {
       if (p.durum !== tab) return false;
       if (aramaMetni) {
         const q = aramaMetni.toLowerCase();
-        return p.isim.toLowerCase().includes(q) || p.departman?.toLowerCase().includes(q) || p.telefon?.includes(q);
+        return p.isim.toLowerCase().includes(q) ||
+          p.departman?.toLowerCase().includes(q) ||
+          p.telefon?.includes(q);
       }
       return true;
     });
@@ -144,6 +206,8 @@ function PersonellerPageInner() {
 
   return (
     <div className="min-h-screen bg-[#060810] text-white font-sans antialiased">
+
+      {/* ── HEADER ── */}
       <div className="sticky top-0 z-40 border-b border-[#0f1624] bg-[#060810]/95 backdrop-blur-xl">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -152,11 +216,14 @@ function PersonellerPageInner() {
             </div>
             <div>
               <h1 className="text-sm font-black tracking-tight text-white leading-none">Personeller</h1>
-              <p className="text-[10px] text-gray-600 leading-none mt-0.5">{aktifSayisi} aktif · {ayrilanSayisi} ayrılan</p>
+              <p className="text-[10px] text-gray-600 leading-none mt-0.5">
+                {aktifSayisi} aktif · {ayrilanSayisi} ayrılan
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={veriCek} className="p-2 text-gray-600 hover:text-white border border-[#1a2236] hover:border-[#2a3550] rounded-xl transition-colors">
+            <button onClick={veriCek}
+              className="p-2 text-gray-600 hover:text-white border border-[#1a2236] hover:border-[#2a3550] rounded-xl transition-colors">
               <RefreshCw size={14} />
             </button>
             <Link href="/personel/yeni"
@@ -168,19 +235,36 @@ function PersonellerPageInner() {
       </div>
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-4">
+
+        {/* ── TAB + ARAMA ── */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex gap-1 bg-[#0c0f1a] border border-[#1a2236] rounded-xl p-1">
             <button onClick={() => setTab("aktif")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors ${tab === "aktif" ? "bg-emerald-600 text-white" : "text-gray-500 hover:text-gray-300"}`}>
-              <UserCheck size={13} /> Aktif
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tab === "aktif" ? "bg-white/20" : "bg-white/5"}`}>{aktifSayisi}</span>
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
+                tab === "aktif"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}>
+              <UserCheck size={13} />
+              Aktif
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tab === "aktif" ? "bg-white/20" : "bg-white/5"}`}>
+                {aktifSayisi}
+              </span>
             </button>
             <button onClick={() => setTab("ayrildi")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors ${tab === "ayrildi" ? "bg-red-600 text-white" : "text-gray-500 hover:text-gray-300"}`}>
-              <UserX size={13} /> Ayrılanlar
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tab === "ayrildi" ? "bg-white/20" : "bg-white/5"}`}>{ayrilanSayisi}</span>
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
+                tab === "ayrildi"
+                  ? "bg-red-600 text-white shadow-sm"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}>
+              <UserX size={13} />
+              Ayrılanlar
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tab === "ayrildi" ? "bg-white/20" : "bg-white/5"}`}>
+                {ayrilanSayisi}
+              </span>
             </button>
           </div>
+
           <div className="relative flex-1">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
             <input value={aramaMetni} onChange={e => setAramaMetni(e.target.value)}
@@ -189,25 +273,40 @@ function PersonellerPageInner() {
           </div>
         </div>
 
-        {aramaMetni ? (
+        {/* ── ARAMA SONUÇLARI ── */}
+        {aramaMetni && (
           <div className="space-y-2">
-            <p className="text-[10px] text-gray-600 uppercase tracking-widest px-1">{filtreliPersoneller.length} sonuç</p>
-            {filtreliPersoneller.length === 0
-              ? <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl py-10 text-center text-gray-600 text-xs uppercase tracking-widest">Personel bulunamadı</div>
-              : filtreliPersoneller.map(p => <PersonelKart key={p.id} personel={p} />)
-            }
+            <p className="text-[10px] text-gray-600 uppercase tracking-widest px-1">
+              {filtreliPersoneller.length} sonuç
+            </p>
+            {filtreliPersoneller.length === 0 ? (
+              <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl py-10 text-center text-gray-600 text-xs uppercase tracking-widest">
+                Personel bulunamadı
+              </div>
+            ) : (
+              filtreliPersoneller.map(p => <PersonelKart key={p.id} personel={p} />)
+            )}
           </div>
-        ) : (
+        )}
+
+        {/* ── DEPARTMAN BÖLÜMLERI ── */}
+        {!aramaMetni && (
           <div className="space-y-3">
             {DEPARTMANLAR.map(dept => (
-              <DepartmanBolum key={dept.key} dept={dept} personeller={gruplar[dept.key] || []}
+              <DepartmanBolum
+                key={dept.key}
+                dept={dept}
+                personeller={gruplar[dept.key] || []}
                 acik={acikBolumler[dept.key]}
-                onToggle={() => setAcikBolumler(prev => ({ ...prev, [dept.key]: !prev[dept.key] }))} />
+                onToggle={() => setAcikBolumler(prev => ({ ...prev, [dept.key]: !prev[dept.key] }))}
+              />
             ))}
           </div>
         )}
 
-        <p className="text-center text-[10px] text-gray-700 py-2">KEBO ERP · Toplam {personeller.length} personel kaydı</p>
+        <p className="text-center text-[10px] text-gray-700 py-2">
+          KEBO ERP · Toplam {personeller.length} personel kaydı
+        </p>
       </div>
     </div>
   );
@@ -215,7 +314,7 @@ function PersonellerPageInner() {
 
 export default function PersonellerPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#060810] flex items-center justify-center"><div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#060810] flex items-center justify-center"><div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"/></div>}>
       <PersonellerPageInner />
     </Suspense>
   );
