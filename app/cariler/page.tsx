@@ -4,89 +4,52 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Plus, Search, Building2, Trash2, X, Loader2, CheckCircle2,
-  AlertTriangle, FileText, Wallet, ArrowLeft, Phone, Hash, TrendingDown, Clock
+  AlertTriangle, FileText, Wallet, ArrowLeft, Phone, Hash,
+  TrendingDown, Calendar
 } from "lucide-react";
 
-const SABIT_TATILLER = (yil: number): string[] => [
-  `${yil}-01-01`, `${yil}-04-23`, `${yil}-05-01`, `${yil}-05-19`,
-  `${yil}-07-15`, `${yil}-08-30`, `${yil}-10-29`,
-];
+// ─── ÖDEME TAKVİMİ ────────────────────────────────────────────────────────────
 
-const DINI_TATILLER: string[] = [
-  "2024-04-10","2024-04-11","2024-04-12",
-  "2024-06-16","2024-06-17","2024-06-18","2024-06-19",
+const SABIT_TATILLER = (y: number) => [
+  `${y}-01-01`,`${y}-04-23`,`${y}-05-01`,`${y}-05-19`,
+  `${y}-07-15`,`${y}-08-30`,`${y}-10-29`,
+];
+const DINI_TATILLER = [
   "2025-03-30","2025-03-31","2025-04-01",
   "2025-06-06","2025-06-07","2025-06-08","2025-06-09",
   "2026-03-19","2026-03-20","2026-03-21",
   "2026-05-26","2026-05-27","2026-05-28","2026-05-29",
-  "2027-03-08","2027-03-09","2027-03-10",
-  "2027-05-15","2027-05-16","2027-05-17","2027-05-18",
 ];
 
-function isTatilGunu(tarih: Date): boolean {
-  const yil = tarih.getFullYear();
-  const gun = tarih.getDay();
-  if (gun === 0 || gun === 6) return true;
-  const str = tarih.toISOString().split("T")[0];
-  return SABIT_TATILLER(yil).includes(str) || DINI_TATILLER.includes(str);
+function isTatil(t: Date) {
+  const g = t.getDay();
+  if (g === 0 || g === 6) return true;
+  const s = t.toISOString().split("T")[0];
+  return SABIT_TATILLER(t.getFullYear()).includes(s) || DINI_TATILLER.includes(s);
 }
 
-function ilkIsGunu(tarih: Date): Date {
-  const d = new Date(tarih);
-  while (isTatilGunu(d)) d.setDate(d.getDate() + 1);
+function ilkIsGunu(t: Date) {
+  const d = new Date(t);
+  while (isTatil(d)) d.setDate(d.getDate() + 1);
   return d;
 }
 
-function odemeDonemi(faturaTarihi: string) {
-  const tarih = new Date(faturaTarihi + "T00:00:00");
-  const gun = tarih.getDate();
-  const ay = tarih.getMonth();
-  const yil = tarih.getFullYear();
-  let donemBasAy: number, donemBasYil: number, donemBitAy: number, donemBitYil: number;
-  if (gun >= 16) {
-    donemBasAy = ay; donemBasYil = yil;
-    donemBitAy = ay + 1 > 11 ? 0 : ay + 1;
-    donemBitYil = ay + 1 > 11 ? yil + 1 : yil;
-  } else {
-    donemBasAy = ay - 1 < 0 ? 11 : ay - 1;
-    donemBasYil = ay - 1 < 0 ? yil - 1 : yil;
-    donemBitAy = ay; donemBitYil = yil;
-  }
-  const odemeAy = donemBitAy + 1 > 11 ? 0 : donemBitAy + 1;
-  const odemeYil = donemBitAy + 1 > 11 ? donemBitYil + 1 : donemBitYil;
+// Bu ayın 25'inde ödenecek fatura dönemini hesapla
+// Dönem: geçen ayın 16 - bu ayın 15
+function buAyinOdemeDonemi() {
+  const bugun = new Date();
+  const ay = bugun.getMonth();
+  const yil = bugun.getFullYear();
   const pad = (n: number) => String(n + 1).padStart(2, "0");
-  const donemBaslangic = `${donemBasYil}-${pad(donemBasAy)}-16`;
-  const donemBitis = `${donemBitYil}-${pad(donemBitAy)}-15`;
-  const odemeVadesi = ilkIsGunu(new Date(odemeYil, odemeAy, 25));
-  const odemeVadesiStr = odemeVadesi.toISOString().split("T")[0];
-  return { donemBaslangic, donemBitis, odemeVadesi, odemeVadesiStr };
+  // Bu ayın 16 - sonraki ayın 15 arası = sonraki ayın 25'inde ödenecek
+  // Geçen ayın 16 - bu ayın 15 arası = bu ayın 25'inde ödenecek
+  const donemBas = `${ay === 0 ? yil - 1 : yil}-${pad(ay === 0 ? 11 : ay - 1)}-16`;
+  const donemBit = `${yil}-${pad(ay)}-15`;
+  const vade = ilkIsGunu(new Date(yil, ay, 25));
+  return { donemBas, donemBit, vade };
 }
 
-interface FaturaItem {
-  id: string; fatura_no: string; fatura_tarihi: string;
-  toplam_tutar: number; durum: string; aciklama?: string;
-}
-
-interface OdemeDonemiItem {
-  odemeVadesiStr: string; odemeVadesi: Date;
-  donemBaslangic: string; donemBitis: string;
-  faturalar: FaturaItem[]; toplamTutar: number;
-}
-
-function faturalariDonemlereGrupla(faturalar: FaturaItem[]): OdemeDonemiItem[] {
-  const map = new Map<string, OdemeDonemiItem>();
-  faturalar.filter(f => f.durum !== "odendi").forEach(f => {
-    if (!f.fatura_tarihi) return;
-    const d = odemeDonemi(f.fatura_tarihi);
-    if (!map.has(d.odemeVadesiStr)) {
-      map.set(d.odemeVadesiStr, { ...d, faturalar: [], toplamTutar: 0 });
-    }
-    const item = map.get(d.odemeVadesiStr)!;
-    item.faturalar.push(f);
-    item.toplamTutar += f.toplam_tutar || 0;
-  });
-  return Array.from(map.values()).sort((a, b) => a.odemeVadesiStr.localeCompare(b.odemeVadesiStr));
-}
+// ─── TYPES ────────────────────────────────────────────────────────────────────
 
 interface Cari {
   id: string; cari_kodu: string; unvan: string; vergi_no: string;
@@ -97,72 +60,80 @@ interface Fatura {
   toplam_tutar: number; durum: string; aciklama: string;
 }
 interface Odeme {
-  id: string; cari_id: string; tutar: number; tarih: string;
-  aciklama: string; odeme_yontemi: string; donem_bas?: string; donem_bit?: string;
+  id: string; tutar: number; tarih: string; aciklama: string; odeme_yontemi: string;
 }
 
 const inputCls = "w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/50 text-white text-sm h-10 px-3 rounded-xl outline-none transition-all placeholder:text-gray-700";
 const fmt = (v: number) => new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2 }).format(v);
 const fmtTarih = (t: string) => { if (!t) return "—"; try { const p = t.split("-"); return `${p[2]}.${p[1]}.${p[0]}`; } catch { return t; } };
 
+// ─── ANA SAYFA ────────────────────────────────────────────────────────────────
+
 export default function CarilerPage() {
   const supabase = createClient();
   const [cariler, setCariler] = useState<Cari[]>([]);
-  const [faturaBorclari, setFaturaBorclari] = useState<Map<string, number>>(new Map());
+  const [cariTutarMap, setCariTutarMap] = useState<Map<string, { buAy: number; toplam: number }>>(new Map());
   const [yukleniyor, setYukleniyor] = useState(true);
   const [aramaMetni, setAramaMetni] = useState("");
   const [aktifTab, setAktifTab] = useState<"duzenli" | "diger">("duzenli");
   const [seciliCari, setSeciliCari] = useState<Cari | null>(null);
   const [cariFaturalar, setCariFaturalar] = useState<Fatura[]>([]);
   const [cariOdemeler, setCariOdemeler] = useState<Odeme[]>([]);
-  const [yaklasanOdemeler, setYaklasanOdemeler] = useState<OdemeDonemiItem[]>([]);
-  const [detayTab, setDetayTab] = useState<"yaklasan" | "faturalar" | "odemeler">("yaklasan");
+  const [detayTab, setDetayTab] = useState<"faturalar" | "odemeler">("faturalar");
   const [modalAcik, setModalAcik] = useState(false);
   const [odemeModalAcik, setOdemeModalAcik] = useState(false);
-  const [araOdemeModal, setAraOdemeModal] = useState(false);
-  const [araOdemeTip, setAraOdemeTip] = useState<"yaklasan" | "toplam" | null>(null);
-  const [secilenDonem, setSecilenDonem] = useState<OdemeDonemiItem | null>(null);
+  const [seciliFaturalar, setSeciliFaturalar] = useState<Set<string>>(new Set());
+  const [manuelTutar, setManuelTutar] = useState("");
+  const [odemeTarih, setOdemeTarih] = useState(new Date().toISOString().split("T")[0]);
+  const [odemeYontemi, setOdemeYontemi] = useState("Nakit");
+  const [odemeAciklama, setOdemeAciklama] = useState("");
   const [formSaving, setFormSaving] = useState(false);
   const [toast, setToast] = useState<{ tip: "basari" | "hata"; mesaj: string } | null>(null);
   const [form, setForm] = useState({ cari_kodu: "", unvan: "", vergi_no: "", vergi_dairesi: "", telefon: "", adres: "", tip: "tedarikci", kategori: "duzenli" });
-  const [odemeForm, setOdemeForm] = useState({ tutar: "", tarih: new Date().toISOString().split("T")[0], aciklama: "", odeme_yontemi: "Nakit" });
-  const [araOdemeForm, setAraOdemeForm] = useState({ tutar: "", tarih: new Date().toISOString().split("T")[0], aciklama: "" });
 
   const showToast = (tip: "basari" | "hata", mesaj: string) => {
     setToast({ tip, mesaj });
     setTimeout(() => setToast(null), 3000);
   };
 
+  const donem = useMemo(() => buAyinOdemeDonemi(), []);
+
   const veriCek = useCallback(async () => {
     setYukleniyor(true);
     const [{ data: c }, { data: f }] = await Promise.all([
       supabase.from("cariler").select("*").order("unvan"),
-      supabase.from("faturalar").select("cari_unvan, toplam_tutar, durum"),
+      supabase.from("faturalar").select("cari_unvan, toplam_tutar, durum, fatura_tarihi"),
     ]);
     if (c) setCariler(c as Cari[]);
     if (f) {
-      const borcMap = new Map<string, number>();
-      f.filter(fatura => fatura.durum !== "odendi").forEach(fatura => {
-        borcMap.set(fatura.cari_unvan, (borcMap.get(fatura.cari_unvan) || 0) + (fatura.toplam_tutar || 0));
+      const map = new Map<string, { buAy: number; toplam: number }>();
+      f.forEach(fatura => {
+        if (!map.has(fatura.cari_unvan)) map.set(fatura.cari_unvan, { buAy: 0, toplam: 0 });
+        const item = map.get(fatura.cari_unvan)!;
+        if (fatura.durum !== "odendi") {
+          item.toplam += fatura.toplam_tutar || 0;
+          // Bu ayın 25'inde ödenecek dönem mi?
+          if (fatura.fatura_tarihi >= donem.donemBas && fatura.fatura_tarihi <= donem.donemBit) {
+            item.buAy += fatura.toplam_tutar || 0;
+          }
+        }
       });
-      setFaturaBorclari(borcMap);
+      setCariTutarMap(map);
     }
     setYukleniyor(false);
-  }, []);
+  }, [donem]);
 
   useEffect(() => { veriCek(); }, [veriCek]);
 
   const cariDetayAc = async (cari: Cari) => {
     setSeciliCari(cari);
-    setDetayTab("yaklasan");
+    setDetayTab("faturalar");
     const [{ data: f }, { data: o }] = await Promise.all([
-      supabase.from("faturalar").select("id,fatura_no,fatura_tarihi,toplam_tutar,durum,aciklama").eq("cari_unvan", cari.unvan).order("fatura_tarihi", { ascending: false }),
+      supabase.from("faturalar").select("*").eq("cari_unvan", cari.unvan).order("fatura_tarihi", { ascending: false }),
       supabase.from("cari_odemeler").select("*").eq("cari_id", cari.id).order("tarih", { ascending: false }),
     ]);
-    const fList = (f || []) as Fatura[];
-    setCariFaturalar(fList);
+    setCariFaturalar((f || []) as Fatura[]);
     setCariOdemeler((o || []) as Odeme[]);
-    setYaklasanOdemeler(faturalariDonemlereGrupla(fList));
   };
 
   const kaydet = async () => {
@@ -177,40 +148,55 @@ export default function CarilerPage() {
     veriCek();
   };
 
-  const odemeKaydet = async () => {
-    if (!seciliCari || !odemeForm.tutar) return;
-    setFormSaving(true);
-    const { error } = await supabase.from("cari_odemeler").insert([{
-      cari_id: seciliCari.id, cari_unvan: seciliCari.unvan,
-      tutar: parseFloat(odemeForm.tutar), tarih: odemeForm.tarih,
-      aciklama: odemeForm.aciklama, odeme_yontemi: odemeForm.odeme_yontemi,
-    }]);
-    setFormSaving(false);
-    if (error) { showToast("hata", "Kayıt hatası: " + error.message); return; }
-    showToast("basari", "Ödeme kaydedildi.");
-    setOdemeModalAcik(false);
-    setOdemeForm({ tutar: "", tarih: new Date().toISOString().split("T")[0], aciklama: "", odeme_yontemi: "Nakit" });
-    cariDetayAc(seciliCari);
-    veriCek();
+  const odemeAc = () => {
+    setSeciliFaturalar(new Set());
+    setManuelTutar("");
+    setOdemeTarih(new Date().toISOString().split("T")[0]);
+    setOdemeYontemi("Nakit");
+    setOdemeAciklama("");
+    setOdemeModalAcik(true);
   };
 
-  const araOdemeKaydet = async () => {
-    if (!seciliCari || !araOdemeForm.tutar || !secilenDonem) return;
+  const faturaSec = (id: string) => {
+    setSeciliFaturalar(prev => {
+      const s = new Set(prev);
+      s.has(id) ? s.delete(id) : s.add(id);
+      return s;
+    });
+    setManuelTutar(""); // seçim değişince manuel tutarı temizle
+  };
+
+  const seciliToplam = useMemo(() => {
+    return cariFaturalar
+      .filter(f => seciliFaturalar.has(f.id) && f.durum !== "odendi")
+      .reduce((s, f) => s + (f.toplam_tutar || 0), 0);
+  }, [seciliFaturalar, cariFaturalar]);
+
+  const odemeKaydet = async () => {
+    if (!seciliCari) return;
+    const tutar = manuelTutar ? parseFloat(manuelTutar) : seciliToplam;
+    if (!tutar) { showToast("hata", "Tutar giriniz veya fatura seçiniz."); return; }
     setFormSaving(true);
+
+    // Ödemeyi kaydet
     const { error } = await supabase.from("cari_odemeler").insert([{
       cari_id: seciliCari.id, cari_unvan: seciliCari.unvan,
-      tutar: parseFloat(araOdemeForm.tutar), tarih: araOdemeForm.tarih,
-      aciklama: `Ara Ödeme${araOdemeTip === "yaklasan" ? ` (${fmtTarih(secilenDonem.donemBaslangic)}-${fmtTarih(secilenDonem.donemBitis)})` : ""}: ${araOdemeForm.aciklama}`,
-      odeme_yontemi: "Nakit",
-      donem_bas: araOdemeTip === "yaklasan" ? secilenDonem.donemBaslangic : null,
-      donem_bit: araOdemeTip === "yaklasan" ? secilenDonem.donemBitis : null,
+      tutar, tarih: odemeTarih,
+      odeme_yontemi: odemeYontemi,
+      aciklama: odemeAciklama || `${seciliFaturalar.size} fatura için ödeme`,
     }]);
+
+    if (error) { showToast("hata", "Kayıt hatası: " + error.message); setFormSaving(false); return; }
+
+    // Seçili faturaları ödendi işaretle
+    if (seciliFaturalar.size > 0) {
+      await supabase.from("faturalar").update({ durum: "odendi", islendi: true })
+        .in("id", Array.from(seciliFaturalar));
+    }
+
     setFormSaving(false);
-    if (error) { showToast("hata", "Kayıt hatası: " + error.message); return; }
-    showToast("basari", "Ara ödeme kaydedildi.");
-    setAraOdemeModal(false);
-    setAraOdemeTip(null);
-    setAraOdemeForm({ tutar: "", tarih: new Date().toISOString().split("T")[0], aciklama: "" });
+    showToast("basari", "Ödeme kaydedildi.");
+    setOdemeModalAcik(false);
     cariDetayAc(seciliCari);
     veriCek();
   };
@@ -230,15 +216,15 @@ export default function CarilerPage() {
 
   const toplamFatura = cariFaturalar.reduce((s, f) => s + (f.toplam_tutar || 0), 0);
   const toplamOdeme = cariOdemeler.reduce((s, o) => s + (o.tutar || 0), 0);
-  const bekleyenBakiye = toplamFatura - toplamOdeme;
+  const bekleyenBakiye = cariFaturalar.filter(f => f.durum !== "odendi").reduce((s, f) => s + (f.toplam_tutar || 0), 0) - toplamOdeme;
   const duzenliSayisi = cariler.filter(c => c.kategori === "duzenli").length;
   const digerSayisi = cariler.filter(c => c.kategori !== "duzenli").length;
-  const toplamBorc = Array.from(faturaBorclari.values()).reduce((s, v) => s + v, 0);
+  const odenmemisFaturalar = cariFaturalar.filter(f => f.durum !== "odendi");
 
   const durumRenk = (durum: string) => {
-    if (durum === "odendi") return "bg-emerald-500/10 text-emerald-400";
-    if (durum === "gecikti") return "bg-red-500/10 text-red-400";
-    return "bg-yellow-500/10 text-yellow-400";
+    if (durum === "odendi") return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+    if (durum === "gecikti") return "bg-red-500/10 text-red-400 border-red-500/20";
+    return "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
   };
 
   return (
@@ -266,14 +252,14 @@ export default function CarilerPage() {
             <div>
               <h1 className="text-sm font-black text-white leading-none">{seciliCari ? seciliCari.unvan : "Cariler"}</h1>
               <p className="text-[10px] text-gray-600 mt-0.5">
-                {seciliCari ? `VN: ${seciliCari.vergi_no || "—"}` : `${cariler.length} cari · Toplam borç: ₺${fmt(toplamBorc)}`}
+                {seciliCari ? `VN: ${seciliCari.vergi_no || "—"}` : `${cariler.length} cari`}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {seciliCari ? (
               <>
-                <button onClick={() => setOdemeModalAcik(true)} className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl transition-colors">
+                <button onClick={odemeAc} className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl transition-colors">
                   <Wallet size={14} /> Ödeme Ekle
                 </button>
                 <button onClick={() => sil(seciliCari.id)} className="p-2 text-gray-600 hover:text-red-400 border border-[#1a2236] rounded-xl transition-colors">
@@ -292,17 +278,21 @@ export default function CarilerPage() {
       {/* CARİ LİSTESİ */}
       {!seciliCari && (
         <div className="max-w-6xl mx-auto px-4 py-5 space-y-4">
-          <div className="bg-[#0c0f1a] border border-red-500/20 rounded-2xl p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-                <TrendingDown size={16} className="text-red-400" />
-              </div>
-              <div>
-                <p className="text-[10px] text-gray-600 uppercase tracking-widest">Toplam Bekleyen Borç</p>
-                <p className="text-xl font-black text-red-400">₺{fmt(toplamBorc)}</p>
-              </div>
+
+          {/* Bu ayın ödeme tarihi */}
+          <div className="bg-[#0c0f1a] border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+              <Calendar size={16} className="text-amber-400" />
             </div>
-            <p className="text-[11px] text-gray-600">{cariler.length} cari</p>
+            <div>
+              <p className="text-[10px] text-gray-600 uppercase tracking-widest">Bu Ay Ödeme Günü</p>
+              <p className="text-sm font-black text-amber-400">
+                {donem.vade.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
+              </p>
+              <p className="text-[10px] text-gray-600 mt-0.5">
+                {fmtTarih(donem.donemBas)} – {fmtTarih(donem.donemBit)} dönem faturaları
+              </p>
+            </div>
           </div>
 
           <div className="flex gap-1 bg-[#0c0f1a] border border-[#1a2236] rounded-xl p-1 w-fit">
@@ -327,7 +317,9 @@ export default function CarilerPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {filtreliCariler.map(c => {
-                const borc = faturaBorclari.get(c.unvan) || 0;
+                const tutarlar = cariTutarMap.get(c.unvan);
+                const buAyTutar = tutarlar?.buAy || 0;
+                const toplamBorc = tutarlar?.toplam || 0;
                 return (
                   <div key={c.id} onClick={() => cariDetayAc(c)}
                     className="bg-[#0c0f1a] border border-[#1a2236] hover:border-blue-500/40 rounded-2xl p-5 cursor-pointer transition-all hover:bg-[#0f1320] group">
@@ -342,11 +334,18 @@ export default function CarilerPage() {
                     <p className="text-sm font-black text-white group-hover:text-blue-400 transition-colors leading-tight mb-2">{c.unvan}</p>
                     {c.vergi_no && <p className="text-[11px] text-gray-600 flex items-center gap-1.5 mb-1"><Hash size={9} /> VN: {c.vergi_no}</p>}
                     {c.telefon && <p className="text-[11px] text-gray-600 flex items-center gap-1.5 mb-1"><Phone size={9} /> {c.telefon}</p>}
-                    <div className={`mt-3 pt-3 border-t ${borc > 0 ? "border-red-500/20" : "border-[#1a2236]"}`}>
-                      {borc > 0 ? (
+
+                    <div className="mt-3 pt-3 border-t border-[#1a2236] space-y-1.5">
+                      {buAyTutar > 0 ? (
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider">Bekleyen Borç</span>
-                          <span className="text-sm font-black text-red-400">₺{fmt(borc)}</span>
+                          <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Bu Ay Ödenecek</span>
+                          <span className="text-sm font-black text-amber-400">₺{fmt(buAyTutar)}</span>
+                        </div>
+                      ) : null}
+                      {toplamBorc > 0 ? (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-red-400/70 uppercase tracking-wider">Toplam Borç</span>
+                          <span className="text-xs font-bold text-red-400">₺{fmt(toplamBorc)}</span>
                         </div>
                       ) : (
                         <div className="flex items-center justify-between">
@@ -381,10 +380,7 @@ export default function CarilerPage() {
             </div>
           </div>
 
-          <div className="flex gap-1 bg-[#0c0f1a] border border-[#1a2236] rounded-xl p-1 w-fit flex-wrap">
-            <button onClick={() => setDetayTab("yaklasan")} className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${detayTab === "yaklasan" ? "bg-amber-600 text-white" : "text-gray-500 hover:text-white"}`}>
-              <Clock size={12} /> Yaklaşan Ödemeler ({yaklasanOdemeler.length})
-            </button>
+          <div className="flex gap-1 bg-[#0c0f1a] border border-[#1a2236] rounded-xl p-1 w-fit">
             <button onClick={() => setDetayTab("faturalar")} className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${detayTab === "faturalar" ? "bg-blue-600 text-white" : "text-gray-500 hover:text-white"}`}>
               <FileText size={12} /> Faturalar ({cariFaturalar.length})
             </button>
@@ -393,91 +389,6 @@ export default function CarilerPage() {
             </button>
           </div>
 
-          {/* YAKLAŞAN ÖDEMELER */}
-          {detayTab === "yaklasan" && (
-            <div className="space-y-3">
-              {yaklasanOdemeler.length === 0 ? (
-                <div className="bg-[#0c0f1a] border border-emerald-500/20 rounded-2xl py-16 text-center">
-                  <CheckCircle2 size={32} className="text-emerald-400 mx-auto mb-3" />
-                  <p className="text-emerald-400 font-bold text-sm">Bekleyen ödeme yok</p>
-                </div>
-              ) : yaklasanOdemeler.map((donem, i) => {
-                const bugun = new Date();
-                const vade = new Date(donem.odemeVadesiStr + "T00:00:00");
-                const kalan = Math.ceil((vade.getTime() - bugun.getTime()) / (1000 * 60 * 60 * 24));
-                const gecmis = kalan < 0;
-                const yakin = kalan >= 0 && kalan <= 7;
-                const donemAraOdemeleri = cariOdemeler.filter(o => o.donem_bas === donem.donemBaslangic && o.donem_bit === donem.donemBitis);
-                const donemAraOdemeToplam = donemAraOdemeleri.reduce((s, o) => s + o.tutar, 0);
-                const kalanBorc = donem.toplamTutar - donemAraOdemeToplam;
-                return (
-                  <div key={i} className={`bg-[#0c0f1a] border rounded-2xl overflow-hidden ${gecmis ? "border-red-500/30" : yakin ? "border-amber-500/30" : "border-[#1a2236]"}`}>
-                    <div className="px-5 py-4 flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2 flex-wrap">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${gecmis ? "bg-red-500/10 text-red-400" : yakin ? "bg-amber-500/10 text-amber-400" : "bg-blue-500/10 text-blue-400"}`}>
-                            {gecmis ? `${Math.abs(kalan)} gün gecikti` : kalan === 0 ? "Bugün!" : `${kalan} gün kaldı`}
-                          </span>
-                          {donemAraOdemeToplam > 0 && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-400">
-                              ₺{fmt(donemAraOdemeToplam)} ara ödeme yapıldı
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm font-black text-white">
-                          {new Date(donem.odemeVadesiStr + "T00:00:00").toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })} — ödeme günü
-                        </p>
-                        <p className="text-[11px] text-gray-600 mt-0.5">
-                          {fmtTarih(donem.donemBaslangic)} – {fmtTarih(donem.donemBitis)} dönem · {donem.faturalar.length} fatura
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-[10px] text-gray-600 mb-0.5">Dönem Toplam</p>
-                        <p className="text-lg font-black text-white">₺{fmt(donem.toplamTutar)}</p>
-                        {donemAraOdemeToplam > 0 && (
-                          <>
-                            <p className="text-[10px] text-gray-600 mt-1">Kalan</p>
-                            <p className={`text-sm font-black ${kalanBorc > 0 ? "text-red-400" : "text-emerald-400"}`}>₺{fmt(kalanBorc)}</p>
-                          </>
-                        )}
-                        <button onClick={() => { setSecilenDonem(donem); setAraOdemeModal(true); setAraOdemeTip(null); }}
-                          className="mt-2 text-[11px] font-bold text-blue-400 hover:text-blue-300 transition-colors whitespace-nowrap">
-                          + Ara Ödeme
-                        </button>
-                      </div>
-                    </div>
-                    <div className="border-t border-[#1a2236] overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-[#0f1624]">
-                            {["Fatura No", "Tarih", "Tutar", "Durum"].map(h => (
-                              <th key={h} className="text-left px-4 py-2 text-[10px] text-gray-600 uppercase tracking-widest">{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#0f1624]">
-                          {donem.faturalar.map((f: FaturaItem) => (
-                            <tr key={f.id} className="hover:bg-white/[0.02]">
-                              <td className="px-4 py-2 text-blue-400 font-bold">{f.fatura_no}</td>
-                              <td className="px-4 py-2 text-gray-400">{fmtTarih(f.fatura_tarihi)}</td>
-                              <td className="px-4 py-2 text-emerald-400 font-bold">₺{fmt(f.toplam_tutar)}</td>
-                              <td className="px-4 py-2">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${f.durum === "gecikti" ? "bg-red-500/10 text-red-400" : "bg-yellow-500/10 text-yellow-400"}`}>
-                                  {f.durum === "gecikti" ? "Gecikti" : "Bekliyor"}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* FATURALAR */}
           {detayTab === "faturalar" && (
             <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl overflow-hidden">
               {cariFaturalar.length === 0 ? (
@@ -498,7 +409,7 @@ export default function CarilerPage() {
                         <td className="px-4 py-3 text-gray-400">{fmtTarih(f.fatura_tarihi)}</td>
                         <td className="px-4 py-3 text-emerald-400 font-black">₺{fmt(f.toplam_tutar)}</td>
                         <td className="px-4 py-3">
-                          <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${durumRenk(f.durum)}`}>
+                          <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${durumRenk(f.durum)}`}>
                             {f.durum === "odendi" ? "Ödendi" : f.durum === "gecikti" ? "Gecikti" : "Bekliyor"}
                           </span>
                         </td>
@@ -517,7 +428,6 @@ export default function CarilerPage() {
             </div>
           )}
 
-          {/* ÖDEMELER */}
           {detayTab === "odemeler" && (
             <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl overflow-hidden">
               {cariOdemeler.length === 0 ? (
@@ -604,102 +514,103 @@ export default function CarilerPage() {
       )}
 
       {/* ÖDEME MODAL */}
-      {odemeModalAcik && (
+      {odemeModalAcik && seciliCari && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-sm font-black text-white">Ödeme Ekle</h3>
+          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#1a2236] shrink-0">
+              <h3 className="text-sm font-black text-white">Ödeme Ekle — {seciliCari.unvan}</h3>
               <button onClick={() => setOdemeModalAcik(false)} className="text-gray-600 hover:text-white"><X size={16} /></button>
             </div>
-            <div className="space-y-3">
+
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+
+              {/* Ödenmemiş faturalar */}
+              {odenmemisFaturalar.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2 font-bold">Ödenmemiş Faturalar — Seçerek Ekle</p>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {odenmemisFaturalar.map(f => (
+                      <div key={f.id} onClick={() => faturaSec(f.id)}
+                        className={`flex items-center justify-between px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${seciliFaturalar.has(f.id) ? "bg-blue-600/20 border-blue-500/40" : "bg-[#080b14] border-[#1a2236] hover:border-[#2a3550]"}`}>
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${seciliFaturalar.has(f.id) ? "bg-blue-600 border-blue-600" : "border-gray-600"}`}>
+                            {seciliFaturalar.has(f.id) && <CheckCircle2 size={10} className="text-white" />}
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-white">{f.fatura_no}</p>
+                            <p className="text-[10px] text-gray-600">{fmtTarih(f.fatura_tarihi)}</p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-black text-emerald-400">₺{fmt(f.toplam_tutar)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {seciliFaturalar.size > 0 && (
+                    <div className="mt-2 flex items-center justify-between bg-blue-600/10 border border-blue-500/20 rounded-xl px-3 py-2">
+                      <span className="text-[11px] text-blue-400">{seciliFaturalar.size} fatura seçildi</span>
+                      <span className="text-sm font-black text-blue-400">₺{fmt(seciliToplam)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Ayraç */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-[#1a2236]" />
+                <span className="text-[10px] text-gray-600 uppercase tracking-widest">veya manuel tutar gir</span>
+                <div className="flex-1 h-px bg-[#1a2236]" />
+              </div>
+
+              {/* Manuel tutar */}
               <div>
-                <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Tutar (₺) *</p>
+                <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Manuel Tutar (₺)</p>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-xs">₺</span>
-                  <input type="number" value={odemeForm.tutar} onChange={e => setOdemeForm({ ...odemeForm, tutar: e.target.value })} placeholder="0" className={`${inputCls} pl-7`} />
+                  <input type="number" value={manuelTutar}
+                    onChange={e => { setManuelTutar(e.target.value); if (e.target.value) setSeciliFaturalar(new Set()); }}
+                    placeholder={seciliFaturalar.size > 0 ? fmt(seciliToplam) : "0"}
+                    className={`${inputCls} pl-7`} />
                 </div>
+                {manuelTutar && <p className="text-[10px] text-gray-600 mt-1">Manuel tutar girilince fatura seçimi temizlenir</p>}
               </div>
-              <div>
-                <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Tarih</p>
-                <input type="date" value={odemeForm.tarih} onChange={e => setOdemeForm({ ...odemeForm, tarih: e.target.value })} className={inputCls} />
-              </div>
-              <div>
-                <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Ödeme Yöntemi</p>
-                <select value={odemeForm.odeme_yontemi} onChange={e => setOdemeForm({ ...odemeForm, odeme_yontemi: e.target.value })} className={inputCls}>
-                  {["Nakit", "Banka Havalesi", "EFT", "Çek", "Kredi Kartı"].map(y => (
-                    <option key={y} value={y} className="bg-[#0c0f1a]">{y}</option>
-                  ))}
-                </select>
+
+              {/* Ödeme detayları */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Tarih</p>
+                  <input type="date" value={odemeTarih} onChange={e => setOdemeTarih(e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Yöntem</p>
+                  <select value={odemeYontemi} onChange={e => setOdemeYontemi(e.target.value)} className={inputCls}>
+                    {["Nakit", "Banka Havalesi", "EFT", "Çek", "Kredi Kartı"].map(y => (
+                      <option key={y} value={y} className="bg-[#0c0f1a]">{y}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div>
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Açıklama</p>
-                <input value={odemeForm.aciklama} onChange={e => setOdemeForm({ ...odemeForm, aciklama: e.target.value })} placeholder="Opsiyonel..." className={inputCls} />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button onClick={() => setOdemeModalAcik(false)} className="flex-1 text-xs font-semibold text-gray-500 hover:text-white border border-[#1a2236] py-2.5 rounded-xl transition-colors">İptal</button>
-                <button onClick={odemeKaydet} disabled={formSaving} className="flex-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
-                  {formSaving ? <Loader2 size={12} className="animate-spin" /> : null} Kaydet
-                </button>
+                <input value={odemeAciklama} onChange={e => setOdemeAciklama(e.target.value)} placeholder="Opsiyonel..." className={inputCls} />
               </div>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* ARA ÖDEME MODAL */}
-      {araOdemeModal && secilenDonem && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-black text-white">Ara Ödeme</h3>
-              <button onClick={() => { setAraOdemeModal(false); setAraOdemeTip(null); }} className="text-gray-600 hover:text-white"><X size={16} /></button>
-            </div>
-            <div className="bg-[#080b14] border border-[#1a2236] rounded-xl p-3 mb-4">
-              <p className="text-[11px] text-gray-500">Dönem: {fmtTarih(secilenDonem.donemBaslangic)} – {fmtTarih(secilenDonem.donemBitis)}</p>
-              <p className="text-sm font-bold text-white mt-1">Dönem Toplam: ₺{fmt(secilenDonem.toplamTutar)}</p>
-            </div>
-            {!araOdemeTip ? (
-              <div className="space-y-3">
-                <p className="text-xs text-gray-400 mb-3">Bu ödemeyi nereye uygulayalım?</p>
-                <button onClick={() => setAraOdemeTip("yaklasan")} className="w-full bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 text-amber-400 rounded-xl p-4 text-left transition-colors">
-                  <p className="text-sm font-bold">Bu dönemden düş</p>
-                  <p className="text-[11px] text-amber-400/70 mt-1">{fmtTarih(secilenDonem.donemBaslangic)} – {fmtTarih(secilenDonem.donemBitis)} dönem borcundan düşer</p>
-                </button>
-                <button onClick={() => setAraOdemeTip("toplam")} className="w-full bg-blue-500/10 border border-blue-500/20 hover:border-blue-500/40 text-blue-400 rounded-xl p-4 text-left transition-colors">
-                  <p className="text-sm font-bold">Toplam bakiyeden düş</p>
-                  <p className="text-[11px] text-blue-400/70 mt-1">Tüm fatura bakiyesinden genel ödeme olarak işlenir</p>
+            {/* Toplam + Onayla */}
+            <div className="px-6 py-4 border-t border-[#1a2236] shrink-0">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs text-gray-500">Ödenecek Tutar</span>
+                <span className="text-xl font-black text-emerald-400">
+                  ₺{fmt(manuelTutar ? parseFloat(manuelTutar) || 0 : seciliToplam)}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setOdemeModalAcik(false)} className="flex-1 text-xs font-semibold text-gray-500 hover:text-white border border-[#1a2236] py-2.5 rounded-xl transition-colors">İptal</button>
+                <button onClick={odemeKaydet} disabled={formSaving || (!manuelTutar && seciliFaturalar.size === 0)}
+                  className="flex-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+                  {formSaving ? <Loader2 size={12} className="animate-spin" /> : null} Ödemeyi Onayla
                 </button>
               </div>
-            ) : (
-              <div className="space-y-3">
-                <div className={`rounded-xl px-3 py-2 border ${araOdemeTip === "yaklasan" ? "bg-amber-500/10 border-amber-500/20" : "bg-blue-500/10 border-blue-500/20"}`}>
-                  <p className={`text-[11px] font-bold ${araOdemeTip === "yaklasan" ? "text-amber-400" : "text-blue-400"}`}>
-                    {araOdemeTip === "yaklasan" ? "Bu dönemden düşülecek" : "Toplam bakiyeden düşülecek"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Tutar (₺) *</p>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-xs">₺</span>
-                    <input type="number" value={araOdemeForm.tutar} onChange={e => setAraOdemeForm({ ...araOdemeForm, tutar: e.target.value })} placeholder="0" className={`${inputCls} pl-7`} />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Tarih</p>
-                  <input type="date" value={araOdemeForm.tarih} onChange={e => setAraOdemeForm({ ...araOdemeForm, tarih: e.target.value })} className={inputCls} />
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Açıklama</p>
-                  <input value={araOdemeForm.aciklama} onChange={e => setAraOdemeForm({ ...araOdemeForm, aciklama: e.target.value })} placeholder="Ara ödeme açıklaması..." className={inputCls} />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button onClick={() => setAraOdemeTip(null)} className="flex-1 text-xs text-gray-500 hover:text-white border border-[#1a2236] py-2.5 rounded-xl transition-colors">Geri</button>
-                  <button onClick={araOdemeKaydet} disabled={formSaving || !araOdemeForm.tutar} className="flex-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
-                    {formSaving ? <Loader2 size={12} className="animate-spin" /> : null} Kaydet
-                  </button>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       )}
