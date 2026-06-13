@@ -65,8 +65,10 @@ export default function Anasayfa() {
       const today = new Date().toISOString().split("T")[0];
       const { data: bugunData } = await supabase.from("gunluk_raporlar")
         .select("toplam_ciro,gunluk_gider,iade_tutar,kurye_raporlari").eq("tarih", today).single();
-      const bugunCiro = bugunData?.toplam_ciro || 0;
-      const bugunNet = bugunCiro - (bugunData?.gunluk_gider || 0) - (bugunData?.iade_tutar || 0);
+
+      // BRÜT CİRO = toplam_ciro + gunluk_gider (gider kasadan çıktığı için brüte dahil)
+      const bugunCiro = (bugunData?.toplam_ciro || 0) + (bugunData?.gunluk_gider || 0);
+      const bugunNet = (bugunData?.toplam_ciro || 0) - (bugunData?.iade_tutar || 0);
       const bugunPaket = bugunData?.kurye_raporlari?.reduce((s: number, k: any) => s + (parseInt(k.paketSayisi) || 0), 0) || 0;
 
       const ay = String(new Date().getMonth() + 1).padStart(2, "0");
@@ -77,12 +79,15 @@ export default function Anasayfa() {
 
       let aylikCiro = 0, aylikGider = 0, enYuksek = 0;
       aylik?.forEach(r => {
-        aylikCiro += r.toplam_ciro || 0;
-        aylikGider += (r.gunluk_gider || 0) + (r.iade_tutar || 0);
-        if ((r.toplam_ciro || 0) > enYuksek) enYuksek = r.toplam_ciro || 0;
+        // BRÜT CİRO = toplam_ciro + gunluk_gider
+        const brut = (r.toplam_ciro || 0) + (r.gunluk_gider || 0);
+        aylikCiro += brut;
+        aylikGider += (r.iade_tutar || 0);
+        if (brut > enYuksek) enYuksek = brut;
       });
       const donemRapor = aylik?.length || 0;
-      const aylikNet = aylikCiro - aylikGider;
+      // Net = toplam_ciro - iade (gider zaten brütte, çıkartmıyoruz net hesabında)
+      const aylikNet = (aylik?.reduce((s, r) => s + (r.toplam_ciro || 0) - (r.iade_tutar || 0), 0) || 0);
       const gunOrt = donemRapor > 0 ? Math.round(aylikCiro / donemRapor) : 0;
 
       const { data: tahsilatlar } = await supabase.from("platform_tahsilatlar").select("satis_tutari,beklenen_odeme_tarihi,durum");
@@ -220,7 +225,7 @@ export default function Anasayfa() {
               {[
                 { l: "Brüt Ciro", v: d.aylikCiro, c: "#3B82F6" },
                 { l: "Net Kâr", v: d.aylikNet, c: "#10B981" },
-                { l: "Gider", v: d.aylikGider, c: "#EF4444" },
+                { l: "İade", v: d.aylikGider, c: "#EF4444" },
               ].map(i => {
                 const pct = d.aylikCiro > 0 ? Math.min((i.v / d.aylikCiro) * 100, 100) : 0;
                 return (
@@ -317,7 +322,7 @@ export default function Anasayfa() {
             <span className="text-xs text-gray-500">KEBO ERP — Tüm sistemler çalışıyor</span>
           </div>
           <div className="flex items-center gap-4 text-[10px] text-gray-700">
-            <span>Supabase ✓</span><span>Vercel ✓</span><span>v2.6</span>
+            <span>Supabase ✓</span><span>Vercel ✓</span><span>v2.7</span>
           </div>
         </div>
 
