@@ -6,7 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard, Wallet, ClipboardList, Users, Settings, LogOut,
-  Utensils, BarChart3, TrendingUp, Menu, X, Building2, FileText, ChevronDown
+  Utensils, BarChart3, TrendingUp, Menu, X, Building2, FileText, ChevronDown,
+  Package
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +33,6 @@ export default function Sidebar() {
 
   useEffect(() => { setDrawerAcik(false); }, [pathname]);
 
-  // Kasa alt menüsü açık kalsın eğer alt sayfalardaysa
   useEffect(() => {
     if (pathname.startsWith("/kasa") || pathname.startsWith("/cariler") || pathname.startsWith("/faturalar")) {
       setKasaAcik(true);
@@ -49,6 +49,7 @@ export default function Sidebar() {
     ...(isAdmin ? [{ name: "Anasayfa", icon: LayoutDashboard, href: "/" }] : []),
     { name: "Kasa Raporu", icon: ClipboardList, href: "/raporlar" },
     ...(isAdmin ? [{ name: "Rapor Analizi", icon: BarChart3, href: "/rapor-analiz" }] : []),
+    { name: "Stok", icon: Package, href: "/stok" },
     { name: "Personel", icon: Users, href: "/personel" },
     { name: "Ayarlar", icon: Settings, href: "/ayarlar" },
   ];
@@ -63,8 +64,8 @@ export default function Sidebar() {
   const bottomNavItems = [
     ...(isAdmin ? [{ name: "Anasayfa", icon: LayoutDashboard, href: "/" }] : []),
     { name: "Kasa Raporu", icon: ClipboardList, href: "/raporlar" },
+    { name: "Stok", icon: Package, href: "/stok" },
     { name: "Personel", icon: Users, href: "/personel" },
-    { name: "Rapor", icon: BarChart3, href: "/rapor-analiz" },
     { name: "Ayarlar", icon: Settings, href: "/ayarlar" },
   ].slice(0, 5);
 
