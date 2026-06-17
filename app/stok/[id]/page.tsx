@@ -5,9 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import {
-  Package, ArrowLeft, ClipboardCheck, Truck, Calendar, TrendingDown,
-  TrendingUp, BarChart3, Activity, Loader2, Edit3, Save, X,
-  AlertTriangle, CheckCircle2, Clock, Trash2, RefreshCw, BrainCircuit
+  ArrowLeft, ClipboardCheck, Truck, TrendingDown,
+  Edit3, Loader2, Save, X, Trash2, Activity, BarChart3, BrainCircuit
 } from "lucide-react";
 
 interface Urun {
@@ -111,7 +110,6 @@ export default function StokDetayPage() {
     };
   }, [urun, hareketler, donemBaslangic, donemBitis]);
 
-  // ─── AI DETAY TAHMİN MOTORU (NEW) ───
   const aiTrendMesaji = useMemo(() => {
     if (!donemAnaliz || donemAnaliz.gunlukOrt <= 0 || hareketler.length < 3) return null;
     
@@ -137,12 +135,13 @@ export default function StokDetayPage() {
     let stok = 0;
     sirali.forEach(h => {
       if (h.tip === "sayim") stok = h.miktar;
+      else if (h.tip === "grid") stok += h.miktar;
       else if (h.tip === "giris") stok += h.miktar;
       else if (h.tip === "cikis") stok -= h.miktar;
       else if (h.tip === "duzeltme") stok = h.miktar;
       tarihMap.set(h.tarih, stok);
     });
-    return Array.from(tarihMap.entries()).map(([tarih, miktar]) => ({tarih, miktar}));
+    return Array.from(tarihMap.entries()).map(([tarih, miktar]) => ({ tarih, miktar }));
   }, [urun, hareketler]);
 
   useEffect(() => {
@@ -177,7 +176,7 @@ export default function StokDetayPage() {
             borderWidth: 2,
             fill: true,
             tension: 0.3,
-            pointRadius: 4,
+PointRadius: 4,
             pointBackgroundColor: "#10B981",
             pointBorderColor: "#0c0f1a",
             pointBorderWidth: 2,
@@ -294,7 +293,7 @@ export default function StokDetayPage() {
 
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
         
-        {/* AI AKILLI ASİSTAN ŞERİDİ (DETAY) */}
+        {/* AI ŞERİT */}
         {aiTrendMesaji && (
           <div className={`rounded-xl border p-3 text-xs flex items-center gap-2 font-medium ${aiTrendMesaji.stil}`}>
             <BrainCircuit className="h-4 w-4 shrink-0" />
@@ -320,7 +319,7 @@ export default function StokDetayPage() {
           </div>
           <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-4">
             <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Tahmini Bitiş Süresi</p>
-            <p className={`text-2xl font-black ${tahminiBitis === null ? "text-gray-500" : tahminiBitis <= 3 ? "text-red-400" : "text-amber-400" : "text-blue-400"}`}>
+            <p className="text-2xl font-black text-blue-400">
               {tahminiBitis !== null ? `${tahminiBitis}` : "—"} <span className="text-sm text-gray-500">gün</span>
             </p>
             <p className="text-[10px] text-gray-600 mt-1">{tahminiBitis !== null ? `~${new Date(Date.now() + tahminiBitis * 86400000).toLocaleDateString("tr-TR")}` : "Veri yetersiz"}</p>

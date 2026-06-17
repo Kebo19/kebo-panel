@@ -4,11 +4,9 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import {
-  Package, PlusCircle, Search, Filter, AlertTriangle, TrendingDown,
-  TrendingUp, Truck, ClipboardCheck, Loader2, X, Save, Edit3, Trash2,
-  RefreshCw, Layers, BarChart3, Calendar, ChevronDown, ChevronUp,
-  CheckCircle2, Eye, ArrowUpRight, ArrowDownRight, Zap, Bell, Box, 
-  Activity, Plus, Minus, FileSpreadsheet, Sparkles, BrainCircuit, Clock
+  Package, PlusCircle, Search, AlertTriangle, TrendingDown,
+  Truck, ClipboardCheck, Loader2, X, Save, Edit3, Trash2,
+  RefreshCw, Layers, Box, Clock, BrainCircuit
 } from "lucide-react";
 
 interface Urun {
@@ -21,7 +19,7 @@ interface Urun {
   son_fiyat: number | null;
   durum: string;
   notlar: string | null;
-  sayim_periyodu: string; // Günlük, Haftalık, Aylık gruplama için eklendi
+  sayim_periyodu: string;
   updated_at: string;
 }
 
@@ -67,7 +65,7 @@ export default function StokPage() {
 
   const [arama, setArama] = useState("");
   const [filtreKategori, setFiltreKategori] = useState("");
-  const [filtrePeriyot, setFiltrePeriyot] = useState(""); // Periyot filtresi
+  const [filtrePeriyot, setFiltrePeriyot] = useState("");
   const [sadeceKritik, setSadeceKritik] = useState(false);
 
   const [yeniUrunAcik, setYeniUrunAcik] = useState(false);
@@ -82,7 +80,7 @@ export default function StokPage() {
   const [yBirim, setYBirim] = useState("kg");
   const [yMinStok, setYMinStok] = useState("");
   const [yIlkStok, setYIlkStok] = useState("");
-  const [yPeriyot, setYPeriyot] = useState("gunluk"); // Form periyot alanı
+  const [yPeriyot, setYPeriyot] = useState("gunluk");
   const [yNotlar, setYNotlar] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -142,7 +140,6 @@ export default function StokPage() {
     return Math.floor(urun.mevcut_stok / ort);
   }, [gunlukOrtalama]);
 
-  // ─── YAPAY ZEKA ALGORİTMİK UYARI MOTORU (AI ENGINE) ───
   const aiAnalizleri = useMemo(() => {
     if (urunler.length === 0 || hareketler.length < 5) return [];
     const uyarilar: { urun_adi: string; tip: "kritik" | "hizli" | "stabil" | "atik"; mesaj: string }[] = [];
@@ -152,7 +149,6 @@ export default function StokPage() {
       const ort = gunlukOrtalama(u.id);
 
       if (ort > 0) {
-        // Son 2 hareket arası kullanım hızını hesapla
         const sayimlar = urunHareketleri.filter(h => h.tip === "sayim");
         if (sayimlar.length >= 2) {
           const sonKullanimHizi = Math.max(sayimlar[1].miktar - sayimlar[0].miktar, 0);
@@ -183,7 +179,7 @@ export default function StokPage() {
       }
     });
 
-    return uyarilar.slice(0, 3); // Ekranda en kritik 3 tanesini göster
+    return uyarilar.slice(0, 3);
   }, [urunler, hareketler, gunlukOrtalama, tahminiBitisGunu]);
 
   const filtreliUrunler = useMemo(() => {
@@ -394,7 +390,7 @@ export default function StokPage() {
 
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
-        {/* ─── AI YAPAY ZEKA AKILLI ASİSTAN PANELİ (NEW FEATURE) ─── */}
+        {/* AI PANEL */}
         <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-r from-blue-950/20 via-[#0c0f1a] to-[#0c0f1a] p-4">
           <div className="flex items-center gap-2 mb-3">
             <BrainCircuit className="h-4 w-4 text-blue-400 animate-pulse" />
@@ -438,7 +434,7 @@ export default function StokPage() {
                   <card.icon size={13} className={`text-${card.color}-400`}/>
                 </div>
               </div>
-              <p className={`text-2xl font-black text-${card.color}-400`}>{card.value}</p>
+              <p className="text-2xl font-black text-white">{card.value}</p>
             </div>
           ))}
         </div>
@@ -451,7 +447,6 @@ export default function StokPage() {
               className="w-full bg-[#080b14] border border-[#1a2236] focus:border-blue-500/40 text-white text-sm h-9 pl-9 pr-3 rounded-xl outline-none"/>
           </div>
           
-          {/* SAYIM PERİYODU GRUPLAMA FİLTRESİ (Müşteri Talebi) */}
           <div className="flex items-center gap-1 bg-[#080b14] border border-[#1a2236] rounded-xl px-2">
             <Clock size={12} className="text-gray-500" />
             <select value={filtrePeriyot} onChange={e => setFiltrePeriyot(e.target.value)}
@@ -517,7 +512,6 @@ export default function StokPage() {
                         ) : <span className="text-gray-700">—</span>}
                       </td>
                       
-                      {/* SAYIM GRUBU ALANI */}
                       <td className="px-4 py-3.5 font-medium text-gray-400 capitalize">
                         {urun.sayim_periyodu === "aylik" ? "🗓 Aylık" : urun.sayim_periyodu === "haftalik" ? "📅 Haftalık" : "⏱ Günlük"}
                       </td>
@@ -560,7 +554,7 @@ export default function StokPage() {
         </div>
       </div>
 
-      {/* YENİ / DÜZENLEME ÜRÜN MODAL */}
+      {/* YENİ / DÜZENLEME MODAL */}
       {yeniUrunAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl w-full max-w-md shadow-2xl">
@@ -592,7 +586,6 @@ export default function StokPage() {
                 </div>
               </div>
 
-              {/* SAYIM SIKLIĞI PERİYODU SEÇİM ALANI (NEW) */}
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase tracking-wide font-medium mb-1">Sayım Döngüsü / Grubu</label>
                 <select value={yPeriyot} onChange={e => setYPeriyot(e.target.value)}
