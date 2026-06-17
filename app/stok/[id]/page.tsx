@@ -133,14 +133,20 @@ export default function StokDetayPage() {
     const sirali = [...hareketler].sort((a, b) => a.tarih.localeCompare(b.tarih));
     const tarihMap = new Map<string, number>();
     let stok = 0;
+    
     sirali.forEach(h => {
-      if (h.tip === "sayim") stok = h.miktar;
-      else if (h.tip === "grid") stok += h.miktar;
-      else if (h.tip === "giris") stok += h.miktar;
-      else if (h.tip === "cikis") stok -= h.miktar;
-      else if (h.tip === "duzeltme") stok = h.miktar;
+      if (h.tip === "sayim") {
+        stok = h.miktar;
+      } else if (h.tip === "giris") {
+        stok += h.miktar;
+      } else if (h.tip === "cikis") {
+        stok -= h.miktar;
+      } else if (h.tip === "duzeltme") {
+        stok = h.miktar;
+      }
       tarihMap.set(h.tarih, stok);
     });
+    
     return Array.from(tarihMap.entries()).map(([tarih, miktar]) => ({ tarih, miktar }));
   }, [urun, hareketler]);
 
@@ -176,7 +182,7 @@ export default function StokDetayPage() {
             borderWidth: 2,
             fill: true,
             tension: 0.3,
-PointRadius: 4,
+            pointRadius: 4,
             pointBackgroundColor: "#10B981",
             pointBorderColor: "#0c0f1a",
             pointBorderWidth: 2,

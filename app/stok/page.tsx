@@ -84,6 +84,10 @@ export default function StokPage() {
   const [yNotlar, setYNotlar] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Dinamik Kategori Alanları İçin State'ler
+  const [digerKategoriModu, setDigerKategoriModu] = useState(false);
+  const [yeniKategoriAdi, setYeniKategoriAdi] = useState("");
+
   const [sayimMiktar, setSayimMiktar] = useState("");
   const [sayimTarih, setSayimTarih] = useState(bugun());
   const [sayimNot, setSayimNot] = useState("");
@@ -202,6 +206,7 @@ export default function StokPage() {
   const yeniUrunReset = () => {
     setYUrunAdi(""); setYKategori(""); setYBirim("kg");
     setYMinStok(""); setYIlkStok(""); setYPeriyot("gunluk"); setYNotlar("");
+    setDigerKategoriModu(false); setYeniKategoriAdi("");
     setYeniUrunAcik(false); setDuzenleUrun(null);
   };
 
@@ -213,11 +218,36 @@ export default function StokPage() {
       const ekleyen = userEmail.split("@")[0] || "Bilinmiyor";
       const minStokNum = parseFloat(yMinStok) || 0;
       const ilkStokNum = parseFloat(yIlkStok) || 0;
+      let nihaiKategori = yKategori;
+
+      // Kullanıcı "Diğer..." seçeneğiyle yeni bir kategori yazdıysa bunu veritabanına ekle
+      if (digerKategoriModu && yeniKategoriAdi.trim()) {
+        const katAd = yeniKategoriAdi.trim();
+        // Aynı isimde kategori var mı kontrol et
+        const mevcutKat = kategoriler.find(k => k.ad.toLowerCase() === katAd.toLowerCase());
+        
+        if (mevcutKat) {
+          nihaiKategori = mevcutKat.ad;
+        } else {
+          // Yeni kategoriyi ekle (Rasgele bir hex renk atayarak)
+          const renkler = ["#10B981", "#3B82F6", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4"];
+          const rasgeleRenk = renkler[Math.floor(Math.random() * renkler.length)];
+          const { data: yeniKatData, error: katErr } = await supabase
+            .from("stok_kategoriler")
+            .insert([{ ad: katAd, renk: rasgeleRenk, sira: kategoriler.length + 1 }])
+            .select()
+            .single();
+
+          if (!katErr && yeniKatData) {
+            nihaiKategori = yeniKatData.ad;
+          }
+        }
+      }
 
       if (duzenleUrun) {
         const { error } = await supabase.from("stok_urunler").update({
           urun_adi: yUrunAdi.trim(),
-          kategori: yKategori || null,
+          kategori: nihaiKategori || null,
           birim: yBirim,
           min_stok: minStokNum,
           sayim_periyodu: yPeriyot,
@@ -227,7 +257,7 @@ export default function StokPage() {
       } else {
         const { data: yeni, error } = await supabase.from("stok_urunler").insert([{
           urun_adi: yUrunAdi.trim(),
-          kategori: yKategori || null,
+          kategori: nihaiKategori || null,
           birim: yBirim,
           min_stok: minStokNum,
           sayim_periyodu: yPeriyot,
@@ -343,6 +373,8 @@ export default function StokPage() {
       setYMinStok(duzenleUrun.min_stok.toString());
       setYPeriyot(duzenleUrun.sayim_periyodu || "gunluk");
       setYNotlar(duzenleUrun.notlar || "");
+      setDigerKategoriModu(false);
+      setYeniKategoriAdi("");
       setYeniUrunAcik(true);
     }
   }, [duzenleUrun]);
@@ -571,11 +603,46 @@ export default function StokPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] text-gray-600 uppercase tracking-wide font-medium mb-1">Kategori</label>
-                  <select value={yKategori} onChange={e => setYKategori(e.target.value)}
-                    className="w-full bg-[#080b14] border border-[#1a2236] text-white text-sm h-9 px-3 rounded-xl outline-none">
-                    <option value="">Seçiniz</option>
-                    {kategoriler.map(k => <option key={k.id} value={k.ad}>{k.ad}</option>)}
-                  </select>
+                  {!digerKategoriModu ? (
+                    <select 
+                      value={yKategori} 
+                      onChange={e => {
+                        if (e.target.value === "__DIGER__") {
+                          setDigerKategoriModu(true);
+                          setYKategori("");
+                        } else {
+                          setYKategori(e.target.value);
+                        }
+                      }}
+                      className="w-full bg-[#080b14] border border-[#1a2236] text-white text-sm h-9 px-3 rounded-xl outline-none"
+                    >
+                      <option value="">Seçiniz</option>
+                      {kategoriler.map(k => <option key={k.id} value={k.ad}>{k.ad}</option>)}
+                      <option value="__DIGER__" className="text-blue-400 font-bold">✨ Diğer (Yeni Ekle...)</option>
+                    </select>
+                  ) : (
+                    <div className="relative flex items-center">
+                      <input 
+                        type="text" 
+                        placeholder="Kategori Adı..." 
+                        value={yeniKategoriAdi}
+                        onChange={e => setYeniKategoriAdi(e.target.value)}
+                        autoFocus
+                        className="w-full bg-[#080b14] border border-blue-500/50 text-white text-xs h-9 pl-3 pr-8 rounded-xl outline-none"
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setDigerKategoriModu(false);
+                          setYeniKategoriAdi("");
+                        }}
+                        className="absolute right-2 p-1 text-gray-500 hover:text-red-400"
+                        title="Seçime geri dön"
+                      >
+                        <X size={12}/>
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[10px] text-gray-600 uppercase tracking-wide font-medium mb-1">Birim</label>
