@@ -142,7 +142,7 @@ export default function StokDetayPage() {
       else if (h.tip === "duzeltme") stok = h.miktar;
       tarihMap.set(h.tarih, stok);
     });
-    return Array.from(tarihMap.entries()).map(([tarih, miktar]) => ({?tarih, miktar}));
+    return Array.from(tarihMap.entries()).map(([tarih, miktar]) => ({tarih, miktar}));
   }, [urun, hareketler]);
 
   useEffect(() => {
