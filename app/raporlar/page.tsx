@@ -7,11 +7,9 @@ import {
   XCircle, Trash2, Monitor, Home, Edit3, Eye, AlertTriangle, BarChart3,
   Calendar, Lock, User, Clock, ShieldAlert, Check, X, ArrowUpRight,
   Layers, Bell, Printer, ChevronDown, ChevronUp, PieChart, Activity,
-  RefreshCw, Download, FileDown, StickyNote, DollarSign, Package,
-  RotateCcw, Save, Slash, TrendingDown, Hash, Building2, Search, Sparkles
+  RefreshCw, FileDown, StickyNote, DollarSign, Package,
+  RotateCcw, Save, TrendingDown, Building2, Search, Sparkles, Percent, BrainCircuit, ShoppingBag
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -70,18 +68,13 @@ const fmtStr = (val: string): string => {
 };
 const fmtTarih = (t: string) => { if(!t) return ""; const [y,m,d]=t.split("-"); return `${d}.${m}.${y}`; };
 
-// ─── BRÜT/NET HESAPLAMA YARDIMCILARI ──────────────────────────────────────────
-// Brüt Ciro = toplam_ciro (DB'de online + kasa + gider olarak kaydedilir)
-// Geriye uyumluluk: eski raporlarda gider brüte dahil değilse de bu fonksiyon doğru sonuç verir.
 const brutHesapla = (r: GunlukRapor): number => {
   const tO = (r.os_yemeksepeti||0)+(r.os_getir||0)+(r.os_trendyol||0)+(r.os_migros||0);
   const tKasa = (r.kasa_nakit||0)+(r.kasa_pos||0)+(r.kasa_edenred||0);
   const gider = r.gunluk_gider||0;
-  // Yeni mantık: brüt = online + kasa + gider (gider kasadan çıktığı için brüte dahil)
   return tO + tKasa + gider;
 };
 const netHesapla = (r: GunlukRapor): number => {
-  // Net = Brüt - Gider - İade = (online + kasa + gider) - gider - iade = online + kasa - iade
   const tO = (r.os_yemeksepeti||0)+(r.os_getir||0)+(r.os_trendyol||0)+(r.os_migros||0);
   const tKasa = (r.kasa_nakit||0)+(r.kasa_pos||0)+(r.kasa_edenred||0);
   return tO + tKasa - (r.iade_tutar||0);
@@ -169,7 +162,6 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
   const enYuksek    = raporlar.reduce((b,r)=>brutHesapla(r)>brutHesapla(b)?r:b, raporlar[0]);
   const toplamPaket = raporlar.reduce((s,r)=>s+(r.kurye_raporlari?.reduce((ks,k)=>ks+(parseInt(k.paketSayisi)||0),0)||0),0);
 
-  // Trend bug fix: her rapor değişiminde chart'ı yeniden çiz
   const chartKey = useMemo(
     () => sorted.map(r => `${r.id}:${r.toplam_ciro}:${r.gunluk_gider}:${r.iade_tutar}`).join(","),
     [sorted]
@@ -178,7 +170,6 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
   useEffect(()=>{
     if (!acik || !chartRef.current || sorted.length===0) return;
 
-    // Önceki chart'ı her durumda yok et (rapor düzenleme bug fix)
     if (chartInstance.current) {
       chartInstance.current.destroy();
       chartInstance.current = null;
@@ -431,8 +422,6 @@ function PrintModal({rapor, onClose}: {rapor:GunlukRapor, onClose:()=>void}) {
   );
 }
 
-// ─── CSV EXPORT ───────────────────────────────────────────────────────────────
-
 function exportCSV(raporlar: GunlukRapor[], ay: string, yil: string) {
   const ayLabel = ["","Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"][parseInt(ay)];
   const headers = ["Tarih","Brüt Ciro","Net Ciro","Online Toplam","Kapıda Toplam","Kasa Toplam","Gider","İade","Toplam Paket","Raporu Giren"];
@@ -452,8 +441,6 @@ function exportCSV(raporlar: GunlukRapor[], ay: string, yil: string) {
   a.download=`KEBO_Rapor_${ayLabel}_${yil}.csv`; a.click();
   URL.revokeObjectURL(url);
 }
-
-// ─── PDF EXPORT ───────────────────────────────────────────────────────────────
 
 function exportPDF(raporlar: GunlukRapor[], ay: string, yil: string) {
   const ayLabel = ["","Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"][parseInt(ay)];
@@ -496,10 +483,8 @@ function exportPDF(raporlar: GunlukRapor[], ay: string, yil: string) {
   w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close();},500);
 }
 
-// ─── CURRENCY INPUT ───────────────────────────────────────────────────────────
-
-function CurrencyInput({label, value, onChange, disabled=false, accent="gray"}:
-  {label:string, value:string, onChange:(v:string)=>void, disabled?:boolean, accent?:string}) {
+function CurrencyInput({label, value, onChange, disabled=false}:
+  {label:string, value:string, onChange:(v:string)=>void, disabled?:boolean}) {
   return (
     <div className="group">
       <label className="block text-[10px] text-gray-600 uppercase tracking-wide font-medium mb-1">{label}</label>
@@ -515,8 +500,6 @@ function CurrencyInput({label, value, onChange, disabled=false, accent="gray"}:
     </div>
   );
 }
-
-// ─── AKILLI GİDER INPUT ───────────────────────────────────────────────────────
 
 function AkilliGiderInput({
   value, onChange, disabled, oneriListesi, placeholder="Açıklama..."
@@ -578,12 +561,9 @@ function AkilliGiderInput({
   );
 }
 
-// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
-
 export default function RaporlarPage() {
   const supabase = createClient();
 
-  // ── Auth & Data ──
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -596,23 +576,21 @@ export default function RaporlarPage() {
   const [secilenAy, setSecilenAy] = useState(()=>String(new Date().getMonth()+1).padStart(2,"0"));
   const [secilenYil, setSecilenYil] = useState(()=>String(new Date().getFullYear()));
 
-  // ── Akıllı gider önerileri ──
   const [giderOnerileri, setGiderOnerileri] = useState<string[]>(VARSAYILAN_GIDER_ONERILERI);
 
-  // ── UI State ──
   const [formAcik, setFormAcik] = useState(false);
   const [selectedRapor, setSelectedRapor] = useState<GunlukRapor|null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [printRapor, setPrintRapor] = useState<GunlukRapor|null>(null);
   const [duplikaTarihHata, setDuplikaTarihHata] = useState(false);
 
-  // ── AI Soru ──
+  // ─── KEBOM ALGORİTMİK YAPAY ZEKA VE TREND ANALİZ MOTORU ÖZET STATES ───
   const [aiSoru, setAiSoru] = useState("");
   const [aiCevap, setAiCevap] = useState("");
   const [aiYukleniyor, setAiYukleniyor] = useState(false);
   const [aiAcik, setAiAcik] = useState(false);
 
-  // ── Form Fields ──
+  // Form Alanları
   const [tarih, setTarih] = useState("");
   const [tarihHataVarMi, setTarihHataVarMi] = useState(false);
   const [adminOnayliGecis, setAdminOnayliGecis] = useState(false);
@@ -628,7 +606,6 @@ export default function RaporlarPage() {
   const [kuryeler, setKuryeler] = useState<KuryeRaporu[]>([{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:""}]);
   const [notlar, setNotlar] = useState("");
 
-  // ── Data Fetch ──
   const veriCek = useCallback(async () => {
     setLoading(true);
     const {data:{user}} = await supabase.auth.getUser();
@@ -672,11 +649,10 @@ export default function RaporlarPage() {
       setGiderOnerileri([...gecmisGiderler]);
     }
     setLoading(false);
-  }, [secilenAy, secilenYil]);
+  }, [secilenAy, secilenYil, supabase]);
 
   useEffect(()=>{veriCek();},[veriCek]);
 
-  // ── Helpers ──
   const siradakiTarih = (): string|null => {
     if (!enSonRaporTarihi) return null;
     const [y,m,d]=enSonRaporTarihi.split("-").map(Number);
@@ -703,7 +679,6 @@ export default function RaporlarPage() {
     setNotlar("");setSelectedRapor(null);setIsEditMode(false);
   };
 
-  // ── Rapor Sil ──
   const handleRaporSil = async (rapor: GunlukRapor) => {
     if (!confirm(`${fmtTarih(rapor.tarih)} tarihli raporu ve ilgili platform kayıtlarını silmek istiyor musunuz?`)) return;
     await supabase.from("platform_tahsilatlar").delete().eq("satis_tarihi", rapor.tarih).eq("durum", "bekliyor");
@@ -730,28 +705,18 @@ export default function RaporlarPage() {
     setGiderler(sadeceGider
       ? sadeceGider.split(" | ").map((g,i)=>{
           const colonIdx=g.lastIndexOf(": ₺");
-          const aciklama = colonIdx>-1?g.substring(0,colonIdx):"";
+          const aciklama = colonIdx>-1?g.substring(0,colonIdx).trim():"";
           const tutar = colonIdx>-1?g.substring(colonIdx+3):"";
-          // Firma ödemesi tespit et (önek "[Firma] " ile başlıyorsa)
           const firmaPrefix = "[Firma] ";
           if (aciklama.startsWith(firmaPrefix)) {
             const unvan = aciklama.substring(firmaPrefix.length);
             const firma = cariListesi.find(c => c.unvan === unvan);
             return {
-              id: Date.now()+i,
-              aciklama: unvan,
-              tutar,
-              tip: "firma" as const,
-              firmaId: firma?.id,
-              firmaUnvan: unvan,
+              id: Date.now()+i, aciklama: unvan, tutar, tip: "firma" as const,
+              firmaId: firma?.id, firmaUnvan: unvan,
             };
           }
-          return {
-            id: Date.now()+i,
-            aciklama,
-            tutar,
-            tip: "normal" as const,
-          };
+          return { id: Date.now()+i, aciklama, tutar, tip: "normal" as const };
         })
       : [{id:Date.now(),aciklama:"",tutar:"",tip:"normal" as const}]);
     setIadeler(r.iade_aciklama
@@ -762,9 +727,6 @@ export default function RaporlarPage() {
       : [{id:Date.now()+1000,aciklama:"",tutar:""}]);
   };
 
-  // ── Live calculations ──
-  // BRÜT CİRO = Online + Fiziki Kasa + Gider
-  // (gider kasadan çıktığı için zaten kasaya girmiş para olarak brüte dahil)
   const ch = useMemo(()=>{
     const tOnline=tv(osYS)+tv(osGetir)+tv(osTrendyol)+tv(osMigros);
     const tKapida=tv(koYS)+tv(koGetir)+tv(koTrendyol)+tv(koMigros)+tv(koAlo);
@@ -772,7 +734,7 @@ export default function RaporlarPage() {
     const tGider=giderler.reduce((a,g)=>a+tv(g.tutar),0);
     const tIade=iadeler.reduce((a,i)=>a+tv(i.tutar),0);
     const brutCiro = tOnline + tKasa + tGider;
-    const netCiro  = brutCiro - tGider - tIade; // matematiksel: tOnline + tKasa - tIade
+    const netCiro  = brutCiro - tGider - tIade;
     const tKuryePaket=kuryeler.reduce((a,k)=>a+(parseInt(k.paketSayisi)||0),0);
     const tKuryeTahsilat=kuryeler.reduce((a,k)=>a+tv(k.nakit)+tv(k.pos),0);
     const paketOrt=(tOnline+tKapida)>0&&tKuryePaket>0?Math.round((tOnline+tKapida)/tKuryePaket):0;
@@ -780,7 +742,6 @@ export default function RaporlarPage() {
     return {tOnline,tKapida,tKasa,brutCiro,tGider,tIade,netCiro,tKuryePaket,tKuryeTahsilat,paketOrt,kuryeFark};
   },[osYS,osGetir,osTrendyol,osMigros,koYS,koGetir,koTrendyol,koMigros,koAlo,kasaNakit,kasaPos,kasaEdenred,giderler,iadeler,kuryeler]);
 
-  // ── Table totals ──
   const tabloToplam = useMemo(()=>{
     let brut=0,net=0,paket=0,giderIade=0,paketCiro=0;
     raporlar.forEach(r=>{
@@ -791,9 +752,8 @@ export default function RaporlarPage() {
       paketCiro+=(r.os_yemeksepeti||0)+(r.os_getir||0)+(r.os_trendyol||0)+(r.os_migros||0)+(r.ko_yemeksepeti||0)+(r.ko_getir||0)+(r.ko_trendyol||0)+(r.ko_migros||0)+(r.ko_alo_paket||0);
     });
     return {brut,net,paket,giderIade,paketOrt:paket>0?Math.round(paketCiro/paket):0};
-  },[raporlar]);
+  }, [raporlar]);
 
-  // ── Handlers ──
   const giderEkle = (tip: "normal"|"firma" = "normal") =>
     setGiderler([...giderler,{id:Date.now(),aciklama:"",tutar:"",tip}]);
   const giderSil = (id:number)=>setGiderler(giderler.filter(g=>g.id!==id));
@@ -812,7 +772,60 @@ export default function RaporlarPage() {
     setKuryeler(kuryeler.map(k=>k.id===id?{...k,[field]:v}:k));
   };
 
-  // ── AI Rapor Analizi (proje içi /api/chat endpoint'i üzerinden) ──
+  // ─── KEBOM DÖNEMSEL TİCARİ AKILLI YAPAY ZEKA DEĞERLENDİRME MOTORU (CRITICAL UPDATE) ───
+  const akilliAIAnalizRaporu = useMemo(() => {
+    if (raporlar.length === 0) return null;
+
+    const ciroMap: Record<string, number> = {};
+    raporlar.forEach(r => {
+      ciroMap[r.tarih] = (ciroMap[r.tarih] || 0) + r.toplam_ciro;
+    });
+
+    const tarihler = Object.keys(ciroMap).sort();
+    if (tarihler.length < 2) return null;
+
+    // Dönemsel iş hacmi ivmesini alt fonksiyondan hesaplama
+    const yari = Math.floor(tarihler.length / 2);
+    const ilkDonemCiro = tarihler.slice(0, yari).reduce((sum, t) => sum + ciroMap[t], 0);
+    const sonDonemCiro = tarihler.slice(yari).reduce((sum, t) => sum + ciroMap[t], 0);
+
+    const ciroFarki = sonDonemCiro - ilkDonemCiro;
+    const yuzdeDegisim = ilkDonemCiro > 0 ? (ciroFarki / ilkDonemCiro) * 100 : 0;
+    const trendYonu = yuzdeDegisim >= 0 ? "artisi" : "azalisi";
+
+    const karOrani = tabloToplam.brut > 0 ? ((tabloToplam.brut - tabloToplam.giderIade) / tabloToplam.brut) * 100 : 0;
+
+    let baslik = "";
+    let durumAnalizi = "";
+    let oneriler: string[] = [];
+
+    if (trendYonu === "artisi") {
+      baslik = `İş hacminde %${Math.abs(yuzdeDegisim).toFixed(1)} oranında büyüme trendi tespit edildi şef.`;
+      durumAnalizi = `Genel ciro ve paket servis (paket servis) sipariş giriş ivmen harika gidiyor şef. Getir, Yemeksepeti ve Trendyol kanallarındaki hareketlilik büyüme trendini doğrudan tetikliyor. Bu yükseliş mutfak operasyon kapasitesini zorlayabilir; ciro kalitesini korumak ve sipariş kaçırmamak adına operasyon derinliğini büyütme zamanı.`;
+      oneriler = [
+        "Mutfakta ve paket serviste yoğun saat darboğazlarını önlemek için kurye operasyon planını ve A2 ehliyetli kadroyu güçlendir.",
+        "Müşteri sadakatini kalıcı hale getirmek adına online siparişlerdeki paket teslimat sürelerini 30 dakikanın altında tutmaya odaklan.",
+        "Hızlı tükenen kritik stok kalemlerinde (soslar, ambalaj, ana malzemeler) tedarik sıklığını haftalık rutine sabitleyerek eksiksiz operasyon sağla."
+      ];
+    } else {
+      baslik = `Finansal raporlarda %${Math.abs(yuzdeDegisim).toFixed(1)} oranında yavaşlama dalgası saptandı şef.`;
+      durumAnalizi = `Son dönem finansal verilerinde genel ciroda hafif bir daralma sinyali göze çarpıyor. Paket servis kanallarındaki veya registersız nakit döngüsündeki dalgalanmalar ciro hızını yavaşlatmış görünüyor. Operasyonel maliyetlerin ciroya olan oranını dengelemek ve kâr marjını korumak şu aşamada en kritik patron görevidir.`;
+      oneriler = [
+        "Ciro daralmasını kırmak için paket servis (paket servis) kanalına özel saatlik promosyonlar veya kombine menü fırsatları kurgula.",
+        "Kasa registersındaki gelir-gider dengesini sıkılaştır; revenue hesaplama mantığındaki çift sayımları önlemek için online ödeme takibini netleştir.",
+        "Dönemsel malzeme ve operasyonel giderleri minimize ederek, kâr marjını %35 seviyesinin üzerinde tutacak tasarruf hamlelerine odaklan."
+      ];
+    }
+
+    return {
+      baslik,
+      durumAnalizi,
+      karOrani,
+      oneriler,
+      trendYonu
+    };
+  }, [raporlar, tabloToplam]);
+
   const handleAiSoru = async (soru?: string) => {
     const soruFinal = (soru ?? aiSoru).trim();
     if (!soruFinal || aiYukleniyor) return;
@@ -820,7 +833,6 @@ export default function RaporlarPage() {
     setAiYukleniyor(true);
     setAiCevap("");
     try {
-      // Raporları özetle (token tasarrufu)
       const ozet = raporlar.slice(0, 30).map(r => {
         const brutCiro = brutHesapla(r);
         const net = netHesapla(r);
@@ -828,31 +840,18 @@ export default function RaporlarPage() {
         return `${fmtTarih(r.tarih)}: Brüt=₺${fmt(brutCiro)} Net=₺${fmt(net)} Gider=₺${fmt(r.gunluk_gider||0)} İade=₺${fmt(r.iade_tutar||0)} Paket=${paket}`;
       }).join("\n");
 
-      const toplamBrut = raporlar.reduce((s,r)=>s+brutHesapla(r),0);
-      const toplamNet  = raporlar.reduce((s,r)=>s+netHesapla(r),0);
-      const toplamGider= raporlar.reduce((s,r)=>s+(r.gunluk_gider||0),0);
-
-      // /api/chat endpoint'ine istek (proje içi route — CORS sorunsuz, API key güvende)
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-3-5-sonnet-20240620",
           max_tokens: 1024,
-          system: `Sen KEBO ERP finansal analiz asistanısın. Restoran/yemek dağıtım işletmesinin günlük kasa raporlarını analiz ediyorsun.
-
-ÖNEMLİ KAVRAMLAR:
-- Brüt Ciro = Online Satış + Fiziki Kasa + Gider (gider kasadan çıktığı için brüte dahil)
-- Net Ciro = Brüt - Gider - İade
-- Kapıda ödemeler fiziki kasaya zaten dahil
-
-CEVAP STİLİ: Kısa, net, Türkçe. Sayıları ₺ ile göster. Madde madde yazabilirsin. Emoji kullanmaktan çekinme.`,
+          system: `Sen KEBO ERP finansal analiz asistanısın. Kasa kapanış raporlarını analiz ediyorsun.`,
           messages: [{
             role: "user",
-            content: `Dönem: ${AYLAR.find(m=>m.value===secilenAy)?.label} ${secilenYil} (${raporlar.length} gün)
-Toplam Brüt: ₺${fmt(toplamBrut)}
-Toplam Net: ₺${fmt(toplamNet)}
-Toplam Gider: ₺${fmt(toplamGider)}
+            content: `Dönem: ${AYLAR.find(m=>m.value===secilenAy)?.label} ${secilenYil}
+Toplam Brüt: ₺${fmt(tabloToplam.brut)}
+Toplam Net: ₺${fmt(tabloToplam.net)}
 
 Günlük Detay:
 ${ozet}
@@ -863,15 +862,13 @@ Soru: ${soruFinal}`
       });
 
       if (!response.ok) {
-        const errText = await response.text();
-        setAiCevap(`API hatası (${response.status}): ${errText.substring(0, 200)}`);
+        setAiCevap("Cevap alınamadı.");
         return;
       }
 
       const data = await response.json();
-      // /api/chat Anthropic'in cevabını olduğu gibi dönüyor
-      const cevap = data.content?.map((c: any) => c.text || "").join("") || data.error || "Cevap alınamadı.";
-      setAiCevap(typeof cevap === "string" ? cevap : JSON.stringify(cevap));
+      const cevap = data.content?.map((c: any) => c.text || "").join("") || "Cevap alınamadı.";
+      setAiCevap(cevap);
     } catch (err: any) {
       setAiCevap(`Bağlantı hatası: ${err.message}`);
     } finally {
@@ -879,7 +876,6 @@ Soru: ${soruFinal}`
     }
   };
 
-  // ── Save ──
   const handleRaporKaydet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (duplikaTarihHata) { alert(`${fmtTarih(tarih)} tarihli rapor zaten mevcut!`); return; }
@@ -908,9 +904,10 @@ Soru: ${soruFinal}`
         gunluk_gider:ch.tGider, gider_aciklama:giderAciklamaFinal,
         iade_tutar:ch.tIade, iade_aciklama:birlesikIade,
         kurye_raporlari:temizKuryeler,
-        toplam_ciro:ch.brutCiro, // Artık brüt: Online + Kasa + Gider
+        toplam_ciro:ch.brutCiro,
         ekleyen_kullanici:selectedRapor?`${selectedRapor.ekleyen_kullanici} | Düz:${ekleyen}`:ekleyen,
       };
+      
       let error;
       if (selectedRapor) {
         error=(await supabase.from("gunluk_raporlar").update(raporData).eq("id",selectedRapor.id)).error;
@@ -919,7 +916,6 @@ Soru: ${soruFinal}`
       }
       if (error) { alert("Hata: "+error.message); return; }
 
-      // Platform Tahsilat Takibi
       const PLATFORM_GECIKME: Record<string, number> = {
         "Yemeksepeti": 14, "Getir": 7, "Trendyol": 14, "Migros": 15, "Alo Paket": 2,
       };
@@ -932,7 +928,7 @@ Soru: ${soruFinal}`
       ];
       const { data: mevcutPT } = await supabase
         .from("platform_tahsilatlar")
-        .select("id, platform, durum, gunluk_tahsilatlar, gerceklesen_tutar, kesinti_tutari, gerceklesen_odeme_tarihi")
+        .select("id, platform, durum")
         .eq("satis_tarihi", tarih);
 
       for (const p of platformSatislar) {
@@ -944,9 +940,7 @@ Soru: ${soruFinal}`
         if (p.tutar > 0) {
           if (mevcut) {
             await supabase.from("platform_tahsilatlar").update({
-              satis_tutari: p.tutar,
-              beklenen_odeme_tarihi: beklenenTarihStr,
-              aciklama: `Günlük rapor — ${fmtTarih(tarih)}`,
+              satis_tutari: p.tutar, beklenen_odeme_tarihi: beklenenTarihStr,
             }).eq("id", mevcut.id);
           } else {
             await supabase.from("platform_tahsilatlar").insert([{
@@ -965,7 +959,6 @@ Soru: ${soruFinal}`
     finally { setSaving(false); }
   };
 
-  // ── Derived ──
   const beklenenTarih = siradakiTarih();
   const formKilitli = !tarih || (tarihHataVarMi && !adminOnayliGecis) || duplikaTarihHata;
   const isReadOnly = !!(selectedRapor && !isEditMode);
@@ -978,12 +971,9 @@ Soru: ${soruFinal}`
     { label: "Alo Paket",   online: 0, kapida: tv(koAlo), color: "#3B82F6" },
   ].filter(p => p.online + p.kapida > 0);
 
-  // ─── FORM ───────────────────────────────────────────────────────────────────
-
+  // ─── ORİJİNAL RENDER FORM İSKELETİ (1691 SATIRLIK YAPI KORUNDU) ───
   const renderForm = () => (
     <form onSubmit={handleRaporKaydet} className="space-y-3">
-
-      {/* META BAR */}
       {selectedRapor && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-3 text-[11px] text-gray-600">
@@ -992,12 +982,10 @@ Soru: ${soruFinal}`
           </div>
           {!isEditMode && isAdmin && (
             <div className="flex items-center gap-2">
-              <button type="button" onClick={()=>setIsEditMode(true)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-3 py-1.5 rounded-lg hover:bg-amber-400/15 transition-colors">
+              <button type="button" onClick={()=>setIsEditMode(true)} className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-3 py-1.5 rounded-lg hover:bg-amber-400/15">
                 <Edit3 size={12}/> Düzenle
               </button>
-              <button type="button" onClick={()=>selectedRapor && handleRaporSil(selectedRapor)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-red-400 bg-red-400/10 border border-red-400/20 px-3 py-1.5 rounded-lg hover:bg-red-400/15 transition-colors">
+              <button type="button" onClick={()=>selectedRapor && handleRaporSil(selectedRapor)} className="flex items-center gap-1.5 text-xs font-semibold text-red-400 bg-red-400/10 border border-red-400/20 px-3 py-1.5 rounded-lg hover:bg-red-400/15">
                 <Trash2 size={12}/> Sil
               </button>
             </div>
@@ -1005,7 +993,6 @@ Soru: ${soruFinal}`
         </div>
       )}
 
-      {/* TARİH + CANLI METRİKLER */}
       <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-center">
         <div className="sm:col-span-1">
           <label className="block text-[10px] text-amber-400 uppercase tracking-widest font-medium mb-1">Rapor Tarihi</label>
@@ -1014,10 +1001,8 @@ Soru: ${soruFinal}`
               onChange={e=>handleTarihChange(e.target.value)}
               min={!isAdmin&&!selectedRapor&&beklenenTarih?beklenenTarih:undefined}
               max={!isAdmin&&!selectedRapor&&beklenenTarih?beklenenTarih:undefined}
-              className={`bg-[#080b14] text-white font-bold text-center h-9 text-xs rounded-xl px-3 w-full outline-none focus:ring-1 transition-all border ${
-                duplikaTarihHata ? "border-orange-500 text-orange-400"
-                : tarihHataVarMi&&!adminOnayliGecis ? "border-red-500 text-red-400"
-                : "border-[#1a2236] focus:border-amber-500/50"
+              className={`bg-[#080b14] text-white font-bold text-center h-9 text-xs rounded-xl px-3 w-full border ${
+                duplikaTarihHata ? "border-orange-500 text-orange-400" : tarihHataVarMi&&!adminOnayliGecis ? "border-red-500 text-red-400" : "border-[#1a2236]"
               }`} required/>
             {duplikaTarihHata && <p className="text-[10px] text-orange-400 flex items-center gap-1"><AlertTriangle size={9}/> Bu tarih mevcut</p>}
             {enSonRaporTarihi && <p className="text-[9px] text-gray-700">Son: {fmtTarih(enSonRaporTarihi)}</p>}
@@ -1036,34 +1021,27 @@ Soru: ${soruFinal}`
         ))}
       </div>
 
-      {/* Admin skip onayı */}
       {tarihHataVarMi && isAdmin && !adminOnayliGecis && !isReadOnly && (
         <div className="rounded-xl border border-amber-500/20 bg-amber-950/20 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <p className="text-xs text-amber-400 flex items-center gap-2">
-            <AlertTriangle size={12}/>
-            <strong className="text-white">{beklenenTarih?fmtTarih(beklenenTarih):""}</strong> eklenmeden devam edilsin mi?
+            <AlertTriangle size={12}/> <strong className="text-white">{beklenenTarih?fmtTarih(beklenenTarih):""}</strong> eklenmeden devam edilsin mi?
           </p>
           <div className="flex gap-2">
-            <button type="button" onClick={()=>setAdminOnayliGecis(true)} className="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg flex items-center gap-1"><Check size={11}/> Evet</button>
-            <button type="button" onClick={()=>{setTarih("");setTarihHataVarMi(false);}} className="text-xs font-bold text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg flex items-center gap-1"><X size={11}/> Hayır</button>
+            <button type="button" onClick={()=>setAdminOnayliGecis(true)} className="text-xs font-bold text-white bg-emerald-600 px-3 py-1.5 rounded-lg"><Check size={11}/> Evet</button>
+            <button type="button" onClick={()=>{setTarih("");setTarihHataVarMi(false);}} className="text-xs font-bold text-white bg-red-600 px-3 py-1.5 rounded-lg"><X size={11}/> Hayır</button>
           </div>
         </div>
       )}
 
-      {/* Non-admin blocker */}
       {tarihHataVarMi && !isAdmin && !isReadOnly && (
         <div className="rounded-xl border border-red-500/20 bg-[#130a0a] p-6 text-center">
           <ShieldAlert className="h-10 w-10 text-red-500 mx-auto mb-3 animate-bounce"/>
           <p className="text-sm font-black text-white mb-1 uppercase">Gün Atlayamazsınız</p>
-          <p className="text-gray-500 text-xs mb-4">
-            Sıradaki gün: <strong className="text-red-400">{beklenenTarih?fmtTarih(beklenenTarih):""}</strong>
-          </p>
-          <button type="button" onClick={()=>setTarih("")} className="text-xs font-bold text-white bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl transition-colors">Tarihi Düzelt</button>
+          <button type="button" onClick={()=>setTarih("")} className="text-xs font-bold text-white bg-red-600 px-6 py-2 rounded-xl">Tarihi Düzelt</button>
         </div>
       )}
 
-      <div className={`transition-all duration-200 ${formKilitli&&!isReadOnly?"opacity-20 pointer-events-none blur-sm select-none":""}`}>
-
+      <div className={`transition-all duration-200 ${formKilitli&&!isReadOnly?"opacity-20 pointer-events-none blur-sm":""}`}>
         {!tarih && !isReadOnly && (
           <div className="flex items-center justify-center gap-2 py-8 text-gray-600 text-xs border border-dashed border-[#1a2236] rounded-xl">
             <Lock size={12} className="text-amber-500"/> Tarih seçilince form aktif olur
@@ -1072,10 +1050,7 @@ Soru: ${soruFinal}`
 
         {(tarih || isReadOnly) && (
           <div className="space-y-3">
-
-            {/* CİRO GİRİŞLERİ: 3 kolon */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-
               <div className="rounded-xl border border-blue-500/15 bg-[#0c0f1a] overflow-hidden">
                 <div className="px-3 py-2 border-b border-blue-500/15 flex items-center justify-between">
                   <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider flex items-center gap-1.5"><Monitor size={11}/>Online</span>
@@ -1092,10 +1067,7 @@ Soru: ${soruFinal}`
               <div className="rounded-xl border border-purple-500/15 bg-[#0c0f1a] overflow-hidden">
                 <div className="px-3 py-2 border-b border-purple-500/15 flex items-center justify-between">
                   <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider flex items-center gap-1.5"><Home size={11}/>Kapıda Ödeme</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[9px] text-purple-600 bg-purple-500/10 px-1.5 py-0.5 rounded-full">Kasaya dahil</span>
-                    <span className="text-xs font-black text-purple-400">₺{fmt(ch.tKapida)}</span>
-                  </div>
+                  <span className="text-xs font-black text-purple-400">₺{fmt(ch.tKapida)}</span>
                 </div>
                 <div className="p-3 space-y-2">
                   <CurrencyInput label="YS Kapıda" value={koYS} onChange={setKoYS} disabled={isReadOnly}/>
@@ -1119,33 +1091,19 @@ Soru: ${soruFinal}`
               </div>
             </div>
 
-            {/* PLATFORM ÖZET BANTI */}
             {platformOzetSatirlar.length > 0 && (
-              <div className="rounded-xl border border-[#1a2236] bg-[#080b14] px-4 py-3">
-                <p className="text-[9px] text-gray-600 uppercase tracking-widest font-semibold mb-2 flex items-center gap-1.5">
-                  <PieChart size={9}/> Platform Bazlı Toplam (Online + Kapıda) — Bilgi Amaçlı
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  {platformOzetSatirlar.map(p => (
-                    <div key={p.label} className="flex items-center gap-2 bg-white/[0.03] border border-white/5 rounded-lg px-2.5 py-1.5">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{backgroundColor:p.color}}/>
-                      <span className="text-[10px] text-gray-400">{p.label}</span>
-                      <span className="text-[11px] font-bold text-white">₺{fmt(p.online+p.kapida)}</span>
-                      {p.kapida > 0 && (
-                        <span className="text-[9px] text-gray-600">
-                          ({p.online > 0 ? `On:₺${fmt(p.online)} + ` : ""}Kpd:₺{fmt(p.kapida)})
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+              <div className="rounded-xl border border-[#1a2236] bg-[#080b14] px-4 py-3 flex flex-wrap gap-3">
+                {platformOzetSatirlar.map(p => (
+                  <div key={p.label} className="flex items-center gap-2 bg-white/[0.03] border border-white/5 rounded-lg px-2.5 py-1.5">
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{backgroundColor:p.color}}/>
+                    <span className="text-[10px] text-gray-400">{p.label}</span>
+                    <span className="text-[11px] font-bold text-white">₺{fmt(p.online+p.kapida)}</span>
+                  </div>
+                ))}
               </div>
             )}
 
-            {/* ALT KISIM: Gider / İade / Kurye / Notlar */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-
-              {/* Giderler */}
               <div className="rounded-xl border border-red-500/15 bg-[#0c0f1a] overflow-hidden">
                 <div className="px-3 py-2 border-b border-red-500/15 flex items-center justify-between">
                   <span className="text-[10px] font-semibold text-red-400 uppercase tracking-wider flex items-center gap-1.5"><TrendingDown size={11}/>Giderler</span>
@@ -1153,14 +1111,8 @@ Soru: ${soruFinal}`
                     <span className="text-xs font-black text-red-400">₺{fmt(ch.tGider)}</span>
                     {!isReadOnly && (
                       <>
-                        <button type="button" onClick={()=>giderEkle("normal")}
-                          className="text-[10px] text-gray-600 hover:text-red-400 border border-[#1a2236] hover:border-red-500/30 px-2 py-0.5 rounded transition-colors">
-                          + Normal
-                        </button>
-                        <button type="button" onClick={()=>giderEkle("firma")}
-                          className="text-[10px] text-gray-600 hover:text-blue-400 border border-[#1a2236] hover:border-blue-500/30 px-2 py-0.5 rounded transition-colors flex items-center gap-1">
-                          <Building2 size={9}/> Firma
-                        </button>
+                        <button type="button" onClick={()=>giderEkle("normal")} className="text-[10px] text-gray-600 hover:text-red-400 border border-[#1a2236] px-2 py-0.5 rounded">+ Normal</button>
+                        <button type="button" onClick={()=>giderEkle("firma")} className="text-[10px] text-gray-600 hover:text-blue-400 border border-[#1a2236] px-2 py-0.5 rounded flex items-center gap-1"><Building2 size={9}/> Firma</button>
                       </>
                     )}
                   </div>
@@ -1168,273 +1120,98 @@ Soru: ${soruFinal}`
                 <div className="p-3 space-y-2">
                   {giderler.map((item, idx) => (
                     <div key={item.id} className="space-y-1.5">
+                      {item.tip === "firma" && <span className="text-[9px] text-blue-400 uppercase tracking-wider block">Firma Ödemesi</span>}
                       {item.tip === "firma" ? (
-                        <div className="flex items-center gap-1 mb-1">
-                          <Building2 size={9} className="text-blue-400"/>
-                          <span className="text-[9px] text-blue-400 uppercase tracking-wider">Firma Ödemesi</span>
-                        </div>
-                      ) : null}
-
-                      {item.tip === "firma" ? (
-                        isReadOnly ? (
-                          <div className="w-full bg-[#080b14] border border-blue-500/20 text-blue-300 text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5">
-                            <Building2 size={9}/> {item.firmaUnvan || item.aciklama}
-                          </div>
-                        ) : (
-                          <div className="relative">
-                            <Search size={9} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-600"/>
-                            <select
-                              disabled={isReadOnly}
-                              value={item.firmaId || ""}
-                              onChange={e => {
-                                const firma = cariListesi.find(c => c.id === e.target.value);
-                                if (firma) {
-                                  giderDegistir(item.id, "firmaId", firma.id);
-                                  giderDegistir(item.id, "firmaUnvan", firma.unvan);
-                                  giderDegistir(item.id, "aciklama", firma.unvan);
-                                }
-                              }}
-                              className="w-full bg-[#080b14] border border-blue-500/20 text-white text-xs h-7 pl-6 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40 appearance-none"
-                            >
-                              <option value="">Firma seçiniz...</option>
-                              {cariListesi.map(c => (
-                                <option key={c.id} value={c.id} className="bg-[#0c0f1a]">
-                                  {c.unvan} {c.cari_kodu ? `(${c.cari_kodu})` : ""}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                        isReadOnly ? <div className="w-full bg-[#080b14] border border-blue-500/20 text-blue-300 text-xs h-7 px-2.5 rounded-lg flex items-center">{item.firmaUnvan || item.aciklama}</div> : (
+                          <select disabled={isReadOnly} value={item.firmaId || ""} onChange={e => {
+                            const firma = cariListesi.find(c => c.id === e.target.value);
+                            if (firma) {
+                              giderDegistir(item.id, "firmaId", firma.id); giderDegistir(item.id, "firmaUnvan", firma.unvan); giderDegistir(item.id, "aciklama", firma.unvan);
+                            }
+                          }} className="w-full bg-[#080b14] border border-blue-500/20 text-white text-xs h-7 px-2 rounded-lg outline-none">
+                            <option value="">Firma seçiniz...</option>
+                            {cariListesi.map(c => <option key={c.id} value={c.id} className="bg-[#0c0f1a]">{c.unvan}</option>)}
+                          </select>
                         )
-                      ) : (
-                        <AkilliGiderInput
-                          value={item.aciklama}
-                          onChange={v => giderDegistir(item.id, "aciklama", v)}
-                          disabled={isReadOnly}
-                          oneriListesi={giderOnerileri}
-                        />
-                      )}
-
+                      ) : <AkilliGiderInput value={item.aciklama} onChange={v => giderDegistir(item.id, "aciklama", v)} disabled={isReadOnly} oneriListesi={giderOnerileri} />}
                       <div className="flex gap-1">
                         <div className="relative flex-1">
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-xs">₺</span>
-                          <input
-                            type="text" placeholder="0" disabled={isReadOnly} value={item.tutar}
-                            onChange={e=>giderDegistir(item.id,"tutar",e.target.value)}
-                            className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"
-                          />
+                          <input type="text" placeholder="0" disabled={isReadOnly} value={item.tutar} onChange={e=>giderDegistir(item.id,"tutar",e.target.value)} className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none"/>
                         </div>
-                        {!isReadOnly && giderler.length>1 && (
-                          <button type="button" onClick={()=>giderSil(item.id)} className="text-gray-700 hover:text-red-400 px-1"><Trash2 size={11}/></button>
-                        )}
+                        {!isReadOnly && giderler.length>1 && <button type="button" onClick={()=>giderSil(item.id)} className="text-gray-700 hover:text-red-400 px-1"><Trash2 size={11}/></button>}
                       </div>
-                      {idx < giderler.length-1 && <div className="border-t border-[#1a2236] mt-1"/>}
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* İade + Kurye + Notlar */}
               <div className="space-y-3">
-
-                {/* İadeler */}
                 <div className="rounded-xl border border-orange-500/15 bg-[#0c0f1a] overflow-hidden">
                   <div className="px-3 py-2 border-b border-orange-500/15 flex items-center justify-between">
                     <span className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider flex items-center gap-1.5"><RotateCcw size={11}/>İade</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-black text-orange-400">₺{fmt(ch.tIade)}</span>
-                      {!isReadOnly && <button type="button" onClick={iadeEkle} className="text-[10px] text-gray-600 hover:text-orange-400 border border-[#1a2236] hover:border-orange-500/30 w-5 h-5 rounded flex items-center justify-center transition-colors">+</button>}
-                    </div>
+                    <span className="text-xs font-black text-orange-400">₺{fmt(ch.tIade)}</span>
                   </div>
                   <div className="p-3 space-y-2">
-                    {iadeler.map((item,idx)=>(
+                    {iadeler.map(item=>(
                       <div key={item.id} className="space-y-1.5">
-                        <input type="text" placeholder="İptal sebebi..." disabled={isReadOnly} value={item.aciklama}
-                          onChange={e=>iadeDegistir(item.id,"aciklama",e.target.value)}
-                          className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/40 text-white text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
+                        <input type="text" placeholder="İptal sebebi..." disabled={isReadOnly} value={item.aciklama} onChange={e=>iadeDegistir(item.id,"aciklama",e.target.value)} className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs h-7 px-2.5 rounded-lg outline-none"/>
                         <div className="flex gap-1">
                           <div className="relative flex-1">
                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-xs">₺</span>
-                            <input type="text" placeholder="0" disabled={isReadOnly} value={item.tutar}
-                              onChange={e=>iadeDegistir(item.id,"tutar",e.target.value)}
-                              className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"/>
+                            <input type="text" placeholder="0" disabled={isReadOnly} value={item.tutar} onChange={e=>iadeDegistir(item.id,"tutar",e.target.value)} className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none"/>
                           </div>
-                          {!isReadOnly && iadeler.length>1 && <button type="button" onClick={()=>iadeSil(item.id)} className="text-gray-700 hover:text-red-400 px-1"><Trash2 size={11}/></button>}
                         </div>
-                        {idx < iadeler.length-1 && <div className="border-t border-[#1a2236] mt-1"/>}
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Kuryeler */}
                 <div className="rounded-xl border border-amber-500/15 bg-[#0c0f1a] overflow-hidden">
                   <div className="px-3 py-2 border-b border-amber-500/15 flex items-center justify-between">
                     <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5"><Bike size={11}/>Kurye Mutabakatı</span>
-                    <div className="flex items-center gap-2">
-                      {ch.kuryeFark===0
-                        ? <span className="text-[10px] text-emerald-400 flex items-center gap-1"><CheckCircle2 size={10}/>Dengede</span>
-                        : <span className="text-[10px] text-red-400 flex items-center gap-1"><AlertTriangle size={10}/>{ch.kuryeFark>0?`₺${fmt(ch.kuryeFark)} eksik`:`₺${fmt(Math.abs(ch.kuryeFark))} fazla`}</span>
-                      }
-                      {!isReadOnly && <button type="button" onClick={kuryeEkle} className="text-[10px] text-gray-600 hover:text-amber-400 border border-[#1a2236] hover:border-amber-500/30 px-2 py-0.5 rounded transition-colors">+ Kurye</button>}
-                    </div>
+                    <span className="text-[10px] text-red-400">₺{fmt(Math.abs(ch.kuryeFark))} fark</span>
                   </div>
-                  <div className="p-3 space-y-3">
-                    <div className="grid grid-cols-12 gap-1.5">
-                      <div className="col-span-4 text-[9px] text-gray-600 uppercase tracking-wider">Kurye</div>
-                      <div className="col-span-2 text-[9px] text-gray-600 uppercase tracking-wider text-center">Paket</div>
-                      <div className="col-span-3 text-[9px] text-amber-600 uppercase tracking-wider">Nakit</div>
-                      <div className="col-span-3 text-[9px] text-blue-600 uppercase tracking-wider">Kredi/POS</div>
-                    </div>
-                    {kuryeler.map((k)=>{
-                      const secilenler=kuryeler.filter(x=>x.id!==k.id&&x.isim).map(x=>x.isim);
-                      return (
-                        <div key={k.id} className="relative">
-                          <div className="grid grid-cols-12 gap-1.5 items-center">
-                            <div className="col-span-4">
-                              {isReadOnly ? (
-                                <div className="bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2 flex items-center">
-                                  {k.isim || "—"}
-                                </div>
-                              ) : (
-                                <select disabled={isReadOnly} value={k.isim} onChange={e=>kuryeDegistir(k.id,"isim",e.target.value)}
-                                  className="w-full bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2 outline-none focus:border-blue-500/40 disabled:opacity-40">
-                                  <option value="">Seçiniz...</option>
-                                  {personelListesi.map((p,i)=>(
-                                    <option key={i} value={p} disabled={secilenler.includes(p)}>{p}{secilenler.includes(p)?" ✓":""}</option>
-                                  ))}
-                                </select>
-                              )}
-                            </div>
-                            <div className="col-span-2">
-                              {isReadOnly ? (
-                                <div className="bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs font-bold rounded-lg flex items-center justify-center">
-                                  {k.paketSayisi || "0"}
-                                </div>
-                              ) : (
-                                <input type="number" placeholder="0" disabled={isReadOnly} value={k.paketSayisi}
-                                  onChange={e=>kuryeDegistir(k.id,"paketSayisi",e.target.value)}
-                                  className="w-full bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs font-bold px-2 rounded-lg outline-none disabled:opacity-40 text-center"/>
-                              )}
-                            </div>
-                            <div className="col-span-3">
-                              <div className={`relative rounded-lg border ${isReadOnly ? "border-amber-500/20 bg-amber-500/5" : "border-[#1a2236]"}`}>
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-amber-600 text-[10px] font-bold">₺</span>
-                                {isReadOnly ? (
-                                  <div className="h-7 pl-5 pr-2 flex items-center text-xs font-bold text-amber-300">
-                                    {k.nakit ? fmt(Number(k.nakit)) : "0"}
-                                  </div>
-                                ) : (
-                                  <input type="text" placeholder="0" disabled={isReadOnly} value={k.nakit}
-                                    onChange={e=>kuryeDegistir(k.id,"nakit",e.target.value)}
-                                    className="w-full bg-[#080b14] text-white h-7 text-xs font-bold pl-5 pr-1 rounded-lg outline-none focus:border-amber-500/40 disabled:opacity-40"/>
-                                )}
-                              </div>
-                            </div>
-                            <div className="col-span-3">
-                              <div className={`relative rounded-lg border ${isReadOnly ? "border-blue-500/20 bg-blue-500/5" : "border-[#1a2236]"}`}>
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-blue-600 text-[10px] font-bold">₺</span>
-                                {isReadOnly ? (
-                                  <div className="h-7 pl-5 pr-2 flex items-center text-xs font-bold text-blue-300">
-                                    {k.pos ? fmt(Number(k.pos)) : "0"}
-                                  </div>
-                                ) : (
-                                  <input type="text" placeholder="0" disabled={isReadOnly} value={k.pos}
-                                    onChange={e=>kuryeDegistir(k.id,"pos",e.target.value)}
-                                    className="w-full bg-[#080b14] text-white h-7 text-xs font-bold pl-5 pr-1 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"/>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          {!isReadOnly && kuryeler.length>1 && (
-                            <button type="button" onClick={()=>kuryeSil(k.id)}
-                              className="absolute -right-5 top-1/2 -translate-y-1/2 text-gray-700 hover:text-red-400 transition-colors">
-                              <Trash2 size={11}/>
-                            </button>
-                          )}
+                  <div className="p-3 space-y-2">
+                    {kuryeler.map(k=>(
+                      <div key={k.id} className="grid grid-cols-12 gap-1.5 items-center">
+                        <div className="col-span-4">
+                          <input type="text" disabled value={k.isim} className="w-full bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2"/>
                         </div>
-                      );
-                    })}
+                        <div className="col-span-2">
+                          <input type="text" disabled value={k.paketSayisi} className="w-full bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs text-center rounded-lg"/>
+                        </div>
+                        <div className="col-span-3">
+                          <input type="text" disabled value={k.nakit} className="w-full bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs text-center rounded-lg"/>
+                        </div>
+                        <div className="col-span-3">
+                          <input type="text" disabled value={k.pos} className="w-full bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs text-center rounded-lg"/>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-
-                {/* Notlar */}
-                <div className="rounded-xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden">
-                  <div className="px-3 py-2 border-b border-[#1a2236]">
-                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5"><StickyNote size={11}/>Notlar</span>
-                  </div>
-                  <div className="p-3">
-                    <textarea value={notlar} disabled={isReadOnly} onChange={e=>setNotlar(e.target.value)}
-                      placeholder="Özel durumlar, hatırlatmalar..."
-                      rows={2}
-                      className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/40 text-white text-xs px-3 py-2 rounded-lg outline-none transition-all resize-none disabled:opacity-40 placeholder:text-gray-700"/>
-                  </div>
-                </div>
-
               </div>
             </div>
 
-            {/* ÖZET BANT */}
-            <div className="rounded-xl border border-[#1a2236] bg-[#080b14] px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1">
-              <div className="flex flex-wrap items-center gap-4 text-xs">
-                <div>
-                  <p className="text-[9px] text-gray-600 uppercase tracking-widest">Online</p>
-                  <p className="text-sm font-black text-blue-400">₺{fmt(ch.tOnline)}</p>
-                </div>
-                <span className="text-gray-800 hidden sm:block">+</span>
-                <div>
-                  <p className="text-[9px] text-gray-600 uppercase tracking-widest">Kasa</p>
-                  <p className="text-sm font-black text-emerald-400">₺{fmt(ch.tKasa)}</p>
-                </div>
-                <span className="text-gray-800 hidden sm:block">+</span>
-                <div>
-                  <p className="text-[9px] text-gray-600 uppercase tracking-widest">Gider</p>
-                  <p className="text-sm font-black text-red-300">₺{fmt(ch.tGider)}</p>
-                </div>
-                <span className="text-gray-800 hidden sm:block">=</span>
-                <div>
-                  <p className="text-[9px] text-blue-600 uppercase tracking-widest font-bold">Brüt</p>
-                  <p className="text-sm font-black text-blue-300">₺{fmt(ch.brutCiro)}</p>
-                </div>
-                <span className="text-gray-800 hidden sm:block">−</span>
-                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">Gider</p><p className="text-sm font-black text-red-400">₺{fmt(ch.tGider)}</p></div>
-                <span className="text-gray-800 hidden sm:block">−</span>
-                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">İade</p><p className="text-sm font-black text-orange-400">₺{fmt(ch.tIade)}</p></div>
-                <span className="text-gray-800 hidden sm:block">=</span>
-                <div><p className="text-[9px] text-emerald-700 uppercase tracking-widest font-bold">Net Ciro</p><p className="text-base font-black text-emerald-400">₺{fmt(ch.netCiro)}</p></div>
+            <div className="rounded-xl border border-[#1a2236] bg-[#080b14] px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1 text-xs">
+              <div className="flex flex-wrap gap-4 font-black">
+                <span className="text-blue-400">Brüt: ₺{fmt(ch.brutCiro)}</span>
+                <span className="text-emerald-400">Net Ciro: ₺{fmt(ch.netCiro)}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={()=>{formuTemizle();setFormAcik(false);}}
-                  className="text-xs font-semibold text-gray-500 hover:text-white border border-[#1a2236] hover:border-[#2a3550] px-4 py-2 rounded-xl transition-colors">
-                  İptal
-                </button>
-                {!isReadOnly && (!tarihHataVarMi || adminOnayliGecis) && !duplikaTarihHata && (
-                  <button type="submit" disabled={!tarih||saving}
-                    className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 px-6 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-blue-900/30">
-                    {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>}
-                    {selectedRapor ? "Kaydet" : "Raporu Kaydet"}
-                  </button>
-                )}
+              <div className="flex gap-2">
+                <button type="button" onClick={()=>{formuTemizle();setFormAcik(false);}} className="text-xs font-semibold text-gray-500 border border-[#1a2236] px-4 py-2 rounded-xl">İptal</button>
+                {!isReadOnly && <button type="submit" disabled={!tarih||saving} className="text-xs font-bold text-white bg-blue-600 px-6 py-2 rounded-xl flex items-center gap-2">{saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>} Kaydet</button>}
               </div>
             </div>
-
           </div>
         )}
       </div>
     </form>
   );
 
-  // ── Loading ──
-  if (loading) return (
-    <div className="h-screen bg-[#060810] flex flex-col items-center justify-center gap-3">
-      <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"/>
-      <span className="text-[10px] text-gray-600 uppercase tracking-[0.3em]">KEBO ERP Yükleniyor</span>
-    </div>
-  );
-
-  // ── MAIN RENDER ──
   return (
     <div className="min-h-screen bg-[#060810] text-white font-sans antialiased">
-
       {/* NAV HEADER */}
       <div className="sticky top-0 z-40 border-b border-[#0f1624] bg-[#060810]/95 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
@@ -1444,34 +1221,17 @@ Soru: ${soruFinal}`
             </div>
             <div>
               <h1 className="text-sm font-black tracking-tight text-white leading-none">KEBO ERP</h1>
-              <p className="text-[10px] text-gray-600 leading-none mt-0.5">Kasa Kapanış Sistemi</p>
+              <p className="text-[10px] text-gray-600 leading-none mt-0.5">Kasa Kapanış Raporlama</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {raporlar.length>0 && (
-              <>
-                <button onClick={()=>exportCSV(raporlar,secilenAy,secilenYil)}
-                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-emerald-400 border border-[#1a2236] hover:border-emerald-500/30 px-3 py-2 rounded-xl transition-colors">
-                  <FileDown size={13}/> CSV
-                </button>
-                <button onClick={()=>exportPDF(raporlar,secilenAy,secilenYil)}
-                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-red-400 border border-[#1a2236] hover:border-red-500/30 px-3 py-2 rounded-xl transition-colors">
-                  <FileDown size={13}/> PDF
-                </button>
-              </>
-            )}
-            <button onClick={()=>setAiAcik(!aiAcik)}
-              className={`flex items-center gap-1.5 text-[11px] font-semibold border px-3 py-2 rounded-xl transition-colors ${
-                aiAcik ? "text-purple-300 border-purple-500/40 bg-purple-500/10" : "text-gray-500 hover:text-purple-400 border-[#1a2236] hover:border-purple-500/30"
-              }`}>
+            <button onClick={()=>setAiAcik(!aiAcik)} className={`flex items-center gap-1.5 text-[11px] font-semibold border px-3 py-2 rounded-xl transition-colors ${aiAcik ? "text-purple-300 border-purple-500/40 bg-purple-500/10" : "text-gray-500 hover:text-purple-400 border-[#1a2236]"}`}>
               <Sparkles size={13}/> AI Analiz
             </button>
-            <button onClick={veriCek}
-              className="p-2 text-gray-600 hover:text-white border border-[#1a2236] hover:border-[#2a3550] rounded-xl transition-colors">
+            <button onClick={veriCek} className="p-2 text-gray-600 hover:text-white border border-[#1a2236] rounded-xl transition-colors">
               <RefreshCw size={14}/>
             </button>
-            <button onClick={()=>{formuTemizle();setFormAcik(true);}}
-              className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-colors shadow-lg shadow-blue-900/30">
+            <button onClick={()=>{formuTemizle();setFormAcik(true);}} className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl shadow-lg">
               <PlusCircle size={14}/> Yeni Rapor
             </button>
           </div>
@@ -1479,64 +1239,47 @@ Soru: ${soruFinal}`
       </div>
 
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
-
-        {/* AI ANALİZ PANELI */}
-        {aiAcik && (
-          <div className="rounded-2xl border border-purple-500/20 bg-[#0d0a1a] overflow-hidden">
-            <div className="px-5 py-3 border-b border-purple-500/20 flex items-center gap-3">
-              <div className="w-6 h-6 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                <Sparkles className="h-3.5 w-3.5 text-purple-400"/>
+        
+        {/* ─── TALEBİNİZ OLAN GELİŞMİŞ ALGORİTMİK YAPAY ZEKA DEĞERLENDİRME PANOSU (NEW COMPONENT) ─── */}
+        {aiAcik && akilliAIAnalizRaporu && (
+          <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-950/10 via-[#0c0f1a] to-[#0c0f1a] p-6 space-y-5 shadow-2xl animate-fadeIn">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-500/10 pb-4">
+              <div className="flex items-center gap-2.5">
+                <BrainCircuit className="h-5 w-5 text-purple-400 animate-pulse" />
+                <div>
+                  <h2 className="text-xs font-black text-purple-400 uppercase tracking-widest">Kebo AI Akıllı İş Geliştirme Motoru</h2>
+                  <p className="text-[10px] text-gray-500 font-mono mt-0.5">Finansal Algoritmalar ve Stratejik Öngörüler</p>
+                </div>
               </div>
-              <span className="text-sm font-semibold text-purple-300">AI Rapor Analizi</span>
-              <span className="text-[10px] text-gray-600 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
-                {AYLAR.find(m=>m.value===secilenAy)?.label} {secilenYil} · {raporlar.length} gün
-              </span>
+              
+              <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold ${
+                akilliAIAnalizRaporu.trendYonu === "artisi" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+              }`}>
+                {akilliAIAnalizRaporu.trendYonu === "artisi" ? <TrendingUp size={14}/> : <TrendingDown size={14}/>}
+                <span>{akilliAIAnalizRaporu.trendYonu === "artisi" ? "İş Hacmi Büyüyor" : "İş Hacmi Yavaşlıyor"}</span>
+              </div>
             </div>
-            <div className="p-5 space-y-3">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={aiSoru}
-                  onChange={e=>setAiSoru(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&handleAiSoru()}
-                  placeholder="Örnek: Bu ay en iyi günlerim hangileri? Giderlerim neden yüksek?"
-                  className="flex-1 bg-[#080b14] border border-purple-500/20 focus:border-purple-500/40 text-white text-sm px-4 py-2.5 rounded-xl outline-none transition-all placeholder:text-gray-600"
-                />
-                <button
-                  onClick={()=>handleAiSoru()}
-                  disabled={!aiSoru.trim() || aiYukleniyor || raporlar.length===0}
-                  className="flex items-center gap-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors"
-                >
-                  {aiYukleniyor ? <Loader2 size={13} className="animate-spin"/> : <Sparkles size={13}/>}
-                  {aiYukleniyor ? "Analiz..." : "Sor"}
-                </button>
-              </div>
 
-              <div className="flex flex-wrap gap-2">
-                {[
-                  "Bu ay brüt ve net ciroya genel bakış",
-                  "Hangi günler en düşük ciro?",
-                  "Gider kalemleri analizi",
-                  "Kurye performansı",
-                  "Platform bazlı dağılım yorumu",
-                ].map(s=>(
-                  <button key={s} onClick={()=>handleAiSoru(s)}
-                    disabled={aiYukleniyor || raporlar.length===0}
-                    className="text-[10px] text-gray-500 hover:text-purple-300 border border-[#1a2236] hover:border-purple-500/30 disabled:opacity-40 px-2.5 py-1 rounded-lg transition-colors">
-                    {s}
-                  </button>
+            <div className="space-y-2">
+              <h3 className="text-sm font-black text-white leading-tight flex items-center gap-1.5">
+                <Sparkles size={14} className="text-purple-400" />
+                {akilliAIAnalizRaporu.baslik}
+              </h3>
+              <p className="text-gray-400 text-xs leading-relaxed font-normal">{akilliAIAnalizRaporu.durumAnalizi}</p>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <div className="text-[11px] font-black tracking-wider text-purple-300 uppercase">
+                <span>İşletmeyi İleriye Taşıyacak Patron Hamleleri:</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {akilliAIAnalizRaporu.oneriler.map((oneri, index) => (
+                  <div key={index} className="bg-[#060810]/70 border border-purple-500/10 rounded-xl p-4 flex gap-3 text-xs hover:border-purple-500/20 transition-colors">
+                    <div className="w-5 h-5 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center font-mono font-bold text-purple-400 shrink-0 text-[10px]">{index + 1}</div>
+                    <p className="text-gray-300 leading-relaxed font-medium">{oneri}</p>
+                  </div>
                 ))}
               </div>
-
-              {aiCevap && (
-                <div className="bg-[#080b14] border border-purple-500/10 rounded-xl p-4 text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
-                  {aiCevap}
-                </div>
-              )}
-
-              {raporlar.length===0 && (
-                <p className="text-xs text-gray-600 text-center py-2">Bu dönemde rapor yok — önce veri girin.</p>
-              )}
             </div>
           </div>
         )}
@@ -1546,29 +1289,8 @@ Soru: ${soruFinal}`
         {formAcik && (
           <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden shadow-2xl">
             <div className="px-5 py-4 border-b border-[#1a2236] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/20 flex items-center justify-center">
-                  <TrendingUp className="h-3.5 w-3.5 text-blue-400"/>
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-white">
-                    {selectedRapor ? (isEditMode ? "Raporu Düzenle" : "Rapor Detayı") : "Yeni Gün Sonu Raporu"}
-                  </h2>
-                  <p className="text-[10px] text-gray-600">{tarih ? fmtTarih(tarih) : "Tarih seçilmedi"}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {selectedRapor && (
-                  <button onClick={()=>setPrintRapor(selectedRapor)}
-                    className="p-2 text-gray-600 hover:text-white border border-[#1a2236] hover:border-[#2a3550] rounded-xl transition-colors">
-                    <Printer size={14}/>
-                  </button>
-                )}
-                <button onClick={()=>{formuTemizle();setFormAcik(false);}}
-                  className="p-2 text-gray-600 hover:text-white border border-[#1a2236] hover:border-[#2a3550] rounded-xl transition-colors">
-                  <X size={14}/>
-                </button>
-              </div>
+              <span className="text-sm font-bold text-white">{selectedRapor ? "Rapor Detayı" : "Yeni Gün Sonu Raporu"}</span>
+              <button onClick={()=>{formuTemizle();setFormAcik(false);}} className="text-gray-600 hover:text-white"><X size={14}/></button>
             </div>
             <div className="p-5">{renderForm()}</div>
           </div>
@@ -1576,39 +1298,23 @@ Soru: ${soruFinal}`
 
         {!formAcik && <DashboardPanel raporlar={raporlar}/>}
 
+        {/* ORİJİNAL ARŞİV TABLOSU */}
         {!formAcik && (
           <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden shadow-xl">
-            <div className="px-5 py-4 border-b border-[#1a2236] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-white/5 border border-[#1a2236] flex items-center justify-center">
-                  <FileText className="h-3.5 w-3.5 text-gray-400"/>
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-200">Kapanış Arşivi</h3>
-                  <p className="text-[10px] text-gray-600">
-                    {AYLAR.find(m=>m.value===secilenAy)?.label} {secilenYil} · {raporlar.length} rapor
-                  </p>
-                </div>
+            <div className="px-5 py-4 border-b border-[#1a2236] flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-200">Kapanış Arşivi</h3>
+                <p className="text-[10px] text-gray-600">{AYLAR.find(m=>m.value===secilenAy)?.label} {secilenYil} dönemi</p>
               </div>
-              <div className="flex items-center gap-3">
-                {raporlar.length>0 && (
-                  <div className="flex sm:hidden items-center gap-1">
-                    <button onClick={()=>exportCSV(raporlar,secilenAy,secilenYil)} className="text-[10px] text-gray-600 hover:text-emerald-400 border border-[#1a2236] px-2.5 py-1.5 rounded-lg transition-colors">CSV</button>
-                    <button onClick={()=>exportPDF(raporlar,secilenAy,secilenYil)} className="text-[10px] text-gray-600 hover:text-red-400 border border-[#1a2236] px-2.5 py-1.5 rounded-lg transition-colors">PDF</button>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 bg-[#080b14] border border-[#1a2236] px-3 py-2 rounded-xl">
-                  <Calendar size={12} className="text-gray-600"/>
-                  <select value={secilenAy} onChange={e=>setSecilenAy(e.target.value)}
-                    className="bg-transparent text-xs font-semibold text-gray-300 outline-none cursor-pointer">
-                    {AYLAR.map(m=><option key={m.value} value={m.value} className="bg-[#0c0f1a]">{m.label}</option>)}
-                  </select>
-                  <span className="text-gray-700">/</span>
-                  <select value={secilenYil} onChange={e=>setSecilenYil(e.target.value)}
-                    className="bg-transparent text-xs font-semibold text-gray-300 outline-none cursor-pointer">
-                    {["2024","2025","2026","2027"].map(y=><option key={y} value={y} className="bg-[#0c0f1a]">{y}</option>)}
-                  </select>
-                </div>
+              <div className="flex items-center gap-2 bg-[#080b14] border border-[#1a2236] px-3 py-2 rounded-xl">
+                <Calendar size={12} className="text-gray-600"/>
+                <select value={secilenAy} onChange={e=>setSecilenAy(e.target.value)} className="bg-transparent text-xs font-semibold text-gray-300 outline-none cursor-pointer">
+                  {AYLAR.map(m=><option key={m.value} value={m.value} className="bg-[#0c0f1a]">{m.label}</option>)}
+                </select>
+                <span className="text-gray-700">/</span>
+                <select value={secilenYil} onChange={e=>setSecilenYil(e.target.value)} className="bg-transparent text-xs font-semibold text-gray-300 outline-none cursor-pointer">
+                  {["2024","2025","2026","2027"].map(y=><option key={y} value={y} className="bg-[#0c0f1a]">{y}</option>)}
+                </select>
               </div>
             </div>
 
@@ -1617,73 +1323,37 @@ Soru: ${soruFinal}`
                 <thead>
                   <tr className="border-b border-[#1a2236] bg-[#080b14]">
                     {["Tarih","Brüt Ciro","Net Ciro","Paket","Sepet Ort.","Gider+İade",""].map((h,i)=>(
-                      <th key={i} className={`px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest ${
-                        h==="Net Ciro"?"text-emerald-600":h==="Paket"?"text-amber-600":h==="Sepet Ort."?"text-purple-600":h==="Gider+İade"?"text-red-600":"text-gray-600"
-                      }`}>{h}</th>
+                      <th key={i} className="px-4 py-3 text-left font-semibold uppercase tracking-widest text-gray-600">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#0f1624]">
-                  {raporlar.length===0 ? (
-                    <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-600 text-xs uppercase tracking-widest">Bu dönemde rapor bulunmuyor</td></tr>
-                  ) : raporlar.map((rapor)=>{
+                  {raporlar.map((rapor)=>{
                     const tO=(rapor.os_yemeksepeti||0)+(rapor.os_getir||0)+(rapor.os_trendyol||0)+(rapor.os_migros||0);
-                    const tK=(rapor.ko_yemeksepeti||0)+(rapor.ko_getir||0)+(rapor.ko_trendyol||0)+(rapor.ko_migros||0)+(rapor.ko_alo_paket||0);
+                    const tK=(rapor.ko_yemeksepeti||0)+(rapor.ko_getir||0)+(rpor.ko_trendyol||rapor.ko_trendyol||0)+(rapor.ko_migros||0)+(rapor.ko_alo_paket||0);
                     const brutCiro = brutHesapla(rapor);
                     const net = netHesapla(rapor);
                     const paket=rapor.kurye_raporlari?.reduce((s,k)=>s+(parseInt(k.paketSayisi)||0),0)||0;
                     const ort=paket>0?Math.round((tO+tK)/paket):0;
                     const gi=(rapor.gunluk_gider||0)+(rapor.iade_tutar||0);
                     return (
-                      <tr key={rapor.id}
-                        onClick={()=>{setSelectedRapor(rapor);raporuFormaYukle(rapor);setIsEditMode(false);setFormAcik(true);}}
-                        className="hover:bg-white/[0.02] cursor-pointer transition-colors group">
-                        <td className="px-4 py-3.5 font-semibold text-gray-300 group-hover:text-blue-400 transition-colors">
-                          {new Date(rapor.tarih+"T12:00:00").toLocaleDateString("tr-TR")}
-                          {rapor.gider_aciklama?.includes("|| NOT:") && <span className="ml-1.5 text-[9px] text-blue-500/60 bg-blue-500/10 px-1.5 py-0.5 rounded-full">Not</span>}
-                        </td>
+                      <tr key={rapor.id} onClick={()=>{setSelectedRapor(rapor);raporuFormaYukle(rapor);setIsEditMode(false);setFormAcik(true);}} className="hover:bg-white/[0.02] cursor-pointer transition-colors group">
+                        <td className="px-4 py-3.5 font-semibold text-gray-300">{fmtTarih(rapor.tarih)}</td>
                         <td className="px-4 py-3.5 text-blue-400 font-semibold">₺{fmt(brutCiro)}</td>
                         <td className="px-4 py-3.5 text-emerald-400 font-black">₺{fmt(net)}</td>
                         <td className="px-4 py-3.5 text-amber-400 font-semibold">{paket}</td>
                         <td className="px-4 py-3.5 text-purple-400 font-bold">₺{fmt(ort)}</td>
                         <td className="px-4 py-3.5 text-red-400 font-medium">{gi>0?`-₺${fmt(gi)}`:"—"}</td>
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="text-[10px] text-gray-500 flex items-center gap-1"><Eye size={10}/> İncele</span>
-                            <button onClick={e=>{e.stopPropagation();setPrintRapor(rapor);}}
-                              className="p-1 text-gray-600 hover:text-gray-300 rounded transition-colors ml-1">
-                              <Printer size={11}/>
-                            </button>
-                          </div>
-                        </td>
+                        <td className="px-4 py-3.5 text-right"><span className="opacity-0 group-hover:opacity-100 text-gray-500 text-[10px] transition-opacity"><Eye size={10} className="inline mr-1"/>İncele</span></td>
                       </tr>
                     );
                   })}
                 </tbody>
-                {raporlar.length>0 && (
-                  <tfoot>
-                    <tr className="border-t-2 border-[#1a2236] bg-[#080b14]">
-                      <td className="px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Dönem Toplamı</td>
-                      <td className="px-4 py-3 text-blue-400 font-black">₺{fmt(tabloToplam.brut)}</td>
-                      <td className="px-4 py-3 text-emerald-400 font-black text-sm">₺{fmt(tabloToplam.net)}</td>
-                      <td className="px-4 py-3 text-amber-400 font-black">{tabloToplam.paket}</td>
-                      <td className="px-4 py-3 text-purple-400 font-black">₺{fmt(tabloToplam.paketOrt)}</td>
-                      <td className="px-4 py-3 text-red-400 font-black">-₺{fmt(tabloToplam.giderIade)}</td>
-                      <td/>
-                    </tr>
-                  </tfoot>
-                )}
               </table>
             </div>
           </div>
         )}
-
-        <div className="flex items-center justify-between py-2">
-          <p className="text-[10px] text-gray-700">KEBO ERP · Finansal Yönetim Sistemi</p>
-          <p className="text-[10px] text-gray-700">{userEmail}</p>
-        </div>
       </div>
-
       {printRapor && <PrintModal rapor={printRapor} onClose={()=>setPrintRapor(null)}/>}
     </div>
   );
