@@ -104,14 +104,7 @@ export default function FaturalarPage() {
 
   const secimTemizle = () => setSeciliFaturalar(new Set());
 
-  const topluOdendi = async () => {
-    if (seciliFaturalar.size === 0) return;
-    setTopluIslemYukleniyor(true);
-    await supabase.from("faturalar").update({ durum: "odendi", islendi: true }).in("id", Array.from(seciliFaturalar));
-    showToast("basari", `${seciliFaturalar.size} fatura ödendi olarak işaretlendi.`);
-    setTopluIslemYukleniyor(false);
-    veriCek();
-  };
+  // Toplu "Ödendi İşaretle" kaldırıldı — ödeme işlemi Cariler > Ödeme Ekle'den yapılmalı
 
   const topluGecikti = async () => {
     if (seciliFaturalar.size === 0) return;
@@ -218,8 +211,9 @@ export default function FaturalarPage() {
     veriCek();
   };
 
+  // durumGuncelle — sadece "gecikti" ve "bekliyor" için kullanılır artık
   const durumGuncelle = async (id: string, durum: string) => {
-    await supabase.from("faturalar").update({ durum, islendi: durum === "odendi" }).eq("id", id);
+    await supabase.from("faturalar").update({ durum, islendi: false }).eq("id", id);
     veriCek();
   };
 
@@ -294,7 +288,7 @@ export default function FaturalarPage() {
     return faturalar.filter(f => seciliFaturalar.has(f.id)).reduce((s, f) => s + (f.toplam_tutar || 0), 0);
   }, [seciliFaturalar, faturalar]);
 
-  // Fatura tablosu — toplu seçim ile
+  // Fatura tablosu — "Ödendi" butonu kaldırıldı, ödeme Cariler'den yapılır
   const FaturaTablosu = ({ liste }: { liste: Fatura[] }) => {
     const hepsiSecili = liste.length > 0 && liste.every(f => seciliFaturalar.has(f.id));
     return (
@@ -332,11 +326,12 @@ export default function FaturalarPage() {
               </td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-1.5">
+                  {/* "Ödendi" butonu kaldırıldı — ödeme Cariler > Ödeme Ekle'den yapılır */}
                   {f.durum === "bekliyor" && (
-                    <>
-                      <button onClick={() => durumGuncelle(f.id, "odendi")} className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg hover:bg-emerald-500/20 transition-colors whitespace-nowrap">Ödendi</button>
-                      <button onClick={() => durumGuncelle(f.id, "gecikti")} className="text-[10px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded-lg hover:bg-red-500/20 transition-colors whitespace-nowrap">Gecikti</button>
-                    </>
+                    <button onClick={() => durumGuncelle(f.id, "gecikti")} className="text-[10px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded-lg hover:bg-red-500/20 transition-colors whitespace-nowrap">Gecikti</button>
+                  )}
+                  {f.durum === "gecikti" && (
+                    <button onClick={() => durumGuncelle(f.id, "bekliyor")} className="text-[10px] font-bold text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-1 rounded-lg hover:bg-yellow-500/20 transition-colors whitespace-nowrap">Bekliyor</button>
                   )}
                   {f.durum === "odendi" && <span className="text-[10px] text-emerald-400 font-bold">✓</span>}
                   <button onClick={() => sil(f.id)} className="text-gray-700 hover:text-red-400 transition-colors ml-1"><Trash2 size={13} /></button>
@@ -534,7 +529,7 @@ export default function FaturalarPage() {
         )}
       </div>
 
-      {/* TOPLU İŞLEM ÇUBUĞU */}
+      {/* TOPLU İŞLEM ÇUBUĞU — "Ödendi İşaretle" kaldırıldı */}
       {seciliFaturalar.size > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#0c0f1a]/98 backdrop-blur-xl border-t border-blue-500/30 px-4 py-3">
           <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 flex-wrap">
@@ -544,13 +539,9 @@ export default function FaturalarPage() {
               <button onClick={secimTemizle} className="text-[11px] text-gray-500 hover:text-white transition-colors">Seçimi Temizle</button>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={topluOdendi} disabled={topluIslemYukleniyor}
-                className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors">
-                {topluIslemYukleniyor ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                Ödendi İşaretle
-              </button>
               <button onClick={topluGecikti} disabled={topluIslemYukleniyor}
                 className="flex items-center gap-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors">
+                {topluIslemYukleniyor ? <Loader2 size={12} className="animate-spin" /> : null}
                 Gecikti İşaretle
               </button>
               <button onClick={topluSil} disabled={topluIslemYukleniyor}
@@ -619,7 +610,6 @@ export default function FaturalarPage() {
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Durum</p>
                 <select value={form.durum} onChange={e => setForm({ ...form, durum: e.target.value })} className={inputCls}>
                   <option value="bekliyor" className="bg-[#0c0f1a]">Bekliyor</option>
-                  <option value="odendi" className="bg-[#0c0f1a]">Ödendi</option>
                   <option value="gecikti" className="bg-[#0c0f1a]">Gecikti</option>
                 </select>
               </div>

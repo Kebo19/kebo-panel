@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   Plus, Search, Building2, Trash2, X, Loader2, CheckCircle2,
   AlertTriangle, Wallet, ArrowLeft, Phone, Hash,
-  Calendar, Check, Square, CheckSquare
+  Calendar, Check, Square, CheckSquare, ChevronDown, ChevronUp, Edit2
 } from "lucide-react";
 
 const SABIT_TATILLER = (y: number) => [
@@ -52,10 +52,15 @@ interface Cari {
 }
 interface Fatura {
   id: string; fatura_no: string; fatura_tarihi: string;
-  toplam_tutar: number; durum: string; aciklama: string;
+  toplam_tutar: number; durum: string; aciklama: string; cari_id?: string; cari_unvan?: string;
 }
 interface Odeme {
   id: string; tutar: number; tarih: string; aciklama: string; odeme_yontemi: string;
+}
+interface BuAyFatura extends Fatura {
+  cari_unvan: string;
+  cari_id: string;
+  cariObj?: Cari;
 }
 
 const inputCls = "w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/50 text-white text-sm h-11 px-3 rounded-xl outline-none transition-all placeholder:text-gray-700";
@@ -68,7 +73,7 @@ export default function CarilerPage() {
   const [cariTutarMap, setCariTutarMap] = useState<Map<string, { buAy: number; toplam: number }>>(new Map());
   const [yukleniyor, setYukleniyor] = useState(true);
   const [aramaMetni, setAramaMetni] = useState("");
-  const [aktifTab, setAktifTab] = useState<"duzenli" | "diger">("duzenli");
+  const [aktifTab, setAktifTab] = useState<"duzenli" | "diger" | "buay">("duzenli");
   const [seciliCari, setSeciliCari] = useState<Cari | null>(null);
   const [cariFaturalar, setCariFaturalar] = useState<Fatura[]>([]);
   const [cariOdemeler, setCariOdemeler] = useState<Odeme[]>([]);
@@ -83,6 +88,16 @@ export default function CarilerPage() {
   const [topluIslemYukleniyor, setTopluIslemYukleniyor] = useState(false);
   const [toast, setToast] = useState<{ tip: "basari" | "hata"; mesaj: string } | null>(null);
   const [form, setForm] = useState({ cari_kodu: "", unvan: "", vergi_no: "", vergi_dairesi: "", telefon: "", adres: "", tip: "tedarikci", kategori: "duzenli" });
+
+  // Bu Ay Ödenecekler state
+  const [buAyFaturalar, setBuAyFaturalar] = useState<BuAyFatura[]>([]);
+  const [acikCariGruplar, setAcikCariGruplar] = useState<Set<string>>(new Set());
+  const [buAyYukleniyor, setBuAyYukleniyor] = useState(false);
+  const [duzenleModal, setDuzenleModal] = useState<{ acik: boolean; fatura: BuAyFatura | null }>({ acik: false, fatura: null });
+  const [duzenleForm, setDuzenleForm] = useState({ tutar: "", durum: "bekliyor" });
+
+  // Detay sayfasında anlık durum güncellemesi için local state
+  const [localDurumlar, setLocalDurumlar] = useState<Map<string, string>>(new Map());
 
   const showToast = (tip: "basari" | "hata", mesaj: string) => {
     setToast({ tip, mesaj });
@@ -116,11 +131,26 @@ export default function CarilerPage() {
     setYukleniyor(false);
   }, [donem]);
 
+  const buAyVeriCek = useCallback(async () => {
+    setBuAyYukleniyor(true);
+    const { data: f } = await supabase
+      .from("faturalar")
+      .select("*")
+      .gte("fatura_tarihi", donem.donemBas)
+      .lte("fatura_tarihi", donem.donemBit)
+      .neq("durum", "odendi")
+      .order("fatura_tarihi", { ascending: false });
+    setBuAyFaturalar((f || []) as BuAyFatura[]);
+    setBuAyYukleniyor(false);
+  }, [donem]);
+
   useEffect(() => { veriCek(); }, [veriCek]);
+  useEffect(() => { if (aktifTab === "buay") buAyVeriCek(); }, [aktifTab, buAyVeriCek]);
 
   const cariDetayAc = async (cari: Cari) => {
     setSeciliCari(cari);
     setSeciliFaturalar(new Set());
+    setLocalDurumlar(new Map());
     const [{ data: f }, { data: o }] = await Promise.all([
       supabase.from("faturalar").select("*").eq("cari_unvan", cari.unvan).order("fatura_tarihi", { ascending: false }),
       supabase.from("cari_odemeler").select("*").eq("cari_id", cari.id).order("tarih", { ascending: false }),
@@ -173,13 +203,19 @@ export default function CarilerPage() {
     [seciliFaturalar, cariFaturalar]
   );
 
-  // Toplu işlemler
+  // Toplu işlemler — optimistic update ile durum sütununu anında güncelle
   const topluDurumGuncelle = async (durum: string) => {
     if (seciliFaturalar.size === 0) return;
+    // Anında UI güncelle
+    const yeniDurumlar = new Map(localDurumlar);
+    seciliFaturalar.forEach(id => yeniDurumlar.set(id, durum));
+    setLocalDurumlar(yeniDurumlar);
+
     setTopluIslemYukleniyor(true);
     await supabase.from("faturalar").update({ durum, islendi: durum === "odendi" }).in("id", Array.from(seciliFaturalar));
     showToast("basari", `${seciliFaturalar.size} fatura ${durum === "odendi" ? "ödendi" : durum === "gecikti" ? "gecikti" : "bekliyor"} olarak işaretlendi.`);
     setTopluIslemYukleniyor(false);
+    setSeciliFaturalar(new Set());
     if (seciliCari) cariDetayAc(seciliCari);
     veriCek();
   };
@@ -223,39 +259,105 @@ export default function CarilerPage() {
     veriCek();
   };
 
+  // Bu ay fatura düzenleme
+  const buAyDuzenleAc = (f: BuAyFatura) => {
+    setDuzenleForm({ tutar: String(f.toplam_tutar), durum: f.durum });
+    setDuzenleModal({ acik: true, fatura: f });
+  };
+
+  const buAyDuzenleKaydet = async () => {
+    if (!duzenleModal.fatura) return;
+    setFormSaving(true);
+    await supabase.from("faturalar").update({
+      toplam_tutar: parseFloat(duzenleForm.tutar) || duzenleModal.fatura.toplam_tutar,
+      durum: duzenleForm.durum,
+      islendi: duzenleForm.durum === "odendi",
+    }).eq("id", duzenleModal.fatura.id);
+    setFormSaving(false);
+    showToast("basari", "Fatura güncellendi.");
+    setDuzenleModal({ acik: false, fatura: null });
+    buAyVeriCek();
+    veriCek();
+  };
+
+  const buAyTekDurumGuncelle = async (faturaId: string, durum: string) => {
+    await supabase.from("faturalar").update({ durum, islendi: durum === "odendi" }).eq("id", faturaId);
+    setBuAyFaturalar(prev => prev.map(f => f.id === faturaId ? { ...f, durum } : f));
+    showToast("basari", `Fatura ${durum === "odendi" ? "ödendi" : durum === "gecikti" ? "gecikti" : "bekliyor"} olarak işaretlendi.`);
+    veriCek();
+  };
+
+  const toggleCariGrup = (unvan: string) => {
+    setAcikCariGruplar(prev => {
+      const s = new Set(prev);
+      s.has(unvan) ? s.delete(unvan) : s.add(unvan);
+      return s;
+    });
+  };
+
   const filtreliCariler = useMemo(() => cariler.filter(c => {
     const kategoriUygun = c.kategori === aktifTab || (!c.kategori && aktifTab === "diger");
     const aramaUygun = !aramaMetni || c.unvan?.toLowerCase().includes(aramaMetni.toLowerCase()) || c.vergi_no?.includes(aramaMetni);
     return kategoriUygun && aramaUygun;
   }), [cariler, aktifTab, aramaMetni]);
 
-  // Toplam hesaplar
-  const toplamFaturaOdenmis = cariFaturalar.filter(f => f.durum === "odendi").reduce((s, f) => s + (f.toplam_tutar || 0), 0);
+  // Bu ay faturalarını cari bazlı grupla
+  const buAyCariGruplari = useMemo(() => {
+    const map = new Map<string, { unvan: string; faturalar: BuAyFatura[]; toplam: number }>();
+    buAyFaturalar.forEach(f => {
+      const unvan = f.cari_unvan || "Bilinmiyor";
+      if (!map.has(unvan)) map.set(unvan, { unvan, faturalar: [], toplam: 0 });
+      const g = map.get(unvan)!;
+      g.faturalar.push(f);
+      g.toplam += f.toplam_tutar || 0;
+    });
+    return Array.from(map.values()).sort((a, b) => b.toplam - a.toplam);
+  }, [buAyFaturalar]);
+
+  const buAyGenelToplam = useMemo(() =>
+    buAyFaturalar.reduce((s, f) => s + (f.toplam_tutar || 0), 0),
+    [buAyFaturalar]
+  );
+
+  // Toplam hesaplar (detay sayfası)
   const toplamFatura = cariFaturalar.reduce((s, f) => s + (f.toplam_tutar || 0), 0);
   const toplamOdeme = cariOdemeler.reduce((s, o) => s + (o.tutar || 0), 0);
-  // Toplam ödeme = yapılan ödemeler + ödendi işaretlenen faturaların tutarı
-  const toplamOdemeGercek = toplamOdeme + toplamFaturaOdenmis;
-  // Bakiye = ödenmemiş faturaların toplamı
-  const toplamBorc = cariFaturalar.filter(f => f.durum !== "odendi").reduce((s, f) => s + (f.toplam_tutar || 0), 0);
+  const toplamBorc = cariFaturalar.filter(f => {
+    const gercek = localDurumlar.get(f.id) || faturaDurumHesapla(f.fatura_tarihi, f.durum);
+    return gercek !== "odendi";
+  }).reduce((s, f) => s + (f.toplam_tutar || 0), 0);
   const buAyOdenecek = cariFaturalar.filter(f =>
-    f.durum !== "odendi" &&
+    (localDurumlar.get(f.id) || f.durum) !== "odendi" &&
     f.fatura_tarihi >= donem.donemBas &&
     f.fatura_tarihi <= donem.donemBit
   ).reduce((s, f) => s + (f.toplam_tutar || 0), 0);
   const duzenliSayisi = cariler.filter(c => c.kategori === "duzenli").length;
   const digerSayisi = cariler.filter(c => c.kategori !== "duzenli").length;
-  const odenmemisFaturalar = cariFaturalar.filter(f => f.durum !== "odendi");
+  const odenmemisFaturalar = cariFaturalar.filter(f => {
+    const gercek = localDurumlar.get(f.id) || faturaDurumHesapla(f.fatura_tarihi, f.durum);
+    return gercek !== "odendi";
+  });
   const hepsiSecili = cariFaturalar.length > 0 && cariFaturalar.every(f => seciliFaturalar.has(f.id));
 
-  // Birleşik liste — fatura ve ödemeler ayrı sütunda gösterilecek
   const birlesikListe = useMemo(() => [
     ...cariFaturalar.map(f => ({
       tip: "fatura" as const,
       tarih: f.fatura_tarihi,
-      veri: { ...f, gercekDurum: faturaDurumHesapla(f.fatura_tarihi, f.durum) },
+      veri: {
+        ...f,
+        gercekDurum: localDurumlar.get(f.id) || faturaDurumHesapla(f.fatura_tarihi, f.durum),
+      },
     })),
     ...cariOdemeler.map(o => ({ tip: "odeme" as const, tarih: o.tarih, veri: o })),
-  ].sort((a, b) => b.tarih.localeCompare(a.tarih)), [cariFaturalar, cariOdemeler]);
+  ].sort((a, b) => b.tarih.localeCompare(a.tarih)), [cariFaturalar, cariOdemeler, localDurumlar]);
+
+  const durumRenk = (d: string) =>
+    d === "odendi" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+    d === "gecikti" ? "bg-red-500/10 text-red-400 border-red-500/20" :
+    "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
+
+  const durumEtiket = (d: string) =>
+    d === "odendi" ? "Ödendi" : d === "gecikti" ? "Gecikti" : "Bekliyor";
 
   return (
     <div className="min-h-screen bg-[#060810] text-white font-sans antialiased pb-24">
@@ -306,6 +408,8 @@ export default function CarilerPage() {
       {/* CARİ LİSTESİ */}
       {!seciliCari && (
         <div className="max-w-6xl mx-auto px-4 py-5 space-y-4">
+
+          {/* Vade bilgisi */}
           <div className="bg-[#0c0f1a] border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
               <Calendar size={16} className="text-amber-400" />
@@ -319,6 +423,7 @@ export default function CarilerPage() {
             </div>
           </div>
 
+          {/* Sekmeler */}
           <div className="flex gap-1 bg-[#0c0f1a] border border-[#1a2236] rounded-xl p-1 w-fit">
             <button onClick={() => setAktifTab("duzenli")} className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors ${aktifTab === "duzenli" ? "bg-blue-600 text-white" : "text-gray-500 hover:text-white"}`}>
               Düzenli Ödemeler ({duzenliSayisi})
@@ -326,61 +431,174 @@ export default function CarilerPage() {
             <button onClick={() => setAktifTab("diger")} className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors ${aktifTab === "diger" ? "bg-blue-600 text-white" : "text-gray-500 hover:text-white"}`}>
               Diğer ({digerSayisi})
             </button>
+            <button onClick={() => setAktifTab("buay")} className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 ${aktifTab === "buay" ? "bg-amber-500 text-white" : "text-amber-400 hover:text-white"}`}>
+              <Calendar size={11} /> Bu Ay Ödenecekler
+            </button>
           </div>
 
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
-            <input value={aramaMetni} onChange={e => setAramaMetni(e.target.value)} placeholder="Ünvan veya vergi no ara..."
-              className="w-full bg-[#0c0f1a] border border-[#1a2236] text-white text-xs h-9 pl-9 pr-3 rounded-xl outline-none focus:border-blue-500/40 placeholder:text-gray-700" />
-          </div>
+          {/* Bu Ay Ödenecekler sekmesi */}
+          {aktifTab === "buay" && (
+            <div className="space-y-3">
+              {/* Özet banner */}
+              <div className="bg-[#0c0f1a] border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1">Toplam Bu Ay Ödenecek</p>
+                  <p className="text-2xl font-black text-amber-400">₺{fmt(buAyGenelToplam)}</p>
+                  <p className="text-[10px] text-gray-500 mt-1">{buAyFaturalar.length} fatura · {buAyCariGruplari.length} cari · Vade: {donem.vade.toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}</p>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                  <Calendar size={20} className="text-amber-400" />
+                </div>
+              </div>
 
-          {yukleniyor ? (
-            <div className="flex items-center justify-center py-20"><div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>
-          ) : filtreliCariler.length === 0 ? (
-            <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl py-16 text-center text-gray-600 text-xs uppercase tracking-widest">Cari bulunamadı</div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {filtreliCariler.map(c => {
-                const tutarlar = cariTutarMap.get(c.unvan);
-                const buAyTutar = tutarlar?.buAy || 0;
-                const toplamBorcCari = tutarlar?.toplam || 0;
-                return (
-                  <div key={c.id} onClick={() => cariDetayAc(c)}
-                    className="bg-[#0c0f1a] border border-[#1a2236] hover:border-blue-500/40 rounded-2xl p-5 cursor-pointer transition-all hover:bg-[#0f1320] group">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                        <span className="text-lg font-black text-blue-400">{c.unvan?.charAt(0)?.toUpperCase()}</span>
+              {buAyYukleniyor ? (
+                <div className="flex items-center justify-center py-16"><div className="w-8 h-8 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" /></div>
+              ) : buAyCariGruplari.length === 0 ? (
+                <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl py-16 text-center text-gray-600 text-xs uppercase tracking-widest">Bu dönemde ödenecek fatura yok</div>
+              ) : (
+                buAyCariGruplari.map(grup => (
+                  <div key={grup.unvan} className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl overflow-hidden">
+                    {/* Cari başlık satırı */}
+                    <button
+                      onClick={() => toggleCariGrup(grup.unvan)}
+                      className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                          <span className="text-sm font-black text-blue-400">{grup.unvan.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-black text-white">{grup.unvan}</p>
+                          <p className="text-[10px] text-gray-500">{grup.faturalar.length} fatura</p>
+                        </div>
                       </div>
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded-lg shrink-0 ${c.tip === "tedarikci" ? "bg-orange-500/10 text-orange-400" : "bg-blue-500/10 text-blue-400"}`}>
-                        {c.tip === "tedarikci" ? "Tedarikçi" : "Müşteri"}
-                      </span>
-                    </div>
-                    <p className="text-sm font-black text-white group-hover:text-blue-400 transition-colors leading-tight mb-2">{c.unvan}</p>
-                    {c.vergi_no && <p className="text-[11px] text-gray-600 flex items-center gap-1.5 mb-1"><Hash size={9} /> VN: {c.vergi_no}</p>}
-                    {c.telefon && <p className="text-[11px] text-gray-600 flex items-center gap-1.5 mb-1"><Phone size={9} /> {c.telefon}</p>}
-                    <div className="mt-3 pt-3 border-t border-[#1a2236] space-y-1.5">
-                      {buAyTutar > 0 && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] text-amber-400 font-bold">Bu Ay Ödenecek</span>
-                          <span className="text-sm font-black text-amber-400">₺{fmt(buAyTutar)}</span>
-                        </div>
-                      )}
-                      {toplamBorcCari > 0 ? (
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] text-red-400/80">Toplam Borç</span>
-                          <span className="text-sm font-bold text-red-400">₺{fmt(toplamBorcCari)}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] text-emerald-400 font-bold">Borç Yok</span>
-                          <CheckCircle2 size={14} className="text-emerald-400" />
-                        </div>
-                      )}
-                    </div>
+                      <div className="flex items-center gap-4">
+                        <p className="text-base font-black text-amber-400">₺{fmt(grup.toplam)}</p>
+                        {acikCariGruplar.has(grup.unvan) ? <ChevronUp size={14} className="text-gray-600" /> : <ChevronDown size={14} className="text-gray-600" />}
+                      </div>
+                    </button>
+
+                    {/* Fatura satırları */}
+                    {acikCariGruplar.has(grup.unvan) && (
+                      <div className="border-t border-[#1a2236]">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-[#0f1624]">
+                              <th className="text-left px-5 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Fatura No</th>
+                              <th className="text-left px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Tarih</th>
+                              <th className="text-right px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Tutar</th>
+                              <th className="text-left px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Durum</th>
+                              <th className="px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold text-right">İşlem</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#0a0d18]">
+                            {grup.faturalar.map(f => (
+                              <tr key={f.id} className="hover:bg-white/[0.02] transition-colors">
+                                <td className="px-5 py-3 text-blue-400 font-bold">{f.fatura_no}</td>
+                                <td className="px-4 py-3 text-gray-400">{fmtTarih(f.fatura_tarihi)}</td>
+                                <td className="px-4 py-3 text-right font-black text-white">₺{fmt(f.toplam_tutar)}</td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${durumRenk(f.durum)}`}>
+                                    {durumEtiket(f.durum)}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {f.durum !== "odendi" && (
+                                      <button onClick={() => buAyTekDurumGuncelle(f.id, "odendi")}
+                                        className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg hover:bg-emerald-500/20 transition-colors whitespace-nowrap">
+                                        Ödendi
+                                      </button>
+                                    )}
+                                    {f.durum === "bekliyor" && (
+                                      <button onClick={() => buAyTekDurumGuncelle(f.id, "gecikti")}
+                                        className="text-[10px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded-lg hover:bg-red-500/20 transition-colors whitespace-nowrap">
+                                        Gecikti
+                                      </button>
+                                    )}
+                                    <button onClick={() => buAyDuzenleAc(f)}
+                                      className="text-[10px] font-bold text-gray-400 bg-white/5 border border-white/10 px-2 py-1 rounded-lg hover:bg-white/10 transition-colors">
+                                      <Edit2 size={10} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t border-[#1a2236] bg-[#080b14]">
+                              <td colSpan={2} className="px-5 py-3 text-[10px] text-gray-600 font-bold uppercase">{grup.faturalar.length} fatura</td>
+                              <td className="px-4 py-3 text-right text-sm font-black text-amber-400">₺{fmt(grup.toplam)}</td>
+                              <td colSpan={2} />
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    )}
                   </div>
-                );
-              })}
+                ))
+              )}
             </div>
+          )}
+
+          {/* Düzenli / Diğer sekmeleri */}
+          {aktifTab !== "buay" && (
+            <>
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
+                <input value={aramaMetni} onChange={e => setAramaMetni(e.target.value)} placeholder="Ünvan veya vergi no ara..."
+                  className="w-full bg-[#0c0f1a] border border-[#1a2236] text-white text-xs h-9 pl-9 pr-3 rounded-xl outline-none focus:border-blue-500/40 placeholder:text-gray-700" />
+              </div>
+
+              {yukleniyor ? (
+                <div className="flex items-center justify-center py-20"><div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>
+              ) : filtreliCariler.length === 0 ? (
+                <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl py-16 text-center text-gray-600 text-xs uppercase tracking-widest">Cari bulunamadı</div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {filtreliCariler.map(c => {
+                    const tutarlar = cariTutarMap.get(c.unvan);
+                    const buAyTutar = tutarlar?.buAy || 0;
+                    const toplamBorcCari = tutarlar?.toplam || 0;
+                    return (
+                      <div key={c.id} onClick={() => cariDetayAc(c)}
+                        className="bg-[#0c0f1a] border border-[#1a2236] hover:border-blue-500/40 rounded-2xl p-5 cursor-pointer transition-all hover:bg-[#0f1320] group">
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                            <span className="text-lg font-black text-blue-400">{c.unvan?.charAt(0)?.toUpperCase()}</span>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-1 rounded-lg shrink-0 ${c.tip === "tedarikci" ? "bg-orange-500/10 text-orange-400" : "bg-blue-500/10 text-blue-400"}`}>
+                            {c.tip === "tedarikci" ? "Tedarikçi" : "Müşteri"}
+                          </span>
+                        </div>
+                        <p className="text-sm font-black text-white group-hover:text-blue-400 transition-colors leading-tight mb-2">{c.unvan}</p>
+                        {c.vergi_no && <p className="text-[11px] text-gray-600 flex items-center gap-1.5 mb-1"><Hash size={9} /> VN: {c.vergi_no}</p>}
+                        {c.telefon && <p className="text-[11px] text-gray-600 flex items-center gap-1.5 mb-1"><Phone size={9} /> {c.telefon}</p>}
+                        <div className="mt-3 pt-3 border-t border-[#1a2236] space-y-1.5">
+                          {buAyTutar > 0 && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] text-amber-400 font-bold">Bu Ay Ödenecek</span>
+                              <span className="text-sm font-black text-amber-400">₺{fmt(buAyTutar)}</span>
+                            </div>
+                          )}
+                          {toplamBorcCari > 0 ? (
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] text-red-400/80">Toplam Borç</span>
+                              <span className="text-sm font-bold text-red-400">₺{fmt(toplamBorcCari)}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] text-emerald-400 font-bold">Borç Yok</span>
+                              <CheckCircle2 size={14} className="text-emerald-400" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -454,12 +672,8 @@ export default function CarilerPage() {
                         <td className="px-4 py-4 text-right text-base font-black text-red-400">₺{fmt(f.toplam_tutar)}</td>
                         <td className="px-4 py-4 text-right text-gray-700">—</td>
                         <td className="px-4 py-4">
-                          <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${
-                            f.gercekDurum === "odendi" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                            f.gercekDurum === "gecikti" ? "bg-red-500/10 text-red-400 border-red-500/20" :
-                            "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
-                          }`}>
-                            {f.gercekDurum === "odendi" ? "Ödendi" : f.gercekDurum === "gecikti" ? "Gecikti" : "Bekliyor"}
+                          <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${durumRenk(f.gercekDurum)}`}>
+                            {durumEtiket(f.gercekDurum)}
                           </span>
                         </td>
                       </tr>
@@ -669,6 +883,50 @@ export default function CarilerPage() {
                 <button onClick={odemeKaydet} disabled={formSaving || (!manuelTutar && seciliFaturalar.size === 0)}
                   className="flex-1 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
                   {formSaving ? <Loader2 size={14} className="animate-spin" /> : null} Ödemeyi Onayla
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BU AY FATURA DÜZENLEME MODAL */}
+      {duzenleModal.acik && duzenleModal.fatura && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-sm font-black text-white">Fatura Düzenle</h3>
+                <p className="text-[10px] text-gray-600 mt-0.5">{duzenleModal.fatura.fatura_no} · {duzenleModal.fatura.cari_unvan}</p>
+              </div>
+              <button onClick={() => setDuzenleModal({ acik: false, fatura: null })} className="text-gray-600 hover:text-white"><X size={16} /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Tutar (₺)</p>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-sm">₺</span>
+                  <input type="number" value={duzenleForm.tutar}
+                    onChange={e => setDuzenleForm(prev => ({ ...prev, tutar: e.target.value }))}
+                    className={`${inputCls} pl-8`} />
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Durum</p>
+                <select value={duzenleForm.durum}
+                  onChange={e => setDuzenleForm(prev => ({ ...prev, durum: e.target.value }))}
+                  className={inputCls}>
+                  <option value="bekliyor" className="bg-[#0c0f1a]">Bekliyor</option>
+                  <option value="gecikti" className="bg-[#0c0f1a]">Gecikti</option>
+                  <option value="odendi" className="bg-[#0c0f1a]">Ödendi</option>
+                </select>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setDuzenleModal({ acik: false, fatura: null })}
+                  className="flex-1 text-sm font-semibold text-gray-500 hover:text-white border border-[#1a2236] py-2.5 rounded-xl transition-colors">İptal</button>
+                <button onClick={buAyDuzenleKaydet} disabled={formSaving}
+                  className="flex-1 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+                  {formSaving ? <Loader2 size={13} className="animate-spin" /> : null} Kaydet
                 </button>
               </div>
             </div>
