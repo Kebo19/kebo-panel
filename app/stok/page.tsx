@@ -155,20 +155,52 @@ export default function StokPage() {
   }, [urunler]);
 
   const gunlukOrtalama = useCallback((urunId: string): number => {
-    const uHareket = hareketler.filter(h => h.urun_id === urunId && h.tip === "sayim")
+    // Son 7 günün tarih sınırını hesapla
+    const bugunDate = new Date();
+    bugunDate.setHours(0, 0, 0, 0);
+    const yediGunOnce = new Date(bugunDate);
+    yediGunOnce.setDate(yediGunOnce.getDate() - 7);
+    const yediGunOnceStr = yediGunOnce.toISOString().split("T")[0];
+
+    // Bu ürünün son 7 güne ait sayımlarını tarihe göre sırala
+    const sonYediGunSayimlar = hareketler
+      .filter(h => h.urun_id === urunId && h.tip === "sayim" && h.tarih >= yediGunOnceStr)
       .sort((a, b) => a.tarih.localeCompare(b.tarih));
-    if (uHareket.length < 2) return 0;
-    const son = uHareket[uHareket.length - 1];
-    const onceki = uHareket[uHareket.length - 2];
-    const aradaGelen = hareketler
-      .filter(h => h.urun_id === urunId && h.tip === "giris" && h.tarih > onceki.tarih && h.tarih <= son.tarih)
-      .reduce((s, h) => s + h.miktar, 0);
-    const gunSayisi = Math.max(
-      (new Date(son.tarih).getTime() - new Date(onceki.tarih).getTime()) / (1000 * 60 * 60 * 24),
-      1
-    );
-    const kullanim = (onceki.miktar + aradaGelen) - son.miktar;
-    return kullanim > 0 ? kullanim / gunSayisi : 0;
+
+    if (sonYediGunSayimlar.length < 2) return 0;
+
+    // Ardışık sayım çiftleri üzerinden günlük tüketim hesapla
+    let toplamKullanim = 0;
+    let toplamGun = 0;
+
+    for (let i = 1; i < sonYediGunSayimlar.length; i++) {
+      const onceki = sonYediGunSayimlar[i - 1];
+      const sonraki = sonYediGunSayimlar[i];
+
+      // Bu iki sayım arasındaki mal girişlerini bul
+      const aradaGelen = hareketler
+        .filter(h =>
+          h.urun_id === urunId &&
+          h.tip === "giris" &&
+          h.tarih > onceki.tarih &&
+          h.tarih <= sonraki.tarih
+        )
+        .reduce((s, h) => s + h.miktar, 0);
+
+      const gunFarki = Math.max(
+        (new Date(sonraki.tarih).getTime() - new Date(onceki.tarih).getTime()) / (1000 * 60 * 60 * 24),
+        1
+      );
+
+      const kullanim = (onceki.miktar + aradaGelen) - sonraki.miktar;
+      if (kullanim > 0) {
+        toplamKullanim += kullanim;
+        toplamGun += gunFarki;
+      }
+    }
+
+    // Veri olan gün sayısına böl (eksik günler hesaba katılmaz)
+    return toplamGun > 0 ? toplamKullanim / toplamGun : 0;
   }, [hareketler]);
 
   const tahminiBitisGunu = useCallback((urun: Urun): number | null => {
