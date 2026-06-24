@@ -169,15 +169,12 @@ export default function StokPage() {
 
     if (sonYediGunSayimlar.length < 2) return 0;
 
-    // Ardışık sayım çiftleri üzerinden günlük tüketim hesapla
     let toplamKullanim = 0;
     let toplamGun = 0;
 
     for (let i = 1; i < sonYediGunSayimlar.length; i++) {
       const onceki = sonYediGunSayimlar[i - 1];
       const sonraki = sonYediGunSayimlar[i];
-
-      // Bu iki sayım arasındaki mal girişlerini bul
       const aradaGelen = hareketler
         .filter(h =>
           h.urun_id === urunId &&
@@ -186,12 +183,10 @@ export default function StokPage() {
           h.tarih <= sonraki.tarih
         )
         .reduce((s, h) => s + h.miktar, 0);
-
       const gunFarki = Math.max(
         (new Date(sonraki.tarih).getTime() - new Date(onceki.tarih).getTime()) / (1000 * 60 * 60 * 24),
         1
       );
-
       const kullanim = (onceki.miktar + aradaGelen) - sonraki.miktar;
       if (kullanim > 0) {
         toplamKullanim += kullanim;
@@ -199,7 +194,6 @@ export default function StokPage() {
       }
     }
 
-    // Veri olan gün sayısına böl (eksik günler hesaba katılmaz)
     return toplamGun > 0 ? toplamKullanim / toplamGun : 0;
   }, [hareketler]);
 
