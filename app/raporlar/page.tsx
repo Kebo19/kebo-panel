@@ -80,6 +80,21 @@ interface Cari {
 
 const FALLBACK_PERSONELLER = ["Ahmet Yılmaz","Mehmet Kaya","Can Demir","Ali Öztürk","Mustafa Şahin"];
 
+// ── Yetki Sistemi ──
+// Tam yetkili: raporları doğrudan düzenleyebilir, onay bekleyen değişiklikleri onaylayabilir/reddedebilir.
+const TAM_YETKILILER = ["murat@kebo.com", "bulent@kebo.com"];
+// Onaylı düzenleyici: mevcut raporlarda değişiklik yapabilir ama değişiklik önce onaya gider,
+// tam yetkili biri onaylamadan rapor güncellenmez.
+const ONAYLI_DUZENLEYICILER = ["ayse@kebo.com"];
+
+interface DegisiklikTalebi {
+  id: string; rapor_id: string; rapor_tarihi: string;
+  talep_eden: string; talep_tarihi: string;
+  eski_veri: any; yeni_veri: any;
+  durum: "bekliyor" | "onaylandi" | "reddedildi";
+  onaylayan?: string | null; onay_tarihi?: string | null; red_sebebi?: string | null;
+}
+
 
 
 const AYLAR = [
@@ -317,8 +332,6 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
       t.Migros+=(r.os_migros||0)+(r.ko_migros||0);
 
       t["Alo Paket"]+=(r.ko_alo_paket||0);
-
-      t["Chick'N Fride"]+=(r.os_chicknfride||0)+(r.ko_chicknfride||0);
 
     });
 
@@ -1182,7 +1195,19 @@ export default function RaporlarPage() {
 
   const [isAdmin, setIsAdmin] = useState(false);
 
+  const [isOnayliDuzenleyici, setIsOnayliDuzenleyici] = useState(false);
+
   const [userEmail, setUserEmail] = useState("");
+
+  const [onayBekleyenler, setOnayBekleyenler] = useState<DegisiklikTalebi[]>([]);
+
+  const [onayGecmisi, setOnayGecmisi] = useState<DegisiklikTalebi[]>([]);
+
+  const [onayModalAcik, setOnayModalAcik] = useState(false);
+
+  const [onayModalTab, setOnayModalTab] = useState<"bekleyen"|"gecmis">("bekleyen");
+
+  const [onayIslemId, setOnayIslemId] = useState<string|null>(null);
 
   const [raporlar, setRaporlar] = useState<GunlukRapor[]>([]);
 
@@ -1242,9 +1267,9 @@ export default function RaporlarPage() {
 
   const [osYS, setOsYS] = useState(""); const [osGetir, setOsGetir] = useState("");
 
-  const [osTrendyol, setOsTrendyol] = useState(""); const [osMigros, setOsMigros] = useState("");
-
   const [osChickNFride, setOsChickNFride] = useState("");
+
+  const [osTrendyol, setOsTrendyol] = useState(""); const [osMigros, setOsMigros] = useState("");
 
   const [koYS, setKoYS] = useState(""); const [koGetir, setKoGetir] = useState("");
 
@@ -1278,7 +1303,27 @@ export default function RaporlarPage() {
 
     const mail = user?.email||""; setUserEmail(mail);
 
-    setIsAdmin(mail==="murat@kebo.com"||mail==="bulent@kebo.com");
+    const mailAdmin = TAM_YETKILILER.includes(mail);
+
+    setIsAdmin(mailAdmin);
+
+    setIsOnayliDuzenleyici(ONAYLI_DUZENLEYICILER.includes(mail));
+
+    if (mailAdmin) {
+
+      const { data: talepler } = await supabase.from("rapor_degisiklik_talepleri")
+
+        .select("*").order("talep_tarihi", { ascending: false });
+
+      if (talepler) {
+
+        setOnayBekleyenler((talepler as DegisiklikTalebi[]).filter(t => t.durum === "bekliyor"));
+
+        setOnayGecmisi((talepler as DegisiklikTalebi[]).filter(t => t.durum !== "bekliyor"));
+
+      }
+
+    }
 
 
 
@@ -1436,13 +1481,125 @@ export default function RaporlarPage() {
 
 
 
+  // ── Onay Bekleyen Değişiklik: Onayla / Reddet ──
+
+  const handleTalepOnayla = async (talep: DegisiklikTalebi) => {
+
+    if (!isAdmin) return;
+
+    if (!confirm(`${fmtTarih(talep.rapor_tarihi)} tarihli rapor için ${talep.talep_eden} tarafından yapılan değişikliği onaylıyor musunuz?`)) return;
+
+    setOnayIslemId(talep.id);
+
+    try {
+
+      const { error: guncelleError } = await supabase.from("gunluk_raporlar")
+
+        .update(talep.yeni_veri).eq("id", talep.rapor_id);
+
+      if (guncelleError) { alert("Rapor güncellenirken hata: " + guncelleError.message); return; }
+
+      const { error: talepError } = await supabase.from("rapor_degisiklik_talepleri")
+
+        .update({ durum: "onaylandi", onaylayan: userEmail, onay_tarihi: new Date().toISOString() })
+
+        .eq("id", talep.id);
+
+      if (talepError) { alert("Talep güncellenirken hata: " + talepError.message); return; }
+
+      veriCek();
+
+    } finally {
+
+      setOnayIslemId(null);
+
+    }
+
+  };
+
+
+
+  const handleTalepReddet = async (talep: DegisiklikTalebi) => {
+
+    if (!isAdmin) return;
+
+    const sebep = prompt("Reddetme sebebi (opsiyonel):") || "";
+
+    if (!confirm(`${fmtTarih(talep.rapor_tarihi)} tarihli değişiklik talebini reddetmek istediğinize emin misiniz?`)) return;
+
+    setOnayIslemId(talep.id);
+
+    try {
+
+      const { error } = await supabase.from("rapor_degisiklik_talepleri")
+
+        .update({ durum: "reddedildi", onaylayan: userEmail, onay_tarihi: new Date().toISOString(), red_sebebi: sebep })
+
+        .eq("id", talep.id);
+
+      if (error) { alert("Hata: " + error.message); return; }
+
+      veriCek();
+
+    } finally {
+
+      setOnayIslemId(null);
+
+    }
+
+  };
+
+
+
+  // İki rapor kaydı arasındaki farklı alanları okunabilir şekilde listeler
+
+  const talepFarklari = (eski: any, yeni: any) => {
+
+    const ALAN_ETIKET: Record<string,string> = {
+
+      os_yemeksepeti:"Yemeksepeti (Online)", os_getir:"Getir (Online)", os_trendyol:"Trendyol (Online)",
+
+      os_migros:"Migros (Online)", os_chicknfride:"Chick'N Fride (Online)",
+
+      ko_yemeksepeti:"Yemeksepeti (Kapıda)", ko_getir:"Getir (Kapıda)", ko_trendyol:"Trendyol (Kapıda)",
+
+      ko_migros:"Migros (Kapıda)", ko_alo_paket:"Alo Paket", ko_chicknfride:"Chick'N Fride (Kapıda)",
+
+      kasa_nakit:"Kasa Nakit", kasa_pos:"Kasa POS", kasa_edenred:"Kasa Edenred",
+
+      gunluk_gider:"Günlük Gider", iade_tutar:"İade Tutarı", toplam_ciro:"Toplam Ciro",
+
+      gider_aciklama:"Gider Açıklaması", iade_aciklama:"İade Açıklaması",
+
+    };
+
+    const farklar: { alan:string; eskiDeger:any; yeniDeger:any }[] = [];
+
+    Object.keys(ALAN_ETIKET).forEach(k => {
+
+      const eskiVal = eski?.[k]; const yeniVal = yeni?.[k];
+
+      if (JSON.stringify(eskiVal) !== JSON.stringify(yeniVal)) {
+
+        farklar.push({ alan: ALAN_ETIKET[k], eskiDeger: eskiVal, yeniDeger: yeniVal });
+
+      }
+
+    });
+
+    return farklar;
+
+  };
+
+
+
   const raporuFormaYukle = (r: GunlukRapor) => {
 
     setTarih(r.tarih); setTarihHataVarMi(false); setAdminOnayliGecis(false); setDuplikaTarihHata(false);
 
     setOsYS(fmt(r.os_yemeksepeti)); setOsGetir(fmt(r.os_getir));
 
-    setOsTrendyol(fmt(r.os_trendyol)); setOsMigros(fmt(r.os_migros)); setOsChickNFride(fmt(r.os_chicknfride));
+    setOsTrendyol(fmt(r.os_trendyol)); setOsMigros(fmt(r.os_migros));
 
     setKoYS(fmt(r.ko_yemeksepeti)); setKoGetir(fmt(r.ko_getir));
 
@@ -1834,6 +1991,36 @@ Soru: ${soruFinal}`
 
       };
 
+      // Onaylı düzenleyici (ör. Ayşe) mevcut bir raporu düzenliyorsa:
+      // rapor doğrudan güncellenmez, tam yetkili birinin onayına gönderilir.
+      if (selectedRapor && !isAdmin && isOnayliDuzenleyici) {
+
+        const { error: talepError } = await supabase.from("rapor_degisiklik_talepleri").insert([{
+
+          rapor_id: selectedRapor.id,
+
+          rapor_tarihi: selectedRapor.tarih,
+
+          talep_eden: userEmail,
+
+          eski_veri: selectedRapor,
+
+          yeni_veri: raporData,
+
+          durum: "bekliyor",
+
+        }]);
+
+        if (talepError) { alert("Talep gönderilirken hata: "+talepError.message); return; }
+
+        alert(`${fmtTarih(selectedRapor.tarih)} tarihli rapor için değişiklik talebiniz onaya gönderildi. Murat veya Bülent onayladığında rapor güncellenecek.`);
+
+        formuTemizle(); setFormAcik(false); veriCek();
+
+        return;
+
+      }
+
       let error;
 
       if (selectedRapor) {
@@ -1994,7 +2181,7 @@ Soru: ${soruFinal}`
 
           </div>
 
-          {!isEditMode && isAdmin && (
+          {!isEditMode && (isAdmin || isOnayliDuzenleyici) && (
 
             <div className="flex items-center gap-2">
 
@@ -2006,6 +2193,8 @@ Soru: ${soruFinal}`
 
               </button>
 
+              {isAdmin && (
+
               <button type="button" onClick={()=>selectedRapor && handleRaporSil(selectedRapor)}
 
                 className="flex items-center gap-1.5 text-xs font-semibold text-red-400 bg-red-400/10 border border-red-400/20 px-3 py-1.5 rounded-lg hover:bg-red-400/15 transition-colors">
@@ -2013,6 +2202,8 @@ Soru: ${soruFinal}`
                 <Trash2 size={12}/> Sil
 
               </button>
+
+              )}
 
             </div>
 
@@ -2958,6 +3149,28 @@ Soru: ${soruFinal}`
 
             </button>
 
+            {isAdmin && (
+
+              <button onClick={()=>{setOnayModalTab("bekleyen");setOnayModalAcik(true);}}
+
+                className={`relative flex items-center gap-1.5 text-[11px] font-semibold border px-3 py-2 rounded-xl transition-colors ${
+
+                  onayBekleyenler.length>0 ? "text-amber-300 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/15" : "text-gray-500 hover:text-white border-[#1a2236] hover:border-[#2a3550]"
+
+                }`}>
+
+                <AlertTriangle size={13}/> Onay Bekleyenler
+
+                {onayBekleyenler.length>0 && (
+
+                  <span className="ml-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-amber-500 text-[10px] font-black text-black">{onayBekleyenler.length}</span>
+
+                )}
+
+              </button>
+
+            )}
+
             <button onClick={()=>{formuTemizle();setFormAcik(true);}}
 
               className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-colors shadow-lg shadow-blue-900/30">
@@ -3387,6 +3600,164 @@ Soru: ${soruFinal}`
 
 
       {printRapor && <PrintModal rapor={printRapor} onClose={()=>setPrintRapor(null)}/>}
+
+      {onayModalAcik && (
+
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+
+          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
+
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#1a2236]">
+
+              <p className="text-sm font-black text-white flex items-center gap-2"><AlertTriangle size={15} className="text-amber-400"/> Rapor Değişiklik Talepleri</p>
+
+              <button onClick={()=>setOnayModalAcik(false)} className="text-gray-600 hover:text-white"><X size={16}/></button>
+
+            </div>
+
+            <div className="flex gap-2 px-5 pt-3">
+
+              <button onClick={()=>setOnayModalTab("bekleyen")}
+
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${onayModalTab==="bekleyen"?"bg-amber-500/15 text-amber-300 border border-amber-500/30":"text-gray-500 hover:text-white"}`}>
+
+                Bekleyen ({onayBekleyenler.length})
+
+              </button>
+
+              <button onClick={()=>setOnayModalTab("gecmis")}
+
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${onayModalTab==="gecmis"?"bg-blue-500/15 text-blue-300 border border-blue-500/30":"text-gray-500 hover:text-white"}`}>
+
+                Geçmiş ({onayGecmisi.length})
+
+              </button>
+
+            </div>
+
+            <div className="p-5 space-y-3 overflow-y-auto">
+
+              {onayModalTab==="bekleyen" && (
+
+                onayBekleyenler.length===0 ? (
+
+                  <p className="text-xs text-gray-600 text-center py-8">Onay bekleyen değişiklik talebi yok.</p>
+
+                ) : onayBekleyenler.map(talep => {
+
+                  const farklar = talepFarklari(talep.eski_veri, talep.yeni_veri);
+
+                  return (
+
+                    <div key={talep.id} className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+
+                      <div className="flex items-center justify-between mb-2">
+
+                        <p className="text-xs font-bold text-white">{fmtTarih(talep.rapor_tarihi)} tarihli rapor</p>
+
+                        <p className="text-[10px] text-gray-500">{talep.talep_eden} · {new Date(talep.talep_tarihi).toLocaleString("tr-TR")}</p>
+
+                      </div>
+
+                      <div className="space-y-1 mb-3">
+
+                        {farklar.length===0 ? (
+
+                          <p className="text-[11px] text-gray-600">Değişiklik tespit edilemedi.</p>
+
+                        ) : farklar.map((f,i)=>(
+
+                          <div key={i} className="flex items-center justify-between text-[11px] bg-black/20 rounded-lg px-2.5 py-1.5">
+
+                            <span className="text-gray-400">{f.alan}</span>
+
+                            <span className="flex items-center gap-1.5">
+
+                              <span className="text-gray-600 line-through">{typeof f.eskiDeger==="number"?`₺${fmt(f.eskiDeger)}`:(f.eskiDeger||"—")}</span>
+
+                              <span className="text-gray-600">→</span>
+
+                              <span className="text-emerald-400 font-semibold">{typeof f.yeniDeger==="number"?`₺${fmt(f.yeniDeger)}`:(f.yeniDeger||"—")}</span>
+
+                            </span>
+
+                          </div>
+
+                        ))}
+
+                      </div>
+
+                      <div className="flex gap-2">
+
+                        <button onClick={()=>handleTalepReddet(talep)} disabled={onayIslemId===talep.id}
+
+                          className="flex-1 text-xs font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 disabled:opacity-40 py-2 rounded-lg transition-colors">
+
+                          Reddet
+
+                        </button>
+
+                        <button onClick={()=>handleTalepOnayla(talep)} disabled={onayIslemId===talep.id}
+
+                          className="flex-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 py-2 rounded-lg transition-colors flex items-center justify-center gap-2">
+
+                          {onayIslemId===talep.id?<Loader2 size={13} className="animate-spin"/>:null} Onayla
+
+                        </button>
+
+                      </div>
+
+                    </div>
+
+                  );
+
+                })
+
+              )}
+
+              {onayModalTab==="gecmis" && (
+
+                onayGecmisi.length===0 ? (
+
+                  <p className="text-xs text-gray-600 text-center py-8">Henüz bir geçmiş kaydı yok.</p>
+
+                ) : onayGecmisi.map(talep => (
+
+                  <div key={talep.id} className={`rounded-xl border p-3 text-[11px] ${talep.durum==="onaylandi"?"border-emerald-500/20 bg-emerald-500/5":"border-red-500/20 bg-red-500/5"}`}>
+
+                    <p className="text-white font-semibold mb-1">{fmtTarih(talep.rapor_tarihi)} tarihli rapor</p>
+
+                    <p className="text-gray-400">
+
+                      <span className="font-semibold">{talep.talep_eden}</span> düzenleme yaptı ({new Date(talep.talep_tarihi).toLocaleString("tr-TR")})
+
+                    </p>
+
+                    <p className={talep.durum==="onaylandi"?"text-emerald-400":"text-red-400"}>
+
+                      <span className="font-semibold">{talep.onaylayan}</span> {talep.durum==="onaylandi"?"onayladı":"reddetti"} ({talep.onay_tarihi ? new Date(talep.onay_tarihi).toLocaleString("tr-TR") : "—"})
+
+                    </p>
+
+                    {talep.durum==="reddedildi" && talep.red_sebebi && (
+
+                      <p className="text-gray-500 mt-1">Sebep: {talep.red_sebebi}</p>
+
+                    )}
+
+                  </div>
+
+                ))
+
+              )}
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
 
     </div>
 
