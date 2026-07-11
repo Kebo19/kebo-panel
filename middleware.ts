@@ -1,41 +1,57 @@
-// middleware.ts
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+export async function middleware(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({
+    request,
+  })
 
-  // 1. STATİK DOSYALARI VE RESİMLERİ DOĞRUDAN PAS GEÇ (Hız için çok önemli)
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api') ||
-    pathname.includes('favicon.ico') ||
-    pathname.includes('.')
-  ) {
-    return NextResponse.next()
-  }
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({
+            request,
+          })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
 
-  // 2. Supabase'in tarayıcıda oluşturduğu auth çerezlerini kontrol et
-  const cookies = request.cookies.getAll()
-  const hasSession = cookies.some(c => c.name.includes('auth-token') || c.name.includes('sb-access-token'))
+  // Gelen kişinin giriş yapıp yapmadığını kontrol et
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // 3. Giriş yapmamışsa ve login sayfasında değilse login'e yönlendir
-  if (!hasSession && pathname !== '/login') {
+  // Eğer kişi giriş YAPMAMIŞSA ve şu an login sayfasında DEĞİLSE, onu login'e kovala
+  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // 4. Giriş yapmışsa ve login'e gitmeye çalışıyorsa ana sayfaya at
-  if (hasSession && pathname === '/login') {
+  // Eğer kişi zaten GİRİŞ YAPMIŞSA ve tekrar login sayfasına gitmeye çalışıyorsa, onu ana sayfaya geri gönder
+  if (user && request.nextUrl.pathname.startsWith('/login')) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
   }
 
-  return NextResponse.next()
+  return supabaseResponse
 }
 
 export const config = {
-  matcher: ['/((?!.*\\.).*)'],
+  matcher: [
+    /*
+     * Görseller, ikonlar ve arka plan dosyaları hariç her sayfada bu güvenliği çalıştır:
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 }
