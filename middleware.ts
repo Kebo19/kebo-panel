@@ -1,7 +1,20 @@
+// middleware.ts
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // 1. STATİK DOSYALARI VE RESİMLERİ EN BAŞTAN MUAF TUT (Performans için kritik)
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname.includes('favicon.ico') ||
+    pathname.includes('.')
+  ) {
+    return NextResponse.next()
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -15,7 +28,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
             request,
           })
@@ -27,18 +40,19 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Gelen kişinin giriş yapıp yapmadığını kontrol et
-  const { data: { user } } = await supabase.auth.getUser()
+  // 2. Ağ yükünü azaltmak için getUser() yerine session kontrolü yapıyoruz
+  const { data: { session } } = await supabase.auth.getSession()
+  const isLoggedIn = !!session
 
-  // Eğer kişi giriş YAPMAMIŞSA ve şu an login sayfasında DEĞİLSE, onu login'e kovala
-  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
+  // 3. Giriş yapmamış kullanıcı login sayfasında değilse login'e gönder
+  if (!isLoggedIn && pathname !== '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Eğer kişi zaten GİRİŞ YAPMIŞSA ve tekrar login sayfasına gitmeye çalışıyorsa, onu ana sayfaya geri gönder
-  if (user && request.nextUrl.pathname.startsWith('/login')) {
+  // 4. Giriş yapmış kullanıcı tekrar login'e gitmeye çalışırsa ana sayfaya at
+  if (isLoggedIn && pathname === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
@@ -47,11 +61,7 @@ export async function middleware(request: NextRequest) {
   return supabaseResponse
 }
 
+// Güvenlik önlemi olarak matcher'ı da temiz tutuyoruz
 export const config = {
-  matcher: [
-    /*
-     * Görseller, ikonlar ve arka plan dosyaları hariç her sayfada bu güvenliği çalıştır:
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!.*\\.).*)'],
 }
