@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Supabase soğuk başlangıç (cold start) yaşadığında ya da ağ gecikmesi
@@ -11,8 +12,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 const AUTH_CHECK_TIMEOUT_MS = 6000
 
 async function getUserSafely(
-  supabase: ReturnType<typeof createServerClient>
-): Promise<{ user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] | null; timedOut: boolean }> {
+  supabase: SupabaseClient
+): Promise<{ user: User | null; timedOut: boolean }> {
   const timeoutMarker = Symbol('auth-timeout')
 
   const timeoutPromise = new Promise<typeof timeoutMarker>((resolve) => {
@@ -20,10 +21,11 @@ async function getUserSafely(
   })
 
   try {
-    const result = await Promise.race([
-      supabase.auth.getUser().then((res) => res.data.user),
-      timeoutPromise,
-    ])
+    const authPromise: Promise<User | null> = supabase.auth
+      .getUser()
+      .then((result) => result.data.user)
+
+    const result = await Promise.race([authPromise, timeoutPromise])
 
     if (result === timeoutMarker) {
       return { user: null, timedOut: true }
