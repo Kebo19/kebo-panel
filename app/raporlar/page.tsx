@@ -18,7 +18,9 @@ import {
 
   RefreshCw, Download, FileDown, StickyNote, DollarSign, Package,
 
-  RotateCcw, Save, Slash, TrendingDown, Hash, Building2, Search, Sparkles
+  RotateCcw, Save, Slash, TrendingDown, Hash, Building2, Search, Sparkles,
+
+  Banknote, CreditCard, Percent, Truck, Users2
 
 } from "lucide-react";
 
@@ -36,7 +38,11 @@ interface KuryeRaporu {
 
   id: number; isim: string; nakit: string; pos: string; paketSayisi: string;
 
+  tip?: "sabit" | "havuz"; // sabit = Roadrunner garantili kurye, havuz = garantisiz ek kurye
+
 }
+
+interface PlatformGiris { tutar: string; paket: string; }
 
 interface SatirRaporu {
 
@@ -50,11 +56,34 @@ interface GunlukRapor {
 
   id: string; tarih: string;
 
+  // Legacy (eski, tek platform bazlı — geçmiş raporlarda okuma amaçlı hâlâ tutuluyor)
   os_yemeksepeti: number; os_getir: number; os_trendyol: number; os_migros: number; os_chicknfride: number;
 
   ko_yemeksepeti: number; ko_getir: number; ko_trendyol: number; ko_migros: number; ko_alo_paket: number; ko_chicknfride: number;
 
-  kasa_nakit: number; kasa_pos: number; kasa_edenred: number;
+  // Online — Kebo
+  os_kebo_ys: number; os_kebo_ys_paket: number; os_kebo_ys_indirim: number;
+  os_kebo_trendyol: number; os_kebo_trendyol_paket: number; os_kebo_trendyol_indirim: number;
+  os_kebo_migros: number; os_kebo_migros_paket: number;
+
+  // Online — Chick'N Fride
+  os_cnf_ys: number; os_cnf_ys_paket: number; os_cnf_ys_indirim: number;
+  os_cnf_trendyol: number; os_cnf_trendyol_paket: number; os_cnf_trendyol_indirim: number;
+  os_cnf_migros_yemek: number; os_cnf_migros_yemek_paket: number;
+
+  // Kapıda Ödeme — Kebo
+  ko_kebo_ys: number; ko_kebo_ys_paket: number; ko_kebo_ys_indirim: number;
+  ko_kebo_trendyol: number; ko_kebo_trendyol_paket: number; ko_kebo_trendyol_indirim: number;
+  ko_kebo_migros_yemek: number; ko_kebo_migros_yemek_paket: number;
+  ko_kebo_alo: number; ko_kebo_alo_paket: number;
+
+  // Kapıda Ödeme — Chick'N Fride
+  ko_cnf_ys: number; ko_cnf_ys_paket: number; ko_cnf_ys_indirim: number;
+  ko_cnf_trendyol: number; ko_cnf_trendyol_paket: number; ko_cnf_trendyol_indirim: number;
+  ko_cnf_migros_yemek: number; ko_cnf_migros_yemek_paket: number;
+  ko_cnf_alo: number; ko_cnf_alo_paket: number;
+
+  kasa_nakit: number; kasa_pos: number; kasa_edenred: number; kasa_metropol: number;
 
   gunluk_gider: number; gider_aciklama?: string;
 
@@ -167,7 +196,7 @@ const brutHesapla = (r: GunlukRapor): number => {
 
   const tO = (r.os_yemeksepeti||0)+(r.os_getir||0)+(r.os_trendyol||0)+(r.os_migros||0)+(r.os_chicknfride||0);
 
-  const tKasa = (r.kasa_nakit||0)+(r.kasa_pos||0)+(r.kasa_edenred||0);
+  const tKasa = (r.kasa_nakit||0)+(r.kasa_pos||0)+(r.kasa_edenred||0)+(r.kasa_metropol||0);
 
   const gider = r.gunluk_gider||0;
 
@@ -183,7 +212,7 @@ const netHesapla = (r: GunlukRapor): number => {
 
   const tO = (r.os_yemeksepeti||0)+(r.os_getir||0)+(r.os_trendyol||0)+(r.os_migros||0)+(r.os_chicknfride||0);
 
-  const tKasa = (r.kasa_nakit||0)+(r.kasa_pos||0)+(r.kasa_edenred||0);
+  const tKasa = (r.kasa_nakit||0)+(r.kasa_pos||0)+(r.kasa_edenred||0)+(r.kasa_metropol||0);
 
   return tO + tKasa - (r.iade_tutar||0);
 
@@ -695,7 +724,14 @@ function PrintModal({rapor, onClose}: {rapor:GunlukRapor, onClose:()=>void}) {
 
   const tK=(rapor.ko_yemeksepeti||0)+(rapor.ko_getir||0)+(rapor.ko_trendyol||0)+(rapor.ko_migros||0)+(rapor.ko_alo_paket||0)+(rapor.ko_chicknfride||0);
 
-  const tKasa=(rapor.kasa_nakit||0)+(rapor.kasa_pos||0)+(rapor.kasa_edenred||0);
+  const tKasa=(rapor.kasa_nakit||0)+(rapor.kasa_pos||0)+(rapor.kasa_edenred||0)+(rapor.kasa_metropol||0);
+
+  // Yeni (Kebo/Chick'N Fride marka bazlı) yapıyla girilmiş mi? — eski raporlarda bu alanlar 0/undefined olur.
+  const yeniYapiVarMi = !!((rapor.os_kebo_ys||rapor.os_kebo_trendyol||rapor.os_kebo_migros||rapor.os_cnf_ys||rapor.os_cnf_trendyol||rapor.os_cnf_migros_yemek||
+    rapor.ko_kebo_ys||rapor.ko_kebo_trendyol||rapor.ko_kebo_migros_yemek||rapor.ko_cnf_ys||rapor.ko_cnf_trendyol||rapor.ko_cnf_migros_yemek));
+
+  const tIndirimPT = (rapor.os_kebo_ys_indirim||0)+(rapor.os_cnf_ys_indirim||0)+(rapor.ko_kebo_ys_indirim||0)+(rapor.ko_cnf_ys_indirim||0);
+  const tIndirimTY = (rapor.os_kebo_trendyol_indirim||0)+(rapor.os_cnf_trendyol_indirim||0)+(rapor.ko_kebo_trendyol_indirim||0)+(rapor.ko_cnf_trendyol_indirim||0);
 
   const brutCiro = brutHesapla(rapor);
 
@@ -821,7 +857,30 @@ function PrintModal({rapor, onClose}: {rapor:GunlukRapor, onClose:()=>void}) {
 
             {rapor.kasa_edenred>0&&<div className="row"><span>Edenred / Sodexo</span><span>₺{fmt(rapor.kasa_edenred)}</span></div>}
 
+            {rapor.kasa_metropol>0&&<div className="row"><span>Metropol</span><span>₺{fmt(rapor.kasa_metropol)}</span></div>}
+
             <div className="row bold"><span>Kasa Toplam</span><span>₺{fmt(tKasa)}</span></div>
+
+            {yeniYapiVarMi && (
+              <>
+                <hr className="divider"/>
+                <div className="section-title">Marka Detayı (Kebo / Chick'N Fride)</div>
+                <div className="row"><span style={{fontWeight:700}}>Kebo</span><span></span></div>
+                {(rapor.os_kebo_ys||rapor.ko_kebo_ys)>0&&<div className="row"><span>· Yemeksepeti ({(rapor.os_kebo_ys_paket||0)+(rapor.ko_kebo_ys_paket||0)} pkt)</span><span>₺{fmt((rapor.os_kebo_ys||0)+(rapor.ko_kebo_ys||0))}</span></div>}
+                {(rapor.os_kebo_trendyol||rapor.ko_kebo_trendyol)>0&&<div className="row"><span>· Trendyol ({(rapor.os_kebo_trendyol_paket||0)+(rapor.ko_kebo_trendyol_paket||0)} pkt)</span><span>₺{fmt((rapor.os_kebo_trendyol||0)+(rapor.ko_kebo_trendyol||0))}</span></div>}
+                {(rapor.os_kebo_migros||rapor.ko_kebo_migros_yemek)>0&&<div className="row"><span>· Migros ({(rapor.os_kebo_migros_paket||0)+(rapor.ko_kebo_migros_yemek_paket||0)} pkt)</span><span>₺{fmt((rapor.os_kebo_migros||0)+(rapor.ko_kebo_migros_yemek||0))}</span></div>}
+                {rapor.ko_kebo_alo>0&&<div className="row"><span>· Alo Paket ({rapor.ko_kebo_alo_paket||0} pkt)</span><span>₺{fmt(rapor.ko_kebo_alo)}</span></div>}
+                <div className="row"><span style={{fontWeight:700,marginTop:"4px"}}>Chick'N Fride</span><span></span></div>
+                {(rapor.os_cnf_ys||rapor.ko_cnf_ys)>0&&<div className="row"><span>· Yemeksepeti ({(rapor.os_cnf_ys_paket||0)+(rapor.ko_cnf_ys_paket||0)} pkt)</span><span>₺{fmt((rapor.os_cnf_ys||0)+(rapor.ko_cnf_ys||0))}</span></div>}
+                {(rapor.os_cnf_trendyol||rapor.ko_cnf_trendyol)>0&&<div className="row"><span>· Trendyol ({(rapor.os_cnf_trendyol_paket||0)+(rapor.ko_cnf_trendyol_paket||0)} pkt)</span><span>₺{fmt((rapor.os_cnf_trendyol||0)+(rapor.ko_cnf_trendyol||0))}</span></div>}
+                {(rapor.os_cnf_migros_yemek||rapor.ko_cnf_migros_yemek)>0&&<div className="row"><span>· Migros Yemek ({(rapor.os_cnf_migros_yemek_paket||0)+(rapor.ko_cnf_migros_yemek_paket||0)} pkt)</span><span>₺{fmt((rapor.os_cnf_migros_yemek||0)+(rapor.ko_cnf_migros_yemek||0))}</span></div>}
+                {rapor.ko_cnf_alo>0&&<div className="row"><span>· Alo Paket ({rapor.ko_cnf_alo_paket||0} pkt)</span><span>₺{fmt(rapor.ko_cnf_alo)}</span></div>}
+                {(tIndirimPT+tIndirimTY)>0&&<>
+                  <div className="row" style={{color:"#dc2626"}}><span>(-) Yemeksepeti İndirim</span><span>-₺{fmt(tIndirimPT)}</span></div>
+                  <div className="row" style={{color:"#dc2626"}}><span>(-) Trendyol İndirim</span><span>-₺{fmt(tIndirimTY)}</span></div>
+                </>}
+              </>
+            )}
 
             <hr className="divider"/>
 
@@ -1053,6 +1112,44 @@ function CurrencyInput({label, value, onChange, disabled=false, accent="gray"}:
 
 
 
+// ─── PLATFORM SATIRI (tutar + paket sayısı + opsiyonel indirim) ───────────────
+
+function PlatformSatir({label, value, onChange, indirim, onIndirimChange, disabled=false}:
+  {label:string, value:PlatformGiris, onChange:(v:PlatformGiris)=>void,
+   indirim?:string, onIndirimChange?:(v:string)=>void, disabled?:boolean}) {
+  return (
+    <div className="rounded-lg border border-[#1a2236] bg-[#080b14] p-2">
+      <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold mb-1.5">{label}</p>
+      <div className="flex items-center gap-1.5">
+        <div className="relative flex-1">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-600 text-[11px] font-medium">₺</span>
+          <input type="text" value={value.tutar} disabled={disabled}
+            onChange={e=>onChange({...value, tutar: fmtStr(e.target.value)})}
+            placeholder="0"
+            className="w-full bg-[#0c0f1a] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 text-white text-xs font-bold h-8 pl-6 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-700"/>
+        </div>
+        <div className="relative w-[64px] shrink-0">
+          <Package size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600"/>
+          <input type="number" value={value.paket} disabled={disabled}
+            onChange={e=>onChange({...value, paket: e.target.value})}
+            placeholder="0"
+            title="Paket sayısı"
+            className="w-full bg-[#0c0f1a] border border-[#1a2236] hover:border-[#243050] focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 text-amber-300 text-xs font-bold h-8 pl-6 pr-1.5 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-700"/>
+        </div>
+      </div>
+      {onIndirimChange && (
+        <div className="relative mt-1.5">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-red-500/70 text-[10px] font-medium">-₺</span>
+          <input type="text" value={indirim||""} disabled={disabled}
+            onChange={e=>onIndirimChange(fmtStr(e.target.value))}
+            placeholder="İndirim"
+            className="w-full bg-[#0c0f1a] border border-red-500/10 hover:border-red-500/25 focus:border-red-500/40 focus:ring-1 focus:ring-red-500/15 text-red-300 text-[11px] font-semibold h-7 pl-6 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-700"/>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── AKILLI GİDER INPUT ───────────────────────────────────────────────────────
 
 
@@ -1265,31 +1362,56 @@ export default function RaporlarPage() {
 
   const [adminOnayliGecis, setAdminOnayliGecis] = useState(false);
 
-  const [osYS, setOsYS] = useState(""); const [osGetir, setOsGetir] = useState("");
+  // ── Online — Kebo ──
+  const [osKeboYs, setOsKeboYs] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [osKeboYsIndirim, setOsKeboYsIndirim] = useState("");
+  const [osKeboTrendyol, setOsKeboTrendyol] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [osKeboTrendyolIndirim, setOsKeboTrendyolIndirim] = useState("");
+  const [osKeboMigros, setOsKeboMigros] = useState<PlatformGiris>({tutar:"",paket:""});
 
-  const [osChickNFride, setOsChickNFride] = useState("");
+  // ── Online — Chick'N Fride ──
+  const [osCnfYs, setOsCnfYs] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [osCnfYsIndirim, setOsCnfYsIndirim] = useState("");
+  const [osCnfTrendyol, setOsCnfTrendyol] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [osCnfTrendyolIndirim, setOsCnfTrendyolIndirim] = useState("");
+  const [osCnfMigrosYemek, setOsCnfMigrosYemek] = useState<PlatformGiris>({tutar:"",paket:""});
 
-  const [osTrendyol, setOsTrendyol] = useState(""); const [osMigros, setOsMigros] = useState("");
+  // ── Kapıda Ödeme — Kebo ──
+  const [koKeboYs, setKoKeboYs] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [koKeboYsIndirim, setKoKeboYsIndirim] = useState("");
+  const [koKeboTrendyol, setKoKeboTrendyol] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [koKeboTrendyolIndirim, setKoKeboTrendyolIndirim] = useState("");
+  const [koKeboMigrosYemek, setKoKeboMigrosYemek] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [koKeboAlo, setKoKeboAlo] = useState<PlatformGiris>({tutar:"",paket:""});
 
-  const [koYS, setKoYS] = useState(""); const [koGetir, setKoGetir] = useState("");
-
-  const [koTrendyol, setKoTrendyol] = useState(""); const [koMigros, setKoMigros] = useState("");
-
-  const [koAlo, setKoAlo] = useState("");
-
-  const [koChickNFride, setKoChickNFride] = useState("");
+  // ── Kapıda Ödeme — Chick'N Fride ──
+  const [koCnfYs, setKoCnfYs] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [koCnfYsIndirim, setKoCnfYsIndirim] = useState("");
+  const [koCnfTrendyol, setKoCnfTrendyol] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [koCnfTrendyolIndirim, setKoCnfTrendyolIndirim] = useState("");
+  const [koCnfMigrosYemek, setKoCnfMigrosYemek] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [koCnfAlo, setKoCnfAlo] = useState<PlatformGiris>({tutar:"",paket:""});
 
   const [kasaNakit, setKasaNakit] = useState(""); const [kasaPos, setKasaPos] = useState("");
 
-  const [kasaEdenred, setKasaEdenred] = useState("");
+  const [kasaEdenred, setKasaEdenred] = useState(""); const [kasaMetropol, setKasaMetropol] = useState("");
 
   const [giderler, setGiderler] = useState<SatirRaporu[]>([{id:Date.now(),aciklama:"",tutar:"",tip:"normal"}]);
 
-  const [iadeler, setIadeler] = useState<SatirRaporu[]>([{id:Date.now(),aciklama:"",tutar:""}]);
+  const [iadeler, setIadeler] = useState<SatirRaporu[]>([{id:Date.now(),aciklama:"",tutar:""}]); // İptal-İade Fişleri
 
-  const [kuryeler, setKuryeler] = useState<KuryeRaporu[]>([{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:""}]);
+  const [kuryeler, setKuryeler] = useState<KuryeRaporu[]>([
+    {id:1,isim:"Kurye 1",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
+    {id:2,isim:"Kurye 2",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
+    {id:3,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",tip:"havuz"},
+  ]);
 
   const [notlar, setNotlar] = useState("");
+
+  // Personel Avans / Yemek Kesintisi hızlı giriş (Giderler bölümünden) — tüm aktif personeli listeler
+  const [avansPersonelListesi, setAvansPersonelListesi] = useState<string[]>([]);
+  const [avansSatirlari, setAvansSatirlari] = useState<{id:number; personelIsim:string; tutar:string; aciklama:string}[]>([]);
+  const [kesintiSatirlari, setKesintiSatirlari] = useState<{id:number; personelIsim:string; tutar:string; aciklama:string}[]>([]);
 
 
 
@@ -1342,6 +1464,11 @@ export default function RaporlarPage() {
     const {data:personelData} = await supabase.from("personeller").select("isim").eq("durum","aktif").eq("departman","Kurye").order("isim");
 
     if (personelData?.length) setPersonelListesi(personelData.map((p:any)=>p.isim));
+
+    // Avans/Kesinti hızlı girişi için tüm aktif personel (departman farketmeksizin)
+    const {data:tumPersonelData} = await supabase.from("personeller").select("isim").eq("durum","aktif").order("isim");
+
+    if (tumPersonelData?.length) setAvansPersonelListesi(tumPersonelData.map((p:any)=>p.isim));
 
 
 
@@ -1443,19 +1570,31 @@ export default function RaporlarPage() {
 
   const formuTemizle = () => {
 
-    setOsYS("");setOsGetir("");setOsTrendyol("");setOsMigros("");setOsChickNFride("");
+    const bosPG = ():PlatformGiris=>({tutar:"",paket:""});
 
-    setKoYS("");setKoGetir("");setKoTrendyol("");setKoMigros("");setKoAlo("");setKoChickNFride("");
+    setOsKeboYs(bosPG());setOsKeboYsIndirim("");setOsKeboTrendyol(bosPG());setOsKeboTrendyolIndirim("");setOsKeboMigros(bosPG());
 
-    setKasaNakit("");setKasaPos("");setKasaEdenred("");
+    setOsCnfYs(bosPG());setOsCnfYsIndirim("");setOsCnfTrendyol(bosPG());setOsCnfTrendyolIndirim("");setOsCnfMigrosYemek(bosPG());
+
+    setKoKeboYs(bosPG());setKoKeboYsIndirim("");setKoKeboTrendyol(bosPG());setKoKeboTrendyolIndirim("");setKoKeboMigrosYemek(bosPG());setKoKeboAlo(bosPG());
+
+    setKoCnfYs(bosPG());setKoCnfYsIndirim("");setKoCnfTrendyol(bosPG());setKoCnfTrendyolIndirim("");setKoCnfMigrosYemek(bosPG());setKoCnfAlo(bosPG());
+
+    setKasaNakit("");setKasaPos("");setKasaEdenred("");setKasaMetropol("");
 
     setGiderler([{id:Date.now(),aciklama:"",tutar:"",tip:"normal"}]);
 
     setIadeler([{id:Date.now(),aciklama:"",tutar:""}]);
 
+    setAvansSatirlari([]);setKesintiSatirlari([]);
+
     setTarih("");setTarihHataVarMi(false);setAdminOnayliGecis(false);setDuplikaTarihHata(false);
 
-    setKuryeler([{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:""}]);
+    setKuryeler([
+      {id:1,isim:"Kurye 1",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
+      {id:2,isim:"Kurye 2",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
+      {id:3,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",tip:"havuz"},
+    ]);
 
     setNotlar("");setSelectedRapor(null);setIsEditMode(false);
 
@@ -1597,15 +1736,25 @@ export default function RaporlarPage() {
 
     setTarih(r.tarih); setTarihHataVarMi(false); setAdminOnayliGecis(false); setDuplikaTarihHata(false);
 
-    setOsYS(fmt(r.os_yemeksepeti)); setOsGetir(fmt(r.os_getir));
+    setOsKeboYs({tutar:fmt(r.os_kebo_ys), paket:String(r.os_kebo_ys_paket||"")}); setOsKeboYsIndirim(fmt(r.os_kebo_ys_indirim));
+    setOsKeboTrendyol({tutar:fmt(r.os_kebo_trendyol), paket:String(r.os_kebo_trendyol_paket||"")}); setOsKeboTrendyolIndirim(fmt(r.os_kebo_trendyol_indirim));
+    setOsKeboMigros({tutar:fmt(r.os_kebo_migros), paket:String(r.os_kebo_migros_paket||"")});
 
-    setOsTrendyol(fmt(r.os_trendyol)); setOsMigros(fmt(r.os_migros));
+    setOsCnfYs({tutar:fmt(r.os_cnf_ys), paket:String(r.os_cnf_ys_paket||"")}); setOsCnfYsIndirim(fmt(r.os_cnf_ys_indirim));
+    setOsCnfTrendyol({tutar:fmt(r.os_cnf_trendyol), paket:String(r.os_cnf_trendyol_paket||"")}); setOsCnfTrendyolIndirim(fmt(r.os_cnf_trendyol_indirim));
+    setOsCnfMigrosYemek({tutar:fmt(r.os_cnf_migros_yemek), paket:String(r.os_cnf_migros_yemek_paket||"")});
 
-    setKoYS(fmt(r.ko_yemeksepeti)); setKoGetir(fmt(r.ko_getir));
+    setKoKeboYs({tutar:fmt(r.ko_kebo_ys), paket:String(r.ko_kebo_ys_paket||"")}); setKoKeboYsIndirim(fmt(r.ko_kebo_ys_indirim));
+    setKoKeboTrendyol({tutar:fmt(r.ko_kebo_trendyol), paket:String(r.ko_kebo_trendyol_paket||"")}); setKoKeboTrendyolIndirim(fmt(r.ko_kebo_trendyol_indirim));
+    setKoKeboMigrosYemek({tutar:fmt(r.ko_kebo_migros_yemek), paket:String(r.ko_kebo_migros_yemek_paket||"")});
+    setKoKeboAlo({tutar:fmt(r.ko_kebo_alo), paket:String(r.ko_kebo_alo_paket||"")});
 
-    setKoTrendyol(fmt(r.ko_trendyol)); setKoMigros(fmt(r.ko_migros)); setKoAlo(fmt(r.ko_alo_paket)); setKoChickNFride(fmt(r.ko_chicknfride));
+    setKoCnfYs({tutar:fmt(r.ko_cnf_ys), paket:String(r.ko_cnf_ys_paket||"")}); setKoCnfYsIndirim(fmt(r.ko_cnf_ys_indirim));
+    setKoCnfTrendyol({tutar:fmt(r.ko_cnf_trendyol), paket:String(r.ko_cnf_trendyol_paket||"")}); setKoCnfTrendyolIndirim(fmt(r.ko_cnf_trendyol_indirim));
+    setKoCnfMigrosYemek({tutar:fmt(r.ko_cnf_migros_yemek), paket:String(r.ko_cnf_migros_yemek_paket||"")});
+    setKoCnfAlo({tutar:fmt(r.ko_cnf_alo), paket:String(r.ko_cnf_alo_paket||"")});
 
-    setKasaNakit(fmt(r.kasa_nakit)); setKasaPos(fmt(r.kasa_pos)); setKasaEdenred(fmt(r.kasa_edenred));
+    setKasaNakit(fmt(r.kasa_nakit)); setKasaPos(fmt(r.kasa_pos)); setKasaEdenred(fmt(r.kasa_edenred)); setKasaMetropol(fmt(r.kasa_metropol));
 
     setKuryeler(r.kurye_raporlari?.length
 
@@ -1701,11 +1850,30 @@ export default function RaporlarPage() {
 
   const ch = useMemo(()=>{
 
-    const tOnline=tv(osYS)+tv(osGetir)+tv(osTrendyol)+tv(osMigros)+tv(osChickNFride);
+    const pk = (p:PlatformGiris)=>parseInt(p.paket)||0;
 
-    const tKapida=tv(koYS)+tv(koGetir)+tv(koTrendyol)+tv(koMigros)+tv(koAlo)+tv(koChickNFride);
+    // ── Online ──
+    const tOnlineKebo = tv(osKeboYs.tutar)+tv(osKeboTrendyol.tutar)+tv(osKeboMigros.tutar);
+    const tOnlineCnf  = tv(osCnfYs.tutar)+tv(osCnfTrendyol.tutar)+tv(osCnfMigrosYemek.tutar);
+    const tOnline = tOnlineKebo + tOnlineCnf;
+    const tOnlinePaket = pk(osKeboYs)+pk(osKeboTrendyol)+pk(osKeboMigros)+pk(osCnfYs)+pk(osCnfTrendyol)+pk(osCnfMigrosYemek);
 
-    const tKasa=tv(kasaNakit)+tv(kasaPos)+tv(kasaEdenred);
+    // ── Kapıda Ödeme ──
+    const tKapidaKebo = tv(koKeboYs.tutar)+tv(koKeboTrendyol.tutar)+tv(koKeboMigrosYemek.tutar)+tv(koKeboAlo.tutar);
+    const tKapidaCnf  = tv(koCnfYs.tutar)+tv(koCnfTrendyol.tutar)+tv(koCnfMigrosYemek.tutar)+tv(koCnfAlo.tutar);
+    const tKapida = tKapidaKebo + tKapidaCnf;
+    const tKapidaPaket = pk(koKeboYs)+pk(koKeboTrendyol)+pk(koKeboMigrosYemek)+pk(koKeboAlo)+pk(koCnfYs)+pk(koCnfTrendyol)+pk(koCnfMigrosYemek)+pk(koCnfAlo);
+
+    // ── İndirim Analizi (Yemeksepeti + Trendyol, Kebo + CNF, online + kapıda) ──
+    const tIndirimYS = tv(osKeboYsIndirim)+tv(osCnfYsIndirim)+tv(koKeboYsIndirim)+tv(koCnfYsIndirim);
+    const tIndirimTrendyol = tv(osKeboTrendyolIndirim)+tv(osCnfTrendyolIndirim)+tv(koKeboTrendyolIndirim)+tv(koCnfTrendyolIndirim);
+    const tIndirim = tIndirimYS + tIndirimTrendyol;
+    const paketCiroToplami = tOnline + tKapida; // indirim oranı, platformlardaki brüt paket cirosuna göre
+    const indirimOrani = paketCiroToplami>0 ? (tIndirim/paketCiroToplami)*100 : 0;
+    const indirimUyari = indirimOrani > 15;
+
+    // ── Kasa ──
+    const tKasa=tv(kasaNakit)+tv(kasaPos)+tv(kasaEdenred)+tv(kasaMetropol);
 
     const tGider=giderler.reduce((a,g)=>a+tv(g.tutar),0);
 
@@ -1715,17 +1883,30 @@ export default function RaporlarPage() {
 
     const netCiro  = brutCiro - tGider - tIade; // matematiksel: tOnline + tKasa - tIade
 
-    const tKuryePaket=kuryeler.reduce((a,k)=>a+(parseInt(k.paketSayisi)||0),0);
-
+    // ── Kuryeler: sabit (Roadrunner) kuryede min. 30 paket garantisi, havuzda garanti yok ──
+    const KURYE_GARANTI = 30;
+    const kuryelerHesap = kuryeler.map(k=>{
+      const gercek = parseInt(k.paketSayisi)||0;
+      const uygulanan = k.tip==="havuz" ? gercek : Math.max(gercek, KURYE_GARANTI);
+      return { ...k, gercekPaket:gercek, uygulananPaket:uygulanan, garantiUygulandi: k.tip!=="havuz" && gercek<KURYE_GARANTI };
+    });
+    const tKuryePaket=kuryelerHesap.reduce((a,k)=>a+k.uygulananPaket,0);
+    const tKuryeGercekPaket=kuryelerHesap.reduce((a,k)=>a+k.gercekPaket,0);
     const tKuryeTahsilat=kuryeler.reduce((a,k)=>a+tv(k.nakit)+tv(k.pos),0);
 
     const paketOrt=(tOnline+tKapida)>0&&tKuryePaket>0?Math.round((tOnline+tKapida)/tKuryePaket):0;
 
     const kuryeFark=tKapida-tKuryeTahsilat;
 
-    return {tOnline,tKapida,tKasa,brutCiro,tGider,tIade,netCiro,tKuryePaket,tKuryeTahsilat,paketOrt,kuryeFark};
+    return {tOnline,tOnlineKebo,tOnlineCnf,tOnlinePaket,tKapida,tKapidaKebo,tKapidaCnf,tKapidaPaket,
+      tIndirimYS,tIndirimTrendyol,tIndirim,indirimOrani,indirimUyari,
+      tKasa,brutCiro,tGider,tIade,netCiro,kuryelerHesap,tKuryePaket,tKuryeGercekPaket,tKuryeTahsilat,paketOrt,kuryeFark};
 
-  },[osYS,osGetir,osTrendyol,osMigros,osChickNFride,koYS,koGetir,koTrendyol,koMigros,koAlo,koChickNFride,kasaNakit,kasaPos,kasaEdenred,giderler,iadeler,kuryeler]);
+  },[osKeboYs,osKeboYsIndirim,osKeboTrendyol,osKeboTrendyolIndirim,osKeboMigros,
+     osCnfYs,osCnfYsIndirim,osCnfTrendyol,osCnfTrendyolIndirim,osCnfMigrosYemek,
+     koKeboYs,koKeboYsIndirim,koKeboTrendyol,koKeboTrendyolIndirim,koKeboMigrosYemek,koKeboAlo,
+     koCnfYs,koCnfYsIndirim,koCnfTrendyol,koCnfTrendyolIndirim,koCnfMigrosYemek,koCnfAlo,
+     kasaNakit,kasaPos,kasaEdenred,kasaMetropol,giderler,iadeler,kuryeler]);
 
 
 
@@ -1779,7 +1960,7 @@ export default function RaporlarPage() {
 
 
 
-  const kuryeEkle = ()=>setKuryeler([...kuryeler,{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:""}]);
+  const kuryeEkle = ()=>setKuryeler([...kuryeler,{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:"",tip:"havuz"}]);
 
   const kuryeSil = (id:number)=>setKuryeler(kuryeler.filter(k=>k.id!==id));
 
@@ -1973,11 +2154,40 @@ Soru: ${soruFinal}`
 
         tarih,
 
-        os_yemeksepeti:tv(osYS), os_getir:tv(osGetir), os_trendyol:tv(osTrendyol), os_migros:tv(osMigros), os_chicknfride:tv(osChickNFride),
+        // Legacy alanlar: eski rapor-analiz / dashboard ekranları bozulmasın diye
+        // marka bazlı yeni alanların toplamıyla dolduruluyor (Getir artık formda yok -> 0).
+        os_yemeksepeti:tv(osKeboYs.tutar)+tv(osCnfYs.tutar), os_getir:0,
+        os_trendyol:tv(osKeboTrendyol.tutar)+tv(osCnfTrendyol.tutar),
+        os_migros:tv(osKeboMigros.tutar)+tv(osCnfMigrosYemek.tutar), os_chicknfride:ch.tOnlineCnf,
 
-        ko_yemeksepeti:tv(koYS), ko_getir:tv(koGetir), ko_trendyol:tv(koTrendyol), ko_migros:tv(koMigros), ko_alo_paket:tv(koAlo), ko_chicknfride:tv(koChickNFride),
+        ko_yemeksepeti:tv(koKeboYs.tutar)+tv(koCnfYs.tutar), ko_getir:0,
+        ko_trendyol:tv(koKeboTrendyol.tutar)+tv(koCnfTrendyol.tutar),
+        ko_migros:tv(koKeboMigrosYemek.tutar)+tv(koCnfMigrosYemek.tutar),
+        ko_alo_paket:tv(koKeboAlo.tutar)+tv(koCnfAlo.tutar), ko_chicknfride:ch.tKapidaCnf,
 
-        kasa_nakit:tv(kasaNakit), kasa_pos:tv(kasaPos), kasa_edenred:tv(kasaEdenred),
+        // Online — Kebo
+        os_kebo_ys:tv(osKeboYs.tutar), os_kebo_ys_paket:parseInt(osKeboYs.paket)||0, os_kebo_ys_indirim:tv(osKeboYsIndirim),
+        os_kebo_trendyol:tv(osKeboTrendyol.tutar), os_kebo_trendyol_paket:parseInt(osKeboTrendyol.paket)||0, os_kebo_trendyol_indirim:tv(osKeboTrendyolIndirim),
+        os_kebo_migros:tv(osKeboMigros.tutar), os_kebo_migros_paket:parseInt(osKeboMigros.paket)||0,
+
+        // Online — Chick'N Fride
+        os_cnf_ys:tv(osCnfYs.tutar), os_cnf_ys_paket:parseInt(osCnfYs.paket)||0, os_cnf_ys_indirim:tv(osCnfYsIndirim),
+        os_cnf_trendyol:tv(osCnfTrendyol.tutar), os_cnf_trendyol_paket:parseInt(osCnfTrendyol.paket)||0, os_cnf_trendyol_indirim:tv(osCnfTrendyolIndirim),
+        os_cnf_migros_yemek:tv(osCnfMigrosYemek.tutar), os_cnf_migros_yemek_paket:parseInt(osCnfMigrosYemek.paket)||0,
+
+        // Kapıda Ödeme — Kebo
+        ko_kebo_ys:tv(koKeboYs.tutar), ko_kebo_ys_paket:parseInt(koKeboYs.paket)||0, ko_kebo_ys_indirim:tv(koKeboYsIndirim),
+        ko_kebo_trendyol:tv(koKeboTrendyol.tutar), ko_kebo_trendyol_paket:parseInt(koKeboTrendyol.paket)||0, ko_kebo_trendyol_indirim:tv(koKeboTrendyolIndirim),
+        ko_kebo_migros_yemek:tv(koKeboMigrosYemek.tutar), ko_kebo_migros_yemek_paket:parseInt(koKeboMigrosYemek.paket)||0,
+        ko_kebo_alo:tv(koKeboAlo.tutar), ko_kebo_alo_paket:parseInt(koKeboAlo.paket)||0,
+
+        // Kapıda Ödeme — Chick'N Fride
+        ko_cnf_ys:tv(koCnfYs.tutar), ko_cnf_ys_paket:parseInt(koCnfYs.paket)||0, ko_cnf_ys_indirim:tv(koCnfYsIndirim),
+        ko_cnf_trendyol:tv(koCnfTrendyol.tutar), ko_cnf_trendyol_paket:parseInt(koCnfTrendyol.paket)||0, ko_cnf_trendyol_indirim:tv(koCnfTrendyolIndirim),
+        ko_cnf_migros_yemek:tv(koCnfMigrosYemek.tutar), ko_cnf_migros_yemek_paket:parseInt(koCnfMigrosYemek.paket)||0,
+        ko_cnf_alo:tv(koCnfAlo.tutar), ko_cnf_alo_paket:parseInt(koCnfAlo.paket)||0,
+
+        kasa_nakit:tv(kasaNakit), kasa_pos:tv(kasaPos), kasa_edenred:tv(kasaEdenred), kasa_metropol:tv(kasaMetropol),
 
         gunluk_gider:ch.tGider, gider_aciklama:giderAciklamaFinal,
 
@@ -2041,21 +2251,24 @@ Soru: ${soruFinal}`
 
       const PLATFORM_GECIKME: Record<string, number> = {
 
-        "Yemeksepeti": 14, "Getir": 7, "Trendyol": 14, "Migros": 15, "Alo Paket": 2,
+        "Yemeksepeti (Kebo)": 14, "Yemeksepeti (Chick'N Fride)": 14,
+        "Trendyol (Kebo)": 14, "Trendyol (Chick'N Fride)": 14,
+        "Migros (Kebo)": 15, "Migros Yemek (Chick'N Fride)": 15,
+        "Alo Paket (Kebo)": 2, "Alo Paket (Chick'N Fride)": 2,
 
       };
 
+      // Marka bazlı ayrım korunuyor — her marka platformda ayrı hesap/tahsilat olarak takip edilir.
       const platformSatislar = [
 
-        { platform: "Yemeksepeti", tutar: tv(osYS) + tv(koYS) },
-
-        { platform: "Getir",       tutar: tv(osGetir) + tv(koGetir) },
-
-        { platform: "Trendyol",    tutar: tv(osTrendyol) + tv(koTrendyol) },
-
-        { platform: "Migros",      tutar: tv(osMigros) + tv(koMigros) },
-
-        { platform: "Alo Paket",   tutar: tv(koAlo) },
+        { platform: "Yemeksepeti (Kebo)",           tutar: tv(osKeboYs.tutar) + tv(koKeboYs.tutar) },
+        { platform: "Yemeksepeti (Chick'N Fride)",  tutar: tv(osCnfYs.tutar) + tv(koCnfYs.tutar) },
+        { platform: "Trendyol (Kebo)",               tutar: tv(osKeboTrendyol.tutar) + tv(koKeboTrendyol.tutar) },
+        { platform: "Trendyol (Chick'N Fride)",     tutar: tv(osCnfTrendyol.tutar) + tv(koCnfTrendyol.tutar) },
+        { platform: "Migros (Kebo)",                 tutar: tv(osKeboMigros.tutar) + tv(koKeboMigrosYemek.tutar) },
+        { platform: "Migros Yemek (Chick'N Fride)", tutar: tv(osCnfMigrosYemek.tutar) + tv(koCnfMigrosYemek.tutar) },
+        { platform: "Alo Paket (Kebo)",              tutar: tv(koKeboAlo.tutar) },
+        { platform: "Alo Paket (Chick'N Fride)",    tutar: tv(koCnfAlo.tutar) },
 
       ];
 
@@ -2117,7 +2330,22 @@ Soru: ${soruFinal}`
 
       }
 
-
+      // Personel Avans / Yemek Kesintisi — ilgili personelin profiline (avanslar/kesintiler tabloları) işlenir
+      for (const a of avansSatirlari) {
+        if (!a.personelIsim || !tv(a.tutar)) continue;
+        await supabase.from("avanslar").insert({
+          personel_isim: a.personelIsim, tutar: tv(a.tutar), tarih,
+          odeme_yontemi: "Nakit Kasa", kasa_kaynagi: "Nakit Kasa",
+          aciklama: a.aciklama || `Günlük rapor — ${fmtTarih(tarih)}`,
+        });
+      }
+      for (const k of kesintiSatirlari) {
+        if (!k.personelIsim || !tv(k.tutar)) continue;
+        await supabase.from("kesintiler").insert({
+          personel_isim: k.personelIsim, tutar: tv(k.tutar), tarih,
+          aciklama: k.aciklama || `Günlük rapor — ${fmtTarih(tarih)}`,
+        });
+      }
 
       formuTemizle(); setFormAcik(false); veriCek();
 
@@ -2141,17 +2369,21 @@ Soru: ${soruFinal}`
 
   const platformOzetSatirlar = [
 
-    { label: "Yemeksepeti", online: tv(osYS), kapida: tv(koYS), color: "#FF6B35" },
+    { label: "Kebo · Yemeksepeti",  online: tv(osKeboYs.tutar), kapida: tv(koKeboYs.tutar), color: "#FF6B35" },
 
-    { label: "Getir",       online: tv(osGetir), kapida: tv(koGetir), color: "#8B5CF6" },
+    { label: "Kebo · Trendyol",     online: tv(osKeboTrendyol.tutar), kapida: tv(koKeboTrendyol.tutar), color: "#F97316" },
 
-    { label: "Trendyol",    online: tv(osTrendyol), kapida: tv(koTrendyol), color: "#F97316" },
+    { label: "Kebo · Migros",       online: tv(osKeboMigros.tutar), kapida: tv(koKeboMigrosYemek.tutar), color: "#10B981" },
 
-    { label: "Migros",      online: tv(osMigros), kapida: tv(koMigros), color: "#10B981" },
+    { label: "Kebo · Alo Paket",    online: 0, kapida: tv(koKeboAlo.tutar), color: "#3B82F6" },
 
-    { label: "Alo Paket",   online: 0, kapida: tv(koAlo), color: "#3B82F6" },
+    { label: "CNF · Yemeksepeti",   online: tv(osCnfYs.tutar), kapida: tv(koCnfYs.tutar), color: "#FDBA74" },
 
-    { label: "Chick'N Fride", online: tv(osChickNFride), kapida: tv(koChickNFride), color: "#EF4444" },
+    { label: "CNF · Trendyol",      online: tv(osCnfTrendyol.tutar), kapida: tv(koCnfTrendyol.tutar), color: "#FB923C" },
+
+    { label: "CNF · Migros Yemek",  online: tv(osCnfMigrosYemek.tutar), kapida: tv(koCnfMigrosYemek.tutar), color: "#EF4444" },
+
+    { label: "CNF · Alo Paket",     online: 0, kapida: tv(koCnfAlo.tutar), color: "#F87171" },
 
   ].filter(p => p.online + p.kapida > 0);
 
@@ -2351,98 +2583,112 @@ Soru: ${soruFinal}`
 
 
 
-            {/* CİRO GİRİŞLERİ: 3 kolon */}
+            {/* CİRO GİRİŞLERİ: Online / Kapıda Ödeme (Kebo + Chick'N Fride) + Kasa */}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
-
-
+              {/* ── ONLINE ── */}
               <div className="rounded-xl border border-blue-500/15 bg-[#0c0f1a] overflow-hidden">
-
                 <div className="px-3 py-2 border-b border-blue-500/15 flex items-center justify-between">
-
                   <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider flex items-center gap-1.5"><Monitor size={11}/>Online</span>
-
-                  <span className="text-xs font-black text-blue-400">₺{fmt(ch.tOnline)}</span>
-
+                  <span className="text-xs font-black text-blue-400">₺{fmt(ch.tOnline)} <span className="text-gray-600 font-normal">· {ch.tOnlinePaket} pkt</span></span>
                 </div>
-
-                <div className="p-3 space-y-2">
-
-                  <CurrencyInput label="Yemeksepeti" value={osYS} onChange={setOsYS} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Getir" value={osGetir} onChange={setOsGetir} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Trendyol" value={osTrendyol} onChange={setOsTrendyol} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Migros" value={osMigros} onChange={setOsMigros} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Chick'N Fride" value={osChickNFride} onChange={setOsChickNFride} disabled={isReadOnly}/>
-
-                </div>
-
-              </div>
-
-
-
-              <div className="rounded-xl border border-purple-500/15 bg-[#0c0f1a] overflow-hidden">
-
-                <div className="px-3 py-2 border-b border-purple-500/15 flex items-center justify-between">
-
-                  <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider flex items-center gap-1.5"><Home size={11}/>Kapıda Ödeme</span>
-
-                  <div className="flex items-center gap-1.5">
-
-                    <span className="text-[9px] text-purple-600 bg-purple-500/10 px-1.5 py-0.5 rounded-full">Kasaya dahil</span>
-
-                    <span className="text-xs font-black text-purple-400">₺{fmt(ch.tKapida)}</span>
-
+                <div className="p-3 space-y-3">
+                  <div>
+                    <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1.5">Kebo</p>
+                    <div className="space-y-1.5">
+                      <PlatformSatir label="Yemeksepeti" value={osKeboYs} onChange={setOsKeboYs} indirim={osKeboYsIndirim} onIndirimChange={setOsKeboYsIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Trendyol" value={osKeboTrendyol} onChange={setOsKeboTrendyol} indirim={osKeboTrendyolIndirim} onIndirimChange={setOsKeboTrendyolIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Migros" value={osKeboMigros} onChange={setOsKeboMigros} disabled={isReadOnly}/>
+                    </div>
                   </div>
-
+                  <div>
+                    <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1.5">Chick'N Fride</p>
+                    <div className="space-y-1.5">
+                      <PlatformSatir label="Yemeksepeti" value={osCnfYs} onChange={setOsCnfYs} indirim={osCnfYsIndirim} onIndirimChange={setOsCnfYsIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Trendyol" value={osCnfTrendyol} onChange={setOsCnfTrendyol} indirim={osCnfTrendyolIndirim} onIndirimChange={setOsCnfTrendyolIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Migros Yemek" value={osCnfMigrosYemek} onChange={setOsCnfMigrosYemek} disabled={isReadOnly}/>
+                    </div>
+                  </div>
                 </div>
-
-                <div className="p-3 space-y-2">
-
-                  <CurrencyInput label="YS Kapıda" value={koYS} onChange={setKoYS} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Getir Kapıda" value={koGetir} onChange={setKoGetir} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Trendyol" value={koTrendyol} onChange={setKoTrendyol} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Migros" value={koMigros} onChange={setKoMigros} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Alo Paket" value={koAlo} onChange={setKoAlo} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Chick'N Fride" value={koChickNFride} onChange={setKoChickNFride} disabled={isReadOnly}/>
-
-                </div>
-
               </div>
 
-
-
-              <div className="rounded-xl border border-emerald-500/15 bg-[#0c0f1a] overflow-hidden">
-
-                <div className="px-3 py-2 border-b border-emerald-500/15 flex items-center justify-between">
-
-                  <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5"><Wallet size={11}/>Fiziki Kasa</span>
-
-                  <span className="text-xs font-black text-emerald-400">₺{fmt(ch.tKasa)}</span>
-
+              {/* ── KAPIDA ÖDEME ── */}
+              <div className="rounded-xl border border-purple-500/15 bg-[#0c0f1a] overflow-hidden">
+                <div className="px-3 py-2 border-b border-purple-500/15 flex items-center justify-between">
+                  <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider flex items-center gap-1.5"><Home size={11}/>Kapıda Ödeme</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] text-purple-600 bg-purple-500/10 px-1.5 py-0.5 rounded-full">Kasaya dahil</span>
+                    <span className="text-xs font-black text-purple-400">₺{fmt(ch.tKapida)} <span className="text-gray-600 font-normal">· {ch.tKapidaPaket} pkt</span></span>
+                  </div>
                 </div>
-
-                <div className="p-3 space-y-2">
-
-                  <CurrencyInput label="Nakit" value={kasaNakit} onChange={setKasaNakit} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="POS / Kart" value={kasaPos} onChange={setKasaPos} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Edenred" value={kasaEdenred} onChange={setKasaEdenred} disabled={isReadOnly}/>
-
+                <div className="p-3 space-y-3">
+                  <div>
+                    <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1.5">Kebo</p>
+                    <div className="space-y-1.5">
+                      <PlatformSatir label="Yemeksepeti" value={koKeboYs} onChange={setKoKeboYs} indirim={koKeboYsIndirim} onIndirimChange={setKoKeboYsIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Trendyol" value={koKeboTrendyol} onChange={setKoKeboTrendyol} indirim={koKeboTrendyolIndirim} onIndirimChange={setKoKeboTrendyolIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Migros Yemek" value={koKeboMigrosYemek} onChange={setKoKeboMigrosYemek} disabled={isReadOnly}/>
+                      <PlatformSatir label="Alo Paket" value={koKeboAlo} onChange={setKoKeboAlo} disabled={isReadOnly}/>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1.5">Chick'N Fride</p>
+                    <div className="space-y-1.5">
+                      <PlatformSatir label="Yemeksepeti" value={koCnfYs} onChange={setKoCnfYs} indirim={koCnfYsIndirim} onIndirimChange={setKoCnfYsIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Trendyol" value={koCnfTrendyol} onChange={setKoCnfTrendyol} indirim={koCnfTrendyolIndirim} onIndirimChange={setKoCnfTrendyolIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Migros Yemek" value={koCnfMigrosYemek} onChange={setKoCnfMigrosYemek} disabled={isReadOnly}/>
+                      <PlatformSatir label="Alo Paket" value={koCnfAlo} onChange={setKoCnfAlo} disabled={isReadOnly}/>
+                    </div>
+                  </div>
                 </div>
-
               </div>
 
+            </div>
+
+            {/* ── KASA ── */}
+            <div className="rounded-xl border border-emerald-500/15 bg-[#0c0f1a] overflow-hidden">
+              <div className="px-3 py-2 border-b border-emerald-500/15 flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5"><Wallet size={11}/>Kasa</span>
+                <span className="text-xs font-black text-emerald-400">₺{fmt(ch.tKasa)}</span>
+              </div>
+              <div className="p-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+                <CurrencyInput label="Nakit" value={kasaNakit} onChange={setKasaNakit} disabled={isReadOnly}/>
+                <CurrencyInput label="Pos" value={kasaPos} onChange={setKasaPos} disabled={isReadOnly}/>
+                <CurrencyInput label="Edenred" value={kasaEdenred} onChange={setKasaEdenred} disabled={isReadOnly}/>
+                <CurrencyInput label="Metropol" value={kasaMetropol} onChange={setKasaMetropol} disabled={isReadOnly}/>
+              </div>
+              <p className="px-3 pb-2.5 text-[10px] text-gray-600">Gider için aşağıdaki <span className="text-gray-400 font-semibold">Giderler</span> bölümünü kullan — kasadan çıkan her giderin açıklamasını orada satır satır girebilirsin.</p>
+            </div>
+
+            {/* ── İNDİRİM ANALİZİ ── */}
+            <div className={`rounded-xl border overflow-hidden ${ch.indirimUyari ? "border-red-500/40 bg-red-500/5" : "border-[#1a2236] bg-[#0c0f1a]"}`}>
+              <div className="px-3 py-2 border-b border-[#1a2236] flex items-center justify-between">
+                <span className={`text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5 ${ch.indirimUyari?"text-red-400":"text-gray-400"}`}>
+                  <Percent size={11}/>İndirim Analizi
+                </span>
+                <span className={`text-xs font-black ${ch.indirimUyari?"text-red-400":"text-white"}`}>%{ch.indirimOrani.toFixed(1)}</span>
+              </div>
+              <div className="p-3 grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-[9px] text-gray-600 uppercase tracking-widest">Yemeksepeti İndirim</p>
+                  <p className="text-sm font-black text-red-400">₺{fmt(ch.tIndirimYS)}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-gray-600 uppercase tracking-widest">Trendyol İndirim</p>
+                  <p className="text-sm font-black text-red-400">₺{fmt(ch.tIndirimTrendyol)}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-gray-600 uppercase tracking-widest">Toplam İndirim</p>
+                  <p className="text-sm font-black text-white">₺{fmt(ch.tIndirim)}</p>
+                </div>
+              </div>
+              {ch.indirimUyari && (
+                <div className="mx-3 mb-3 flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+                  <AlertTriangle size={13} className="text-red-400 shrink-0"/>
+                  <p className="text-[11px] text-red-300">İndirim oranı platform cirosunun <span className="font-black">%15'ini</span> geçti — kontrol et.</p>
+                </div>
+              )}
             </div>
 
 
@@ -2679,7 +2925,70 @@ Soru: ${soruFinal}`
 
               <div className="space-y-3">
 
-
+                {/* Personel Avans / Yemek Kesintisi */}
+                <div className="rounded-xl border border-teal-500/15 bg-[#0c0f1a] overflow-hidden">
+                  <div className="px-3 py-2 border-b border-teal-500/15 flex items-center justify-between">
+                    <span className="text-[10px] font-semibold text-teal-400 uppercase tracking-wider flex items-center gap-1.5"><Users2 size={11}/>Personel Avans / Yemek Kesintisi</span>
+                    {!isReadOnly && (
+                      <div className="flex items-center gap-1.5">
+                        <button type="button" onClick={()=>setAvansSatirlari([...avansSatirlari,{id:Date.now(),personelIsim:"",tutar:"",aciklama:""}])}
+                          className="text-[10px] text-gray-600 hover:text-amber-400 border border-[#1a2236] hover:border-amber-500/30 px-2 py-0.5 rounded transition-colors">+ Avans</button>
+                        <button type="button" onClick={()=>setKesintiSatirlari([...kesintiSatirlari,{id:Date.now(),personelIsim:"",tutar:"",aciklama:"Yemek"}])}
+                          className="text-[10px] text-gray-600 hover:text-red-400 border border-[#1a2236] hover:border-red-500/30 px-2 py-0.5 rounded transition-colors">+ Kesinti</button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3 space-y-3">
+                    {avansSatirlari.length===0 && kesintiSatirlari.length===0 && (
+                      <p className="text-[10px] text-gray-600 text-center py-2">Bu raporda personel avans/kesintisi girilmedi.</p>
+                    )}
+                    {avansSatirlari.length>0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-[9px] text-amber-500 uppercase tracking-wider font-bold">Avans</p>
+                        {avansSatirlari.map(a=>(
+                          <div key={a.id} className="grid grid-cols-12 gap-1.5">
+                            <select disabled={isReadOnly} value={a.personelIsim}
+                              onChange={e=>setAvansSatirlari(avansSatirlari.map(x=>x.id===a.id?{...x,personelIsim:e.target.value}:x))}
+                              className="col-span-6 bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2 outline-none focus:border-amber-500/40 disabled:opacity-40">
+                              <option value="">Personel seç...</option>
+                              {avansPersonelListesi.map((p,i)=>(<option key={i} value={p}>{p}</option>))}
+                            </select>
+                            <div className="col-span-5 relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-[10px]">₺</span>
+                              <input type="text" placeholder="0" disabled={isReadOnly} value={a.tutar}
+                                onChange={e=>setAvansSatirlari(avansSatirlari.map(x=>x.id===a.id?{...x,tutar:fmtStr(e.target.value)}:x))}
+                                className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-amber-500/40 disabled:opacity-40"/>
+                            </div>
+                            {!isReadOnly && <button type="button" onClick={()=>setAvansSatirlari(avansSatirlari.filter(x=>x.id!==a.id))} className="col-span-1 text-gray-700 hover:text-red-400 flex items-center justify-center"><Trash2 size={11}/></button>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {kesintiSatirlari.length>0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-[9px] text-red-500 uppercase tracking-wider font-bold">Yemek / Diğer Kesinti</p>
+                        {kesintiSatirlari.map(k=>(
+                          <div key={k.id} className="grid grid-cols-12 gap-1.5">
+                            <select disabled={isReadOnly} value={k.personelIsim}
+                              onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,personelIsim:e.target.value}:x))}
+                              className="col-span-6 bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2 outline-none focus:border-red-500/40 disabled:opacity-40">
+                              <option value="">Personel seç...</option>
+                              {avansPersonelListesi.map((p,i)=>(<option key={i} value={p}>{p}</option>))}
+                            </select>
+                            <div className="col-span-5 relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-[10px]">₺</span>
+                              <input type="text" placeholder="0" disabled={isReadOnly} value={k.tutar}
+                                onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,tutar:fmtStr(e.target.value)}:x))}
+                                className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-red-500/40 disabled:opacity-40"/>
+                            </div>
+                            {!isReadOnly && <button type="button" onClick={()=>setKesintiSatirlari(kesintiSatirlari.filter(x=>x.id!==k.id))} className="col-span-1 text-gray-700 hover:text-red-400 flex items-center justify-center"><Trash2 size={11}/></button>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[9px] text-gray-600">Kaydedince ilgili personelin profilindeki Avans/Kesinti geçmişine otomatik işlenir; ay sonu maaş hesabında oradan görünür.</p>
+                  </div>
+                </div>
 
                 {/* İadeler */}
 
@@ -2687,7 +2996,7 @@ Soru: ${soruFinal}`
 
                   <div className="px-3 py-2 border-b border-orange-500/15 flex items-center justify-between">
 
-                    <span className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider flex items-center gap-1.5"><RotateCcw size={11}/>İade</span>
+                    <span className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider flex items-center gap-1.5"><RotateCcw size={11}/>İptal-İade Fişleri</span>
 
                     <div className="flex items-center gap-1.5">
 
@@ -2705,7 +3014,7 @@ Soru: ${soruFinal}`
 
                       <div key={item.id} className="space-y-1.5">
 
-                        <input type="text" placeholder="İptal sebebi..." disabled={isReadOnly} value={item.aciklama}
+                        <input type="text" placeholder="İptal / iade fiş açıklaması..." disabled={isReadOnly} value={item.aciklama}
 
                           onChange={e=>iadeDegistir(item.id,"aciklama",e.target.value)}
 
@@ -2747,7 +3056,7 @@ Soru: ${soruFinal}`
 
                   <div className="px-3 py-2 border-b border-amber-500/15 flex items-center justify-between">
 
-                    <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5"><Bike size={11}/>Kurye Mutabakatı</span>
+                    <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5"><Truck size={11}/>Kurye (Roadrunner)</span>
 
                     <div className="flex items-center gap-2">
 
@@ -2759,7 +3068,7 @@ Soru: ${soruFinal}`
 
                       }
 
-                      {!isReadOnly && <button type="button" onClick={kuryeEkle} className="text-[10px] text-gray-600 hover:text-amber-400 border border-[#1a2236] hover:border-amber-500/30 px-2 py-0.5 rounded transition-colors">+ Kurye</button>}
+                      {!isReadOnly && <button type="button" onClick={kuryeEkle} className="text-[10px] text-gray-600 hover:text-amber-400 border border-[#1a2236] hover:border-amber-500/30 px-2 py-0.5 rounded transition-colors">+ Havuz Kurye</button>}
 
                     </div>
 
@@ -2767,11 +3076,13 @@ Soru: ${soruFinal}`
 
                   <div className="p-3 space-y-3">
 
+                    <p className="text-[10px] text-gray-600">Sabit kuryede (Roadrunner) günlük en az <span className="text-amber-400 font-bold">30 paket</span> garantisi var — altında kalınırsa ödemede 30 esas alınır. Havuz kuryede garanti yok.</p>
+
                     <div className="grid grid-cols-12 gap-1.5">
 
-                      <div className="col-span-4 text-[9px] text-gray-600 uppercase tracking-wider">Kurye</div>
+                      <div className="col-span-3 text-[9px] text-gray-600 uppercase tracking-wider">Kurye</div>
 
-                      <div className="col-span-2 text-[9px] text-gray-600 uppercase tracking-wider text-center">Paket</div>
+                      <div className="col-span-3 text-[9px] text-gray-600 uppercase tracking-wider text-center">Gerçek / Esas Paket</div>
 
                       <div className="col-span-3 text-[9px] text-amber-600 uppercase tracking-wider">Nakit</div>
 
@@ -2779,9 +3090,9 @@ Soru: ${soruFinal}`
 
                     </div>
 
-                    {kuryeler.map((k)=>{
+                    {ch.kuryelerHesap.map((k)=>{
 
-                      const secilenler=kuryeler.filter(x=>x.id!==k.id&&x.isim).map(x=>x.isim);
+                      const sabit = k.tip!=="havuz";
 
                       return (
 
@@ -2789,53 +3100,73 @@ Soru: ${soruFinal}`
 
                           <div className="grid grid-cols-12 gap-1.5 items-center">
 
-                            <div className="col-span-4">
+                            <div className="col-span-3">
 
                               {isReadOnly ? (
 
-                                <div className="bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2 flex items-center">
+                                <div className="bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2 flex items-center gap-1">
 
-                                  {k.isim || "—"}
+                                  {sabit && <Truck size={9} className="text-amber-500 shrink-0"/>}{k.isim || "—"}
 
                                 </div>
 
                               ) : (
 
-                                <select disabled={isReadOnly} value={k.isim} onChange={e=>kuryeDegistir(k.id,"isim",e.target.value)}
+                                <div className="relative">
 
-                                  className="w-full bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2 outline-none focus:border-blue-500/40 disabled:opacity-40">
+                                  {sabit && <Truck size={9} className="absolute left-2 top-1/2 -translate-y-1/2 text-amber-500"/>}
 
-                                  <option value="">Seçiniz...</option>
+                                  <input type="text" placeholder={sabit?"Kurye adı":"Havuz kurye / firma"} disabled={isReadOnly} value={k.isim}
 
-                                  {personelListesi.map((p,i)=>(
+                                    onChange={e=>kuryeDegistir(k.id,"isim",e.target.value)}
 
-                                    <option key={i} value={p} disabled={secilenler.includes(p)}>{p}{secilenler.includes(p)?" ✓":""}</option>
+                                    className={`w-full bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg ${sabit?"pl-6":"pl-2"} pr-2 outline-none focus:border-amber-500/40 disabled:opacity-40`}/>
 
-                                  ))}
-
-                                </select>
+                                </div>
 
                               )}
 
                             </div>
 
-                            <div className="col-span-2">
+                            <div className="col-span-3">
 
-                              {isReadOnly ? (
+                              <div className="flex items-center gap-1">
 
-                                <div className="bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs font-bold rounded-lg flex items-center justify-center">
+                                {isReadOnly ? (
 
-                                  {k.paketSayisi || "0"}
+                                  <div className="flex-1 bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs font-bold rounded-lg flex items-center justify-center">
 
-                                </div>
+                                    {k.gercekPaket}
 
-                              ) : (
+                                  </div>
 
-                                <input type="number" placeholder="0" disabled={isReadOnly} value={k.paketSayisi}
+                                ) : (
 
-                                  onChange={e=>kuryeDegistir(k.id,"paketSayisi",e.target.value)}
+                                  <input type="number" placeholder="0" disabled={isReadOnly} value={k.paketSayisi}
 
-                                  className="w-full bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs font-bold px-2 rounded-lg outline-none disabled:opacity-40 text-center"/>
+                                    onChange={e=>kuryeDegistir(k.id,"paketSayisi",e.target.value)}
+
+                                    className="flex-1 w-0 bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs font-bold px-2 rounded-lg outline-none disabled:opacity-40 text-center"/>
+
+                                )}
+
+                                {sabit && (
+
+                                  <span title="Ödemede esas alınan paket (garanti uygulandıysa)"
+
+                                    className={`shrink-0 w-9 h-7 flex items-center justify-center text-[10px] font-black rounded-lg border ${k.garantiUygulandi ? "border-amber-500/40 bg-amber-500/10 text-amber-300" : "border-[#1a2236] text-gray-600"}`}>
+
+                                    {k.uygulananPaket}
+
+                                  </span>
+
+                                )}
+
+                              </div>
+
+                              {sabit && k.garantiUygulandi && (
+
+                                <p className="text-[9px] text-amber-500 mt-0.5">Garanti uygulandı (30)</p>
 
                               )}
 
@@ -2899,7 +3230,7 @@ Soru: ${soruFinal}`
 
                           </div>
 
-                          {!isReadOnly && kuryeler.length>1 && (
+                          {!isReadOnly && k.tip==="havuz" && (
 
                             <button type="button" onClick={()=>kuryeSil(k.id)}
 
@@ -2916,6 +3247,14 @@ Soru: ${soruFinal}`
                       );
 
                     })}
+
+                    <div className="pt-1 border-t border-[#1a2236] flex items-center justify-between text-[10px]">
+
+                      <span className="text-gray-600">Gerçek toplam: <span className="text-gray-300 font-bold">{ch.tKuryeGercekPaket} pkt</span></span>
+
+                      <span className="text-gray-600">Ödemeye esas toplam: <span className="text-amber-400 font-bold">{ch.tKuryePaket} pkt</span></span>
+
+                    </div>
 
                   </div>
 
