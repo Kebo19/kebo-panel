@@ -288,21 +288,21 @@ function EksikRaporBanner({enSonRaporTarihi, onEkle}: {enSonRaporTarihi:string|n
 
   return (
 
-    <div className="relative overflow-hidden rounded-2xl border border-red-500/20 bg-[#130a0a] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="relative overflow-hidden rounded-2xl border border-red-500/20 bg-[#fef2f2] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 
-      <div className="absolute inset-0 bg-gradient-to-r from-red-950/30 to-transparent pointer-events-none"/>
+      <div className="absolute inset-0 bg-gradient-to-r from-red-100/60 to-transparent pointer-events-none"/>
 
       <div className="relative flex items-start gap-3">
 
         <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 shrink-0">
 
-          <Bell className="h-4 w-4 text-red-400 animate-pulse"/>
+          <Bell className="h-4 w-4 text-red-600 animate-pulse"/>
 
         </div>
 
         <div>
 
-          <p className="text-xs font-bold text-red-400 uppercase tracking-widest">{eksik.length} Günlük Rapor Eksik</p>
+          <p className="text-xs font-bold text-red-600 uppercase tracking-widest">{eksik.length} Günlük Rapor Eksik</p>
 
           <p className="text-[11px] text-gray-500 mt-0.5">
 
@@ -500,9 +500,9 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
             tooltip:{
 
-              backgroundColor:"#0f1623", borderColor:"#1e2a3a", borderWidth:1,
+              backgroundColor:"#ffffff", borderColor:"#d8dde5", borderWidth:1,
 
-              titleColor:"#94a3b8", bodyColor:"#e2e8f0",
+              titleColor:"#5a6478", bodyColor:"#1a1f2e",
 
               callbacks:{label:(ctx:any)=>ctx.parsed.y===0?`${ctx.dataset.label}: Rapor yok`:`${ctx.dataset.label}: ₺${fmt(ctx.parsed.y)}`}
 
@@ -512,9 +512,9 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
           scales:{
 
-            x:{ticks:{color:"#4b5563",font:{size:10},maxRotation:45,autoSkip:true,maxTicksLimit:12},grid:{color:"rgba(255,255,255,0.03)"}},
+            x:{ticks:{color:"#6b7280",font:{size:10},maxRotation:45,autoSkip:true,maxTicksLimit:12},grid:{color:"rgba(0,0,0,0.05)"}},
 
-            y:{ticks:{color:"#4b5563",font:{size:10},callback:(v:number)=>`₺${(v/1000).toFixed(0)}K`},grid:{color:"rgba(255,255,255,0.04)"}}
+            y:{ticks:{color:"#6b7280",font:{size:10},callback:(v:number)=>`₺${(v/1000).toFixed(0)}K`},grid:{color:"rgba(0,0,0,0.06)"}}
 
           }
 
@@ -540,23 +540,23 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
   return (
 
-    <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden shadow-2xl">
+    <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden shadow-2xl">
 
       <button onClick={()=>setAcik(!acik)}
 
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors">
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-black/[0.03] transition-colors">
 
         <div className="flex items-center gap-3">
 
           <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
 
-            <Activity className="h-3.5 w-3.5 text-blue-400"/>
+            <Activity className="h-3.5 w-3.5 text-blue-600"/>
 
           </div>
 
-          <span className="text-sm font-semibold text-gray-200 tracking-tight">Dönem Analizi</span>
+          <span className="text-sm font-semibold text-gray-800 tracking-tight">Dönem Analizi</span>
 
-          <span className="text-[10px] text-gray-600 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">{raporlar.length} gün</span>
+          <span className="text-[10px] text-gray-600 bg-black/[0.04] border border-white/10 px-2 py-0.5 rounded-full">{raporlar.length} gün</span>
 
         </div>
 
@@ -568,7 +568,7 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
       {acik && (
 
-        <div className="border-t border-[#1a2236] p-5 space-y-5">
+        <div className="border-t border-[#e2e5eb] p-5 space-y-5">
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
 
@@ -584,7 +584,7 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
             ].map(card=>(
 
-              <div key={card.label} className="bg-[#080b14] rounded-xl border border-[#1a2236] p-4 hover:border-[#243050] transition-colors">
+              <div key={card.label} className="bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4 hover:border-[#d8dde5] transition-colors">
 
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-2">{card.label}</p>
 
@@ -612,7 +612,7 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
           <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
 
-            <div className="xl:col-span-2 bg-[#080b14] rounded-xl border border-[#1a2236] p-4">
+            <div className="xl:col-span-2 bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
 
               <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-3 flex items-center gap-1.5">
 
@@ -642,7 +642,7 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
                         <div className="flex items-center gap-2">
 
-                          <span className="text-[11px] font-bold text-white">₺{fmt(d.value)}</span>
+                          <span className="text-[11px] font-bold text-[#1a1f2e]">₺{fmt(d.value)}</span>
 
                           <span className="text-[10px] text-gray-600 w-7 text-right">{Math.round(pct)}%</span>
 
@@ -650,7 +650,7 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
                       </div>
 
-                      <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-1 bg-black/[0.04] rounded-full overflow-hidden">
 
                         <div className="h-full rounded-full transition-all duration-700"
 
@@ -670,7 +670,7 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
 
 
-            <div className="xl:col-span-3 bg-[#080b14] rounded-xl border border-[#1a2236] p-4">
+            <div className="xl:col-span-3 bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
 
               <div className="flex items-center justify-between mb-3">
 
@@ -1084,7 +1084,7 @@ function CurrencyInput({label, value, onChange, disabled=false, accent="gray"}:
 
     <div className="group">
 
-      <label className="block text-[12px] text-gray-300 font-semibold mb-1.5">{label}</label>
+      <label className="block text-[12px] text-gray-700 font-semibold mb-1.5">{label}</label>
 
       <div className="relative">
 
@@ -1096,7 +1096,7 @@ function CurrencyInput({label, value, onChange, disabled=false, accent="gray"}:
 
           onChange={e=>onChange(fmtStr(e.target.value))}
 
-          className="w-full bg-[#11151f] border border-[#232d45] hover:border-[#324066] focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 text-white text-[15px] font-bold h-10 pl-7 pr-3 rounded-xl outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"
+          className="w-full bg-[#f7f8fa] border border-[#dde1e8] hover:border-[#b9c2d1] focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 text-[#1a1f2e] text-[15px] font-bold h-10 pl-7 pr-3 rounded-xl outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"
 
           placeholder="0"
 
@@ -1142,33 +1142,33 @@ function PlatformSatir({label, value, onChange, indirim, onIndirimChange, disabl
   {label:string, value:PlatformGiris, onChange:(v:PlatformGiris)=>void,
    indirim?:string, onIndirimChange?:(v:string)=>void, disabled?:boolean}) {
   return (
-    <div className="rounded-xl border border-[#232d45] bg-[#0a0e18] p-3 hover:border-[#2e3a58] transition-colors">
-      <p className="text-[13px] text-gray-200 font-semibold mb-2">{label}</p>
+    <div className="rounded-xl border border-[#dde1e8] bg-[#f7f8fa] p-3 hover:border-[#d8dde5] transition-colors">
+      <p className="text-[13px] text-gray-800 font-semibold mb-2">{label}</p>
       <div className="flex items-center gap-2">
         <div className="relative flex-[1.4]">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[13px] font-semibold pointer-events-none">₺</span>
           <input type="text" value={value.tutar} disabled={disabled}
             onChange={e=>onChange({...value, tutar: fmtStr(e.target.value)})}
             placeholder="0"
-            className="w-full bg-[#11151f] border border-[#232d45] hover:border-[#324066] focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 text-white text-[15px] font-bold h-10 pl-7 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"/>
+            className="w-full bg-[#f7f8fa] border border-[#dde1e8] hover:border-[#b9c2d1] focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 text-[#1a1f2e] text-[15px] font-bold h-10 pl-7 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"/>
         </div>
         <div className="relative flex-1">
-          <Package size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500/70 pointer-events-none"/>
+          <Package size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-700/70 pointer-events-none"/>
           <input type="number" value={value.paket} disabled={disabled}
             onChange={e=>onChange({...value, paket: e.target.value})}
             placeholder="0"
             title="Paket sayısı"
-            className="w-full bg-[#11151f] border border-[#232d45] hover:border-[#324066] focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/15 text-amber-300 text-[15px] font-bold h-10 pl-8 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"/>
+            className="w-full bg-[#f7f8fa] border border-[#dde1e8] hover:border-[#b9c2d1] focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/15 text-amber-700 text-[15px] font-bold h-10 pl-8 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"/>
           <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-600 font-medium pointer-events-none hidden sm:block">pkt</span>
         </div>
       </div>
       {onIndirimChange && (
         <div className="relative mt-2">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-red-400/90 pointer-events-none">İndirim ₺</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-red-600/90 pointer-events-none">İndirim ₺</span>
           <input type="text" value={indirim||""} disabled={disabled}
             onChange={e=>onIndirimChange(fmtStr(e.target.value))}
             placeholder="0"
-            className="w-full bg-[#150c0e] border border-red-500/15 hover:border-red-500/30 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/15 text-red-300 text-[13px] font-bold h-8 pl-[68px] pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-700 text-right"/>
+            className="w-full bg-[#fef2f2] border border-red-500/15 hover:border-red-500/30 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/15 text-red-700 text-[13px] font-bold h-8 pl-[68px] pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-700 text-right"/>
         </div>
       )}
     </div>
@@ -1251,13 +1251,13 @@ function AkilliGiderInput({
 
         onFocus={() => setAcik(true)}
 
-        className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/40 text-white text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"
+        className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/40 text-[#1a1f2e] text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"
 
       />
 
       {acik && !disabled && filtreli.length > 0 && (
 
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#0d1120] border border-[#1a2236] rounded-xl shadow-2xl overflow-hidden">
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#ffffff] border border-[#e2e5eb] rounded-xl shadow-2xl overflow-hidden">
 
           {filtreli.map((o, i) => (
 
@@ -1269,11 +1269,11 @@ function AkilliGiderInput({
 
               onMouseDown={() => { onChange(o); setAcik(false); setArama(""); }}
 
-              className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-blue-500/10 hover:text-white transition-colors flex items-center gap-2"
+              className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-500/10 hover:text-[#1a1f2e] transition-colors flex items-center gap-2"
 
             >
 
-              <Sparkles size={9} className="text-blue-500/50 shrink-0"/>
+              <Sparkles size={9} className="text-blue-700/50 shrink-0"/>
 
               {o}
 
@@ -1281,7 +1281,7 @@ function AkilliGiderInput({
 
           ))}
 
-          <div className="border-t border-[#1a2236] px-3 py-1 text-[10px] text-gray-700">
+          <div className="border-t border-[#e2e5eb] px-3 py-1 text-[10px] text-gray-700">
 
             Diğer: istediğinizi yazabilirsiniz
 
@@ -2555,9 +2555,9 @@ Soru: ${soruFinal}`
 
           <div className="flex items-center gap-3 text-[11px] text-gray-600">
 
-            <span className="flex items-center gap-1.5"><User size={11} className="text-blue-400"/>{selectedRapor.ekleyen_kullanici}</span>
+            <span className="flex items-center gap-1.5"><User size={11} className="text-blue-600"/>{selectedRapor.ekleyen_kullanici}</span>
 
-            {selectedRapor.created_at && <span className="flex items-center gap-1.5"><Clock size={11} className="text-blue-400"/>{new Date(selectedRapor.created_at).toLocaleString("tr-TR")}</span>}
+            {selectedRapor.created_at && <span className="flex items-center gap-1.5"><Clock size={11} className="text-blue-600"/>{new Date(selectedRapor.created_at).toLocaleString("tr-TR")}</span>}
 
           </div>
 
@@ -2567,7 +2567,7 @@ Soru: ${soruFinal}`
 
               <button type="button" onClick={()=>setIsEditMode(true)}
 
-                className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-3 py-1.5 rounded-lg hover:bg-amber-400/15 transition-colors">
+                className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-400/10 border border-amber-400/20 px-3 py-1.5 rounded-lg hover:bg-amber-400/15 transition-colors">
 
                 <Edit3 size={12}/> Düzenle
 
@@ -2577,7 +2577,7 @@ Soru: ${soruFinal}`
 
               <button type="button" onClick={()=>selectedRapor && handleRaporSil(selectedRapor)}
 
-                className="flex items-center gap-1.5 text-xs font-semibold text-red-400 bg-red-400/10 border border-red-400/20 px-3 py-1.5 rounded-lg hover:bg-red-400/15 transition-colors">
+                className="flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-400/10 border border-red-400/20 px-3 py-1.5 rounded-lg hover:bg-red-400/15 transition-colors">
 
                 <Trash2 size={12}/> Sil
 
@@ -2600,10 +2600,10 @@ Soru: ${soruFinal}`
         <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center shrink-0">
-              {taramaYukleniyor ? <Loader2 size={14} className="text-indigo-400 animate-spin"/> : <Camera size={14} className="text-indigo-400"/>}
+              {taramaYukleniyor ? <Loader2 size={14} className="text-indigo-600 animate-spin"/> : <Camera size={14} className="text-indigo-600"/>}
             </div>
             <div>
-              <p className="text-xs font-bold text-indigo-300">Fişten Doldur</p>
+              <p className="text-xs font-bold text-indigo-700">Fişten Doldur</p>
               <p className="text-[10px] text-gray-500">Kağıt raporun fotoğrafını yükle, AI okuyup formu doldursun</p>
             </div>
           </div>
@@ -2619,13 +2619,13 @@ Soru: ${soruFinal}`
       )}
       {taramaHata && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2.5 flex items-center gap-2">
-          <AlertTriangle size={13} className="text-red-400 shrink-0"/>
-          <p className="text-xs text-red-300">{taramaHata}</p>
+          <AlertTriangle size={13} className="text-red-600 shrink-0"/>
+          <p className="text-xs text-red-700">{taramaHata}</p>
         </div>
       )}
       {taramaBelirsizAlanlar.length > 0 && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-2.5">
-          <p className="text-xs font-bold text-amber-400 flex items-center gap-1.5 mb-1"><AlertTriangle size={12}/> AI bazı alanlardan emin olamadı — lütfen kontrol et:</p>
+          <p className="text-xs font-bold text-amber-600 flex items-center gap-1.5 mb-1"><AlertTriangle size={12}/> AI bazı alanlardan emin olamadı — lütfen kontrol et:</p>
           <p className="text-[11px] text-amber-200/80">{taramaBelirsizAlanlar.join(", ")}</p>
         </div>
       )}
@@ -2636,7 +2636,7 @@ Soru: ${soruFinal}`
 
         <div className="sm:col-span-1">
 
-          <label className="block text-[10px] text-amber-400 uppercase tracking-widest font-medium mb-1">Rapor Tarihi</label>
+          <label className="block text-[10px] text-amber-600 uppercase tracking-widest font-medium mb-1">Rapor Tarihi</label>
 
           <div className="flex flex-col gap-1">
 
@@ -2648,17 +2648,17 @@ Soru: ${soruFinal}`
 
               max={!isAdmin&&!selectedRapor&&beklenenTarih?beklenenTarih:undefined}
 
-              className={`bg-[#080b14] text-white font-bold text-center h-9 text-xs rounded-xl px-3 w-full outline-none focus:ring-1 transition-all border ${
+              className={`bg-[#f7f8fa] text-[#1a1f2e] font-bold text-center h-9 text-xs rounded-xl px-3 w-full outline-none focus:ring-1 transition-all border ${
 
-                duplikaTarihHata ? "border-orange-500 text-orange-400"
+                duplikaTarihHata ? "border-orange-500 text-orange-600"
 
-                : tarihHataVarMi&&!adminOnayliGecis ? "border-red-500 text-red-400"
+                : tarihHataVarMi&&!adminOnayliGecis ? "border-red-500 text-red-600"
 
-                : "border-[#1a2236] focus:border-amber-500/50"
+                : "border-[#e2e5eb] focus:border-amber-500/50"
 
               }`} required/>
 
-            {duplikaTarihHata && <p className="text-[10px] text-orange-400 flex items-center gap-1"><AlertTriangle size={9}/> Bu tarih mevcut</p>}
+            {duplikaTarihHata && <p className="text-[10px] text-orange-600 flex items-center gap-1"><AlertTriangle size={9}/> Bu tarih mevcut</p>}
 
             {enSonRaporTarihi && <p className="text-[9px] text-gray-700">Son: {fmtTarih(enSonRaporTarihi)}</p>}
 
@@ -2668,13 +2668,13 @@ Soru: ${soruFinal}`
 
         {[
 
-          {label:"Brüt Ciro", value:`₺${fmt(ch.brutCiro)}`, color:"text-blue-400", border:"border-blue-500/10 bg-blue-500/5"},
+          {label:"Brüt Ciro", value:`₺${fmt(ch.brutCiro)}`, color:"text-blue-600", border:"border-blue-500/10 bg-blue-500/5"},
 
-          {label:"Net Ciro",  value:`₺${fmt(ch.netCiro)}`,  color:"text-emerald-400", border:"border-emerald-500/10 bg-emerald-500/5"},
+          {label:"Net Ciro",  value:`₺${fmt(ch.netCiro)}`,  color:"text-emerald-600", border:"border-emerald-500/10 bg-emerald-500/5"},
 
-          {label:"Paket",     value:`${fmt(ch.tKuryePaket)}`, color:"text-amber-400", border:"border-amber-500/10 bg-amber-500/5"},
+          {label:"Paket",     value:`${fmt(ch.tKuryePaket)}`, color:"text-amber-600", border:"border-amber-500/10 bg-amber-500/5"},
 
-          {label:"Ort. Sepet",value:`₺${fmt(ch.paketOrt)}`, color:"text-purple-400", border:"border-purple-500/10 bg-purple-500/5"},
+          {label:"Ort. Sepet",value:`₺${fmt(ch.paketOrt)}`, color:"text-purple-600", border:"border-purple-500/10 bg-purple-500/5"},
 
         ].map(c=>(
 
@@ -2696,13 +2696,13 @@ Soru: ${soruFinal}`
 
       {tarihHataVarMi && isAdmin && !adminOnayliGecis && !isReadOnly && (
 
-        <div className="rounded-xl border border-amber-500/20 bg-amber-950/20 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="rounded-xl border border-amber-500/20 bg-amber-100/60 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
 
-          <p className="text-xs text-amber-400 flex items-center gap-2">
+          <p className="text-xs text-amber-600 flex items-center gap-2">
 
             <AlertTriangle size={12}/>
 
-            <strong className="text-white">{beklenenTarih?fmtTarih(beklenenTarih):""}</strong> eklenmeden devam edilsin mi?
+            <strong className="text-[#1a1f2e]">{beklenenTarih?fmtTarih(beklenenTarih):""}</strong> eklenmeden devam edilsin mi?
 
           </p>
 
@@ -2724,15 +2724,15 @@ Soru: ${soruFinal}`
 
       {tarihHataVarMi && !isAdmin && !isReadOnly && (
 
-        <div className="rounded-xl border border-red-500/20 bg-[#130a0a] p-6 text-center">
+        <div className="rounded-xl border border-red-500/20 bg-[#fef2f2] p-6 text-center">
 
-          <ShieldAlert className="h-10 w-10 text-red-500 mx-auto mb-3 animate-bounce"/>
+          <ShieldAlert className="h-10 w-10 text-red-700 mx-auto mb-3 animate-bounce"/>
 
-          <p className="text-sm font-black text-white mb-1 uppercase">Gün Atlayamazsınız</p>
+          <p className="text-sm font-black text-[#1a1f2e] mb-1 uppercase">Gün Atlayamazsınız</p>
 
           <p className="text-gray-500 text-xs mb-4">
 
-            Sıradaki gün: <strong className="text-red-400">{beklenenTarih?fmtTarih(beklenenTarih):""}</strong>
+            Sıradaki gün: <strong className="text-red-600">{beklenenTarih?fmtTarih(beklenenTarih):""}</strong>
 
           </p>
 
@@ -2750,9 +2750,9 @@ Soru: ${soruFinal}`
 
         {!tarih && !isReadOnly && (
 
-          <div className="flex items-center justify-center gap-2 py-8 text-gray-600 text-xs border border-dashed border-[#1a2236] rounded-xl">
+          <div className="flex items-center justify-center gap-2 py-8 text-gray-600 text-xs border border-dashed border-[#e2e5eb] rounded-xl">
 
-            <Lock size={12} className="text-amber-500"/> Tarih seçilince form aktif olur
+            <Lock size={12} className="text-amber-700"/> Tarih seçilince form aktif olur
 
           </div>
 
@@ -2771,14 +2771,14 @@ Soru: ${soruFinal}`
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
               {/* ── ONLINE ── */}
-              <div className="rounded-xl border border-blue-500/20 bg-[#0c0f1a] overflow-hidden">
+              <div className="rounded-xl border border-blue-500/20 bg-[#ffffff] overflow-hidden">
                 <div className="px-4 py-3 border-b border-blue-500/15 flex items-center justify-between bg-blue-500/[0.03]">
-                  <span className="text-[13px] font-bold text-blue-300 flex items-center gap-2"><Monitor size={14}/>Online Satışlar</span>
-                  <span className="text-sm font-black text-blue-300">₺{fmt(ch.tOnline)} <span className="text-gray-500 font-medium text-[11px]">· {ch.tOnlinePaket} paket</span></span>
+                  <span className="text-[13px] font-bold text-blue-700 flex items-center gap-2"><Monitor size={14}/>Online Satışlar</span>
+                  <span className="text-sm font-black text-blue-700">₺{fmt(ch.tOnline)} <span className="text-gray-500 font-medium text-[11px]">· {ch.tOnlinePaket} paket</span></span>
                 </div>
                 <div className="p-3 space-y-4">
                   <div>
-                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full mb-2">🍔 Kebo</span>
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full mb-2">🍔 Kebo</span>
                     <div className="space-y-2">
                       <PlatformSatir label="Yemeksepeti" value={osKeboYs} onChange={setOsKeboYs} indirim={osKeboYsIndirim} onIndirimChange={setOsKeboYsIndirim} disabled={isReadOnly}/>
                       <PlatformSatir label="Trendyol" value={osKeboTrendyol} onChange={setOsKeboTrendyol} indirim={osKeboTrendyolIndirim} onIndirimChange={setOsKeboTrendyolIndirim} disabled={isReadOnly}/>
@@ -2786,7 +2786,7 @@ Soru: ${soruFinal}`
                     </div>
                   </div>
                   <div>
-                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-red-300 bg-red-500/10 border border-red-500/25 px-2.5 py-1 rounded-full mb-2">🍗 Chick'N Fride</span>
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-red-700 bg-red-500/10 border border-red-500/25 px-2.5 py-1 rounded-full mb-2">🍗 Chick'N Fride</span>
                     <div className="space-y-2">
                       <PlatformSatir label="Yemeksepeti" value={osCnfYs} onChange={setOsCnfYs} indirim={osCnfYsIndirim} onIndirimChange={setOsCnfYsIndirim} disabled={isReadOnly}/>
                       <PlatformSatir label="Trendyol" value={osCnfTrendyol} onChange={setOsCnfTrendyol} indirim={osCnfTrendyolIndirim} onIndirimChange={setOsCnfTrendyolIndirim} disabled={isReadOnly}/>
@@ -2797,17 +2797,17 @@ Soru: ${soruFinal}`
               </div>
 
               {/* ── KAPIDA ÖDEME ── */}
-              <div className="rounded-xl border border-purple-500/20 bg-[#0c0f1a] overflow-hidden">
+              <div className="rounded-xl border border-purple-500/20 bg-[#ffffff] overflow-hidden">
                 <div className="px-4 py-3 border-b border-purple-500/15 flex items-center justify-between bg-purple-500/[0.03]">
-                  <span className="text-[13px] font-bold text-purple-300 flex items-center gap-2"><Home size={14}/>Kapıda Ödeme</span>
+                  <span className="text-[13px] font-bold text-purple-700 flex items-center gap-2"><Home size={14}/>Kapıda Ödeme</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-semibold text-purple-300 bg-purple-500/15 border border-purple-500/25 px-2 py-0.5 rounded-full">Kasaya dahil</span>
-                    <span className="text-sm font-black text-purple-300">₺{fmt(ch.tKapida)} <span className="text-gray-500 font-medium text-[11px]">· {ch.tKapidaPaket} paket</span></span>
+                    <span className="text-[10px] font-semibold text-purple-700 bg-purple-500/15 border border-purple-500/25 px-2 py-0.5 rounded-full">Kasaya dahil</span>
+                    <span className="text-sm font-black text-purple-700">₺{fmt(ch.tKapida)} <span className="text-gray-500 font-medium text-[11px]">· {ch.tKapidaPaket} paket</span></span>
                   </div>
                 </div>
                 <div className="p-3 space-y-4">
                   <div>
-                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full mb-2">🍔 Kebo</span>
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full mb-2">🍔 Kebo</span>
                     <div className="space-y-2">
                       <PlatformSatir label="Yemeksepeti" value={koKeboYs} onChange={setKoKeboYs} indirim={koKeboYsIndirim} onIndirimChange={setKoKeboYsIndirim} disabled={isReadOnly}/>
                       <PlatformSatir label="Trendyol" value={koKeboTrendyol} onChange={setKoKeboTrendyol} indirim={koKeboTrendyolIndirim} onIndirimChange={setKoKeboTrendyolIndirim} disabled={isReadOnly}/>
@@ -2816,7 +2816,7 @@ Soru: ${soruFinal}`
                     </div>
                   </div>
                   <div>
-                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-red-300 bg-red-500/10 border border-red-500/25 px-2.5 py-1 rounded-full mb-2">🍗 Chick'N Fride</span>
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-red-700 bg-red-500/10 border border-red-500/25 px-2.5 py-1 rounded-full mb-2">🍗 Chick'N Fride</span>
                     <div className="space-y-2">
                       <PlatformSatir label="Yemeksepeti" value={koCnfYs} onChange={setKoCnfYs} indirim={koCnfYsIndirim} onIndirimChange={setKoCnfYsIndirim} disabled={isReadOnly}/>
                       <PlatformSatir label="Trendyol" value={koCnfTrendyol} onChange={setKoCnfTrendyol} indirim={koCnfTrendyolIndirim} onIndirimChange={setKoCnfTrendyolIndirim} disabled={isReadOnly}/>
@@ -2830,10 +2830,10 @@ Soru: ${soruFinal}`
             </div>
 
             {/* ── KASA ── */}
-            <div className="rounded-xl border border-emerald-500/20 bg-[#0c0f1a] overflow-hidden">
+            <div className="rounded-xl border border-emerald-500/20 bg-[#ffffff] overflow-hidden">
               <div className="px-4 py-3 border-b border-emerald-500/15 flex items-center justify-between bg-emerald-500/[0.03]">
-                <span className="text-[13px] font-bold text-emerald-300 flex items-center gap-2">💰 Kasa</span>
-                <span className="text-sm font-black text-emerald-300">₺{fmt(ch.tKasa)}</span>
+                <span className="text-[13px] font-bold text-emerald-700 flex items-center gap-2">💰 Kasa</span>
+                <span className="text-sm font-black text-emerald-700">₺{fmt(ch.tKasa)}</span>
               </div>
               <div className="p-3 grid grid-cols-2 md:grid-cols-4 gap-2.5">
                 <CurrencyInput label="Nakit" value={kasaNakit} onChange={setKasaNakit} disabled={isReadOnly}/>
@@ -2842,37 +2842,37 @@ Soru: ${soruFinal}`
                 <CurrencyInput label="Metropol" value={kasaMetropol} onChange={setKasaMetropol} disabled={isReadOnly}/>
               </div>
               <div className="mx-3 mb-3 rounded-lg border border-red-500/20 bg-red-500/5 px-3.5 py-2.5 flex items-center justify-between">
-                <span className="text-[12px] text-red-300 font-semibold flex items-center gap-1.5"><TrendingDown size={13}/>Gider (salt okunur)</span>
-                <span className="text-[15px] font-black text-red-300">₺{fmt(ch.tGider)}</span>
+                <span className="text-[12px] text-red-700 font-semibold flex items-center gap-1.5"><TrendingDown size={13}/>Gider (salt okunur)</span>
+                <span className="text-[15px] font-black text-red-700">₺{fmt(ch.tGider)}</span>
               </div>
-              <p className="px-3.5 pb-3 text-[11px] text-gray-500 leading-relaxed">Gider için aşağıdaki <span className="text-gray-300 font-semibold">Giderler</span> bölümünü kullan — buraya doğrudan giriş yapılamaz, orada eklediğin her satır bu toplama otomatik yansır.</p>
+              <p className="px-3.5 pb-3 text-[11px] text-gray-500 leading-relaxed">Gider için aşağıdaki <span className="text-gray-700 font-semibold">Giderler</span> bölümünü kullan — buraya doğrudan giriş yapılamaz, orada eklediğin her satır bu toplama otomatik yansır.</p>
             </div>
 
             {/* ── İNDİRİM ANALİZİ ── */}
-            <div className={`rounded-xl border overflow-hidden ${ch.indirimUyari ? "border-red-500/40 bg-red-500/5" : "border-[#232d45] bg-[#0c0f1a]"}`}>
-              <div className={`px-4 py-3 border-b flex items-center justify-between ${ch.indirimUyari ? "border-red-500/25 bg-red-500/[0.04]" : "border-[#232d45] bg-white/[0.02]"}`}>
-                <span className={`text-[13px] font-bold flex items-center gap-2 ${ch.indirimUyari?"text-red-300":"text-gray-200"}`}>
+            <div className={`rounded-xl border overflow-hidden ${ch.indirimUyari ? "border-red-500/40 bg-red-500/5" : "border-[#dde1e8] bg-[#ffffff]"}`}>
+              <div className={`px-4 py-3 border-b flex items-center justify-between ${ch.indirimUyari ? "border-red-500/25 bg-red-500/[0.04]" : "border-[#dde1e8] bg-black/[0.03]"}`}>
+                <span className={`text-[13px] font-bold flex items-center gap-2 ${ch.indirimUyari?"text-red-700":"text-gray-800"}`}>
                   <Percent size={14}/>İndirim Analizi
                 </span>
-                <span className={`text-sm font-black ${ch.indirimUyari?"text-red-300":"text-white"}`}>%{ch.indirimOrani.toFixed(1)}</span>
+                <span className={`text-sm font-black ${ch.indirimUyari?"text-red-700":"text-[#1a1f2e]"}`}>%{ch.indirimOrani.toFixed(1)}</span>
               </div>
               <div className="p-3.5 grid grid-cols-3 gap-2 text-center">
                 <div>
                   <p className="text-[11px] text-gray-400 font-medium">Yemeksepeti</p>
-                  <p className="text-[15px] font-black text-red-300">₺{fmt(ch.tIndirimYS)}</p>
+                  <p className="text-[15px] font-black text-red-700">₺{fmt(ch.tIndirimYS)}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-gray-400 font-medium">Trendyol</p>
-                  <p className="text-[15px] font-black text-red-300">₺{fmt(ch.tIndirimTrendyol)}</p>
+                  <p className="text-[15px] font-black text-red-700">₺{fmt(ch.tIndirimTrendyol)}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-gray-400 font-medium">Toplam</p>
-                  <p className="text-[15px] font-black text-white">₺{fmt(ch.tIndirim)}</p>
+                  <p className="text-[15px] font-black text-[#1a1f2e]">₺{fmt(ch.tIndirim)}</p>
                 </div>
               </div>
               {ch.indirimUyari && (
                 <div className="mx-3.5 mb-3.5 flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3.5 py-2.5">
-                  <AlertTriangle size={14} className="text-red-400 shrink-0"/>
+                  <AlertTriangle size={14} className="text-red-600 shrink-0"/>
                   <p className="text-[12px] text-red-200">İndirim oranı platform cirosunun <span className="font-black">%15'ini</span> geçti — kontrol et.</p>
                 </div>
               )}
@@ -2884,7 +2884,7 @@ Soru: ${soruFinal}`
 
             {platformOzetSatirlar.length > 0 && (
 
-              <div className="rounded-xl border border-[#1a2236] bg-[#080b14] px-4 py-3">
+              <div className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] px-4 py-3">
 
                 <p className="text-[11px] text-gray-400 font-semibold mb-2.5 flex items-center gap-1.5">
 
@@ -2896,13 +2896,13 @@ Soru: ${soruFinal}`
 
                   {platformOzetSatirlar.map(p => (
 
-                    <div key={p.label} className="flex items-center gap-2 bg-white/[0.03] border border-white/5 rounded-lg px-2.5 py-1.5">
+                    <div key={p.label} className="flex items-center gap-2 bg-black/[0.04] border border-white/5 rounded-lg px-2.5 py-1.5">
 
                       <div className="w-2 h-2 rounded-full shrink-0" style={{backgroundColor:p.color}}/>
 
                       <span className="text-[10px] text-gray-400">{p.label}</span>
 
-                      <span className="text-[11px] font-bold text-white">₺{fmt(p.online+p.kapida)}</span>
+                      <span className="text-[11px] font-bold text-[#1a1f2e]">₺{fmt(p.online+p.kapida)}</span>
 
                       {p.kapida > 0 && (
 
@@ -2934,15 +2934,15 @@ Soru: ${soruFinal}`
 
               {/* Giderler */}
 
-              <div className="rounded-xl border border-red-500/15 bg-[#0c0f1a] overflow-hidden">
+              <div className="rounded-xl border border-red-500/20 bg-[#ffffff] overflow-hidden">
 
-                <div className="px-3 py-2 border-b border-red-500/15 flex items-center justify-between">
+                <div className="px-4 py-3 border-b border-red-500/15 flex flex-wrap items-center justify-between gap-2 bg-red-500/[0.03]">
 
-                  <span className="text-[10px] font-semibold text-red-400 uppercase tracking-wider flex items-center gap-1.5"><TrendingDown size={11}/>Giderler</span>
+                  <span className="text-[13px] font-bold text-red-700 flex items-center gap-2">💸 Giderler</span>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
 
-                    <span className="text-xs font-black text-red-400">₺{fmt(ch.tGider)}</span>
+                    <span className="text-sm font-black text-red-700">₺{fmt(ch.tGider)}</span>
 
                     {!isReadOnly && (
 
@@ -2950,7 +2950,7 @@ Soru: ${soruFinal}`
 
                         <button type="button" onClick={()=>giderEkle("normal")}
 
-                          className="text-[10px] text-gray-600 hover:text-red-400 border border-[#1a2236] hover:border-red-500/30 px-2 py-0.5 rounded transition-colors">
+                          className="text-[11px] font-semibold text-gray-700 hover:text-red-700 bg-black/[0.04] hover:bg-red-500/10 border border-[#d8dde5] hover:border-red-500/30 px-2.5 py-1 rounded-lg transition-colors">
 
                           + Normal
 
@@ -2958,17 +2958,17 @@ Soru: ${soruFinal}`
 
                         <button type="button" onClick={()=>giderEkle("firma")}
 
-                          className="text-[10px] text-gray-600 hover:text-blue-400 border border-[#1a2236] hover:border-blue-500/30 px-2 py-0.5 rounded transition-colors flex items-center gap-1">
+                          className="text-[11px] font-semibold text-gray-700 hover:text-blue-700 bg-black/[0.04] hover:bg-blue-500/10 border border-[#d8dde5] hover:border-blue-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
 
-                          <Building2 size={9}/> Firma
+                          <Building2 size={11}/> Firma
 
                         </button>
 
                         <button type="button" onClick={()=>giderEkle("personel")}
 
-                          className="text-[10px] text-gray-600 hover:text-teal-400 border border-[#1a2236] hover:border-teal-500/30 px-2 py-0.5 rounded transition-colors flex items-center gap-1">
+                          className="text-[11px] font-semibold text-gray-700 hover:text-teal-700 bg-black/[0.04] hover:bg-teal-500/10 border border-[#d8dde5] hover:border-teal-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
 
-                          <Users2 size={9}/> Personel
+                          <Users2 size={11}/> Personel
 
                         </button>
 
@@ -2988,21 +2988,21 @@ Soru: ${soruFinal}`
 
                       {item.tip === "firma" ? (
 
-                        <div className="flex items-center gap-1 mb-1">
+                        <div className="flex items-center gap-1.5 mb-1">
 
-                          <Building2 size={9} className="text-blue-400"/>
+                          <Building2 size={11} className="text-blue-600"/>
 
-                          <span className="text-[9px] text-blue-400 uppercase tracking-wider">Firma Ödemesi</span>
+                          <span className="text-[11px] font-semibold text-blue-700">Firma Ödemesi</span>
 
                         </div>
 
                       ) : item.tip === "personel" ? (
 
-                        <div className="flex items-center gap-1 mb-1">
+                        <div className="flex items-center gap-1.5 mb-1">
 
-                          <Users2 size={9} className="text-teal-400"/>
+                          <Users2 size={11} className="text-teal-600"/>
 
-                          <span className="text-[9px] text-teal-400 uppercase tracking-wider">Personel Tüketimi — kasadan fiş çıkar, otomatik avans olarak işlenir</span>
+                          <span className="text-[11px] font-semibold text-teal-700">Personel Tüketimi — kasadan fiş çıkar, otomatik avans olarak işlenir</span>
 
                         </div>
 
@@ -3014,7 +3014,7 @@ Soru: ${soruFinal}`
 
                         isReadOnly ? (
 
-                          <div className="w-full bg-[#080b14] border border-blue-500/20 text-blue-300 text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5">
+                          <div className="w-full bg-[#f7f8fa] border border-blue-500/20 text-blue-700 text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5">
 
                             <Building2 size={9}/> {item.firmaUnvan || item.aciklama}
 
@@ -3048,7 +3048,7 @@ Soru: ${soruFinal}`
 
                               }}
 
-                              className="w-full bg-[#080b14] border border-blue-500/20 text-white text-xs h-7 pl-6 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40 appearance-none"
+                              className="w-full bg-[#f7f8fa] border border-blue-500/20 text-[#1a1f2e] text-xs h-7 pl-6 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40 appearance-none"
 
                             >
 
@@ -3056,7 +3056,7 @@ Soru: ${soruFinal}`
 
                               {cariListesi.map(c => (
 
-                                <option key={c.id} value={c.id} className="bg-[#0c0f1a]">
+                                <option key={c.id} value={c.id} className="bg-[#ffffff]">
 
                                   {c.unvan} {c.cari_kodu ? `(${c.cari_kodu})` : ""}
 
@@ -3074,13 +3074,13 @@ Soru: ${soruFinal}`
                         <div className="space-y-1.5">
                           <select disabled={isReadOnly} value={item.personelIsim || ""}
                             onChange={e => giderDegistir(item.id, "personelIsim", e.target.value)}
-                            className="w-full bg-[#080b14] border border-teal-500/20 text-white text-xs h-7 px-2.5 rounded-lg outline-none focus:border-teal-500/40 disabled:opacity-40 appearance-none">
+                            className="w-full bg-[#f7f8fa] border border-teal-500/20 text-[#1a1f2e] text-xs h-7 px-2.5 rounded-lg outline-none focus:border-teal-500/40 disabled:opacity-40 appearance-none">
                             <option value="">Personel seçiniz...</option>
-                            {avansPersonelListesi.map((p,i)=>(<option key={i} value={p} className="bg-[#0c0f1a]">{p}</option>))}
+                            {avansPersonelListesi.map((p,i)=>(<option key={i} value={p} className="bg-[#ffffff]">{p}</option>))}
                           </select>
                           <input type="text" placeholder="Ne tüketti? (örn: 1 adet kola)" disabled={isReadOnly} value={item.aciklama}
                             onChange={e=>giderDegistir(item.id, "aciklama", e.target.value)}
-                            className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-teal-500/40 text-white text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
+                            className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-teal-500/40 text-[#1a1f2e] text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
                         </div>
                       ) : (
 
@@ -3100,11 +3100,11 @@ Soru: ${soruFinal}`
 
 
 
-                      <div className="flex gap-1">
+                      <div className="flex gap-1.5">
 
                         <div className="relative flex-1">
 
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-xs">₺</span>
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 text-[13px] font-semibold">₺</span>
 
                           <input
 
@@ -3112,7 +3112,7 @@ Soru: ${soruFinal}`
 
                             onChange={e=>giderDegistir(item.id,"tutar",e.target.value)}
 
-                            className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"
+                            className="w-full bg-[#f7f8fa] border border-[#dde1e8] text-[#1a1f2e] text-[14px] font-bold h-9 pl-7 pr-2 rounded-lg outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/15 disabled:opacity-40"
 
                           />
 
@@ -3120,13 +3120,13 @@ Soru: ${soruFinal}`
 
                         {!isReadOnly && giderler.length>1 && (
 
-                          <button type="button" onClick={()=>giderSil(item.id)} className="text-gray-700 hover:text-red-400 px-1"><Trash2 size={11}/></button>
+                          <button type="button" onClick={()=>giderSil(item.id)} className="text-gray-500 hover:text-red-600 px-1.5"><Trash2 size={13}/></button>
 
                         )}
 
                       </div>
 
-                      {idx < giderler.length-1 && <div className="border-t border-[#1a2236] mt-1"/>}
+                      {idx < giderler.length-1 && <div className="border-t border-[#e2e5eb] mt-1"/>}
 
                     </div>
 
@@ -3143,12 +3143,12 @@ Soru: ${soruFinal}`
               <div className="space-y-3">
 
                 {/* Personel Kesintisi — kasayı/gideri etkilemez, sadece ay sonu maaştan düşülür */}
-                <div className="rounded-xl border border-rose-500/15 bg-[#0c0f1a] overflow-hidden">
+                <div className="rounded-xl border border-rose-500/15 bg-[#ffffff] overflow-hidden">
                   <div className="px-3 py-2 border-b border-rose-500/15 flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-rose-400 uppercase tracking-wider flex items-center gap-1.5"><Users2 size={11}/>Personel Kesintisi</span>
+                    <span className="text-[10px] font-semibold text-rose-600 uppercase tracking-wider flex items-center gap-1.5"><Users2 size={11}/>Personel Kesintisi</span>
                     {!isReadOnly && (
                       <button type="button" onClick={()=>setKesintiSatirlari([...kesintiSatirlari,{id:Date.now(),personelIsim:"",tutar:"",aciklama:""}])}
-                        className="text-[10px] text-gray-600 hover:text-rose-400 border border-[#1a2236] hover:border-rose-500/30 px-2 py-0.5 rounded transition-colors">+ Kesinti</button>
+                        className="text-[10px] text-gray-600 hover:text-rose-600 border border-[#e2e5eb] hover:border-rose-500/30 px-2 py-0.5 rounded transition-colors">+ Kesinti</button>
                     )}
                   </div>
                   <div className="p-3 space-y-2">
@@ -3161,7 +3161,7 @@ Soru: ${soruFinal}`
                         <div className="grid grid-cols-12 gap-1.5">
                           <select disabled={isReadOnly} value={k.personelIsim}
                             onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,personelIsim:e.target.value}:x))}
-                            className="col-span-6 bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2 outline-none focus:border-rose-500/40 disabled:opacity-40">
+                            className="col-span-6 bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs rounded-lg px-2 outline-none focus:border-rose-500/40 disabled:opacity-40">
                             <option value="">Personel seç...</option>
                             {avansPersonelListesi.map((p,i)=>(<option key={i} value={p}>{p}</option>))}
                           </select>
@@ -3169,13 +3169,13 @@ Soru: ${soruFinal}`
                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-[10px]">₺</span>
                             <input type="text" placeholder="0" disabled={isReadOnly} value={k.tutar}
                               onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,tutar:fmtStr(e.target.value)}:x))}
-                              className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-rose-500/40 disabled:opacity-40"/>
+                              className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-rose-500/40 disabled:opacity-40"/>
                           </div>
-                          {!isReadOnly && <button type="button" onClick={()=>setKesintiSatirlari(kesintiSatirlari.filter(x=>x.id!==k.id))} className="col-span-1 text-gray-700 hover:text-red-400 flex items-center justify-center"><Trash2 size={11}/></button>}
+                          {!isReadOnly && <button type="button" onClick={()=>setKesintiSatirlari(kesintiSatirlari.filter(x=>x.id!==k.id))} className="col-span-1 text-gray-700 hover:text-red-600 flex items-center justify-center"><Trash2 size={11}/></button>}
                         </div>
                         <input type="text" placeholder="Kesinti sebebi (örn: eksik ürün gönderimi)" disabled={isReadOnly} value={k.aciklama}
                           onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,aciklama:e.target.value}:x))}
-                          className="w-full bg-[#080b14] border border-[#1a2236] text-white text-[11px] h-6 px-2 rounded-lg outline-none focus:border-rose-500/40 disabled:opacity-40 placeholder:text-gray-700"/>
+                          className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-[11px] h-6 px-2 rounded-lg outline-none focus:border-rose-500/40 disabled:opacity-40 placeholder:text-gray-700"/>
                       </div>
                     ))}
                     <p className="text-[9px] text-gray-600">Kaydedince ilgili personelin profilindeki Kesinti geçmişine işlenir; ay sonu maaş hesabında oradan görünür.</p>
@@ -3184,17 +3184,17 @@ Soru: ${soruFinal}`
 
                 {/* İadeler */}
 
-                <div className="rounded-xl border border-orange-500/15 bg-[#0c0f1a] overflow-hidden">
+                <div className="rounded-xl border border-orange-500/15 bg-[#ffffff] overflow-hidden">
 
                   <div className="px-3 py-2 border-b border-orange-500/15 flex items-center justify-between">
 
-                    <span className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider flex items-center gap-1.5"><RotateCcw size={11}/>İptal-İade Fişleri</span>
+                    <span className="text-[10px] font-semibold text-orange-600 uppercase tracking-wider flex items-center gap-1.5"><RotateCcw size={11}/>İptal-İade Fişleri</span>
 
                     <div className="flex items-center gap-1.5">
 
-                      <span className="text-xs font-black text-orange-400">₺{fmt(ch.tIade)}</span>
+                      <span className="text-xs font-black text-orange-600">₺{fmt(ch.tIade)}</span>
 
-                      {!isReadOnly && <button type="button" onClick={iadeEkle} className="text-[10px] text-gray-600 hover:text-orange-400 border border-[#1a2236] hover:border-orange-500/30 w-5 h-5 rounded flex items-center justify-center transition-colors">+</button>}
+                      {!isReadOnly && <button type="button" onClick={iadeEkle} className="text-[10px] text-gray-600 hover:text-orange-600 border border-[#e2e5eb] hover:border-orange-500/30 w-5 h-5 rounded flex items-center justify-center transition-colors">+</button>}
 
                     </div>
 
@@ -3210,7 +3210,7 @@ Soru: ${soruFinal}`
 
                           onChange={e=>iadeDegistir(item.id,"aciklama",e.target.value)}
 
-                          className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/40 text-white text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
+                          className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/40 text-[#1a1f2e] text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
 
                         <div className="flex gap-1">
 
@@ -3222,15 +3222,15 @@ Soru: ${soruFinal}`
 
                               onChange={e=>iadeDegistir(item.id,"tutar",e.target.value)}
 
-                              className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"/>
+                              className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"/>
 
                           </div>
 
-                          {!isReadOnly && iadeler.length>1 && <button type="button" onClick={()=>iadeSil(item.id)} className="text-gray-700 hover:text-red-400 px-1"><Trash2 size={11}/></button>}
+                          {!isReadOnly && iadeler.length>1 && <button type="button" onClick={()=>iadeSil(item.id)} className="text-gray-700 hover:text-red-600 px-1"><Trash2 size={11}/></button>}
 
                         </div>
 
-                        {idx < iadeler.length-1 && <div className="border-t border-[#1a2236] mt-1"/>}
+                        {idx < iadeler.length-1 && <div className="border-t border-[#e2e5eb] mt-1"/>}
 
                       </div>
 
@@ -3244,23 +3244,23 @@ Soru: ${soruFinal}`
 
                 {/* Kuryeler */}
 
-                <div className="rounded-xl border border-amber-500/15 bg-[#0c0f1a] overflow-hidden">
+                <div className="rounded-xl border border-amber-500/15 bg-[#ffffff] overflow-hidden">
 
                   <div className="px-3 py-2 border-b border-amber-500/15 flex items-center justify-between">
 
-                    <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5"><Truck size={11}/>Kurye (Roadrunner)</span>
+                    <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider flex items-center gap-1.5"><Truck size={11}/>Kurye (Roadrunner)</span>
 
                     <div className="flex items-center gap-2">
 
                       {ch.kuryeFark===0
 
-                        ? <span className="text-[10px] text-emerald-400 flex items-center gap-1"><CheckCircle2 size={10}/>Dengede</span>
+                        ? <span className="text-[10px] text-emerald-600 flex items-center gap-1"><CheckCircle2 size={10}/>Dengede</span>
 
-                        : <span className="text-[10px] text-red-400 flex items-center gap-1"><AlertTriangle size={10}/>{ch.kuryeFark>0?`₺${fmt(ch.kuryeFark)} eksik`:`₺${fmt(Math.abs(ch.kuryeFark))} fazla`}</span>
+                        : <span className="text-[10px] text-red-600 flex items-center gap-1"><AlertTriangle size={10}/>{ch.kuryeFark>0?`₺${fmt(ch.kuryeFark)} eksik`:`₺${fmt(Math.abs(ch.kuryeFark))} fazla`}</span>
 
                       }
 
-                      {!isReadOnly && <button type="button" onClick={kuryeEkle} className="text-[10px] text-gray-600 hover:text-amber-400 border border-[#1a2236] hover:border-amber-500/30 px-2 py-0.5 rounded transition-colors">+ Havuz Kurye</button>}
+                      {!isReadOnly && <button type="button" onClick={kuryeEkle} className="text-[10px] text-gray-600 hover:text-amber-600 border border-[#e2e5eb] hover:border-amber-500/30 px-2 py-0.5 rounded transition-colors">+ Havuz Kurye</button>}
 
                     </div>
 
@@ -3268,7 +3268,7 @@ Soru: ${soruFinal}`
 
                   <div className="p-3 space-y-3">
 
-                    <p className="text-[10px] text-gray-600">Sabit kuryede (Roadrunner) günlük en az <span className="text-amber-400 font-bold">30 paket</span> garantisi var — altında kalınırsa ödemede 30 esas alınır. Havuz kuryede garanti yok.</p>
+                    <p className="text-[10px] text-gray-600">Sabit kuryede (Roadrunner) günlük en az <span className="text-amber-600 font-bold">30 paket</span> garantisi var — altında kalınırsa ödemede 30 esas alınır. Havuz kuryede garanti yok.</p>
 
                     <div className="grid grid-cols-12 gap-1.5">
 
@@ -3296,9 +3296,9 @@ Soru: ${soruFinal}`
 
                               {isReadOnly ? (
 
-                                <div className="bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2 flex items-center gap-1">
+                                <div className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs rounded-lg px-2 flex items-center gap-1">
 
-                                  {sabit && <Truck size={9} className="text-amber-500 shrink-0"/>}{k.isim || "—"}
+                                  {sabit && <Truck size={9} className="text-amber-700 shrink-0"/>}{k.isim || "—"}
 
                                 </div>
 
@@ -3306,13 +3306,13 @@ Soru: ${soruFinal}`
 
                                 <div className="relative">
 
-                                  {sabit && <Truck size={9} className="absolute left-2 top-1/2 -translate-y-1/2 text-amber-500"/>}
+                                  {sabit && <Truck size={9} className="absolute left-2 top-1/2 -translate-y-1/2 text-amber-700"/>}
 
                                   <input type="text" placeholder={sabit?"Kurye adı":"Havuz kurye / firma"} disabled={isReadOnly} value={k.isim}
 
                                     onChange={e=>kuryeDegistir(k.id,"isim",e.target.value)}
 
-                                    className={`w-full bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg ${sabit?"pl-6":"pl-2"} pr-2 outline-none focus:border-amber-500/40 disabled:opacity-40`}/>
+                                    className={`w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs rounded-lg ${sabit?"pl-6":"pl-2"} pr-2 outline-none focus:border-amber-500/40 disabled:opacity-40`}/>
 
                                 </div>
 
@@ -3326,7 +3326,7 @@ Soru: ${soruFinal}`
 
                                 {isReadOnly ? (
 
-                                  <div className="flex-1 bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs font-bold rounded-lg flex items-center justify-center">
+                                  <div className="flex-1 bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs font-bold rounded-lg flex items-center justify-center">
 
                                     {k.gercekPaket}
 
@@ -3338,7 +3338,7 @@ Soru: ${soruFinal}`
 
                                     onChange={e=>kuryeDegistir(k.id,"paketSayisi",e.target.value)}
 
-                                    className="flex-1 w-0 bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs font-bold px-2 rounded-lg outline-none disabled:opacity-40 text-center"/>
+                                    className="flex-1 w-0 bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs font-bold px-2 rounded-lg outline-none disabled:opacity-40 text-center"/>
 
                                 )}
 
@@ -3346,7 +3346,7 @@ Soru: ${soruFinal}`
 
                                   <span title="Ödemede esas alınan paket (garanti uygulandıysa)"
 
-                                    className={`shrink-0 w-9 h-7 flex items-center justify-center text-[10px] font-black rounded-lg border ${k.garantiUygulandi ? "border-amber-500/40 bg-amber-500/10 text-amber-300" : "border-[#1a2236] text-gray-600"}`}>
+                                    className={`shrink-0 w-9 h-7 flex items-center justify-center text-[10px] font-black rounded-lg border ${k.garantiUygulandi ? "border-amber-500/40 bg-amber-500/10 text-amber-700" : "border-[#e2e5eb] text-gray-600"}`}>
 
                                     {k.uygulananPaket}
 
@@ -3358,7 +3358,7 @@ Soru: ${soruFinal}`
 
                               {sabit && k.garantiUygulandi && (
 
-                                <p className="text-[9px] text-amber-500 mt-0.5">Garanti uygulandı (30)</p>
+                                <p className="text-[9px] text-amber-700 mt-0.5">Garanti uygulandı (30)</p>
 
                               )}
 
@@ -3366,13 +3366,13 @@ Soru: ${soruFinal}`
 
                             <div className="col-span-3">
 
-                              <div className={`relative rounded-lg border ${isReadOnly ? "border-amber-500/20 bg-amber-500/5" : "border-[#1a2236]"}`}>
+                              <div className={`relative rounded-lg border ${isReadOnly ? "border-amber-500/20 bg-amber-500/5" : "border-[#e2e5eb]"}`}>
 
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-amber-600 text-[10px] font-bold">₺</span>
 
                                 {isReadOnly ? (
 
-                                  <div className="h-7 pl-5 pr-2 flex items-center text-xs font-bold text-amber-300">
+                                  <div className="h-7 pl-5 pr-2 flex items-center text-xs font-bold text-amber-700">
 
                                     {k.nakit ? fmt(Number(k.nakit)) : "0"}
 
@@ -3384,7 +3384,7 @@ Soru: ${soruFinal}`
 
                                     onChange={e=>kuryeDegistir(k.id,"nakit",e.target.value)}
 
-                                    className="w-full bg-[#080b14] text-white h-7 text-xs font-bold pl-5 pr-1 rounded-lg outline-none focus:border-amber-500/40 disabled:opacity-40"/>
+                                    className="w-full bg-[#f7f8fa] text-[#1a1f2e] h-7 text-xs font-bold pl-5 pr-1 rounded-lg outline-none focus:border-amber-500/40 disabled:opacity-40"/>
 
                                 )}
 
@@ -3394,13 +3394,13 @@ Soru: ${soruFinal}`
 
                             <div className="col-span-3">
 
-                              <div className={`relative rounded-lg border ${isReadOnly ? "border-blue-500/20 bg-blue-500/5" : "border-[#1a2236]"}`}>
+                              <div className={`relative rounded-lg border ${isReadOnly ? "border-blue-500/20 bg-blue-500/5" : "border-[#e2e5eb]"}`}>
 
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-blue-600 text-[10px] font-bold">₺</span>
 
                                 {isReadOnly ? (
 
-                                  <div className="h-7 pl-5 pr-2 flex items-center text-xs font-bold text-blue-300">
+                                  <div className="h-7 pl-5 pr-2 flex items-center text-xs font-bold text-blue-700">
 
                                     {k.pos ? fmt(Number(k.pos)) : "0"}
 
@@ -3412,7 +3412,7 @@ Soru: ${soruFinal}`
 
                                     onChange={e=>kuryeDegistir(k.id,"pos",e.target.value)}
 
-                                    className="w-full bg-[#080b14] text-white h-7 text-xs font-bold pl-5 pr-1 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"/>
+                                    className="w-full bg-[#f7f8fa] text-[#1a1f2e] h-7 text-xs font-bold pl-5 pr-1 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"/>
 
                                 )}
 
@@ -3426,7 +3426,7 @@ Soru: ${soruFinal}`
 
                             <button type="button" onClick={()=>kuryeSil(k.id)}
 
-                              className="absolute -right-5 top-1/2 -translate-y-1/2 text-gray-700 hover:text-red-400 transition-colors">
+                              className="absolute -right-5 top-1/2 -translate-y-1/2 text-gray-700 hover:text-red-600 transition-colors">
 
                               <Trash2 size={11}/>
 
@@ -3440,11 +3440,11 @@ Soru: ${soruFinal}`
 
                     })}
 
-                    <div className="pt-1 border-t border-[#1a2236] flex items-center justify-between text-[10px]">
+                    <div className="pt-1 border-t border-[#e2e5eb] flex items-center justify-between text-[10px]">
 
-                      <span className="text-gray-600">Gerçek toplam: <span className="text-gray-300 font-bold">{ch.tKuryeGercekPaket} pkt</span></span>
+                      <span className="text-gray-600">Gerçek toplam: <span className="text-gray-700 font-bold">{ch.tKuryeGercekPaket} pkt</span></span>
 
-                      <span className="text-gray-600">Ödemeye esas toplam: <span className="text-amber-400 font-bold">{ch.tKuryePaket} pkt</span></span>
+                      <span className="text-gray-600">Ödemeye esas toplam: <span className="text-amber-600 font-bold">{ch.tKuryePaket} pkt</span></span>
 
                     </div>
 
@@ -3456,9 +3456,9 @@ Soru: ${soruFinal}`
 
                 {/* Notlar */}
 
-                <div className="rounded-xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden">
+                <div className="rounded-xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden">
 
-                  <div className="px-3 py-2 border-b border-[#1a2236]">
+                  <div className="px-3 py-2 border-b border-[#e2e5eb]">
 
                     <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5"><StickyNote size={11}/>Notlar</span>
 
@@ -3472,7 +3472,7 @@ Soru: ${soruFinal}`
 
                       rows={2}
 
-                      className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/40 text-white text-xs px-3 py-2 rounded-lg outline-none transition-all resize-none disabled:opacity-40 placeholder:text-gray-700"/>
+                      className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/40 text-[#1a1f2e] text-xs px-3 py-2 rounded-lg outline-none transition-all resize-none disabled:opacity-40 placeholder:text-gray-700"/>
 
                   </div>
 
@@ -3488,7 +3488,7 @@ Soru: ${soruFinal}`
 
             {/* ÖZET BANT */}
 
-            <div className="rounded-xl border border-[#1a2236] bg-[#080b14] px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1">
+            <div className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1">
 
               <div className="flex flex-wrap items-center gap-4 text-xs">
 
@@ -3496,7 +3496,7 @@ Soru: ${soruFinal}`
 
                   <p className="text-[9px] text-gray-600 uppercase tracking-widest">Online</p>
 
-                  <p className="text-sm font-black text-blue-400">₺{fmt(ch.tOnline)}</p>
+                  <p className="text-sm font-black text-blue-600">₺{fmt(ch.tOnline)}</p>
 
                 </div>
 
@@ -3506,7 +3506,7 @@ Soru: ${soruFinal}`
 
                   <p className="text-[9px] text-gray-600 uppercase tracking-widest">Kasa</p>
 
-                  <p className="text-sm font-black text-emerald-400">₺{fmt(ch.tKasa)}</p>
+                  <p className="text-sm font-black text-emerald-600">₺{fmt(ch.tKasa)}</p>
 
                 </div>
 
@@ -3516,7 +3516,7 @@ Soru: ${soruFinal}`
 
                   <p className="text-[9px] text-gray-600 uppercase tracking-widest">Gider</p>
 
-                  <p className="text-sm font-black text-red-300">₺{fmt(ch.tGider)}</p>
+                  <p className="text-sm font-black text-red-700">₺{fmt(ch.tGider)}</p>
 
                 </div>
 
@@ -3526,21 +3526,21 @@ Soru: ${soruFinal}`
 
                   <p className="text-[9px] text-blue-600 uppercase tracking-widest font-bold">Brüt</p>
 
-                  <p className="text-sm font-black text-blue-300">₺{fmt(ch.brutCiro)}</p>
+                  <p className="text-sm font-black text-blue-700">₺{fmt(ch.brutCiro)}</p>
 
                 </div>
 
                 <span className="text-gray-800 hidden sm:block">−</span>
 
-                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">Gider</p><p className="text-sm font-black text-red-400">₺{fmt(ch.tGider)}</p></div>
+                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">Gider</p><p className="text-sm font-black text-red-600">₺{fmt(ch.tGider)}</p></div>
 
                 <span className="text-gray-800 hidden sm:block">−</span>
 
-                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">İade</p><p className="text-sm font-black text-orange-400">₺{fmt(ch.tIade)}</p></div>
+                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">İade</p><p className="text-sm font-black text-orange-600">₺{fmt(ch.tIade)}</p></div>
 
                 <span className="text-gray-800 hidden sm:block">=</span>
 
-                <div><p className="text-[9px] text-emerald-700 uppercase tracking-widest font-bold">Net Ciro</p><p className="text-base font-black text-emerald-400">₺{fmt(ch.netCiro)}</p></div>
+                <div><p className="text-[9px] text-emerald-700 uppercase tracking-widest font-bold">Net Ciro</p><p className="text-base font-black text-emerald-600">₺{fmt(ch.netCiro)}</p></div>
 
               </div>
 
@@ -3548,7 +3548,7 @@ Soru: ${soruFinal}`
 
                 <button type="button" onClick={()=>{formuTemizle();setFormAcik(false);}}
 
-                  className="text-xs font-semibold text-gray-500 hover:text-white border border-[#1a2236] hover:border-[#2a3550] px-4 py-2 rounded-xl transition-colors">
+                  className="text-xs font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] px-4 py-2 rounded-xl transition-colors">
 
                   İptal
 
@@ -3590,7 +3590,7 @@ Soru: ${soruFinal}`
 
   if (loading) return (
 
-    <div className="h-screen bg-[#060810] flex flex-col items-center justify-center gap-3">
+    <div className="h-screen bg-[#f4f5f7] flex flex-col items-center justify-center gap-3">
 
       <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"/>
 
@@ -3606,13 +3606,13 @@ Soru: ${soruFinal}`
 
   return (
 
-    <div className="min-h-screen bg-[#060810] text-white font-sans antialiased">
+    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased">
 
 
 
       {/* NAV HEADER */}
 
-      <div className="sticky top-0 z-40 border-b border-[#0f1624] bg-[#060810]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
 
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
 
@@ -3626,7 +3626,7 @@ Soru: ${soruFinal}`
 
             <div>
 
-              <h1 className="text-sm font-black tracking-tight text-white leading-none">KEBO ERP</h1>
+              <h1 className="text-sm font-black tracking-tight text-[#1a1f2e] leading-none">KEBO ERP</h1>
 
               <p className="text-[10px] text-gray-600 leading-none mt-0.5">Kasa Kapanış Sistemi</p>
 
@@ -3642,7 +3642,7 @@ Soru: ${soruFinal}`
 
                 <button onClick={()=>exportCSV(raporlar,secilenAy,secilenYil)}
 
-                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-emerald-400 border border-[#1a2236] hover:border-emerald-500/30 px-3 py-2 rounded-xl transition-colors">
+                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-emerald-600 border border-[#e2e5eb] hover:border-emerald-500/30 px-3 py-2 rounded-xl transition-colors">
 
                   <FileDown size={13}/> CSV
 
@@ -3650,7 +3650,7 @@ Soru: ${soruFinal}`
 
                 <button onClick={()=>exportPDF(raporlar,secilenAy,secilenYil)}
 
-                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-red-400 border border-[#1a2236] hover:border-red-500/30 px-3 py-2 rounded-xl transition-colors">
+                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-red-600 border border-[#e2e5eb] hover:border-red-500/30 px-3 py-2 rounded-xl transition-colors">
 
                   <FileDown size={13}/> PDF
 
@@ -3664,7 +3664,7 @@ Soru: ${soruFinal}`
 
               className={`flex items-center gap-1.5 text-[11px] font-semibold border px-3 py-2 rounded-xl transition-colors ${
 
-                aiAcik ? "text-purple-300 border-purple-500/40 bg-purple-500/10" : "text-gray-500 hover:text-purple-400 border-[#1a2236] hover:border-purple-500/30"
+                aiAcik ? "text-purple-700 border-purple-500/40 bg-purple-500/10" : "text-gray-500 hover:text-purple-600 border-[#e2e5eb] hover:border-purple-500/30"
 
               }`}>
 
@@ -3674,7 +3674,7 @@ Soru: ${soruFinal}`
 
             <button onClick={veriCek}
 
-              className="p-2 text-gray-600 hover:text-white border border-[#1a2236] hover:border-[#2a3550] rounded-xl transition-colors">
+              className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] rounded-xl transition-colors">
 
               <RefreshCw size={14}/>
 
@@ -3686,7 +3686,7 @@ Soru: ${soruFinal}`
 
                 className={`relative flex items-center gap-1.5 text-[11px] font-semibold border px-3 py-2 rounded-xl transition-colors ${
 
-                  onayBekleyenler.length>0 ? "text-amber-300 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/15" : "text-gray-500 hover:text-white border-[#1a2236] hover:border-[#2a3550]"
+                  onayBekleyenler.length>0 ? "text-amber-700 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/15" : "text-gray-500 hover:text-[#1a1f2e] border-[#e2e5eb] hover:border-[#d8dde5]"
 
                 }`}>
 
@@ -3726,19 +3726,19 @@ Soru: ${soruFinal}`
 
         {aiAcik && (
 
-          <div className="rounded-2xl border border-purple-500/20 bg-[#0d0a1a] overflow-hidden">
+          <div className="rounded-2xl border border-purple-500/20 bg-[#faf9ff] overflow-hidden">
 
             <div className="px-5 py-3 border-b border-purple-500/20 flex items-center gap-3">
 
               <div className="w-6 h-6 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
 
-                <Sparkles className="h-3.5 w-3.5 text-purple-400"/>
+                <Sparkles className="h-3.5 w-3.5 text-purple-600"/>
 
               </div>
 
-              <span className="text-sm font-semibold text-purple-300">AI Rapor Analizi</span>
+              <span className="text-sm font-semibold text-purple-700">AI Rapor Analizi</span>
 
-              <span className="text-[10px] text-gray-600 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] text-gray-600 bg-black/[0.04] border border-white/10 px-2 py-0.5 rounded-full">
 
                 {AYLAR.find(m=>m.value===secilenAy)?.label} {secilenYil} · {raporlar.length} gün
 
@@ -3762,7 +3762,7 @@ Soru: ${soruFinal}`
 
                   placeholder="Örnek: Bu ay en iyi günlerim hangileri? Giderlerim neden yüksek?"
 
-                  className="flex-1 bg-[#080b14] border border-purple-500/20 focus:border-purple-500/40 text-white text-sm px-4 py-2.5 rounded-xl outline-none transition-all placeholder:text-gray-600"
+                  className="flex-1 bg-[#f7f8fa] border border-purple-500/20 focus:border-purple-500/40 text-[#1a1f2e] text-sm px-4 py-2.5 rounded-xl outline-none transition-all placeholder:text-gray-600"
 
                 />
 
@@ -3806,7 +3806,7 @@ Soru: ${soruFinal}`
 
                     disabled={aiYukleniyor || raporlar.length===0}
 
-                    className="text-[10px] text-gray-500 hover:text-purple-300 border border-[#1a2236] hover:border-purple-500/30 disabled:opacity-40 px-2.5 py-1 rounded-lg transition-colors">
+                    className="text-[10px] text-gray-500 hover:text-purple-700 border border-[#e2e5eb] hover:border-purple-500/30 disabled:opacity-40 px-2.5 py-1 rounded-lg transition-colors">
 
                     {s}
 
@@ -3820,7 +3820,7 @@ Soru: ${soruFinal}`
 
               {aiCevap && (
 
-                <div className="bg-[#080b14] border border-purple-500/10 rounded-xl p-4 text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+                <div className="bg-[#f7f8fa] border border-purple-500/10 rounded-xl p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
 
                   {aiCevap}
 
@@ -3850,21 +3850,21 @@ Soru: ${soruFinal}`
 
         {formAcik && (
 
-          <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden shadow-2xl">
+          <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden shadow-2xl">
 
-            <div className="px-5 py-4 border-b border-[#1a2236] flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
 
               <div className="flex items-center gap-3">
 
                 <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/20 flex items-center justify-center">
 
-                  <TrendingUp className="h-3.5 w-3.5 text-blue-400"/>
+                  <TrendingUp className="h-3.5 w-3.5 text-blue-600"/>
 
                 </div>
 
                 <div>
 
-                  <h2 className="text-sm font-bold text-white">
+                  <h2 className="text-sm font-bold text-[#1a1f2e]">
 
                     {selectedRapor ? (isEditMode ? "Raporu Düzenle" : "Rapor Detayı") : "Yeni Gün Sonu Raporu"}
 
@@ -3882,7 +3882,7 @@ Soru: ${soruFinal}`
 
                   <button onClick={()=>setPrintRapor(selectedRapor)}
 
-                    className="p-2 text-gray-600 hover:text-white border border-[#1a2236] hover:border-[#2a3550] rounded-xl transition-colors">
+                    className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] rounded-xl transition-colors">
 
                     <Printer size={14}/>
 
@@ -3892,7 +3892,7 @@ Soru: ${soruFinal}`
 
                 <button onClick={()=>{formuTemizle();setFormAcik(false);}}
 
-                  className="p-2 text-gray-600 hover:text-white border border-[#1a2236] hover:border-[#2a3550] rounded-xl transition-colors">
+                  className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] rounded-xl transition-colors">
 
                   <X size={14}/>
 
@@ -3916,13 +3916,13 @@ Soru: ${soruFinal}`
 
         {!formAcik && (
 
-          <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden shadow-xl">
+          <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden shadow-xl">
 
-            <div className="px-5 py-4 border-b border-[#1a2236] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="px-5 py-4 border-b border-[#e2e5eb] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 
               <div className="flex items-center gap-3">
 
-                <div className="w-7 h-7 rounded-lg bg-white/5 border border-[#1a2236] flex items-center justify-center">
+                <div className="w-7 h-7 rounded-lg bg-black/[0.04] border border-[#e2e5eb] flex items-center justify-center">
 
                   <FileText className="h-3.5 w-3.5 text-gray-400"/>
 
@@ -3930,7 +3930,7 @@ Soru: ${soruFinal}`
 
                 <div>
 
-                  <h3 className="text-sm font-semibold text-gray-200">Kapanış Arşivi</h3>
+                  <h3 className="text-sm font-semibold text-gray-800">Kapanış Arşivi</h3>
 
                   <p className="text-[10px] text-gray-600">
 
@@ -3948,23 +3948,23 @@ Soru: ${soruFinal}`
 
                   <div className="flex sm:hidden items-center gap-1">
 
-                    <button onClick={()=>exportCSV(raporlar,secilenAy,secilenYil)} className="text-[10px] text-gray-600 hover:text-emerald-400 border border-[#1a2236] px-2.5 py-1.5 rounded-lg transition-colors">CSV</button>
+                    <button onClick={()=>exportCSV(raporlar,secilenAy,secilenYil)} className="text-[10px] text-gray-600 hover:text-emerald-600 border border-[#e2e5eb] px-2.5 py-1.5 rounded-lg transition-colors">CSV</button>
 
-                    <button onClick={()=>exportPDF(raporlar,secilenAy,secilenYil)} className="text-[10px] text-gray-600 hover:text-red-400 border border-[#1a2236] px-2.5 py-1.5 rounded-lg transition-colors">PDF</button>
+                    <button onClick={()=>exportPDF(raporlar,secilenAy,secilenYil)} className="text-[10px] text-gray-600 hover:text-red-600 border border-[#e2e5eb] px-2.5 py-1.5 rounded-lg transition-colors">PDF</button>
 
                   </div>
 
                 )}
 
-                <div className="flex items-center gap-2 bg-[#080b14] border border-[#1a2236] px-3 py-2 rounded-xl">
+                <div className="flex items-center gap-2 bg-[#f7f8fa] border border-[#e2e5eb] px-3 py-2 rounded-xl">
 
                   <Calendar size={12} className="text-gray-600"/>
 
                   <select value={secilenAy} onChange={e=>setSecilenAy(e.target.value)}
 
-                    className="bg-transparent text-xs font-semibold text-gray-300 outline-none cursor-pointer">
+                    className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer">
 
-                    {AYLAR.map(m=><option key={m.value} value={m.value} className="bg-[#0c0f1a]">{m.label}</option>)}
+                    {AYLAR.map(m=><option key={m.value} value={m.value} className="bg-[#ffffff]">{m.label}</option>)}
 
                   </select>
 
@@ -3972,9 +3972,9 @@ Soru: ${soruFinal}`
 
                   <select value={secilenYil} onChange={e=>setSecilenYil(e.target.value)}
 
-                    className="bg-transparent text-xs font-semibold text-gray-300 outline-none cursor-pointer">
+                    className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer">
 
-                    {["2024","2025","2026","2027"].map(y=><option key={y} value={y} className="bg-[#0c0f1a]">{y}</option>)}
+                    {["2024","2025","2026","2027"].map(y=><option key={y} value={y} className="bg-[#ffffff]">{y}</option>)}
 
                   </select>
 
@@ -3992,7 +3992,7 @@ Soru: ${soruFinal}`
 
                 <thead>
 
-                  <tr className="border-b border-[#1a2236] bg-[#080b14]">
+                  <tr className="border-b border-[#e2e5eb] bg-[#f7f8fa]">
 
                     {["Tarih","Brüt Ciro","Net Ciro","Paket","Sepet Ort.","Gider+İade",""].map((h,i)=>(
 
@@ -4036,25 +4036,25 @@ Soru: ${soruFinal}`
 
                         onClick={()=>{setSelectedRapor(rapor);raporuFormaYukle(rapor);setIsEditMode(false);setFormAcik(true);}}
 
-                        className="hover:bg-white/[0.02] cursor-pointer transition-colors group">
+                        className="hover:bg-black/[0.03] cursor-pointer transition-colors group">
 
-                        <td className="px-4 py-3.5 font-semibold text-gray-300 group-hover:text-blue-400 transition-colors">
+                        <td className="px-4 py-3.5 font-semibold text-gray-700 group-hover:text-blue-600 transition-colors">
 
                           {new Date(rapor.tarih+"T12:00:00").toLocaleDateString("tr-TR")}
 
-                          {rapor.gider_aciklama?.includes("|| NOT:") && <span className="ml-1.5 text-[9px] text-blue-500/60 bg-blue-500/10 px-1.5 py-0.5 rounded-full">Not</span>}
+                          {rapor.gider_aciklama?.includes("|| NOT:") && <span className="ml-1.5 text-[9px] text-blue-700/60 bg-blue-500/10 px-1.5 py-0.5 rounded-full">Not</span>}
 
                         </td>
 
-                        <td className="px-4 py-3.5 text-blue-400 font-semibold">₺{fmt(brutCiro)}</td>
+                        <td className="px-4 py-3.5 text-blue-600 font-semibold">₺{fmt(brutCiro)}</td>
 
-                        <td className="px-4 py-3.5 text-emerald-400 font-black">₺{fmt(net)}</td>
+                        <td className="px-4 py-3.5 text-emerald-600 font-black">₺{fmt(net)}</td>
 
-                        <td className="px-4 py-3.5 text-amber-400 font-semibold">{paket}</td>
+                        <td className="px-4 py-3.5 text-amber-600 font-semibold">{paket}</td>
 
-                        <td className="px-4 py-3.5 text-purple-400 font-bold">₺{fmt(ort)}</td>
+                        <td className="px-4 py-3.5 text-purple-600 font-bold">₺{fmt(ort)}</td>
 
-                        <td className="px-4 py-3.5 text-red-400 font-medium">{gi>0?`-₺${fmt(gi)}`:"—"}</td>
+                        <td className="px-4 py-3.5 text-red-600 font-medium">{gi>0?`-₺${fmt(gi)}`:"—"}</td>
 
                         <td className="px-4 py-3.5">
 
@@ -4064,7 +4064,7 @@ Soru: ${soruFinal}`
 
                             <button onClick={e=>{e.stopPropagation();setPrintRapor(rapor);}}
 
-                              className="p-1 text-gray-600 hover:text-gray-300 rounded transition-colors ml-1">
+                              className="p-1 text-gray-600 hover:text-gray-900 rounded transition-colors ml-1">
 
                               <Printer size={11}/>
 
@@ -4086,19 +4086,19 @@ Soru: ${soruFinal}`
 
                   <tfoot>
 
-                    <tr className="border-t-2 border-[#1a2236] bg-[#080b14]">
+                    <tr className="border-t-2 border-[#e2e5eb] bg-[#f7f8fa]">
 
                       <td className="px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Dönem Toplamı</td>
 
-                      <td className="px-4 py-3 text-blue-400 font-black">₺{fmt(tabloToplam.brut)}</td>
+                      <td className="px-4 py-3 text-blue-600 font-black">₺{fmt(tabloToplam.brut)}</td>
 
-                      <td className="px-4 py-3 text-emerald-400 font-black text-sm">₺{fmt(tabloToplam.net)}</td>
+                      <td className="px-4 py-3 text-emerald-600 font-black text-sm">₺{fmt(tabloToplam.net)}</td>
 
-                      <td className="px-4 py-3 text-amber-400 font-black">{tabloToplam.paket}</td>
+                      <td className="px-4 py-3 text-amber-600 font-black">{tabloToplam.paket}</td>
 
-                      <td className="px-4 py-3 text-purple-400 font-black">₺{fmt(tabloToplam.paketOrt)}</td>
+                      <td className="px-4 py-3 text-purple-600 font-black">₺{fmt(tabloToplam.paketOrt)}</td>
 
-                      <td className="px-4 py-3 text-red-400 font-black">-₺{fmt(tabloToplam.giderIade)}</td>
+                      <td className="px-4 py-3 text-red-600 font-black">-₺{fmt(tabloToplam.giderIade)}</td>
 
                       <td/>
 
@@ -4136,13 +4136,13 @@ Soru: ${soruFinal}`
 
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
 
-          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
+          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
 
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#1a2236]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e5eb]">
 
-              <p className="text-sm font-black text-white flex items-center gap-2"><AlertTriangle size={15} className="text-amber-400"/> Rapor Değişiklik Talepleri</p>
+              <p className="text-sm font-black text-[#1a1f2e] flex items-center gap-2"><AlertTriangle size={15} className="text-amber-600"/> Rapor Değişiklik Talepleri</p>
 
-              <button onClick={()=>setOnayModalAcik(false)} className="text-gray-600 hover:text-white"><X size={16}/></button>
+              <button onClick={()=>setOnayModalAcik(false)} className="text-gray-600 hover:text-[#1a1f2e]"><X size={16}/></button>
 
             </div>
 
@@ -4150,7 +4150,7 @@ Soru: ${soruFinal}`
 
               <button onClick={()=>setOnayModalTab("bekleyen")}
 
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${onayModalTab==="bekleyen"?"bg-amber-500/15 text-amber-300 border border-amber-500/30":"text-gray-500 hover:text-white"}`}>
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${onayModalTab==="bekleyen"?"bg-amber-500/15 text-amber-700 border border-amber-500/30":"text-gray-500 hover:text-[#1a1f2e]"}`}>
 
                 Bekleyen ({onayBekleyenler.length})
 
@@ -4158,7 +4158,7 @@ Soru: ${soruFinal}`
 
               <button onClick={()=>setOnayModalTab("gecmis")}
 
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${onayModalTab==="gecmis"?"bg-blue-500/15 text-blue-300 border border-blue-500/30":"text-gray-500 hover:text-white"}`}>
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${onayModalTab==="gecmis"?"bg-blue-500/15 text-blue-700 border border-blue-500/30":"text-gray-500 hover:text-[#1a1f2e]"}`}>
 
                 Geçmiş ({onayGecmisi.length})
 
@@ -4184,7 +4184,7 @@ Soru: ${soruFinal}`
 
                       <div className="flex items-center justify-between mb-2">
 
-                        <p className="text-xs font-bold text-white">{fmtTarih(talep.rapor_tarihi)} tarihli rapor</p>
+                        <p className="text-xs font-bold text-[#1a1f2e]">{fmtTarih(talep.rapor_tarihi)} tarihli rapor</p>
 
                         <p className="text-[10px] text-gray-500">{talep.talep_eden} · {new Date(talep.talep_tarihi).toLocaleString("tr-TR")}</p>
 
@@ -4208,7 +4208,7 @@ Soru: ${soruFinal}`
 
                               <span className="text-gray-600">→</span>
 
-                              <span className="text-emerald-400 font-semibold">{typeof f.yeniDeger==="number"?`₺${fmt(f.yeniDeger)}`:(f.yeniDeger||"—")}</span>
+                              <span className="text-emerald-600 font-semibold">{typeof f.yeniDeger==="number"?`₺${fmt(f.yeniDeger)}`:(f.yeniDeger||"—")}</span>
 
                             </span>
 
@@ -4222,7 +4222,7 @@ Soru: ${soruFinal}`
 
                         <button onClick={()=>handleTalepReddet(talep)} disabled={onayIslemId===talep.id}
 
-                          className="flex-1 text-xs font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 disabled:opacity-40 py-2 rounded-lg transition-colors">
+                          className="flex-1 text-xs font-bold text-red-600 border border-red-500/30 hover:bg-red-500/10 disabled:opacity-40 py-2 rounded-lg transition-colors">
 
                           Reddet
 
@@ -4256,7 +4256,7 @@ Soru: ${soruFinal}`
 
                   <div key={talep.id} className={`rounded-xl border p-3 text-[11px] ${talep.durum==="onaylandi"?"border-emerald-500/20 bg-emerald-500/5":"border-red-500/20 bg-red-500/5"}`}>
 
-                    <p className="text-white font-semibold mb-1">{fmtTarih(talep.rapor_tarihi)} tarihli rapor</p>
+                    <p className="text-[#1a1f2e] font-semibold mb-1">{fmtTarih(talep.rapor_tarihi)} tarihli rapor</p>
 
                     <p className="text-gray-400">
 
@@ -4264,7 +4264,7 @@ Soru: ${soruFinal}`
 
                     </p>
 
-                    <p className={talep.durum==="onaylandi"?"text-emerald-400":"text-red-400"}>
+                    <p className={talep.durum==="onaylandi"?"text-emerald-600":"text-red-600"}>
 
                       <span className="font-semibold">{talep.onaylayan}</span> {talep.durum==="onaylandi"?"onayladı":"reddetti"} ({talep.onay_tarihi ? new Date(talep.onay_tarihi).toLocaleString("tr-TR") : "—"})
 
