@@ -20,7 +20,7 @@ import {
 
   RotateCcw, Save, Slash, TrendingDown, Hash, Building2, Search, Sparkles,
 
-  Banknote, CreditCard, Percent, Truck, Users2
+  Banknote, CreditCard, Percent, Truck, Users2, Camera, ImageUp
 
 } from "lucide-react";
 
@@ -1437,6 +1437,12 @@ export default function RaporlarPage() {
   // Not: Personel Avans artık ayrı bir state değil — Giderler listesinde tip:"personel" olan satırlar bu işi görüyor.
   const [kesintiSatirlari, setKesintiSatirlari] = useState<{id:number; personelIsim:string; tutar:string; aciklama:string}[]>([]);
 
+  // ── Fişten Doldur (AI tarama) ──
+  const [taramaYukleniyor, setTaramaYukleniyor] = useState(false);
+  const [taramaHata, setTaramaHata] = useState("");
+  const [taramaBelirsizAlanlar, setTaramaBelirsizAlanlar] = useState<string[]>([]);
+  const dosyaInputRef = useRef<HTMLInputElement>(null);
+
 
 
   // ── Data Fetch ──
@@ -2016,6 +2022,93 @@ export default function RaporlarPage() {
 
   };
 
+  // ── Fişten Doldur: kağıt raporu fotoğraflayıp/yükleyip AI'ye okutma ──
+  const nToStr = (n:number|undefined) => (n && n>0) ? fmt(n) : "";
+
+  const handleFisTara = async (file: File) => {
+    if (!file) return;
+    setTaramaYukleniyor(true); setTaramaHata(""); setTaramaBelirsizAlanlar([]);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const response = await fetch("/api/rapor-tara", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64, mediaType: file.type || "image/jpeg" }),
+      });
+      const veri = await response.json();
+      if (!response.ok || veri.error) {
+        setTaramaHata(veri.error || "Fiş okunamadı, tekrar deneyin."); return;
+      }
+
+      // Tarih (sadece yeni rapor eklerken, düzenleme modunda tarihi ezme)
+      if (veri.tarih && !selectedRapor) handleTarihChange(veri.tarih);
+
+      const pg = (o:any): PlatformGiris => ({ tutar: nToStr(o?.tutar), paket: o?.paket ? String(o.paket) : "" });
+
+      const ok = veri.online?.kebo || {}; const oc = veri.online?.cnf || {};
+      setOsKeboYs(pg(ok.ys)); setOsKeboYsIndirim(nToStr(ok.ys?.indirim));
+      setOsKeboTrendyol(pg(ok.trendyol)); setOsKeboTrendyolIndirim(nToStr(ok.trendyol?.indirim));
+      setOsKeboMigros(pg(ok.migros));
+      setOsCnfYs(pg(oc.ys)); setOsCnfYsIndirim(nToStr(oc.ys?.indirim));
+      setOsCnfTrendyol(pg(oc.trendyol)); setOsCnfTrendyolIndirim(nToStr(oc.trendyol?.indirim));
+      setOsCnfMigrosYemek(pg(oc.migrosYemek));
+
+      const kk = veri.kapida?.kebo || {}; const kc = veri.kapida?.cnf || {};
+      setKoKeboYs(pg(kk.ys)); setKoKeboYsIndirim(nToStr(kk.ys?.indirim));
+      setKoKeboTrendyol(pg(kk.trendyol)); setKoKeboTrendyolIndirim(nToStr(kk.trendyol?.indirim));
+      setKoKeboMigrosYemek(pg(kk.migrosYemek)); setKoKeboAlo(pg(kk.alo));
+      setKoCnfYs(pg(kc.ys)); setKoCnfYsIndirim(nToStr(kc.ys?.indirim));
+      setKoCnfTrendyol(pg(kc.trendyol)); setKoCnfTrendyolIndirim(nToStr(kc.trendyol?.indirim));
+      setKoCnfMigrosYemek(pg(kc.migrosYemek)); setKoCnfAlo(pg(kc.alo));
+
+      if (veri.kasa) {
+        setKasaNakit(nToStr(veri.kasa.nakit)); setKasaPos(nToStr(veri.kasa.pos));
+        setKasaEdenred(nToStr(veri.kasa.edenred)); setKasaMetropol(nToStr(veri.kasa.metropol));
+      }
+
+      const yeniGiderler: SatirRaporu[] = [];
+      (veri.giderler||[]).forEach((g:any,i:number) => {
+        if (g.tutar || g.aciklama) yeniGiderler.push({ id: Date.now()+i, aciklama: g.aciklama||"", tutar: nToStr(g.tutar), tip: "normal" });
+      });
+      (veri.avanslar||[]).forEach((a:any,i:number) => {
+        if (a.tutar || a.personel) yeniGiderler.push({ id: Date.now()+100+i, aciklama: a.aciklama||"", tutar: nToStr(a.tutar), tip: "personel", personelIsim: a.personel||"" });
+      });
+      if (yeniGiderler.length) setGiderler(yeniGiderler);
+
+      const yeniKesintiler = (veri.kesintiler||[]).filter((k:any)=>k.tutar||k.personel)
+        .map((k:any,i:number)=>({ id: Date.now()+200+i, personelIsim: k.personel||"", tutar: nToStr(k.tutar), aciklama: k.aciklama||"" }));
+      if (yeniKesintiler.length) setKesintiSatirlari(yeniKesintiler);
+
+      const yeniIadeler = (veri.iadeler||[]).filter((i:any)=>i.tutar||i.aciklama)
+        .map((i:any,idx:number)=>({ id: Date.now()+300+idx, aciklama: i.aciklama||"", tutar: nToStr(i.tutar) }));
+      if (yeniIadeler.length) setIadeler(yeniIadeler);
+
+      const sabitler = (veri.kuryeSabit||[]);
+      const havuzlar = (veri.kuryeHavuz||[]).filter((k:any)=>k.isim||k.paket||k.tutar);
+      const yeniKuryeler: KuryeRaporu[] = [
+        { id:1, isim: sabitler[0]?.isim||"Kurye 1", nakit: nToStr(sabitler[0]?.nakit), pos: nToStr(sabitler[0]?.pos), paketSayisi: sabitler[0]?.paket?String(sabitler[0].paket):"", tip:"sabit" },
+        { id:2, isim: sabitler[1]?.isim||"Kurye 2", nakit: nToStr(sabitler[1]?.nakit), pos: nToStr(sabitler[1]?.pos), paketSayisi: sabitler[1]?.paket?String(sabitler[1].paket):"", tip:"sabit" },
+        ...havuzlar.map((k:any,i:number)=>({ id: Date.now()+400+i, isim: k.isim||"Havuz Kurye", nakit: nToStr(k.nakit), pos: nToStr(k.pos), paketSayisi: k.paket?String(k.paket):"", tip:"havuz" as const })),
+      ];
+      setKuryeler(yeniKuryeler);
+
+      if (veri.notlar) setNotlar(veri.notlar);
+
+      setTaramaBelirsizAlanlar(veri.belirsiz_alanlar || []);
+    } catch (err:any) {
+      setTaramaHata("Bağlantı hatası: " + err.message);
+    } finally {
+      setTaramaYukleniyor(false);
+      if (dosyaInputRef.current) dosyaInputRef.current.value = "";
+    }
+  };
+
 
 
   // ── AI Rapor Analizi (proje içi /api/chat endpoint'i üzerinden) ──
@@ -2500,6 +2593,41 @@ Soru: ${soruFinal}`
       )}
 
 
+
+      {/* FİŞTEN DOLDUR (AI Tarama) */}
+      {!isReadOnly && (
+        <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center shrink-0">
+              {taramaYukleniyor ? <Loader2 size={14} className="text-indigo-400 animate-spin"/> : <Camera size={14} className="text-indigo-400"/>}
+            </div>
+            <div>
+              <p className="text-xs font-bold text-indigo-300">Fişten Doldur</p>
+              <p className="text-[10px] text-gray-500">Kağıt raporun fotoğrafını yükle, AI okuyup formu doldursun</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input ref={dosyaInputRef} type="file" accept="image/*" capture="environment" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleFisTara(f); }}/>
+            <button type="button" disabled={taramaYukleniyor} onClick={() => dosyaInputRef.current?.click()}
+              className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 px-3.5 py-2 rounded-xl transition-colors">
+              {taramaYukleniyor ? "Okunuyor..." : <><Camera size={13}/> Tara</>}
+            </button>
+          </div>
+        </div>
+      )}
+      {taramaHata && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2.5 flex items-center gap-2">
+          <AlertTriangle size={13} className="text-red-400 shrink-0"/>
+          <p className="text-xs text-red-300">{taramaHata}</p>
+        </div>
+      )}
+      {taramaBelirsizAlanlar.length > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-2.5">
+          <p className="text-xs font-bold text-amber-400 flex items-center gap-1.5 mb-1"><AlertTriangle size={12}/> AI bazı alanlardan emin olamadı — lütfen kontrol et:</p>
+          <p className="text-[11px] text-amber-200/80">{taramaBelirsizAlanlar.join(", ")}</p>
+        </div>
+      )}
 
       {/* TARİH + CANLI METRİKLER */}
 

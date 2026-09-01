@@ -1,44 +1,35 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
-// Bu endpoint Vercel Cron tarafından günlük olarak tetiklenir. Amacı,
-// Supabase projesinin uzun süre işlem görmediği için duraklatılmasını
-// (free plan cold start / pause) önlemektir. Böylece kullanıcılar panele
-// giriş yaptığında Supabase her zaman "uyanık" olur ve middleware
-// zaman aşımı (504 MIDDLEWARE_INVOCATION_TIMEOUT) yaşanmaz.
-export async function GET(request: Request) {
-  // Vercel dışından rastgele çağrılmasını engellemek için CRON_SECRET
-  // kontrolü. Vercel bu değeri cron isteklerine otomatik ekler; projene
-  // env variable olarak CRON_SECRET eklersen bu koruma aktif olur.
-  const authHeader = request.headers.get("authorization");
-  if (
-    process.env.CRON_SECRET &&
-    authHeader !== `Bearer ${process.env.CRON_SECRET}`
-  ) {
-    return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 401 });
-  }
-
+// AI Analiz (raporlar sayfasındaki "AI Analiz" paneli) ve genel amaçlı
+// Claude tamamlama istekleri buradan geçer. Anahtar sadece burada,
+// sunucu tarafında kullanılır — tarayıcıya asla gönderilmez.
+//
+// NOT: Supabase "keepalive" (uyanık tutma) görevi artık burada değil,
+// /api/keepalive altında — vercel.json'daki cron tanımıyla eşleşsin diye.
+export async function POST(req: Request) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const body = await req.json();
 
-    // Hafif bir sorgu ile Supabase'i aktif tutuyoruz. RLS nedeniyle satır
-    // dönmeyebilir, önemli olan bağlantının kurulup projeyi "uyandırması".
-    const { error } = await supabase.from("profiles").select("id").limit(1);
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || "",
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify(body),
+    });
 
-    if (error) {
-      console.error("[keepalive] Supabase sorgu hatası:", error.message);
-      return NextResponse.json(
-        { ok: false, error: error.message },
-        { status: 500 }
-      );
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("API Hatası:", data);
+      return NextResponse.json({ error: "API Hatası", details: data }, { status: response.status });
     }
 
-    return NextResponse.json({ ok: true, checkedAt: new Date().toISOString() });
+    return NextResponse.json(data);
   } catch (error) {
-    console.error("[keepalive] Beklenmeyen hata:", error);
-    return NextResponse.json({ ok: false }, { status: 500 });
+    console.error("Sunucu Hatası:", error);
+    return NextResponse.json({ error: "Sunucu Hatası" }, { status: 500 });
   }
 }

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// Bu endpoint Vercel Cron tarafından günlük olarak tetiklenir. Amacı,
-// Supabase projesinin uzun süre işlem görmediği için duraklatılmasını
+// Bu endpoint Vercel Cron tarafından günlük olarak tetiklenir (bkz. vercel.json).
+// Amacı, Supabase projesinin uzun süre işlem görmediği için duraklatılmasını
 // (free plan cold start / pause) önlemektir. Böylece kullanıcılar panele
 // giriş yaptığında Supabase her zaman "uyanık" olur ve middleware
-// zaman aşımı (504 MIDDLEWARE_INVOCATION_TIMEOUT) yaşanmaz.
+// zaman aşımı (504 MIDDLEWARE_INVOCATION_TIMEOUT) ya da eksik veri (personel
+// listesi, kullanıcı adları vb. gelmemesi) yaşanmaz.
 export async function GET(request: Request) {
   // Vercel dışından rastgele çağrılmasını engellemek için CRON_SECRET
   // kontrolü. Vercel bu değeri cron isteklerine otomatik ekler; projene
