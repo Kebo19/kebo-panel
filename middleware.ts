@@ -102,9 +102,11 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Görseller, ikonlar, arka plan dosyaları ve keepalive endpoint'i hariç
-     * her sayfada bu güvenliği çalıştır:
+     * Görseller, ikonlar, arka plan dosyaları ve tüm api/ uç noktaları
+     * (chat, keepalive, rapor-tara — kendi hata/oturum kontrolünü kendileri
+     * yapıyor, sayfa girişi gibi login'e yönlendirilmemeliler) hariç her
+     * sayfada bu güvenliği çalıştır:
      */
-    '/((?!_next/static|_next/image|favicon.ico|api/keepalive|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
