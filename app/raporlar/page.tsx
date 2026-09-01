@@ -38,7 +38,7 @@ interface KuryeRaporu {
 
   id: number; isim: string; nakit: string; pos: string; paketSayisi: string;
 
-  tip?: "sabit" | "havuz"; // sabit = Roadrunner garantili kurye, havuz = garantisiz ek kurye
+  tip?: "sabit" | "havuz" | "kendi"; // sabit = Roadrunner garantili kurye, havuz = garantisiz ek kurye, kendi = 14.08.2026 öncesi kendi personel kurye
 
 }
 
@@ -46,9 +46,9 @@ interface PlatformGiris { tutar: string; paket: string; }
 
 interface SatirRaporu {
 
-  id: number; aciklama: string; tutar: string; tip?: "normal" | "firma";
+  id: number; aciklama: string; tutar: string; tip?: "normal" | "firma" | "personel";
 
-  firmaId?: string; firmaUnvan?: string;
+  firmaId?: string; firmaUnvan?: string; personelIsim?: string;
 
 }
 
@@ -1112,6 +1112,30 @@ function CurrencyInput({label, value, onChange, disabled=false, accent="gray"}:
 
 
 
+// ─── KURYE DÖNEM YAPISI ────────────────────────────────────────────────────────
+// 13.08.2026: Geçiş günü — hem kendi kurye hem Roadrunner havuz kuryesi çalıştı (garanti yok).
+// 14.08.2026'dan itibaren: Roadrunner 2 sabit kurye (30 paket garantili) + havuz kurye.
+// Bu tarihten öncesi: sadece kendi personel kuryesi (garanti yok).
+const ROADRUNNER_GECIS_GUNU = "2026-08-13";
+const ROADRUNNER_TAM_BASLANGIC = "2026-08-14";
+
+function kuryeYapisiHesapla(tarihStr: string): KuryeRaporu[] {
+  if (!tarihStr || tarihStr < ROADRUNNER_GECIS_GUNU) {
+    return [{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:"",tip:"kendi"}];
+  }
+  if (tarihStr === ROADRUNNER_GECIS_GUNU) {
+    return [
+      {id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:"",tip:"kendi"},
+      {id:Date.now()+1,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",tip:"havuz"},
+    ];
+  }
+  return [
+    {id:1,isim:"Kurye 1",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
+    {id:2,isim:"Kurye 2",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
+    {id:3,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",tip:"havuz"},
+  ];
+}
+
 // ─── PLATFORM SATIRI (tutar + paket sayısı + opsiyonel indirim) ───────────────
 
 function PlatformSatir({label, value, onChange, indirim, onIndirimChange, disabled=false}:
@@ -1410,7 +1434,7 @@ export default function RaporlarPage() {
 
   // Personel Avans / Yemek Kesintisi hızlı giriş (Giderler bölümünden) — tüm aktif personeli listeler
   const [avansPersonelListesi, setAvansPersonelListesi] = useState<string[]>([]);
-  const [avansSatirlari, setAvansSatirlari] = useState<{id:number; personelIsim:string; tutar:string; aciklama:string}[]>([]);
+  // Not: Personel Avans artık ayrı bir state değil — Giderler listesinde tip:"personel" olan satırlar bu işi görüyor.
   const [kesintiSatirlari, setKesintiSatirlari] = useState<{id:number; personelIsim:string; tutar:string; aciklama:string}[]>([]);
 
 
@@ -1556,6 +1580,9 @@ export default function RaporlarPage() {
 
     setTarih(val); setAdminOnayliGecis(false); setDuplikaTarihHata(false);
 
+    // Yeni rapor eklerken (düzenleme değil) seçilen tarihe göre doğru kurye yapısını (kendi/geçiş/Roadrunner) otomatik kur.
+    if (!selectedRapor) setKuryeler(kuryeYapisiHesapla(val));
+
     if (!val||selectedRapor||!enSonRaporTarihi) { setTarihHataVarMi(false); return; }
 
     if (mevcutTarihler.has(val)) { setDuplikaTarihHata(true); setTarihHataVarMi(false); return; }
@@ -1586,7 +1613,7 @@ export default function RaporlarPage() {
 
     setIadeler([{id:Date.now(),aciklama:"",tutar:""}]);
 
-    setAvansSatirlari([]);setKesintiSatirlari([]);
+    setKesintiSatirlari([]);
 
     setTarih("");setTarihHataVarMi(false);setAdminOnayliGecis(false);setDuplikaTarihHata(false);
 
@@ -1810,6 +1837,22 @@ export default function RaporlarPage() {
 
           }
 
+          // Personel avans tespiti (önek "[Personel Avans] Ad — açıklama" biçiminde)
+          const personelPrefix = "[Personel Avans] ";
+          if (aciklama.startsWith(personelPrefix)) {
+            const govde = aciklama.substring(personelPrefix.length);
+            const ayrimIdx = govde.indexOf(" — ");
+            const personelIsim = ayrimIdx>-1 ? govde.substring(0, ayrimIdx) : govde;
+            const detay = ayrimIdx>-1 ? govde.substring(ayrimIdx+3) : "";
+            return {
+              id: Date.now()+i,
+              aciklama: detay,
+              tutar,
+              tip: "personel" as const,
+              personelIsim,
+            };
+          }
+
           return {
 
             id: Date.now()+i,
@@ -1883,12 +1926,13 @@ export default function RaporlarPage() {
 
     const netCiro  = brutCiro - tGider - tIade; // matematiksel: tOnline + tKasa - tIade
 
-    // ── Kuryeler: sabit (Roadrunner) kuryede min. 30 paket garantisi, havuzda garanti yok ──
+    // ── Kuryeler: SADECE tip==="sabit" (Roadrunner, 14.08.2026+) olan satırlarda min. 30 paket garantisi var.
+    // "havuz" ve "kendi" (14.08.2026 öncesi kendi personel kurye / geçiş günü) satırlarında garanti yok.
     const KURYE_GARANTI = 30;
     const kuryelerHesap = kuryeler.map(k=>{
       const gercek = parseInt(k.paketSayisi)||0;
-      const uygulanan = k.tip==="havuz" ? gercek : Math.max(gercek, KURYE_GARANTI);
-      return { ...k, gercekPaket:gercek, uygulananPaket:uygulanan, garantiUygulandi: k.tip!=="havuz" && gercek<KURYE_GARANTI };
+      const uygulanan = k.tip==="sabit" ? Math.max(gercek, KURYE_GARANTI) : gercek;
+      return { ...k, gercekPaket:gercek, uygulananPaket:uygulanan, garantiUygulandi: k.tip==="sabit" && gercek<KURYE_GARANTI };
     });
     const tKuryePaket=kuryelerHesap.reduce((a,k)=>a+k.uygulananPaket,0);
     const tKuryeGercekPaket=kuryelerHesap.reduce((a,k)=>a+k.gercekPaket,0);
@@ -1938,13 +1982,13 @@ export default function RaporlarPage() {
 
   // ── Handlers ──
 
-  const giderEkle = (tip: "normal"|"firma" = "normal") =>
+  const giderEkle = (tip: "normal"|"firma"|"personel" = "normal") =>
 
-    setGiderler([...giderler,{id:Date.now(),aciklama:"",tutar:"",tip}]);
+    setGiderler([...giderler,{id:Date.now(),aciklama:tip==="personel"?"Personel tüketim (yemek/içecek)":"",tutar:"",tip}]);
 
   const giderSil = (id:number)=>setGiderler(giderler.filter(g=>g.id!==id));
 
-  const giderDegistir = (id:number,field:"aciklama"|"tutar"|"firmaId"|"firmaUnvan",val:string)=>
+  const giderDegistir = (id:number,field:"aciklama"|"tutar"|"firmaId"|"firmaUnvan"|"personelIsim",val:string)=>
 
     setGiderler(giderler.map(g=>g.id===id?{...g,[field]:field==="tutar"?fmtStr(val):val}:g));
 
@@ -2134,7 +2178,9 @@ Soru: ${soruFinal}`
 
         .map(g=>{
 
-          const ad = g.tip==="firma" && g.firmaUnvan ? `[Firma] ${g.firmaUnvan}` : (g.aciklama||"Belirtilmemiş");
+          const ad = g.tip==="firma" && g.firmaUnvan ? `[Firma] ${g.firmaUnvan}`
+            : g.tip==="personel" && g.personelIsim ? `[Personel Avans] ${g.personelIsim} — ${g.aciklama||"Belirtilmemiş"}`
+            : (g.aciklama||"Belirtilmemiş");
 
           return `${ad}: ₺${g.tutar}`;
 
@@ -2330,20 +2376,28 @@ Soru: ${soruFinal}`
 
       }
 
-      // Personel Avans / Yemek Kesintisi — ilgili personelin profiline (avanslar/kesintiler tabloları) işlenir
-      for (const a of avansSatirlari) {
-        if (!a.personelIsim || !tv(a.tutar)) continue;
+      // Personel Avans — Giderler listesindeki tip:"personel" satırları (kasadan fiş çıkan personel tüketimi)
+      // otomatik olarak ilgili personelin avans geçmişine işlenir. Kasa/gider toplamına zaten dahil (giderler dizisinde).
+      // NOT: rapor düzenlenip tekrar kaydedilirse çift kayıt oluşmasın diye, bu rapora ait
+      // önceki otomatik avans/kesinti kayıtları (aynı tarih + işaretli odeme_yontemi/aciklama) önce silinir.
+      await supabase.from("avanslar").delete().eq("tarih", tarih).eq("odeme_yontemi", "Ürün / Fiş (Kasa Gideri)");
+      for (const g of giderler) {
+        if (g.tip !== "personel" || !g.personelIsim || !tv(g.tutar)) continue;
         await supabase.from("avanslar").insert({
-          personel_isim: a.personelIsim, tutar: tv(a.tutar), tarih,
-          odeme_yontemi: "Nakit Kasa", kasa_kaynagi: "Nakit Kasa",
-          aciklama: a.aciklama || `Günlük rapor — ${fmtTarih(tarih)}`,
+          personel_isim: g.personelIsim, tutar: tv(g.tutar), tarih,
+          odeme_yontemi: "Ürün / Fiş (Kasa Gideri)", kasa_kaynagi: "Nakit Kasa",
+          aciklama: g.aciklama || `Personel tüketim — ${fmtTarih(tarih)}`,
         });
       }
+      // Personel Kesintisi — kasayı etkilemez, sadece ay sonu maaş hesabında düşülür.
+      // "[Rapor] " öneki bu kaydın günlük rapordan geldiğini işaretler; düzenlemede aynı tarihli
+      // işaretli eski kayıtlar silinip güncel haliyle yeniden eklenir (çift kayıt olmasın diye).
+      await supabase.from("kesintiler").delete().eq("tarih", tarih).like("aciklama", "[Rapor]%");
       for (const k of kesintiSatirlari) {
         if (!k.personelIsim || !tv(k.tutar)) continue;
         await supabase.from("kesintiler").insert({
           personel_isim: k.personelIsim, tutar: tv(k.tutar), tarih,
-          aciklama: k.aciklama || `Günlük rapor — ${fmtTarih(tarih)}`,
+          aciklama: `[Rapor] ${k.aciklama || fmtTarih(tarih)}`,
         });
       }
 
@@ -2658,7 +2712,11 @@ Soru: ${soruFinal}`
                 <CurrencyInput label="Edenred" value={kasaEdenred} onChange={setKasaEdenred} disabled={isReadOnly}/>
                 <CurrencyInput label="Metropol" value={kasaMetropol} onChange={setKasaMetropol} disabled={isReadOnly}/>
               </div>
-              <p className="px-3 pb-2.5 text-[10px] text-gray-600">Gider için aşağıdaki <span className="text-gray-400 font-semibold">Giderler</span> bölümünü kullan — kasadan çıkan her giderin açıklamasını orada satır satır girebilirsin.</p>
+              <div className="mx-3 mb-3 rounded-lg border border-red-500/15 bg-red-500/5 px-3 py-2 flex items-center justify-between">
+                <span className="text-[10px] text-red-400 uppercase tracking-wide font-medium flex items-center gap-1.5"><TrendingDown size={11}/>Gider (salt okunur)</span>
+                <span className="text-sm font-black text-red-400">₺{fmt(ch.tGider)}</span>
+              </div>
+              <p className="px-3 pb-2.5 text-[10px] text-gray-600">Gider için aşağıdaki <span className="text-gray-400 font-semibold">Giderler</span> bölümünü kullan — buraya doğrudan giriş yapılamaz, orada eklediğin her satır bu toplama otomatik yansır.</p>
             </div>
 
             {/* ── İNDİRİM ANALİZİ ── */}
@@ -2777,6 +2835,14 @@ Soru: ${soruFinal}`
 
                         </button>
 
+                        <button type="button" onClick={()=>giderEkle("personel")}
+
+                          className="text-[10px] text-gray-600 hover:text-teal-400 border border-[#1a2236] hover:border-teal-500/30 px-2 py-0.5 rounded transition-colors flex items-center gap-1">
+
+                          <Users2 size={9}/> Personel
+
+                        </button>
+
                       </>
 
                     )}
@@ -2798,6 +2864,16 @@ Soru: ${soruFinal}`
                           <Building2 size={9} className="text-blue-400"/>
 
                           <span className="text-[9px] text-blue-400 uppercase tracking-wider">Firma Ödemesi</span>
+
+                        </div>
+
+                      ) : item.tip === "personel" ? (
+
+                        <div className="flex items-center gap-1 mb-1">
+
+                          <Users2 size={9} className="text-teal-400"/>
+
+                          <span className="text-[9px] text-teal-400 uppercase tracking-wider">Personel Tüketimi — kasadan fiş çıkar, otomatik avans olarak işlenir</span>
 
                         </div>
 
@@ -2865,6 +2941,18 @@ Soru: ${soruFinal}`
 
                         )
 
+                      ) : item.tip === "personel" ? (
+                        <div className="space-y-1.5">
+                          <select disabled={isReadOnly} value={item.personelIsim || ""}
+                            onChange={e => giderDegistir(item.id, "personelIsim", e.target.value)}
+                            className="w-full bg-[#080b14] border border-teal-500/20 text-white text-xs h-7 px-2.5 rounded-lg outline-none focus:border-teal-500/40 disabled:opacity-40 appearance-none">
+                            <option value="">Personel seçiniz...</option>
+                            {avansPersonelListesi.map((p,i)=>(<option key={i} value={p} className="bg-[#0c0f1a]">{p}</option>))}
+                          </select>
+                          <input type="text" placeholder="Ne tüketti? (örn: 1 adet kola)" disabled={isReadOnly} value={item.aciklama}
+                            onChange={e=>giderDegistir(item.id, "aciklama", e.target.value)}
+                            className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-teal-500/40 text-white text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
+                        </div>
                       ) : (
 
                         <AkilliGiderInput
@@ -2925,68 +3013,43 @@ Soru: ${soruFinal}`
 
               <div className="space-y-3">
 
-                {/* Personel Avans / Yemek Kesintisi */}
-                <div className="rounded-xl border border-teal-500/15 bg-[#0c0f1a] overflow-hidden">
-                  <div className="px-3 py-2 border-b border-teal-500/15 flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-teal-400 uppercase tracking-wider flex items-center gap-1.5"><Users2 size={11}/>Personel Avans / Yemek Kesintisi</span>
+                {/* Personel Kesintisi — kasayı/gideri etkilemez, sadece ay sonu maaştan düşülür */}
+                <div className="rounded-xl border border-rose-500/15 bg-[#0c0f1a] overflow-hidden">
+                  <div className="px-3 py-2 border-b border-rose-500/15 flex items-center justify-between">
+                    <span className="text-[10px] font-semibold text-rose-400 uppercase tracking-wider flex items-center gap-1.5"><Users2 size={11}/>Personel Kesintisi</span>
                     {!isReadOnly && (
-                      <div className="flex items-center gap-1.5">
-                        <button type="button" onClick={()=>setAvansSatirlari([...avansSatirlari,{id:Date.now(),personelIsim:"",tutar:"",aciklama:""}])}
-                          className="text-[10px] text-gray-600 hover:text-amber-400 border border-[#1a2236] hover:border-amber-500/30 px-2 py-0.5 rounded transition-colors">+ Avans</button>
-                        <button type="button" onClick={()=>setKesintiSatirlari([...kesintiSatirlari,{id:Date.now(),personelIsim:"",tutar:"",aciklama:"Yemek"}])}
-                          className="text-[10px] text-gray-600 hover:text-red-400 border border-[#1a2236] hover:border-red-500/30 px-2 py-0.5 rounded transition-colors">+ Kesinti</button>
-                      </div>
+                      <button type="button" onClick={()=>setKesintiSatirlari([...kesintiSatirlari,{id:Date.now(),personelIsim:"",tutar:"",aciklama:""}])}
+                        className="text-[10px] text-gray-600 hover:text-rose-400 border border-[#1a2236] hover:border-rose-500/30 px-2 py-0.5 rounded transition-colors">+ Kesinti</button>
                     )}
                   </div>
-                  <div className="p-3 space-y-3">
-                    {avansSatirlari.length===0 && kesintiSatirlari.length===0 && (
-                      <p className="text-[10px] text-gray-600 text-center py-2">Bu raporda personel avans/kesintisi girilmedi.</p>
+                  <div className="p-3 space-y-2">
+                    <p className="text-[9px] text-gray-600">Kasayı / gideri etkilemez (örn. eksik ürün gönderimi cezası) — sadece ay sonu maaştan düşülür.</p>
+                    {kesintiSatirlari.length===0 && (
+                      <p className="text-[10px] text-gray-600 text-center py-1">Bu raporda kesinti girilmedi.</p>
                     )}
-                    {avansSatirlari.length>0 && (
-                      <div className="space-y-1.5">
-                        <p className="text-[9px] text-amber-500 uppercase tracking-wider font-bold">Avans</p>
-                        {avansSatirlari.map(a=>(
-                          <div key={a.id} className="grid grid-cols-12 gap-1.5">
-                            <select disabled={isReadOnly} value={a.personelIsim}
-                              onChange={e=>setAvansSatirlari(avansSatirlari.map(x=>x.id===a.id?{...x,personelIsim:e.target.value}:x))}
-                              className="col-span-6 bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2 outline-none focus:border-amber-500/40 disabled:opacity-40">
-                              <option value="">Personel seç...</option>
-                              {avansPersonelListesi.map((p,i)=>(<option key={i} value={p}>{p}</option>))}
-                            </select>
-                            <div className="col-span-5 relative">
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-[10px]">₺</span>
-                              <input type="text" placeholder="0" disabled={isReadOnly} value={a.tutar}
-                                onChange={e=>setAvansSatirlari(avansSatirlari.map(x=>x.id===a.id?{...x,tutar:fmtStr(e.target.value)}:x))}
-                                className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-amber-500/40 disabled:opacity-40"/>
-                            </div>
-                            {!isReadOnly && <button type="button" onClick={()=>setAvansSatirlari(avansSatirlari.filter(x=>x.id!==a.id))} className="col-span-1 text-gray-700 hover:text-red-400 flex items-center justify-center"><Trash2 size={11}/></button>}
+                    {kesintiSatirlari.map(k=>(
+                      <div key={k.id} className="space-y-1">
+                        <div className="grid grid-cols-12 gap-1.5">
+                          <select disabled={isReadOnly} value={k.personelIsim}
+                            onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,personelIsim:e.target.value}:x))}
+                            className="col-span-6 bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2 outline-none focus:border-rose-500/40 disabled:opacity-40">
+                            <option value="">Personel seç...</option>
+                            {avansPersonelListesi.map((p,i)=>(<option key={i} value={p}>{p}</option>))}
+                          </select>
+                          <div className="col-span-5 relative">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-[10px]">₺</span>
+                            <input type="text" placeholder="0" disabled={isReadOnly} value={k.tutar}
+                              onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,tutar:fmtStr(e.target.value)}:x))}
+                              className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-rose-500/40 disabled:opacity-40"/>
                           </div>
-                        ))}
+                          {!isReadOnly && <button type="button" onClick={()=>setKesintiSatirlari(kesintiSatirlari.filter(x=>x.id!==k.id))} className="col-span-1 text-gray-700 hover:text-red-400 flex items-center justify-center"><Trash2 size={11}/></button>}
+                        </div>
+                        <input type="text" placeholder="Kesinti sebebi (örn: eksik ürün gönderimi)" disabled={isReadOnly} value={k.aciklama}
+                          onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,aciklama:e.target.value}:x))}
+                          className="w-full bg-[#080b14] border border-[#1a2236] text-white text-[11px] h-6 px-2 rounded-lg outline-none focus:border-rose-500/40 disabled:opacity-40 placeholder:text-gray-700"/>
                       </div>
-                    )}
-                    {kesintiSatirlari.length>0 && (
-                      <div className="space-y-1.5">
-                        <p className="text-[9px] text-red-500 uppercase tracking-wider font-bold">Yemek / Diğer Kesinti</p>
-                        {kesintiSatirlari.map(k=>(
-                          <div key={k.id} className="grid grid-cols-12 gap-1.5">
-                            <select disabled={isReadOnly} value={k.personelIsim}
-                              onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,personelIsim:e.target.value}:x))}
-                              className="col-span-6 bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2 outline-none focus:border-red-500/40 disabled:opacity-40">
-                              <option value="">Personel seç...</option>
-                              {avansPersonelListesi.map((p,i)=>(<option key={i} value={p}>{p}</option>))}
-                            </select>
-                            <div className="col-span-5 relative">
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-[10px]">₺</span>
-                              <input type="text" placeholder="0" disabled={isReadOnly} value={k.tutar}
-                                onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,tutar:fmtStr(e.target.value)}:x))}
-                                className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-red-500/40 disabled:opacity-40"/>
-                            </div>
-                            {!isReadOnly && <button type="button" onClick={()=>setKesintiSatirlari(kesintiSatirlari.filter(x=>x.id!==k.id))} className="col-span-1 text-gray-700 hover:text-red-400 flex items-center justify-center"><Trash2 size={11}/></button>}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <p className="text-[9px] text-gray-600">Kaydedince ilgili personelin profilindeki Avans/Kesinti geçmişine otomatik işlenir; ay sonu maaş hesabında oradan görünür.</p>
+                    ))}
+                    <p className="text-[9px] text-gray-600">Kaydedince ilgili personelin profilindeki Kesinti geçmişine işlenir; ay sonu maaş hesabında oradan görünür.</p>
                   </div>
                 </div>
 
@@ -3092,7 +3155,7 @@ Soru: ${soruFinal}`
 
                     {ch.kuryelerHesap.map((k)=>{
 
-                      const sabit = k.tip!=="havuz";
+                      const sabit = k.tip==="sabit";
 
                       return (
 
@@ -3230,7 +3293,7 @@ Soru: ${soruFinal}`
 
                           </div>
 
-                          {!isReadOnly && k.tip==="havuz" && (
+                          {!isReadOnly && k.tip!=="sabit" && (
 
                             <button type="button" onClick={()=>kuryeSil(k.id)}
 
