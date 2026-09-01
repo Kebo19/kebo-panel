@@ -140,26 +140,26 @@ export default function PersonelDuzenlePage() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#060810] flex items-center justify-center">
+    <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center">
       <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#060810] text-white font-sans antialiased py-6">
+    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased py-6">
       <div className="max-w-xl mx-auto px-4">
         
         <div className="flex items-center justify-between mb-6">
-          <Link href={`/personel/${id}`} className="flex items-center gap-2 text-xs text-gray-400 hover:text-white transition-colors">
+          <Link href={`/personel/${id}`} className="flex items-center gap-2 text-xs text-gray-400 hover:text-[#1a1f2e] transition-colors">
             <ArrowLeft size={14} /> Detaya Dön
           </Link>
-          <h1 className="text-sm font-black tracking-tight text-white uppercase">Personel Düzenle</h1>
+          <h1 className="text-sm font-black tracking-tight text-[#1a1f2e] uppercase">Personel Düzenle</h1>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-6 space-y-4">
           
           {hata && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl">
+            <div className="bg-red-500/10 border border-red-500/20 text-red-600 text-xs p-3 rounded-xl">
               {hata}
             </div>
           )}
@@ -174,7 +174,7 @@ export default function PersonelDuzenlePage() {
               required
               value={form.full_name}
               onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-              className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40"
+              className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40"
             />
           </div>
 
@@ -187,7 +187,7 @@ export default function PersonelDuzenlePage() {
               type="text"
               value={form.telefon}
               onChange={(e) => handleTelefonChange(e.target.value)}
-              className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 font-mono"
+              className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 font-mono"
             />
           </div>
 
@@ -200,7 +200,7 @@ export default function PersonelDuzenlePage() {
               type="text"
               value={form.tc}
               onChange={(e) => handleTcChange(e.target.value)}
-              className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 font-mono"
+              className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 font-mono"
             />
           </div>
 
@@ -214,7 +214,7 @@ export default function PersonelDuzenlePage() {
               maxLength={26}
               value={form.iban}
               onChange={(e) => handleIbanChange(e.target.value)}
-              className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 font-mono tracking-wider"
+              className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 font-mono tracking-wider"
             />
           </div>
 
@@ -226,10 +226,10 @@ export default function PersonelDuzenlePage() {
             <select
               value={form.department}
               onChange={(e) => setForm({ ...form, department: e.target.value })}
-              className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 appearance-none"
+              className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 appearance-none"
             >
               {DEPARTMANLAR.map((d) => (
-                <option key={d} value={d} className="bg-[#0c0f1a]">{d}</option>
+                <option key={d} value={d} className="bg-[#ffffff]">{d}</option>
               ))}
             </select>
           </div>
@@ -243,47 +243,47 @@ export default function PersonelDuzenlePage() {
               type="date"
               value={form.start_date}
               onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-              className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40"
+              className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40"
             />
           </div>
 
           {/* İŞTEN ÇIKIŞ TARİHİ (Tüm roller görebilir ve ekleyebilir) */}
           <div className="space-y-1.5 border-t border-red-500/20 pt-4 bg-red-500/5 p-3 rounded-xl border">
-            <label className="text-[11px] font-bold text-red-400 uppercase tracking-wider flex items-center gap-1">
+            <label className="text-[11px] font-bold text-red-600 uppercase tracking-wider flex items-center gap-1">
               <UserX size={12} /> İşten Çıkış Tarihi (Girilirse ayrılanlara taşınır)
             </label>
             <input
               type="date"
               value={form.leave_date}
               onChange={(e) => setForm({ ...form, leave_date: e.target.value })}
-              className="w-full bg-[#060810] border border-red-500/20 text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-red-500/40"
+              className="w-full bg-[#f4f5f7] border border-red-500/20 text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-red-500/40"
             />
           </div>
 
           {/* Sadece Patronlar Görebilir: E-posta ve Şifre */}
           {isPatron && (
             <>
-              <div className="space-y-1.5 border-t border-[#1a2236] pt-4">
-                <label className="text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
+              <div className="space-y-1.5 border-t border-[#e2e5eb] pt-4">
+                <label className="text-[11px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1">
                   <Mail size={12} /> E-posta Adresi (Sadece Patron Görür)
                 </label>
                 <input
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40"
+                  className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
+                <label className="text-[11px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1">
                   <Lock size={12} /> Giriş Şifresi (Sadece Patron Görür)
                 </label>
                 <input
                   type="password"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40"
+                  className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40"
                 />
               </div>
             </>
@@ -297,11 +297,11 @@ export default function PersonelDuzenlePage() {
             <select
               value={form.role}
               onChange={(e) => setForm({ ...form, role: e.target.value })}
-              className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 appearance-none"
+              className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 appearance-none"
             >
-              <option value="personel" className="bg-[#0c0f1a]">Personel</option>
-              <option value="mudur" className="bg-[#0c0f1a]">Müdür</option>
-              <option value="yonetici" className="bg-[#0c0f1a]">Yönetici / Admin (Patron)</option>
+              <option value="personel" className="bg-[#ffffff]">Personel</option>
+              <option value="mudur" className="bg-[#ffffff]">Müdür</option>
+              <option value="yonetici" className="bg-[#ffffff]">Yönetici / Admin (Patron)</option>
             </select>
           </div>
 

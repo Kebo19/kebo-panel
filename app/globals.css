@@ -1,29 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  --background: #07090d;
-  --foreground: #ffffff;
+  color-scheme: light;
 
-  --card: #111315;
-  --card-foreground: #ffffff;
+  --background: #f4f5f7;
+  --foreground: #1a1f2e;
 
-  --popover: #111315;
-  --popover-foreground: #ffffff;
+  --card: #ffffff;
+  --card-foreground: #1a1f2e;
+
+  --popover: #ffffff;
+  --popover-foreground: #1a1f2e;
 
   --primary: #f97316;
-  --primary-foreground: #000000;
+  --primary-foreground: #ffffff;
 
-  --secondary: #1a1d21;
-  --secondary-foreground: #ffffff;
+  --secondary: #f1f2f5;
+  --secondary-foreground: #1a1f2e;
 
-  --muted: #16181c;
-  --muted-foreground: #9ca3af;
+  --muted: #f1f2f5;
+  --muted-foreground: #6b7280;
 
   --accent: #f97316;
-  --accent-foreground: #000000;
+  --accent-foreground: #ffffff;
 
-  --border: rgba(255,255,255,0.08);
-  --input: rgba(255,255,255,0.08);
+  --border: rgba(15,20,30,0.1);
+  --input: rgba(15,20,30,0.1);
   --ring: #f97316;
 
   --radius: 1rem;
@@ -34,21 +36,24 @@
 }
 
 html {
-  background: #07090d;
+  background: #f4f5f7;
+  color-scheme: light;
 }
 
 body {
-  background: #07090d;
-  color: white;
-  font-family: Arial, Helvetica, sans-serif;
+  background: #f4f5f7;
+  color: #1a1f2e;
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  letter-spacing: -0.01em;
 }
 
 input {
-  color: white !important;
+  color: #1a1f2e !important;
+  color-scheme: light;
 }
 
 input::placeholder {
-  color: #6b7280 !important;
+  color: #9ca3af !important;
 }
 
 button {
@@ -60,16 +65,37 @@ button {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: #cbd1db;
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-track {
   background: transparent;
-}.kebo-input {
-  background: #0d1117 !important;
-  border: 1px solid rgba(255,255,255,0.06) !important;
+}
+
+.kebo-input {
+  background: #f7f8fa !important;
+  border: 1px solid rgba(15,20,30,0.08) !important;
   height: 48px !important;
   border-radius: 14px !important;
-  color: white !important;
+  color: #1a1f2e !important;
+}
+
+/* ── Giriş animasyonu: kartlar sayfa açılışında hafifçe belirir ── */
+@keyframes kebo-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.kebo-anim-in {
+  animation: kebo-fade-up 0.35s ease-out both;
+}
+
+/* ── Sayı değiştiğinde küçük bir vurgu ── */
+@keyframes kebo-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+.kebo-anim-pop {
+  animation: kebo-pop 0.28s ease-out;
 }

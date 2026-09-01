@@ -33,7 +33,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#060810] flex items-center justify-center p-4 font-sans antialiased">
+    <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center p-4 font-sans antialiased">
 
       {/* Arka plan efekti */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -59,14 +59,14 @@ export default function LoginPage() {
               <path d="M9 17h6"/>
             </svg>
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">
-            KEBO<span className="text-blue-500">.</span>ERP
+          <h1 className="text-2xl font-black text-[#1a1f2e] tracking-tight">
+            KEBO<span className="text-blue-700">.</span>ERP
           </h1>
           <p className="text-gray-500 text-sm mt-1.5">Yönetim Paneline Giriş</p>
         </div>
 
         {/* Kart */}
-        <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl shadow-2xl overflow-hidden">
+        <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl shadow-2xl overflow-hidden">
 
           {/* Üst şerit */}
           <div className="h-0.5 bg-gradient-to-r from-transparent via-blue-500/60 to-transparent" />
@@ -88,7 +88,7 @@ export default function LoginPage() {
                     onChange={e => setEmail(e.target.value)}
                     required
                     autoComplete="email"
-                    className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20 text-white text-sm h-11 pl-10 pr-4 rounded-xl outline-none transition-all placeholder:text-gray-700"
+                    className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20 text-[#1a1f2e] text-sm h-11 pl-10 pr-4 rounded-xl outline-none transition-all placeholder:text-gray-700"
                   />
                 </div>
               </div>
@@ -107,7 +107,7 @@ export default function LoginPage() {
                     onChange={e => setPassword(e.target.value)}
                     required
                     autoComplete="current-password"
-                    className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20 text-white text-sm h-11 pl-10 pr-11 rounded-xl outline-none transition-all placeholder:text-gray-700"
+                    className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20 text-[#1a1f2e] text-sm h-11 pl-10 pr-11 rounded-xl outline-none transition-all placeholder:text-gray-700"
                   />
                   <button
                     type="button"
@@ -125,7 +125,7 @@ export default function LoginPage() {
 
               {/* Hata mesajı */}
               {error && (
-                <div className="flex items-center gap-2.5 bg-red-500/8 border border-red-500/20 text-red-400 text-xs px-4 py-3 rounded-xl">
+                <div className="flex items-center gap-2.5 bg-red-500/8 border border-red-500/20 text-red-600 text-xs px-4 py-3 rounded-xl">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{error}</span>
                 </div>

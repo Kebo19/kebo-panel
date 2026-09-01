@@ -120,12 +120,12 @@ export default function StokDetayPage() {
     const genelOrt = donemAnaliz.gunlukOrt;
 
     if (sonKullanim > genelOrt * 1.35) {
-      return { stil: "text-amber-400 bg-amber-500/5 border-amber-500/20", metin: "AI Uyarısı: Bu malzemenin tüketim hızı genel ortalamanın %35 üzerine çıktı. Mutfak kullanım yoğunluğu arttı!" };
+      return { stil: "text-amber-600 bg-amber-500/5 border-amber-500/20", metin: "AI Uyarısı: Bu malzemenin tüketim hızı genel ortalamanın %35 üzerine çıktı. Mutfak kullanım yoğunluğu arttı!" };
     }
     if (sonKullanim < genelOrt * 0.45 && urun && urun.mevcut_stok > urun.min_stok * 2) {
-      return { stil: "text-purple-400 bg-purple-500/5 border-purple-500/20", metin: "AI Analizi: Tüketim hızı yavaşladı. Depoda fazla bekleme riski var, mal girişini askıya alabilirsiniz." };
+      return { stil: "text-purple-600 bg-purple-500/5 border-purple-500/20", metin: "AI Analizi: Tüketim hızı yavaşladı. Depoda fazla bekleme riski var, mal girişini askıya alabilirsiniz." };
     }
-    return { stil: "text-emerald-400 bg-emerald-500/5 border-emerald-500/10", metin: "AI Analizi: Malzeme tüketim hızı stabil seyrediyor. Algoritma olağandışı bir sapma tespit etmedi." };
+    return { stil: "text-emerald-600 bg-emerald-500/5 border-emerald-500/10", metin: "AI Analizi: Malzeme tüketim hızı stabil seyrediyor. Algoritma olağandışı bir sapma tespit etmedi." };
   }, [donemAnaliz, hareketler, urun]);
 
   const grafikData = useMemo(() => {
@@ -254,15 +254,15 @@ export default function StokDetayPage() {
   };
 
   if (loading) return (
-    <div className="h-screen bg-[#060810] flex items-center justify-center">
+    <div className="h-screen bg-[#f4f5f7] flex items-center justify-center">
       <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"/>
     </div>
   );
 
   if (!urun) return (
-    <div className="min-h-screen bg-[#060810] text-white flex flex-col items-center justify-center gap-4">
+    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] flex flex-col items-center justify-center gap-4">
       <p className="text-gray-500">Ürün bulunamadı</p>
-      <Link href="/stok" className="text-blue-400 text-xs">← Stok Listesine Dön</Link>
+      <Link href="/stok" className="text-blue-600 text-xs">← Stok Listesine Dön</Link>
     </div>
   );
 
@@ -271,23 +271,23 @@ export default function StokDetayPage() {
   const tahminiBitis = donemAnaliz && donemAnaliz.gunlukOrt > 0 ? Math.floor(urun.mevcut_stok / donemAnaliz.gunlukOrt) : null;
 
   return (
-    <div className="min-h-screen bg-[#060810] text-white font-sans antialiased">
+    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased">
       {/* HEADER */}
-      <div className="sticky top-0 z-40 border-b border-[#0f1624] bg-[#060810]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Link href="/stok" className="p-2 text-gray-500 hover:text-white border border-[#1a2236] rounded-xl">
+            <Link href="/stok" className="p-2 text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-xl">
               <ArrowLeft size={14}/>
             </Link>
             <div>
-              <h1 className="text-sm font-black tracking-tight text-white leading-none">{urun.urun_adi}</h1>
+              <h1 className="text-sm font-black tracking-tight text-[#1a1f2e] leading-none">{urun.urun_adi}</h1>
               <p className="text-[10px] text-gray-600 leading-none mt-0.5">
-                {urun.kategori || "Kategorisiz"} · {urun.birim} · <span className="capitalize text-blue-400">{urun.sayim_periyodu || "gunluk"} Sayım</span>
+                {urun.kategori || "Kategorisiz"} · {urun.birim} · <span className="capitalize text-blue-600">{urun.sayim_periyodu || "gunluk"} Sayım</span>
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setGirisAcik(true)} className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-amber-400 border border-[#1a2236] px-3 py-2 rounded-xl">
+            <button onClick={() => setGirisAcik(true)} className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-amber-600 border border-[#e2e5eb] px-3 py-2 rounded-xl">
               <Truck size={13}/> Mal Geldi
             </button>
             <button onClick={() => setSayimAcik(true)} className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl shadow-lg shadow-blue-900/30">
@@ -309,73 +309,73 @@ export default function StokDetayPage() {
 
         {/* KPI ÖZET */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className={`bg-[#0c0f1a] border rounded-2xl p-4 ${tukenmis ? "border-red-500/30" : kritik ? "border-amber-500/30" : "border-emerald-500/20"}`}>
+          <div className={`bg-[#ffffff] border rounded-2xl p-4 ${tukenmis ? "border-red-500/30" : kritik ? "border-amber-500/30" : "border-emerald-500/20"}`}>
             <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Mevcut Stok</p>
-            <p className={`text-2xl font-black ${tukenmis ? "text-red-400" : kritik ? "text-amber-400" : "text-emerald-400"}`}>
+            <p className={`text-2xl font-black ${tukenmis ? "text-red-600" : kritik ? "text-amber-600" : "text-emerald-600"}`}>
               {fmt(urun.mevcut_stok, 1)} <span className="text-sm text-gray-500">{urun.birim}</span>
             </p>
             {urun.min_stok > 0 && <p className="text-[10px] text-gray-600 mt-1">Min: {fmt(urun.min_stok, 1)} {urun.birim}</p>}
           </div>
-          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-4">
+          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
             <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Günlük Ort. Tüketim</p>
-            <p className="text-2xl font-black text-purple-400">
+            <p className="text-2xl font-black text-purple-600">
               {donemAnaliz ? fmt(donemAnaliz.gunlukOrt, 2) : "—"} <span className="text-sm text-gray-500">{urun.birim}/gün</span>
             </p>
             <p className="text-[10px] text-gray-600 mt-1">Son 30 günlük veriye göre</p>
           </div>
-          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-4">
+          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
             <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Tahmini Bitiş Süresi</p>
-            <p className="text-2xl font-black text-blue-400">
+            <p className="text-2xl font-black text-blue-600">
               {tahminiBitis !== null ? `${tahminiBitis}` : "—"} <span className="text-sm text-gray-500">gün</span>
             </p>
             <p className="text-[10px] text-gray-600 mt-1">{tahminiBitis !== null ? `~${new Date(Date.now() + tahminiBitis * 86400000).toLocaleDateString("tr-TR")}` : "Veri yetersiz"}</p>
           </div>
-          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-4">
+          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
             <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Son Alış Fiyatı</p>
-            <p className="text-2xl font-black text-amber-400">{urun.son_fiyat ? `₺${fmt(urun.son_fiyat, 2)}` : "—"}</p>
+            <p className="text-2xl font-black text-amber-600">{urun.son_fiyat ? `₺${fmt(urun.son_fiyat, 2)}` : "—"}</p>
             <p className="text-[10px] text-gray-600 mt-1">Birim başına maliyet</p>
           </div>
         </div>
 
         {/* DÖNEM ANALİZİ */}
-        <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#1a2236] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#e2e5eb] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                <Activity className="h-3.5 w-3.5 text-purple-400"/>
+                <Activity className="h-3.5 w-3.5 text-purple-600"/>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-gray-200">Dönem Analizi</h3>
+                <h3 className="text-sm font-semibold text-gray-800">Dönem Analizi</h3>
                 <p className="text-[10px] text-gray-600">İki tarih arasındaki tüketim hesabı</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <input type="date" value={donemBaslangic} onChange={e => setDonemBaslangic(e.target.value)} className="bg-[#080b14] border border-[#1a2236] text-white text-xs h-8 px-2 rounded-lg outline-none"/>
+              <input type="date" value={donemBaslangic} onChange={e => setDonemBaslangic(e.target.value)} className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-8 px-2 rounded-lg outline-none"/>
               <span className="text-gray-600 text-xs">→</span>
-              <input type="date" value={donemBitis} onChange={e => setDonemBitis(e.target.value)} className="bg-[#080b14] border border-[#1a2236] text-white text-xs h-8 px-2 rounded-lg outline-none"/>
+              <input type="date" value={donemBitis} onChange={e => setDonemBitis(e.target.value)} className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-8 px-2 rounded-lg outline-none"/>
             </div>
           </div>
           {donemAnaliz && donemAnaliz.gunSayisi > 0 ? (
             <div className="p-5 grid grid-cols-2 lg:grid-cols-5 gap-3">
-              <div className="bg-[#080b14] rounded-xl p-3 border border-[#1a2236]">
+              <div className="bg-[#f7f8fa] rounded-xl p-3 border border-[#e2e5eb]">
                 <p className="text-[9px] text-gray-600 uppercase tracking-widest">Başlangıç Stoğu</p>
-                <p className="text-sm font-black text-blue-400 mt-1">{fmt(donemAnaliz.baslangicStok, 1)} {urun.birim}</p>
+                <p className="text-sm font-black text-blue-600 mt-1">{fmt(donemAnaliz.baslangicStok, 1)} {urun.birim}</p>
               </div>
-              <div className="bg-[#080b14] rounded-xl p-3 border border-[#1a2236]">
+              <div className="bg-[#f7f8fa] rounded-xl p-3 border border-[#e2e5eb]">
                 <p className="text-[9px] text-gray-600 uppercase tracking-widest">Arada Gelen Mal</p>
-                <p className="text-sm font-black text-amber-400 mt-1">+ {fmt(donemAnaliz.aradaGelen, 1)} {urun.birim}</p>
+                <p className="text-sm font-black text-amber-600 mt-1">+ {fmt(donemAnaliz.aradaGelen, 1)} {urun.birim}</p>
               </div>
-              <div className="bg-[#080b14] rounded-xl p-3 border border-[#1a2236]">
+              <div className="bg-[#f7f8fa] rounded-xl p-3 border border-[#e2e5eb]">
                 <p className="text-[9px] text-gray-600 uppercase tracking-widest">Bitiş Stoğu</p>
-                <p className="text-sm font-black text-emerald-400 mt-1">{fmt(donemAnaliz.bitisStok, 1)} {urun.birim}</p>
+                <p className="text-sm font-black text-emerald-600 mt-1">{fmt(donemAnaliz.bitisStok, 1)} {urun.birim}</p>
               </div>
-              <div className="bg-[#080b14] rounded-xl p-3 border border-red-500/20">
+              <div className="bg-[#f7f8fa] rounded-xl p-3 border border-red-500/20">
                 <p className="text-[9px] text-red-600 uppercase tracking-widest font-bold">Toplam Kullanım</p>
-                <p className="text-sm font-black text-red-400 mt-1">- {fmt(donemAnaliz.kullanim, 1)} {urun.birim}</p>
+                <p className="text-sm font-black text-red-600 mt-1">- {fmt(donemAnaliz.kullanim, 1)} {urun.birim}</p>
               </div>
-              <div className="bg-[#080b14] rounded-xl p-3 border border-purple-500/20">
+              <div className="bg-[#f7f8fa] rounded-xl p-3 border border-purple-500/20">
                 <p className="text-[9px] text-purple-600 uppercase tracking-widest font-bold">Günlük Ortalama</p>
-                <p className="text-sm font-black text-purple-400 mt-1">{fmt(donemAnaliz.gunlukOrt, 2)} {urun.birim}/gün</p>
+                <p className="text-sm font-black text-purple-600 mt-1">{fmt(donemAnaliz.gunlukOrt, 2)} {urun.birim}/gün</p>
                 <p className="text-[9px] text-gray-700 mt-0.5">{donemAnaliz.gunSayisi} gün</p>
               </div>
             </div>
@@ -386,12 +386,12 @@ export default function StokDetayPage() {
 
         {/* GRAFİK */}
         {grafikData.length > 0 && (
-          <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] p-5">
+          <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] p-5">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                <BarChart3 className="h-3.5 w-3.5 text-emerald-400"/>
+                <BarChart3 className="h-3.5 w-3.5 text-emerald-600"/>
               </div>
-              <h3 className="text-sm font-semibold text-gray-200">Stok Seviyesi Trendi</h3>
+              <h3 className="text-sm font-semibold text-gray-800">Stok Seviyesi Trendi</h3>
             </div>
             <div className="relative" style={{ height: "240px" }}>
               <canvas ref={chartRef}/>
@@ -400,14 +400,14 @@ export default function StokDetayPage() {
         )}
 
         {/* HAREKETLER */}
-        <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#1a2236]">
-            <h3 className="text-sm font-semibold text-gray-200">Tüm Hareketler ({hareketler.length})</h3>
+        <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#e2e5eb]">
+            <h3 className="text-sm font-semibold text-gray-800">Tüm Hareketler ({hareketler.length})</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-[#1a2236] bg-[#080b14]">
+                <tr className="border-b border-[#e2e5eb] bg-[#f7f8fa]">
                   {["Tarih", "Tip", "Miktar", "Açıklama", "Kullanıcı", ""].map((h, i) => (
                     <th key={i} className="px-4 py-3 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-widest">{h}</th>
                   ))}
@@ -418,8 +418,8 @@ export default function StokDetayPage() {
                   const konfig = TIP_KONFIG[h.tip];
                   const Icon = konfig.icon;
                   return (
-                    <tr key={h.id} className="hover:bg-white/[0.02] group">
-                      <td className="px-4 py-3 text-gray-300 font-semibold">{fmtTarih(h.tarih)}</td>
+                    <tr key={h.id} className="hover:bg-black/[0.03] group">
+                      <td className="px-4 py-3 text-gray-700 font-semibold">{fmtTarih(h.tarih)}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-${konfig.color}-500/10 text-${konfig.color}-400`}>
                           <Icon size={9}/> {konfig.label}
@@ -432,7 +432,7 @@ export default function StokDetayPage() {
                       <td className="px-4 py-3 text-gray-600 text-[10px]">{h.kullanici || "—"}</td>
                       <td className="px-4 py-3">
                         {isAdmin && (
-                          <button onClick={() => hareketSil(h)} className="p-1 text-gray-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => hareketSil(h)} className="p-1 text-gray-700 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Trash2 size={11}/>
                           </button>
                         )}
@@ -449,27 +449,27 @@ export default function StokDetayPage() {
       {/* SAYIM MODAL */}
       {sayimAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-blue-500/20 rounded-2xl w-full max-w-sm">
-            <div className="px-5 py-4 border-b border-[#1a2236] flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <ClipboardCheck size={14} className="text-blue-400"/> Sayım Gir
+          <div className="bg-[#ffffff] border border-blue-500/20 rounded-2xl w-full max-w-sm">
+            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[#1a1f2e] flex items-center gap-2">
+                <ClipboardCheck size={14} className="text-blue-600"/> Sayım Gir
               </h3>
               <button onClick={() => setSayimAcik(false)} className="text-gray-600"><X size={16}/></button>
             </div>
             <div className="p-5 space-y-3">
               <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl px-3 py-2 text-xs">
-                Sistem stoğu: <strong className="text-white">{fmt(urun.mevcut_stok, 1)} {urun.birim}</strong>
+                Sistem stoğu: <strong className="text-[#1a1f2e]">{fmt(urun.mevcut_stok, 1)} {urun.birim}</strong>
               </div>
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase tracking-wide font-medium mb-1">Sayım Tarihi</label>
-                <input type="date" value={sayimTarih} onChange={e => setSayimTarih(e.target.value)} className="w-full bg-[#080b14] border border-[#1a2236] text-white text-sm h-9 px-3 rounded-xl outline-none"/>
+                <input type="date" value={sayimTarih} onChange={e => setSayimTarih(e.target.value)} className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none"/>
               </div>
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase tracking-wide font-medium mb-1">Şu Anda Stokta Olan ({urun.birim})</label>
-                <input type="number" step="0.01" value={sayimMiktar} onChange={e => setSayimMiktar(e.target.value)} autoFocus className="w-full bg-[#080b14] border border-[#1a2236] text-white text-lg font-bold h-12 px-3 rounded-xl outline-none"/>
+                <input type="number" step="0.01" value={sayimMiktar} onChange={e => setSayimMiktar(e.target.value)} autoFocus className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-lg font-bold h-12 px-3 rounded-xl outline-none"/>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setSayimAcik(false)} className="text-xs font-semibold text-gray-500 border border-[#1a2236] px-4 py-2 rounded-xl">İptal</button>
+                <button onClick={() => setSayimAcik(false)} className="text-xs font-semibold text-gray-500 border border-[#e2e5eb] px-4 py-2 rounded-xl">İptal</button>
                 <button onClick={sayimKaydet} disabled={saving || !sayimMiktar} className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-xl flex items-center gap-2">
                   {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>} Kaydet
                 </button>
@@ -482,24 +482,24 @@ export default function StokDetayPage() {
       {/* MAL GİRİŞ MODAL */}
       {girisAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-amber-500/20 rounded-2xl w-full max-w-sm">
-            <div className="px-5 py-4 border-b border-[#1a2236] flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Truck size={14} className="text-amber-400"/> Mal Girişi
+          <div className="bg-[#ffffff] border border-amber-500/20 rounded-2xl w-full max-w-sm">
+            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[#1a1f2e] flex items-center gap-2">
+                <Truck size={14} className="text-amber-600"/> Mal Girişi
               </h3>
               <button onClick={() => setGirisAcik(false)} className="text-gray-600"><X size={16}/></button>
             </div>
             <div className="p-5 space-y-3">
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase tracking-wide font-medium mb-1">Geliş Tarihi</label>
-                <input type="date" value={girisTarih} onChange={e => setGirisTarih(e.target.value)} className="w-full bg-[#080b14] border border-[#1a2236] text-white text-sm h-9 px-3 rounded-xl outline-none"/>
+                <input type="date" value={girisTarih} onChange={e => setGirisTarih(e.target.value)} className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none"/>
               </div>
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase tracking-wide font-medium mb-1">Gelen Miktar ({urun.birim})</label>
-                <input type="number" step="0.01" value={girisMiktar} onChange={e => setGirisMiktar(e.target.value)} autoFocus className="w-full bg-[#080b14] border border-[#1a2236] text-white text-lg font-bold h-12 px-3 rounded-xl outline-none"/>
+                <input type="number" step="0.01" value={girisMiktar} onChange={e => setGirisMiktar(e.target.value)} autoFocus className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-lg font-bold h-12 px-3 rounded-xl outline-none"/>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setGirisAcik(false)} className="text-xs font-semibold text-gray-500 border border-[#1a2236] px-4 py-2 rounded-xl">İptal</button>
+                <button onClick={() => setGirisAcik(false)} className="text-xs font-semibold text-gray-500 border border-[#e2e5eb] px-4 py-2 rounded-xl">İptal</button>
                 <button onClick={girisKaydet} disabled={saving || !girisMiktar} className="text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 px-6 py-2 rounded-xl flex items-center gap-2">
                   {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>} Kaydet
                 </button>

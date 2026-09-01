@@ -63,7 +63,7 @@ interface BuAyFatura extends Fatura {
   cariObj?: Cari;
 }
 
-const inputCls = "w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/50 text-white text-sm h-11 px-3 rounded-xl outline-none transition-all placeholder:text-gray-700";
+const inputCls = "w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/50 text-[#1a1f2e] text-sm h-11 px-3 rounded-xl outline-none transition-all placeholder:text-gray-700";
 const fmt = (v: number) => new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2 }).format(v);
 const fmtTarih = (t: string) => { if (!t) return "—"; try { const p = t.split("-"); return `${p[2]}.${p[1]}.${p[0]}`; } catch { return t; } };
 
@@ -352,29 +352,29 @@ export default function CarilerPage() {
   ].sort((a, b) => b.tarih.localeCompare(a.tarih)), [cariFaturalar, cariOdemeler, localDurumlar]);
 
   const durumRenk = (d: string) =>
-    d === "odendi" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-    d === "gecikti" ? "bg-red-500/10 text-red-400 border-red-500/20" :
-    "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
+    d === "odendi" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
+    d === "gecikti" ? "bg-red-500/10 text-red-600 border-red-500/20" :
+    "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
 
   const durumEtiket = (d: string) =>
     d === "odendi" ? "Ödendi" : d === "gecikti" ? "Gecikti" : "Bekliyor";
 
   return (
-    <div className="min-h-screen bg-[#060810] text-white font-sans antialiased pb-24">
+    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased pb-24">
 
       {toast && (
-        <div className={`fixed top-5 right-5 z-[80] flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-2xl text-sm font-semibold ${toast.tip === "basari" ? "bg-emerald-950 border-emerald-500/30 text-emerald-400" : "bg-red-950 border-red-500/30 text-red-400"}`}>
+        <div className={`fixed top-5 right-5 z-[80] flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-2xl text-sm font-semibold ${toast.tip === "basari" ? "bg-emerald-950 border-emerald-500/30 text-emerald-600" : "bg-red-950 border-red-500/30 text-red-600"}`}>
           {toast.tip === "basari" ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
           {toast.mesaj}
         </div>
       )}
 
       {/* HEADER */}
-      <div className="sticky top-0 z-40 border-b border-[#0f1624] bg-[#060810]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             {seciliCari && (
-              <button onClick={() => setSeciliCari(null)} className="p-2 text-gray-600 hover:text-white border border-[#1a2236] rounded-xl transition-colors">
+              <button onClick={() => setSeciliCari(null)} className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-xl transition-colors">
                 <ArrowLeft size={14} />
               </button>
             )}
@@ -382,7 +382,7 @@ export default function CarilerPage() {
               <Building2 className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-black text-white leading-none">{seciliCari ? seciliCari.unvan : "Cariler"}</h1>
+              <h1 className="text-sm font-black text-[#1a1f2e] leading-none">{seciliCari ? seciliCari.unvan : "Cariler"}</h1>
               <p className="text-[10px] text-gray-600 mt-0.5">{seciliCari ? `VN: ${seciliCari.vergi_no || "—"}` : `${cariler.length} cari`}</p>
             </div>
           </div>
@@ -392,7 +392,7 @@ export default function CarilerPage() {
                 <button onClick={odemeAc} className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl transition-colors">
                   <Wallet size={14} /> Ödeme Ekle
                 </button>
-                <button onClick={() => sil(seciliCari.id)} className="p-2 text-gray-600 hover:text-red-400 border border-[#1a2236] rounded-xl transition-colors">
+                <button onClick={() => sil(seciliCari.id)} className="p-2 text-gray-600 hover:text-red-600 border border-[#e2e5eb] rounded-xl transition-colors">
                   <Trash2 size={14} />
                 </button>
               </>
@@ -410,13 +410,13 @@ export default function CarilerPage() {
         <div className="max-w-6xl mx-auto px-4 py-5 space-y-4">
 
           {/* Vade bilgisi */}
-          <div className="bg-[#0c0f1a] border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3">
+          <div className="bg-[#ffffff] border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-              <Calendar size={16} className="text-amber-400" />
+              <Calendar size={16} className="text-amber-600" />
             </div>
             <div>
               <p className="text-[10px] text-gray-600 uppercase tracking-widest">Bu Ay Ödeme Günü</p>
-              <p className="text-sm font-black text-amber-400">
+              <p className="text-sm font-black text-amber-600">
                 {donem.vade.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
               </p>
               <p className="text-[10px] text-gray-600 mt-0.5">{fmtTarih(donem.donemBas)} – {fmtTarih(donem.donemBit)} dönem faturaları</p>
@@ -424,14 +424,14 @@ export default function CarilerPage() {
           </div>
 
           {/* Sekmeler */}
-          <div className="flex gap-1 bg-[#0c0f1a] border border-[#1a2236] rounded-xl p-1 w-fit">
-            <button onClick={() => setAktifTab("duzenli")} className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors ${aktifTab === "duzenli" ? "bg-blue-600 text-white" : "text-gray-500 hover:text-white"}`}>
+          <div className="flex gap-1 bg-[#ffffff] border border-[#e2e5eb] rounded-xl p-1 w-fit">
+            <button onClick={() => setAktifTab("duzenli")} className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors ${aktifTab === "duzenli" ? "bg-blue-600 text-white" : "text-gray-500 hover:text-[#1a1f2e]"}`}>
               Düzenli Ödemeler ({duzenliSayisi})
             </button>
-            <button onClick={() => setAktifTab("diger")} className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors ${aktifTab === "diger" ? "bg-blue-600 text-white" : "text-gray-500 hover:text-white"}`}>
+            <button onClick={() => setAktifTab("diger")} className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors ${aktifTab === "diger" ? "bg-blue-600 text-white" : "text-gray-500 hover:text-[#1a1f2e]"}`}>
               Diğer ({digerSayisi})
             </button>
-            <button onClick={() => setAktifTab("buay")} className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 ${aktifTab === "buay" ? "bg-amber-500 text-white" : "text-amber-400 hover:text-white"}`}>
+            <button onClick={() => setAktifTab("buay")} className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 ${aktifTab === "buay" ? "bg-amber-500 text-[#1a1f2e]" : "text-amber-600 hover:text-[#1a1f2e]"}`}>
               <Calendar size={11} /> Bu Ay Ödenecekler
             </button>
           </div>
@@ -440,50 +440,50 @@ export default function CarilerPage() {
           {aktifTab === "buay" && (
             <div className="space-y-3">
               {/* Özet banner */}
-              <div className="bg-[#0c0f1a] border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between">
+              <div className="bg-[#ffffff] border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1">Toplam Bu Ay Ödenecek</p>
-                  <p className="text-2xl font-black text-amber-400">₺{fmt(buAyGenelToplam)}</p>
+                  <p className="text-2xl font-black text-amber-600">₺{fmt(buAyGenelToplam)}</p>
                   <p className="text-[10px] text-gray-500 mt-1">{buAyFaturalar.length} fatura · {buAyCariGruplari.length} cari · Vade: {donem.vade.toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}</p>
                 </div>
                 <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                  <Calendar size={20} className="text-amber-400" />
+                  <Calendar size={20} className="text-amber-600" />
                 </div>
               </div>
 
               {buAyYukleniyor ? (
                 <div className="flex items-center justify-center py-16"><div className="w-8 h-8 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" /></div>
               ) : buAyCariGruplari.length === 0 ? (
-                <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl py-16 text-center text-gray-600 text-xs uppercase tracking-widest">Bu dönemde ödenecek fatura yok</div>
+                <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl py-16 text-center text-gray-600 text-xs uppercase tracking-widest">Bu dönemde ödenecek fatura yok</div>
               ) : (
                 buAyCariGruplari.map(grup => (
-                  <div key={grup.unvan} className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl overflow-hidden">
+                  <div key={grup.unvan} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
                     {/* Cari başlık satırı */}
                     <button
                       onClick={() => toggleCariGrup(grup.unvan)}
-                      className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors"
+                      className="w-full flex items-center justify-between px-5 py-4 hover:bg-black/[0.03] transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                          <span className="text-sm font-black text-blue-400">{grup.unvan.charAt(0).toUpperCase()}</span>
+                          <span className="text-sm font-black text-blue-600">{grup.unvan.charAt(0).toUpperCase()}</span>
                         </div>
                         <div className="text-left">
-                          <p className="text-sm font-black text-white">{grup.unvan}</p>
+                          <p className="text-sm font-black text-[#1a1f2e]">{grup.unvan}</p>
                           <p className="text-[10px] text-gray-500">{grup.faturalar.length} fatura</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        <p className="text-base font-black text-amber-400">₺{fmt(grup.toplam)}</p>
+                        <p className="text-base font-black text-amber-600">₺{fmt(grup.toplam)}</p>
                         {acikCariGruplar.has(grup.unvan) ? <ChevronUp size={14} className="text-gray-600" /> : <ChevronDown size={14} className="text-gray-600" />}
                       </div>
                     </button>
 
                     {/* Fatura satırları */}
                     {acikCariGruplar.has(grup.unvan) && (
-                      <div className="border-t border-[#1a2236]">
+                      <div className="border-t border-[#e2e5eb]">
                         <table className="w-full text-xs">
                           <thead>
-                            <tr className="border-b border-[#0f1624]">
+                            <tr className="border-b border-[#e2e5eb]">
                               <th className="text-left px-5 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Fatura No</th>
                               <th className="text-left px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Tarih</th>
                               <th className="text-right px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Tutar</th>
@@ -493,10 +493,10 @@ export default function CarilerPage() {
                           </thead>
                           <tbody className="divide-y divide-[#0a0d18]">
                             {grup.faturalar.map(f => (
-                              <tr key={f.id} className="hover:bg-white/[0.02] transition-colors">
-                                <td className="px-5 py-3 text-blue-400 font-bold">{f.fatura_no}</td>
+                              <tr key={f.id} className="hover:bg-black/[0.03] transition-colors">
+                                <td className="px-5 py-3 text-blue-600 font-bold">{f.fatura_no}</td>
                                 <td className="px-4 py-3 text-gray-400">{fmtTarih(f.fatura_tarihi)}</td>
-                                <td className="px-4 py-3 text-right font-black text-white">₺{fmt(f.toplam_tutar)}</td>
+                                <td className="px-4 py-3 text-right font-black text-[#1a1f2e]">₺{fmt(f.toplam_tutar)}</td>
                                 <td className="px-4 py-3">
                                   <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${durumRenk(f.durum)}`}>
                                     {durumEtiket(f.durum)}
@@ -506,18 +506,18 @@ export default function CarilerPage() {
                                   <div className="flex items-center justify-end gap-1.5">
                                     {f.durum !== "odendi" && (
                                       <button onClick={() => buAyTekDurumGuncelle(f.id, "odendi")}
-                                        className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg hover:bg-emerald-500/20 transition-colors whitespace-nowrap">
+                                        className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg hover:bg-emerald-500/20 transition-colors whitespace-nowrap">
                                         Ödendi
                                       </button>
                                     )}
                                     {f.durum === "bekliyor" && (
                                       <button onClick={() => buAyTekDurumGuncelle(f.id, "gecikti")}
-                                        className="text-[10px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded-lg hover:bg-red-500/20 transition-colors whitespace-nowrap">
+                                        className="text-[10px] font-bold text-red-600 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded-lg hover:bg-red-500/20 transition-colors whitespace-nowrap">
                                         Gecikti
                                       </button>
                                     )}
                                     <button onClick={() => buAyDuzenleAc(f)}
-                                      className="text-[10px] font-bold text-gray-400 bg-white/5 border border-white/10 px-2 py-1 rounded-lg hover:bg-white/10 transition-colors">
+                                      className="text-[10px] font-bold text-gray-400 bg-black/[0.04] border border-white/10 px-2 py-1 rounded-lg hover:bg-white/10 transition-colors">
                                       <Edit2 size={10} />
                                     </button>
                                   </div>
@@ -526,9 +526,9 @@ export default function CarilerPage() {
                             ))}
                           </tbody>
                           <tfoot>
-                            <tr className="border-t border-[#1a2236] bg-[#080b14]">
+                            <tr className="border-t border-[#e2e5eb] bg-[#f7f8fa]">
                               <td colSpan={2} className="px-5 py-3 text-[10px] text-gray-600 font-bold uppercase">{grup.faturalar.length} fatura</td>
-                              <td className="px-4 py-3 text-right text-sm font-black text-amber-400">₺{fmt(grup.toplam)}</td>
+                              <td className="px-4 py-3 text-right text-sm font-black text-amber-600">₺{fmt(grup.toplam)}</td>
                               <td colSpan={2} />
                             </tr>
                           </tfoot>
@@ -547,13 +547,13 @@ export default function CarilerPage() {
               <div className="relative">
                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
                 <input value={aramaMetni} onChange={e => setAramaMetni(e.target.value)} placeholder="Ünvan veya vergi no ara..."
-                  className="w-full bg-[#0c0f1a] border border-[#1a2236] text-white text-xs h-9 pl-9 pr-3 rounded-xl outline-none focus:border-blue-500/40 placeholder:text-gray-700" />
+                  className="w-full bg-[#ffffff] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 pl-9 pr-3 rounded-xl outline-none focus:border-blue-500/40 placeholder:text-gray-700" />
               </div>
 
               {yukleniyor ? (
                 <div className="flex items-center justify-center py-20"><div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>
               ) : filtreliCariler.length === 0 ? (
-                <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl py-16 text-center text-gray-600 text-xs uppercase tracking-widest">Cari bulunamadı</div>
+                <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl py-16 text-center text-gray-600 text-xs uppercase tracking-widest">Cari bulunamadı</div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {filtreliCariler.map(c => {
@@ -562,34 +562,34 @@ export default function CarilerPage() {
                     const toplamBorcCari = tutarlar?.toplam || 0;
                     return (
                       <div key={c.id} onClick={() => cariDetayAc(c)}
-                        className="bg-[#0c0f1a] border border-[#1a2236] hover:border-blue-500/40 rounded-2xl p-5 cursor-pointer transition-all hover:bg-[#0f1320] group">
+                        className="bg-[#ffffff] border border-[#e2e5eb] hover:border-blue-500/40 rounded-2xl p-5 cursor-pointer transition-all hover:bg-[#f0f4fa] group">
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                            <span className="text-lg font-black text-blue-400">{c.unvan?.charAt(0)?.toUpperCase()}</span>
+                            <span className="text-lg font-black text-blue-600">{c.unvan?.charAt(0)?.toUpperCase()}</span>
                           </div>
-                          <span className={`text-[10px] font-bold px-2 py-1 rounded-lg shrink-0 ${c.tip === "tedarikci" ? "bg-orange-500/10 text-orange-400" : "bg-blue-500/10 text-blue-400"}`}>
+                          <span className={`text-[10px] font-bold px-2 py-1 rounded-lg shrink-0 ${c.tip === "tedarikci" ? "bg-orange-500/10 text-orange-600" : "bg-blue-500/10 text-blue-600"}`}>
                             {c.tip === "tedarikci" ? "Tedarikçi" : "Müşteri"}
                           </span>
                         </div>
-                        <p className="text-sm font-black text-white group-hover:text-blue-400 transition-colors leading-tight mb-2">{c.unvan}</p>
+                        <p className="text-sm font-black text-[#1a1f2e] group-hover:text-blue-600 transition-colors leading-tight mb-2">{c.unvan}</p>
                         {c.vergi_no && <p className="text-[11px] text-gray-600 flex items-center gap-1.5 mb-1"><Hash size={9} /> VN: {c.vergi_no}</p>}
                         {c.telefon && <p className="text-[11px] text-gray-600 flex items-center gap-1.5 mb-1"><Phone size={9} /> {c.telefon}</p>}
-                        <div className="mt-3 pt-3 border-t border-[#1a2236] space-y-1.5">
+                        <div className="mt-3 pt-3 border-t border-[#e2e5eb] space-y-1.5">
                           {buAyTutar > 0 && (
                             <div className="flex items-center justify-between">
-                              <span className="text-[11px] text-amber-400 font-bold">Bu Ay Ödenecek</span>
-                              <span className="text-sm font-black text-amber-400">₺{fmt(buAyTutar)}</span>
+                              <span className="text-[11px] text-amber-600 font-bold">Bu Ay Ödenecek</span>
+                              <span className="text-sm font-black text-amber-600">₺{fmt(buAyTutar)}</span>
                             </div>
                           )}
                           {toplamBorcCari > 0 ? (
                             <div className="flex items-center justify-between">
-                              <span className="text-[11px] text-red-400/80">Toplam Borç</span>
-                              <span className="text-sm font-bold text-red-400">₺{fmt(toplamBorcCari)}</span>
+                              <span className="text-[11px] text-red-600/80">Toplam Borç</span>
+                              <span className="text-sm font-bold text-red-600">₺{fmt(toplamBorcCari)}</span>
                             </div>
                           ) : (
                             <div className="flex items-center justify-between">
-                              <span className="text-[11px] text-emerald-400 font-bold">Borç Yok</span>
-                              <CheckCircle2 size={14} className="text-emerald-400" />
+                              <span className="text-[11px] text-emerald-600 font-bold">Borç Yok</span>
+                              <CheckCircle2 size={14} className="text-emerald-600" />
                             </div>
                           )}
                         </div>
@@ -609,43 +609,43 @@ export default function CarilerPage() {
 
           {/* 4 kart */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-4">
+            <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
               <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">Toplam Fatura</p>
-              <p className="text-2xl font-black text-blue-400">₺{fmt(toplamFatura)}</p>
+              <p className="text-2xl font-black text-blue-600">₺{fmt(toplamFatura)}</p>
               <p className="text-[10px] text-gray-600 mt-1">{cariFaturalar.length} fatura</p>
             </div>
-            <div className="bg-[#0c0f1a] border border-emerald-500/20 rounded-2xl p-4">
+            <div className="bg-[#ffffff] border border-emerald-500/20 rounded-2xl p-4">
               <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">Toplam Ödeme</p>
-              <p className="text-2xl font-black text-emerald-400">₺{fmt(toplamOdeme)}</p>
+              <p className="text-2xl font-black text-emerald-600">₺{fmt(toplamOdeme)}</p>
               <p className="text-[10px] text-gray-600 mt-1">{cariOdemeler.length} ödeme</p>
             </div>
-            <div className={`bg-[#0c0f1a] border rounded-2xl p-4 ${toplamBorc > 0 ? "border-red-500/20" : "border-emerald-500/20"}`}>
+            <div className={`bg-[#ffffff] border rounded-2xl p-4 ${toplamBorc > 0 ? "border-red-500/20" : "border-emerald-500/20"}`}>
               <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">Toplam Borç</p>
-              <p className={`text-2xl font-black ${toplamBorc > 0 ? "text-red-400" : "text-emerald-400"}`}>₺{fmt(toplamBorc)}</p>
+              <p className={`text-2xl font-black ${toplamBorc > 0 ? "text-red-600" : "text-emerald-600"}`}>₺{fmt(toplamBorc)}</p>
               <p className="text-[10px] text-gray-600 mt-1">ödenmemiş faturalar</p>
             </div>
-            <div className="bg-[#0c0f1a] border border-amber-500/20 rounded-2xl p-4">
+            <div className="bg-[#ffffff] border border-amber-500/20 rounded-2xl p-4">
               <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">Bu Ay Ödenecek</p>
-              <p className="text-2xl font-black text-amber-400">₺{fmt(buAyOdenecek)}</p>
+              <p className="text-2xl font-black text-amber-600">₺{fmt(buAyOdenecek)}</p>
               <p className="text-[10px] text-gray-600 mt-1">{fmtTarih(donem.donemBas)} – {fmtTarih(donem.donemBit)}</p>
             </div>
           </div>
 
           {/* Birleşik tablo */}
-          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl overflow-hidden">
+          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[#1a2236]">
+                <tr className="border-b border-[#e2e5eb]">
                   <th className="px-4 py-4 w-10">
-                    <button onClick={hepsiniSec} className="text-gray-500 hover:text-white transition-colors">
-                      {hepsiSecili ? <CheckSquare size={15} className="text-blue-400" /> : <Square size={15} />}
+                    <button onClick={hepsiniSec} className="text-gray-500 hover:text-[#1a1f2e] transition-colors">
+                      {hepsiSecili ? <CheckSquare size={15} className="text-blue-600" /> : <Square size={15} />}
                     </button>
                   </th>
                   <th className="text-left px-4 py-4 text-xs text-gray-500 uppercase tracking-widest font-semibold">Tür</th>
                   <th className="text-left px-4 py-4 text-xs text-gray-500 uppercase tracking-widest font-semibold">No / Açıklama</th>
                   <th className="text-left px-4 py-4 text-xs text-gray-500 uppercase tracking-widest font-semibold">Tarih</th>
-                  <th className="text-right px-4 py-4 text-xs text-red-400 uppercase tracking-widest font-semibold">Fatura Tutarı</th>
-                  <th className="text-right px-4 py-4 text-xs text-emerald-400 uppercase tracking-widest font-semibold">Ödeme Tutarı</th>
+                  <th className="text-right px-4 py-4 text-xs text-red-600 uppercase tracking-widest font-semibold">Fatura Tutarı</th>
+                  <th className="text-right px-4 py-4 text-xs text-emerald-600 uppercase tracking-widest font-semibold">Ödeme Tutarı</th>
                   <th className="text-left px-4 py-4 text-xs text-gray-500 uppercase tracking-widest font-semibold">Durum</th>
                 </tr>
               </thead>
@@ -657,7 +657,7 @@ export default function CarilerPage() {
                     const f = item.veri as Fatura & { gercekDurum: string };
                     const secili = seciliFaturalar.has(f.id);
                     return (
-                      <tr key={`f-${f.id}`} className={`transition-colors cursor-pointer ${secili ? "bg-blue-600/10" : "hover:bg-white/[0.02]"}`}
+                      <tr key={`f-${f.id}`} className={`transition-colors cursor-pointer ${secili ? "bg-blue-600/10" : "hover:bg-black/[0.03]"}`}
                         onClick={() => faturaSec(f.id)}>
                         <td className="px-4 py-4">
                           <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${secili ? "bg-blue-600 border-blue-600" : "border-gray-600"}`}>
@@ -665,11 +665,11 @@ export default function CarilerPage() {
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">Fatura</span>
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-600 border border-blue-500/20">Fatura</span>
                         </td>
-                        <td className="px-4 py-4 text-sm font-bold text-white">{f.fatura_no}</td>
-                        <td className="px-4 py-4 text-sm text-gray-300">{fmtTarih(f.fatura_tarihi)}</td>
-                        <td className="px-4 py-4 text-right text-base font-black text-red-400">₺{fmt(f.toplam_tutar)}</td>
+                        <td className="px-4 py-4 text-sm font-bold text-[#1a1f2e]">{f.fatura_no}</td>
+                        <td className="px-4 py-4 text-sm text-gray-700">{fmtTarih(f.fatura_tarihi)}</td>
+                        <td className="px-4 py-4 text-right text-base font-black text-red-600">₺{fmt(f.toplam_tutar)}</td>
                         <td className="px-4 py-4 text-right text-gray-700">—</td>
                         <td className="px-4 py-4">
                           <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${durumRenk(f.gercekDurum)}`}>
@@ -681,15 +681,15 @@ export default function CarilerPage() {
                   } else {
                     const o = item.veri as Odeme;
                     return (
-                      <tr key={`o-${o.id}`} className="bg-emerald-950/10 hover:bg-emerald-950/20 transition-colors">
+                      <tr key={`o-${o.id}`} className="bg-emerald-100/60 hover:bg-emerald-100/60 transition-colors">
                         <td className="px-4 py-4 text-gray-700">—</td>
                         <td className="px-4 py-4">
-                          <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Ödeme</span>
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">Ödeme</span>
                         </td>
-                        <td className="px-4 py-4 text-sm text-gray-300">{o.aciklama || o.odeme_yontemi}</td>
-                        <td className="px-4 py-4 text-sm text-gray-300">{fmtTarih(o.tarih)}</td>
+                        <td className="px-4 py-4 text-sm text-gray-700">{o.aciklama || o.odeme_yontemi}</td>
+                        <td className="px-4 py-4 text-sm text-gray-700">{fmtTarih(o.tarih)}</td>
                         <td className="px-4 py-4 text-right text-gray-700">—</td>
-                        <td className="px-4 py-4 text-right text-base font-black text-emerald-400">₺{fmt(o.tutar)}</td>
+                        <td className="px-4 py-4 text-right text-base font-black text-emerald-600">₺{fmt(o.tutar)}</td>
                         <td className="px-4 py-4 text-sm text-gray-500">{o.odeme_yontemi}</td>
                       </tr>
                     );
@@ -697,22 +697,22 @@ export default function CarilerPage() {
                 })}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-[#1a2236] bg-[#080b14]">
+                <tr className="border-t-2 border-[#e2e5eb] bg-[#f7f8fa]">
                   <td colSpan={3} className="px-4 py-4 text-xs text-gray-500 font-bold uppercase tracking-widest">
                     {cariFaturalar.length} Fatura · {cariOdemeler.length} Ödeme
                   </td>
                   <td className="px-4 py-4" />
                   <td className="px-4 py-4 text-right">
                     <p className="text-xs text-gray-500 mb-0.5">Toplam Fatura</p>
-                    <p className="text-sm font-black text-red-400">₺{fmt(toplamFatura)}</p>
+                    <p className="text-sm font-black text-red-600">₺{fmt(toplamFatura)}</p>
                   </td>
                   <td className="px-4 py-4 text-right">
                     <p className="text-xs text-gray-500 mb-0.5">Toplam Ödeme</p>
-                    <p className="text-sm font-black text-emerald-400">₺{fmt(toplamOdeme)}</p>
+                    <p className="text-sm font-black text-emerald-600">₺{fmt(toplamOdeme)}</p>
                   </td>
                   <td className="px-4 py-4">
                     <p className="text-xs text-gray-500 mb-0.5">Toplam Borç</p>
-                    <p className={`text-sm font-black ${toplamBorc > 0 ? "text-red-400" : "text-emerald-400"}`}>₺{fmt(toplamBorc)}</p>
+                    <p className={`text-sm font-black ${toplamBorc > 0 ? "text-red-600" : "text-emerald-600"}`}>₺{fmt(toplamBorc)}</p>
                   </td>
                 </tr>
               </tfoot>
@@ -723,12 +723,12 @@ export default function CarilerPage() {
 
       {/* TOPLU İŞLEM ÇUBUĞU */}
       {seciliFaturalar.size > 0 && seciliCari && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#0c0f1a]/98 backdrop-blur-xl border-t border-blue-500/30 px-4 py-3">
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#ffffff]/98 backdrop-blur-xl border-t border-blue-500/30 px-4 py-3">
           <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-black text-blue-400">{seciliFaturalar.size} fatura seçildi</span>
-              <span className="text-sm font-black text-white">· ₺{fmt(seciliToplam)}</span>
-              <button onClick={() => setSeciliFaturalar(new Set())} className="text-[11px] text-gray-500 hover:text-white transition-colors">Seçimi Temizle</button>
+              <span className="text-sm font-black text-blue-600">{seciliFaturalar.size} fatura seçildi</span>
+              <span className="text-sm font-black text-[#1a1f2e]">· ₺{fmt(seciliToplam)}</span>
+              <button onClick={() => setSeciliFaturalar(new Set())} className="text-[11px] text-gray-500 hover:text-[#1a1f2e] transition-colors">Seçimi Temizle</button>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <button onClick={() => topluDurumGuncelle("odendi")} disabled={topluIslemYukleniyor}
@@ -740,11 +740,11 @@ export default function CarilerPage() {
                 Gecikti
               </button>
               <button onClick={() => topluDurumGuncelle("bekliyor")} disabled={topluIslemYukleniyor}
-                className="text-xs font-bold text-white bg-yellow-600 hover:bg-yellow-700 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors">
+                className="text-xs font-bold text-[#1a1f2e] bg-yellow-600 hover:bg-yellow-700 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors">
                 Ödenmedi
               </button>
               <button onClick={topluSil} disabled={topluIslemYukleniyor}
-                className="flex items-center gap-1.5 text-xs font-bold text-white bg-gray-700 hover:bg-gray-600 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors">
+                className="flex items-center gap-1.5 text-xs font-bold text-[#1a1f2e] bg-gray-700 hover:bg-gray-600 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors">
                 <Trash2 size={12} /> Sil
               </button>
             </div>
@@ -755,24 +755,24 @@ export default function CarilerPage() {
       {/* YENİ CARİ MODAL */}
       {modalAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-base font-black text-white">Yeni Cari</h3>
-              <button onClick={() => setModalAcik(false)} className="text-gray-600 hover:text-white"><X size={16} /></button>
+              <h3 className="text-base font-black text-[#1a1f2e]">Yeni Cari</h3>
+              <button onClick={() => setModalAcik(false)} className="text-gray-600 hover:text-[#1a1f2e]"><X size={16} /></button>
             </div>
             <div className="space-y-3">
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Kategori</p>
                 <select value={form.kategori} onChange={e => setForm({ ...form, kategori: e.target.value })} className={inputCls}>
-                  <option value="duzenli" className="bg-[#0c0f1a]">Düzenli Ödeme</option>
-                  <option value="diger" className="bg-[#0c0f1a]">Diğer</option>
+                  <option value="duzenli" className="bg-[#ffffff]">Düzenli Ödeme</option>
+                  <option value="diger" className="bg-[#ffffff]">Diğer</option>
                 </select>
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Cari Tipi</p>
                 <select value={form.tip} onChange={e => setForm({ ...form, tip: e.target.value })} className={inputCls}>
-                  <option value="tedarikci" className="bg-[#0c0f1a]">Tedarikçi</option>
-                  <option value="musteri" className="bg-[#0c0f1a]">Müşteri</option>
+                  <option value="tedarikci" className="bg-[#ffffff]">Tedarikçi</option>
+                  <option value="musteri" className="bg-[#ffffff]">Müşteri</option>
                 </select>
               </div>
               <div>
@@ -790,7 +790,7 @@ export default function CarilerPage() {
                 </div>
               </div>
               <div className="flex gap-2 pt-2">
-                <button onClick={() => setModalAcik(false)} className="flex-1 text-sm font-semibold text-gray-500 hover:text-white border border-[#1a2236] py-3 rounded-xl transition-colors">İptal</button>
+                <button onClick={() => setModalAcik(false)} className="flex-1 text-sm font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] py-3 rounded-xl transition-colors">İptal</button>
                 <button onClick={kaydet} disabled={formSaving} className="flex-1 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
                   {formSaving ? <Loader2 size={14} className="animate-spin" /> : null} Kaydet
                 </button>
@@ -803,10 +803,10 @@ export default function CarilerPage() {
       {/* ÖDEME MODAL */}
       {odemeModalAcik && seciliCari && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-[#1a2236] shrink-0">
-              <h3 className="text-base font-black text-white">Ödeme Ekle</h3>
-              <button onClick={() => setOdemeModalAcik(false)} className="text-gray-600 hover:text-white"><X size={18} /></button>
+          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#e2e5eb] shrink-0">
+              <h3 className="text-base font-black text-[#1a1f2e]">Ödeme Ekle</h3>
+              <button onClick={() => setOdemeModalAcik(false)} className="text-gray-600 hover:text-[#1a1f2e]"><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
               {odenmemisFaturalar.length > 0 && (
@@ -815,32 +815,32 @@ export default function CarilerPage() {
                   <div className="space-y-2 max-h-52 overflow-y-auto">
                     {odenmemisFaturalar.map(f => (
                       <div key={f.id} onClick={() => faturaSec(f.id)}
-                        className={`flex items-center justify-between px-4 py-3 rounded-xl border cursor-pointer transition-all ${seciliFaturalar.has(f.id) ? "bg-blue-600/20 border-blue-500/40" : "bg-[#080b14] border-[#1a2236] hover:border-[#2a3550]"}`}>
+                        className={`flex items-center justify-between px-4 py-3 rounded-xl border cursor-pointer transition-all ${seciliFaturalar.has(f.id) ? "bg-blue-600/20 border-blue-500/40" : "bg-[#f7f8fa] border-[#e2e5eb] hover:border-[#d8dde5]"}`}>
                         <div className="flex items-center gap-3">
                           <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${seciliFaturalar.has(f.id) ? "bg-blue-600 border-blue-600" : "border-gray-600"}`}>
                             {seciliFaturalar.has(f.id) && <CheckCircle2 size={12} className="text-white" />}
                           </div>
                           <div>
-                            <p className="text-sm font-bold text-white">{f.fatura_no}</p>
+                            <p className="text-sm font-bold text-[#1a1f2e]">{f.fatura_no}</p>
                             <p className="text-xs text-gray-400 mt-0.5">{fmtTarih(f.fatura_tarihi)}</p>
                           </div>
                         </div>
-                        <span className="text-sm font-black text-emerald-400">₺{fmt(f.toplam_tutar)}</span>
+                        <span className="text-sm font-black text-emerald-600">₺{fmt(f.toplam_tutar)}</span>
                       </div>
                     ))}
                   </div>
                   {seciliFaturalar.size > 0 && (
                     <div className="mt-3 flex items-center justify-between bg-blue-600/10 border border-blue-500/20 rounded-xl px-4 py-3">
-                      <span className="text-sm text-blue-400">{seciliFaturalar.size} fatura seçildi</span>
-                      <span className="text-base font-black text-blue-400">₺{fmt(seciliToplam)}</span>
+                      <span className="text-sm text-blue-600">{seciliFaturalar.size} fatura seçildi</span>
+                      <span className="text-base font-black text-blue-600">₺{fmt(seciliToplam)}</span>
                     </div>
                   )}
                 </div>
               )}
               <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-[#1a2236]" />
+                <div className="flex-1 h-px bg-[#e2e5eb]" />
                 <span className="text-xs text-gray-600 uppercase tracking-widest">veya manuel tutar</span>
-                <div className="flex-1 h-px bg-[#1a2236]" />
+                <div className="flex-1 h-px bg-[#e2e5eb]" />
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Manuel Tutar (₺)</p>
@@ -861,7 +861,7 @@ export default function CarilerPage() {
                   <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Yöntem</p>
                   <select value={odemeYontemi} onChange={e => setOdemeYontemi(e.target.value)} className={inputCls}>
                     {["Nakit", "Banka Havalesi", "EFT", "Çek", "Kredi Kartı"].map(y => (
-                      <option key={y} value={y} className="bg-[#0c0f1a]">{y}</option>
+                      <option key={y} value={y} className="bg-[#ffffff]">{y}</option>
                     ))}
                   </select>
                 </div>
@@ -871,15 +871,15 @@ export default function CarilerPage() {
                 <input value={odemeAciklama} onChange={e => setOdemeAciklama(e.target.value)} placeholder="Opsiyonel..." className={inputCls} />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-[#1a2236] shrink-0">
+            <div className="px-6 py-4 border-t border-[#e2e5eb] shrink-0">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-sm text-gray-500">Ödenecek Tutar</span>
-                <span className="text-2xl font-black text-emerald-400">
+                <span className="text-2xl font-black text-emerald-600">
                   ₺{fmt(manuelTutar ? parseFloat(manuelTutar) || 0 : seciliToplam)}
                 </span>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => setOdemeModalAcik(false)} className="flex-1 text-sm font-semibold text-gray-500 hover:text-white border border-[#1a2236] py-3 rounded-xl transition-colors">İptal</button>
+                <button onClick={() => setOdemeModalAcik(false)} className="flex-1 text-sm font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] py-3 rounded-xl transition-colors">İptal</button>
                 <button onClick={odemeKaydet} disabled={formSaving || (!manuelTutar && seciliFaturalar.size === 0)}
                   className="flex-1 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
                   {formSaving ? <Loader2 size={14} className="animate-spin" /> : null} Ödemeyi Onayla
@@ -893,13 +893,13 @@ export default function CarilerPage() {
       {/* BU AY FATURA DÜZENLEME MODAL */}
       {duzenleModal.acik && duzenleModal.fatura && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h3 className="text-sm font-black text-white">Fatura Düzenle</h3>
+                <h3 className="text-sm font-black text-[#1a1f2e]">Fatura Düzenle</h3>
                 <p className="text-[10px] text-gray-600 mt-0.5">{duzenleModal.fatura.fatura_no} · {duzenleModal.fatura.cari_unvan}</p>
               </div>
-              <button onClick={() => setDuzenleModal({ acik: false, fatura: null })} className="text-gray-600 hover:text-white"><X size={16} /></button>
+              <button onClick={() => setDuzenleModal({ acik: false, fatura: null })} className="text-gray-600 hover:text-[#1a1f2e]"><X size={16} /></button>
             </div>
             <div className="space-y-4">
               <div>
@@ -916,14 +916,14 @@ export default function CarilerPage() {
                 <select value={duzenleForm.durum}
                   onChange={e => setDuzenleForm(prev => ({ ...prev, durum: e.target.value }))}
                   className={inputCls}>
-                  <option value="bekliyor" className="bg-[#0c0f1a]">Bekliyor</option>
-                  <option value="gecikti" className="bg-[#0c0f1a]">Gecikti</option>
-                  <option value="odendi" className="bg-[#0c0f1a]">Ödendi</option>
+                  <option value="bekliyor" className="bg-[#ffffff]">Bekliyor</option>
+                  <option value="gecikti" className="bg-[#ffffff]">Gecikti</option>
+                  <option value="odendi" className="bg-[#ffffff]">Ödendi</option>
                 </select>
               </div>
               <div className="flex gap-2 pt-1">
                 <button onClick={() => setDuzenleModal({ acik: false, fatura: null })}
-                  className="flex-1 text-sm font-semibold text-gray-500 hover:text-white border border-[#1a2236] py-2.5 rounded-xl transition-colors">İptal</button>
+                  className="flex-1 text-sm font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] py-2.5 rounded-xl transition-colors">İptal</button>
                 <button onClick={buAyDuzenleKaydet} disabled={formSaving}
                   className="flex-1 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
                   {formSaving ? <Loader2 size={13} className="animate-spin" /> : null} Kaydet

@@ -75,7 +75,7 @@ function TrendBadge({ value, prev }: { value: number; prev: number }) {
   if (!prev) return null;
   const pct = ((value - prev) / prev) * 100;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${pct >= 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${pct >= 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"}`}>
       {pct >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
       {Math.abs(pct).toFixed(1)}%
     </span>
@@ -330,53 +330,53 @@ ${isletmeOzeti}`,
   };
 
   if (yetkiYukleniyor) return (
-    <div className="min-h-screen bg-[#060810] flex items-center justify-center">
+    <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center">
       <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
     </div>
   );
 
   if (!yetkili) return (
-    <div className="min-h-screen bg-[#060810] flex items-center justify-center p-6">
-      <div className="bg-[#0c0f1a] border border-red-500/20 rounded-2xl p-8 max-w-sm text-center">
-        <AlertTriangle className="h-10 w-10 text-red-400 mx-auto mb-4" />
-        <h1 className="text-white font-black text-lg mb-2">Erişim Kısıtlı</h1>
+    <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center p-6">
+      <div className="bg-[#ffffff] border border-red-500/20 rounded-2xl p-8 max-w-sm text-center">
+        <AlertTriangle className="h-10 w-10 text-red-600 mx-auto mb-4" />
+        <h1 className="text-[#1a1f2e] font-black text-lg mb-2">Erişim Kısıtlı</h1>
         <p className="text-gray-500 text-sm">Yalnızca yöneticiler görebilir.</p>
       </div>
     </div>
   );
 
   const oncelikRenk = otomatikAnaliz?.oncelik === "iyi"
-    ? { border: "border-emerald-500/30", bg: "bg-emerald-500/5", dot: "bg-emerald-500", text: "text-emerald-400", label: "İyi Durum" }
+    ? { border: "border-emerald-500/30", bg: "bg-emerald-500/5", dot: "bg-emerald-500", text: "text-emerald-600", label: "İyi Durum" }
     : otomatikAnaliz?.oncelik === "kritik"
-    ? { border: "border-red-500/30", bg: "bg-red-500/5", dot: "bg-red-500", text: "text-red-400", label: "Kritik" }
-    : { border: "border-amber-500/30", bg: "bg-amber-500/5", dot: "bg-amber-500", text: "text-amber-400", label: "Orta" };
+    ? { border: "border-red-500/30", bg: "bg-red-500/5", dot: "bg-red-500", text: "text-red-600", label: "Kritik" }
+    : { border: "border-amber-500/30", bg: "bg-amber-500/5", dot: "bg-amber-500", text: "text-amber-600", label: "Orta" };
 
   return (
-    <div className="min-h-screen bg-[#060810] text-white font-sans antialiased pb-10">
+    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased pb-10">
 
       {/* HEADER */}
-      <div className="sticky top-0 z-40 border-b border-[#0f1624] bg-[#060810]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
         <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center">
               <BarChart3 className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-black text-white leading-none">Rapor & Analiz</h1>
+              <h1 className="text-sm font-black text-[#1a1f2e] leading-none">Rapor & Analiz</h1>
               <p className="text-[10px] text-gray-600 mt-0.5 leading-none">AI destekli iş zekası</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 bg-[#0c0f1a] border border-[#1a2236] px-3 py-1.5 rounded-xl">
+            <div className="flex items-center gap-1.5 bg-[#ffffff] border border-[#e2e5eb] px-3 py-1.5 rounded-xl">
               <Calendar size={11} className="text-gray-600" />
               <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-gray-300 outline-none cursor-pointer w-28" />
+                className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer w-28" />
               <span className="text-gray-700">—</span>
               <input type="date" value={bitis} onChange={e => setBitis(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-gray-300 outline-none cursor-pointer w-28" />
+                className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer w-28" />
             </div>
             <button onClick={veriCek} disabled={yukleniyor}
-              className="p-2 text-gray-600 hover:text-white border border-[#1a2236] rounded-xl transition-colors disabled:opacity-40">
+              className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-xl transition-colors disabled:opacity-40">
               <RefreshCw size={14} className={yukleniyor ? "animate-spin" : ""} />
             </button>
           </div>
@@ -386,11 +386,11 @@ ${isletmeOzeti}`,
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-5 space-y-5">
 
         {/* Rapor türü + filtreler */}
-        <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-5 space-y-4">
+        <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5 space-y-4">
           <div className="flex flex-wrap gap-2">
             {RAPOR_TURLERI.map(t => (
               <button key={t.key} onClick={() => setRaporTuru(t.key)}
-                className={`text-xs font-bold px-4 py-2 rounded-xl transition-colors ${raporTuru === t.key ? "bg-blue-600 text-white" : "bg-white/5 text-gray-400 hover:text-white"}`}>
+                className={`text-xs font-bold px-4 py-2 rounded-xl transition-colors ${raporTuru === t.key ? "bg-blue-600 text-white" : "bg-black/[0.04] text-gray-400 hover:text-[#1a1f2e]"}`}>
                 {t.label}
               </button>
             ))}
@@ -402,7 +402,7 @@ ${isletmeOzeti}`,
               <div className="flex flex-wrap gap-2 mb-3">
                 {Object.keys(PLATFORM_KOLON).map(p => (
                   <button key={p} onClick={() => setSeciliPlatformlar(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-colors border ${seciliPlatformlar.includes(p) ? "text-white border-transparent" : "bg-white/5 text-gray-500 border-[#1a2236]"}`}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-colors border ${seciliPlatformlar.includes(p) ? "text-[#1a1f2e] border-transparent" : "bg-black/[0.04] text-gray-500 border-[#e2e5eb]"}`}
                     style={seciliPlatformlar.includes(p) ? { backgroundColor: PLATFORM_COLORS[p] } : {}}>
                     {p}
                   </button>
@@ -411,7 +411,7 @@ ${isletmeOzeti}`,
               <div className="flex gap-2">
                 {(["hepsi", "online", "kapida"] as const).map(o => (
                   <button key={o} onClick={() => setOdemeFiltre(o)}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-colors ${odemeFiltre === o ? "bg-emerald-600 text-white" : "bg-white/5 text-gray-400 hover:text-white"}`}>
+                    className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-colors ${odemeFiltre === o ? "bg-emerald-600 text-white" : "bg-black/[0.04] text-gray-400 hover:text-[#1a1f2e]"}`}>
                     {o === "hepsi" ? "Online + Kapıda" : o === "online" ? "Sadece Online" : "Sadece Kapıda"}
                   </button>
                 ))}
@@ -425,7 +425,7 @@ ${isletmeOzeti}`,
             <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
           </div>
         ) : raporlar.length === 0 ? (
-          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl py-16 text-center text-gray-600 text-sm">
+          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl py-16 text-center text-gray-600 text-sm">
             Bu tarih aralığında rapor bulunamadı.
           </div>
         ) : (
@@ -440,7 +440,7 @@ ${isletmeOzeti}`,
                     { label: "Toplam Gider", value: stats.toplamGider, prev: stats.oncGider, color: "#F87171" },
                     { label: "Günlük Ortalama", value: stats.gunlukOrt, prev: 0, color: "#FBBF24" },
                   ].map(k => (
-                    <div key={k.label} className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-4">
+                    <div key={k.label} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
                       <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">{k.label}</p>
                       <p className="text-xl font-black" style={{ color: k.color }}>₺{fmt(k.value)}</p>
                       {k.prev > 0 && <div className="mt-1"><TrendBadge value={k.value} prev={k.prev} /></div>}
@@ -448,31 +448,31 @@ ${isletmeOzeti}`,
                   ))}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-4">
+                  <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
                     <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">Gider Oranı</p>
-                    <p className="text-xl font-black text-orange-400">%{stats.giderOrani.toFixed(1)}</p>
-                    <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <p className="text-xl font-black text-orange-600">%{stats.giderOrani.toFixed(1)}</p>
+                    <div className="mt-2 h-1.5 bg-black/[0.04] rounded-full overflow-hidden">
                       <div className="h-full rounded-full bg-orange-500/60" style={{ width: `${Math.min(stats.giderOrani, 100)}%` }} />
                     </div>
                   </div>
                   {stats.enIyi && (
-                    <div className="bg-[#0c0f1a] border border-emerald-500/20 rounded-2xl p-4">
-                      <p className="text-[10px] text-emerald-400 uppercase tracking-widest mb-1">En İyi Gün</p>
-                      <p className="text-sm font-bold text-white">{fmtTarih(stats.enIyi.tarih)}</p>
-                      <p className="text-lg font-black text-emerald-400">₺{fmt(stats.enIyi.toplam_ciro)}</p>
+                    <div className="bg-[#ffffff] border border-emerald-500/20 rounded-2xl p-4">
+                      <p className="text-[10px] text-emerald-600 uppercase tracking-widest mb-1">En İyi Gün</p>
+                      <p className="text-sm font-bold text-[#1a1f2e]">{fmtTarih(stats.enIyi.tarih)}</p>
+                      <p className="text-lg font-black text-emerald-600">₺{fmt(stats.enIyi.toplam_ciro)}</p>
                     </div>
                   )}
                   {stats.enKotu && (
-                    <div className="bg-[#0c0f1a] border border-red-500/20 rounded-2xl p-4">
-                      <p className="text-[10px] text-red-400 uppercase tracking-widest mb-1">En Düşük Gün</p>
-                      <p className="text-sm font-bold text-white">{fmtTarih(stats.enKotu.tarih)}</p>
-                      <p className="text-lg font-black text-red-400">₺{fmt(stats.enKotu.toplam_ciro)}</p>
+                    <div className="bg-[#ffffff] border border-red-500/20 rounded-2xl p-4">
+                      <p className="text-[10px] text-red-600 uppercase tracking-widest mb-1">En Düşük Gün</p>
+                      <p className="text-sm font-bold text-[#1a1f2e]">{fmtTarih(stats.enKotu.tarih)}</p>
+                      <p className="text-lg font-black text-red-600">₺{fmt(stats.enKotu.toplam_ciro)}</p>
                     </div>
                   )}
                 </div>
                 {/* Günlük trend grafiği */}
                 {stats.gunlukDetay.length > 1 && (
-                  <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-5">
+                  <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Günlük Ciro Trendi</p>
                     <div className="h-[180px]">
                       <ResponsiveContainer width="100%" height="100%">
@@ -494,7 +494,7 @@ ${isletmeOzeti}`,
             {/* ── PLATFORM DETAYI ── */}
             {raporTuru === "platform" && (
               <div className="space-y-4">
-                <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-5">
+                <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-4 flex items-center gap-1.5"><PieChart size={12} /> Platform Gelir Dağılımı</p>
                   <div className="space-y-4">
                     {seciliPlatformlar.map(p => {
@@ -504,29 +504,29 @@ ${isletmeOzeti}`,
                       const toplam = (odemeFiltre === "online" ? online : odemeFiltre === "kapida" ? kapida : online + kapida);
                       const pct = stats.toplamPlatform > 0 ? (toplam / stats.toplamPlatform) * 100 : 0;
                       return (
-                        <div key={p} className="bg-[#080b14] rounded-xl border border-[#1a2236] p-4">
+                        <div key={p} className="bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
                               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p] }} />
-                              <span className="text-sm font-bold text-white">{p}</span>
+                              <span className="text-sm font-bold text-[#1a1f2e]">{p}</span>
                             </div>
                             <span className="text-lg font-black" style={{ color: PLATFORM_COLORS[p] }}>₺{fmt(toplam)}</span>
                           </div>
                           <div className="grid grid-cols-3 gap-3 mb-3">
-                            <div className="text-center"><p className="text-[10px] text-gray-600 uppercase tracking-widest">Online</p><p className="text-sm font-bold text-blue-400">₺{fmt(online)}</p></div>
-                            <div className="text-center"><p className="text-[10px] text-gray-600 uppercase tracking-widest">Kapıda</p><p className="text-sm font-bold text-orange-400">₺{fmt(kapida)}</p></div>
-                            <div className="text-center"><p className="text-[10px] text-gray-600 uppercase tracking-widest">Pay</p><p className="text-sm font-bold text-gray-300">{Math.round(pct)}%</p></div>
+                            <div className="text-center"><p className="text-[10px] text-gray-600 uppercase tracking-widest">Online</p><p className="text-sm font-bold text-blue-600">₺{fmt(online)}</p></div>
+                            <div className="text-center"><p className="text-[10px] text-gray-600 uppercase tracking-widest">Kapıda</p><p className="text-sm font-bold text-orange-600">₺{fmt(kapida)}</p></div>
+                            <div className="text-center"><p className="text-[10px] text-gray-600 uppercase tracking-widest">Pay</p><p className="text-sm font-bold text-gray-700">{Math.round(pct)}%</p></div>
                           </div>
-                          <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                          <div className="h-2 bg-black/[0.04] rounded-full overflow-hidden">
                             <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: PLATFORM_COLORS[p] }} />
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                  <div className="mt-4 pt-4 border-t border-[#1a2236] flex justify-between">
+                  <div className="mt-4 pt-4 border-t border-[#e2e5eb] flex justify-between">
                     <span className="text-xs text-gray-600">Platform Toplamı</span>
-                    <span className="text-sm font-black text-white">₺{fmt(stats.toplamPlatform)}</span>
+                    <span className="text-sm font-black text-[#1a1f2e]">₺{fmt(stats.toplamPlatform)}</span>
                   </div>
                 </div>
               </div>
@@ -534,7 +534,7 @@ ${isletmeOzeti}`,
 
             {/* ── KASA DAĞILIMI ── */}
             {raporTuru === "kasa" && (
-              <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-5 space-y-4">
+              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5 space-y-4">
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><Wallet size={12} /> Kasa Ödeme Dağılımı</p>
                 {[
                   { label: "Nakit", value: stats.kasaNakit, color: "#34D399" },
@@ -544,31 +544,31 @@ ${isletmeOzeti}`,
                   const toplam = stats.kasaNakit + stats.kasaPos + stats.kasaEdenred;
                   const pct = toplam > 0 ? (item.value / toplam) * 100 : 0;
                   return (
-                    <div key={item.label} className="bg-[#080b14] rounded-xl border border-[#1a2236] p-4">
+                    <div key={item.label} className="bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-bold text-white">{item.label}</span>
+                        <span className="text-sm font-bold text-[#1a1f2e]">{item.label}</span>
                         <div className="flex items-center gap-3">
                           <span className="text-xs text-gray-500">{Math.round(pct)}%</span>
                           <span className="text-lg font-black" style={{ color: item.color }}>₺{fmt(item.value)}</span>
                         </div>
                       </div>
-                      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-2 bg-black/[0.04] rounded-full overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: item.color }} />
                       </div>
                     </div>
                   );
                 })}
-                <div className="pt-3 border-t border-[#1a2236] flex justify-between">
+                <div className="pt-3 border-t border-[#e2e5eb] flex justify-between">
                   <span className="text-xs text-gray-600">Kasa Toplamı</span>
-                  <span className="text-sm font-black text-white">₺{fmt(stats.kasaNakit + stats.kasaPos + stats.kasaEdenred)}</span>
+                  <span className="text-sm font-black text-[#1a1f2e]">₺{fmt(stats.kasaNakit + stats.kasaPos + stats.kasaEdenred)}</span>
                 </div>
               </div>
             )}
 
             {/* ── GÜN GÜN LİSTE ── */}
             {raporTuru === "gunluk" && (
-              <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl overflow-hidden">
-                <div className="px-5 py-3 border-b border-[#1a2236]">
+              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-[#e2e5eb]">
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5">
                     <Calendar size={11} /> Gün Gün Liste
                   </p>
@@ -576,7 +576,7 @@ ${isletmeOzeti}`,
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-[#1a2236]">
+                      <tr className="border-b border-[#e2e5eb]">
                         {["Tarih", "Brüt Ciro", "Net", "Gider", ...seciliPlatformlar, "Paket"].map(h => (
                           <th key={h} className="text-left px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold whitespace-nowrap">{h}</th>
                         ))}
@@ -584,32 +584,32 @@ ${isletmeOzeti}`,
                     </thead>
                     <tbody className="divide-y divide-[#0f1624]">
                       {stats.gunlukDetay.map(g => (
-                        <tr key={g.tarih} className="hover:bg-white/[0.02] transition-colors">
-                          <td className="px-4 py-3 text-gray-300 font-medium whitespace-nowrap">{fmtTarih(g.tarih)}</td>
-                          <td className="px-4 py-3 text-blue-400 font-bold">₺{fmt(g.brutCiro)}</td>
-                          <td className={`px-4 py-3 font-bold ${g.net >= 0 ? "text-emerald-400" : "text-red-400"}`}>₺{fmt(g.net)}</td>
-                          <td className="px-4 py-3 text-red-400">₺{fmt(g.gider)}</td>
+                        <tr key={g.tarih} className="hover:bg-black/[0.03] transition-colors">
+                          <td className="px-4 py-3 text-gray-700 font-medium whitespace-nowrap">{fmtTarih(g.tarih)}</td>
+                          <td className="px-4 py-3 text-blue-600 font-bold">₺{fmt(g.brutCiro)}</td>
+                          <td className={`px-4 py-3 font-bold ${g.net >= 0 ? "text-emerald-600" : "text-red-600"}`}>₺{fmt(g.net)}</td>
+                          <td className="px-4 py-3 text-red-600">₺{fmt(g.gider)}</td>
                           {seciliPlatformlar.map(p => (
                             <td key={p} className="px-4 py-3 font-bold whitespace-nowrap" style={{ color: PLATFORM_COLORS[p] }}>
                               ₺{fmt(g.platformDetay[p] || 0)}
                             </td>
                           ))}
-                          <td className="px-4 py-3 text-purple-400">{g.paket}</td>
+                          <td className="px-4 py-3 text-purple-600">{g.paket}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="border-t border-[#1a2236] bg-[#080b14]">
+                      <tr className="border-t border-[#e2e5eb] bg-[#f7f8fa]">
                         <td className="px-4 py-3 text-[10px] text-gray-600 uppercase font-bold">TOPLAM</td>
-                        <td className="px-4 py-3 text-blue-400 font-black">₺{fmt(stats.brutCiro)}</td>
-                        <td className="px-4 py-3 text-emerald-400 font-black">₺{fmt(stats.netCiro)}</td>
-                        <td className="px-4 py-3 text-red-400 font-black">₺{fmt(stats.toplamGider)}</td>
+                        <td className="px-4 py-3 text-blue-600 font-black">₺{fmt(stats.brutCiro)}</td>
+                        <td className="px-4 py-3 text-emerald-600 font-black">₺{fmt(stats.netCiro)}</td>
+                        <td className="px-4 py-3 text-red-600 font-black">₺{fmt(stats.toplamGider)}</td>
                         {seciliPlatformlar.map(p => (
                           <td key={p} className="px-4 py-3 font-black whitespace-nowrap" style={{ color: PLATFORM_COLORS[p] }}>
                             ₺{fmt(stats.platformlar[p] || 0)}
                           </td>
                         ))}
-                        <td className="px-4 py-3 text-purple-400 font-black">{fmt(stats.paket)}</td>
+                        <td className="px-4 py-3 text-purple-600 font-black">{fmt(stats.paket)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -619,14 +619,14 @@ ${isletmeOzeti}`,
 
             {/* ── PLATFORM KARŞILAŞTIRMA ── */}
             {raporTuru === "karsilastirma" && (
-              <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl overflow-hidden">
-                <div className="px-5 py-3 border-b border-[#1a2236]">
+              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-[#e2e5eb]">
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><BarChart3 size={11} /> Platform Karşılaştırma</p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-[#1a2236]">
+                      <tr className="border-b border-[#e2e5eb]">
                         {["Platform", "Online Satış", "Kapıda Ödeme", "Toplam", "Pay %"].map(h => (
                           <th key={h} className="text-left px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">{h}</th>
                         ))}
@@ -640,10 +640,10 @@ ${isletmeOzeti}`,
                         const toplam = online + kapida;
                         const pct = stats.toplamPlatform > 0 ? ((toplam / stats.toplamPlatform) * 100).toFixed(1) : "0";
                         return (
-                          <tr key={p} className="hover:bg-white/[0.02] transition-colors">
-                            <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p] }} /><span className="font-bold text-white">{p}</span></div></td>
-                            <td className="px-4 py-3 text-blue-400 font-bold">₺{fmt(online)}</td>
-                            <td className="px-4 py-3 text-orange-400 font-bold">₺{fmt(kapida)}</td>
+                          <tr key={p} className="hover:bg-black/[0.03] transition-colors">
+                            <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p] }} /><span className="font-bold text-[#1a1f2e]">{p}</span></div></td>
+                            <td className="px-4 py-3 text-blue-600 font-bold">₺{fmt(online)}</td>
+                            <td className="px-4 py-3 text-orange-600 font-bold">₺{fmt(kapida)}</td>
                             <td className="px-4 py-3 font-black" style={{ color: PLATFORM_COLORS[p] }}>₺{fmt(toplam)}</td>
                             <td className="px-4 py-3 text-gray-400">{pct}%</td>
                           </tr>
@@ -658,16 +658,16 @@ ${isletmeOzeti}`,
             {/* ════════════════════════════════════════════════════════ */}
             {/* AI İŞ ANALİZ BÖLÜMÜ                                    */}
             {/* ════════════════════════════════════════════════════════ */}
-            <div className="bg-[#0c0f1a] border border-blue-500/20 rounded-2xl overflow-hidden">
+            <div className="bg-[#ffffff] border border-blue-500/20 rounded-2xl overflow-hidden">
               {/* Sekme başlıkları */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[#1a2236]">
-                <div className="flex gap-1 bg-white/5 rounded-xl p-1">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e5eb]">
+                <div className="flex gap-1 bg-black/[0.04] rounded-xl p-1">
                   <button onClick={() => setAktifAiSekme("analiz")}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${aktifAiSekme === "analiz" ? "bg-blue-600 text-white" : "text-gray-500 hover:text-white"}`}>
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${aktifAiSekme === "analiz" ? "bg-blue-600 text-white" : "text-gray-500 hover:text-[#1a1f2e]"}`}>
                     <Sparkles size={12} /> AI Rapor
                   </button>
                   <button onClick={() => setAktifAiSekme("chat")}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${aktifAiSekme === "chat" ? "bg-blue-600 text-white" : "text-gray-500 hover:text-white"}`}>
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${aktifAiSekme === "chat" ? "bg-blue-600 text-white" : "text-gray-500 hover:text-[#1a1f2e]"}`}>
                     <MessageSquare size={12} /> Danışman
                     {mesajlar.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"/>}
                   </button>
@@ -698,20 +698,20 @@ ${isletmeOzeti}`,
                           <div className={`w-2 h-2 rounded-full ${oncelikRenk.dot}`}/>
                           <span className={`text-[10px] font-bold uppercase tracking-widest ${oncelikRenk.text}`}>{oncelikRenk.label}</span>
                         </div>
-                        <p className="text-sm text-gray-200 leading-relaxed">{otomatikAnaliz.ozet}</p>
+                        <p className="text-sm text-gray-800 leading-relaxed">{otomatikAnaliz.ozet}</p>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Başarılar */}
                         {otomatikAnaliz.basarilar.length > 0 && (
                           <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4">
-                            <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                               <TrendingUp size={11} /> Güçlü Yönler
                             </p>
                             <ul className="space-y-2">
                               {otomatikAnaliz.basarilar.map((b, i) => (
-                                <li key={i} className="flex items-start gap-2 text-xs text-gray-300 leading-relaxed">
-                                  <ChevronRight size={12} className="text-emerald-400 shrink-0 mt-0.5"/>
+                                <li key={i} className="flex items-start gap-2 text-xs text-gray-700 leading-relaxed">
+                                  <ChevronRight size={12} className="text-emerald-600 shrink-0 mt-0.5"/>
                                   {b}
                                 </li>
                               ))}
@@ -722,13 +722,13 @@ ${isletmeOzeti}`,
                         {/* Riskler */}
                         {otomatikAnaliz.riskler.length > 0 && (
                           <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
-                            <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                            <p className="text-[10px] font-bold text-red-600 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                               <TrendingDown size={11} /> Dikkat Edilmesi Gerekenler
                             </p>
                             <ul className="space-y-2">
                               {otomatikAnaliz.riskler.map((r, i) => (
-                                <li key={i} className="flex items-start gap-2 text-xs text-gray-300 leading-relaxed">
-                                  <ChevronRight size={12} className="text-red-400 shrink-0 mt-0.5"/>
+                                <li key={i} className="flex items-start gap-2 text-xs text-gray-700 leading-relaxed">
+                                  <ChevronRight size={12} className="text-red-600 shrink-0 mt-0.5"/>
                                   {r}
                                 </li>
                               ))}
@@ -740,14 +740,14 @@ ${isletmeOzeti}`,
                       {/* Öneriler */}
                       {otomatikAnaliz.oneriler.length > 0 && (
                         <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4">
-                          <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                          <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                             <Sparkles size={11} /> Aksiyon Önerileri
                           </p>
                           <div className="space-y-2">
                             {otomatikAnaliz.oneriler.map((o, i) => (
                               <div key={i} className="flex items-start gap-3 bg-white/3 rounded-lg px-3 py-2.5">
-                                <span className="text-[10px] font-black text-blue-500 bg-blue-500/10 rounded-md w-5 h-5 flex items-center justify-center shrink-0">{i+1}</span>
-                                <p className="text-xs text-gray-300 leading-relaxed">{o}</p>
+                                <span className="text-[10px] font-black text-blue-700 bg-blue-500/10 rounded-md w-5 h-5 flex items-center justify-center shrink-0">{i+1}</span>
+                                <p className="text-xs text-gray-700 leading-relaxed">{o}</p>
                               </div>
                             ))}
                           </div>
@@ -770,18 +770,18 @@ ${isletmeOzeti}`,
                       {/* Hedef */}
                       {otomatikAnaliz.hedef && (
                         <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl px-5 py-4 flex items-center gap-3">
-                          <Zap size={16} className="text-blue-400 shrink-0"/>
-                          <p className="text-sm font-semibold text-gray-200">{otomatikAnaliz.hedef}</p>
+                          <Zap size={16} className="text-blue-600 shrink-0"/>
+                          <p className="text-sm font-semibold text-gray-800">{otomatikAnaliz.hedef}</p>
                         </div>
                       )}
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-12 text-center gap-4">
                       <div className="w-14 h-14 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center">
-                        <Bot size={24} className="text-blue-400"/>
+                        <Bot size={24} className="text-blue-600"/>
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-white mb-1">AI İş Analistiniz Hazır</p>
+                        <p className="text-sm font-bold text-[#1a1f2e] mb-1">AI İş Analistiniz Hazır</p>
                         <p className="text-xs text-gray-500 max-w-xs">
                           Verilerinizi analiz edeyim. Ciro trendleri, platform performansı, gider optimizasyonu ve büyüme önerileri için "Analiz Et"e tıklayın.
                         </p>
@@ -808,7 +808,7 @@ ${isletmeOzeti}`,
                         <div className="space-y-2">
                           {HAZIR_SORULAR.map(s => (
                             <button key={s} onClick={() => chatGonder(s)}
-                              className="block w-full text-left text-[11px] text-blue-400/80 hover:text-blue-400 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/10 px-3 py-2 rounded-xl transition-colors leading-relaxed">
+                              className="block w-full text-left text-[11px] text-blue-600/80 hover:text-blue-600 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/10 px-3 py-2 rounded-xl transition-colors leading-relaxed">
                               {s}
                             </button>
                           ))}
@@ -819,13 +819,13 @@ ${isletmeOzeti}`,
                         <div key={i} className={`flex ${m.rol === "user" ? "justify-end" : "justify-start"}`}>
                           {m.rol === "assistant" && (
                             <div className="w-6 h-6 rounded-lg bg-blue-600/20 flex items-center justify-center mr-2 shrink-0 mt-0.5">
-                              <Bot size={12} className="text-blue-400"/>
+                              <Bot size={12} className="text-blue-600"/>
                             </div>
                           )}
                           <div className={`max-w-[85%] text-xs rounded-2xl px-4 py-3 leading-relaxed whitespace-pre-wrap ${
                             m.rol === "user"
                               ? "bg-blue-600 text-white rounded-tr-sm"
-                              : "bg-[#080b14] border border-[#1a2236] text-gray-300 rounded-tl-sm"
+                              : "bg-[#f7f8fa] border border-[#e2e5eb] text-gray-700 rounded-tl-sm"
                           }`}>
                             {m.icerik}
                           </div>
@@ -835,9 +835,9 @@ ${isletmeOzeti}`,
                     {aiYukleniyor && (
                       <div className="flex justify-start">
                         <div className="w-6 h-6 rounded-lg bg-blue-600/20 flex items-center justify-center mr-2 shrink-0">
-                          <Bot size={12} className="text-blue-400"/>
+                          <Bot size={12} className="text-blue-600"/>
                         </div>
-                        <div className="bg-[#080b14] border border-[#1a2236] rounded-2xl rounded-tl-sm px-4 py-3">
+                        <div className="bg-[#f7f8fa] border border-[#e2e5eb] rounded-2xl rounded-tl-sm px-4 py-3">
                           <div className="flex gap-1">
                             <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" style={{animationDelay:"0ms"}}/>
                             <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" style={{animationDelay:"150ms"}}/>
@@ -848,16 +848,16 @@ ${isletmeOzeti}`,
                     )}
                     <div ref={chatSonRef}/>
                   </div>
-                  <div className="p-3 border-t border-[#1a2236] flex gap-2">
+                  <div className="p-3 border-t border-[#e2e5eb] flex gap-2">
                     {mesajlar.length > 0 && (
-                      <button onClick={() => setMesajlar([])} className="p-2.5 text-gray-700 hover:text-gray-400 border border-[#1a2236] rounded-xl transition-colors">
+                      <button onClick={() => setMesajlar([])} className="p-2.5 text-gray-700 hover:text-gray-400 border border-[#e2e5eb] rounded-xl transition-colors">
                         <X size={13}/>
                       </button>
                     )}
                     <input value={soru} onChange={e => setSoru(e.target.value)}
                       onKeyDown={e => e.key === "Enter" && !e.shiftKey && chatGonder()}
                       placeholder="İşletmeniz hakkında bir şey sorun..."
-                      className="flex-1 bg-[#080b14] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 placeholder:text-gray-700" />
+                      className="flex-1 bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 placeholder:text-gray-700" />
                     <button onClick={() => chatGonder()} disabled={aiYukleniyor || !soru.trim()}
                       className="w-10 h-10 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-xl flex items-center justify-center transition-colors">
                       <Send size={13} className="text-white" />

@@ -2632,11 +2632,11 @@ Soru: ${soruFinal}`
 
       {/* TARİH + CANLI METRİKLER */}
 
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-center">
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 items-center">
 
         <div className="sm:col-span-1">
 
-          <label className="block text-[10px] text-amber-600 uppercase tracking-widest font-medium mb-1">Rapor Tarihi</label>
+          <label className="block text-[12px] text-amber-700 font-bold tracking-wide mb-1.5">Rapor Tarihi</label>
 
           <div className="flex flex-col gap-1">
 
@@ -2648,19 +2648,21 @@ Soru: ${soruFinal}`
 
               max={!isAdmin&&!selectedRapor&&beklenenTarih?beklenenTarih:undefined}
 
-              className={`bg-[#f7f8fa] text-[#1a1f2e] font-bold text-center h-9 text-xs rounded-xl px-3 w-full outline-none focus:ring-1 transition-all border ${
+              style={{colorScheme:"light"}}
+
+              className={`bg-[#f7f8fa] text-[#1a1f2e] font-bold text-center h-11 text-[15px] rounded-xl px-3 w-full outline-none focus:ring-2 focus:ring-amber-500/20 transition-all border-2 ${
 
                 duplikaTarihHata ? "border-orange-500 text-orange-600"
 
                 : tarihHataVarMi&&!adminOnayliGecis ? "border-red-500 text-red-600"
 
-                : "border-[#e2e5eb] focus:border-amber-500/50"
+                : "border-[#e2e5eb] focus:border-amber-500/60"
 
               }`} required/>
 
-            {duplikaTarihHata && <p className="text-[10px] text-orange-600 flex items-center gap-1"><AlertTriangle size={9}/> Bu tarih mevcut</p>}
+            {duplikaTarihHata && <p className="text-[11px] font-semibold text-orange-600 flex items-center gap-1"><AlertTriangle size={11}/> Bu tarih mevcut</p>}
 
-            {enSonRaporTarihi && <p className="text-[9px] text-gray-700">Son: {fmtTarih(enSonRaporTarihi)}</p>}
+            {enSonRaporTarihi && <p className="text-[11px] text-gray-500 font-medium">Son rapor: <span className="text-gray-700 font-bold">{fmtTarih(enSonRaporTarihi)}</span></p>}
 
           </div>
 
@@ -2678,11 +2680,11 @@ Soru: ${soruFinal}`
 
         ].map(c=>(
 
-          <div key={c.label} className={`rounded-xl border ${c.border} px-3.5 py-2.5`}>
+          <div key={c.label} className={`rounded-xl border ${c.border} px-4 py-3 transition-transform hover:-translate-y-0.5 hover:shadow-sm`}>
 
-            <p className="text-[11px] text-gray-400 font-medium">{c.label}</p>
+            <p className="text-[12px] text-gray-500 font-semibold">{c.label}</p>
 
-            <p className={`text-base font-black tracking-tight ${c.color}`}>{c.value}</p>
+            <p className={`text-xl font-black tracking-tight ${c.color}`}>{c.value}</p>
 
           </div>
 
@@ -3850,7 +3852,7 @@ Soru: ${soruFinal}`
 
         {formAcik && (
 
-          <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden shadow-2xl">
+          <div className="kebo-anim-in rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden shadow-2xl">
 
             <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
 
@@ -3870,7 +3872,7 @@ Soru: ${soruFinal}`
 
                   </h2>
 
-                  <p className="text-[10px] text-gray-600">{tarih ? fmtTarih(tarih) : "Tarih seçilmedi"}</p>
+                  <p className="text-[13px] text-gray-500 font-medium">{tarih ? fmtTarih(tarih) : "Tarih seçilmedi"}</p>
 
                 </div>
 

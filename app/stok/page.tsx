@@ -507,23 +507,23 @@ export default function StokPage() {
   }, [duzenleUrun]);
 
   if (loading) return (
-    <div className="h-screen bg-[#060810] flex flex-col items-center justify-center gap-3">
+    <div className="h-screen bg-[#f4f5f7] flex flex-col items-center justify-center gap-3">
       <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"/>
       <span className="text-[10px] text-gray-600 uppercase tracking-[0.3em]">Mutfak Deposu Yükleniyor</span>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#060810] text-white font-sans antialiased pb-20">
+    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased pb-20">
       {/* HEADER */}
-      <div className="sticky top-0 z-40 border-b border-[#0f1624] bg-[#060810]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-900/40">
               <Package className="h-4 w-4 text-white"/>
             </div>
             <div>
-              <h1 className="text-sm font-black tracking-tight text-white leading-none">Stok Yönetimi</h1>
+              <h1 className="text-sm font-black tracking-tight text-[#1a1f2e] leading-none">Stok Yönetimi</h1>
               <p className="text-[10px] text-gray-600 leading-none mt-0.5">{stats.toplam} malzeme · {stats.kritik} kritik</p>
             </div>
           </div>
@@ -535,12 +535,12 @@ export default function StokPage() {
             <button 
               onClick={() => setSiraDuzenleModu(!siraDuzenleModu)}
               className={`flex items-center gap-1.5 text-[11px] font-semibold px-3 py-2 rounded-xl border transition-colors ${
-                siraDuzenleModu ? "bg-purple-500/20 border-purple-500/40 text-purple-400" : "text-gray-500 hover:text-purple-400 border-[#1a2236]"
+                siraDuzenleModu ? "bg-purple-500/20 border-purple-500/40 text-purple-600" : "text-gray-500 hover:text-purple-600 border-[#e2e5eb]"
               }`}
             >
               <ListOrdered size={13}/> {siraDuzenleModu ? "Sıralamayı Kapat" : "Sıralama / Düzen Değiştir"}
             </button>
-            <button onClick={veriCek} className="p-2 text-gray-600 hover:text-white border border-[#1a2236] rounded-xl">
+            <button onClick={veriCek} className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-xl">
               <RefreshCw size={14}/>
             </button>
             <button onClick={() => { setDuzenleUrun(null); setYeniUrunAcik(true); }}
@@ -554,10 +554,10 @@ export default function StokPage() {
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
         {/* AI PANEL */}
-        <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-r from-blue-950/20 via-[#0c0f1a] to-[#0c0f1a] p-4">
+        <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-r from-blue-100/60 via-[#0c0f1a] to-[#0c0f1a] p-4">
           <div className="flex items-center gap-2 mb-3">
-            <BrainCircuit className="h-4 w-4 text-blue-400 animate-pulse" />
-            <h2 className="text-xs font-black text-blue-400 uppercase tracking-widest flex items-center gap-2">Kebo AI Akıllı Analiz Motoru</h2>
+            <BrainCircuit className="h-4 w-4 text-blue-600 animate-pulse" />
+            <h2 className="text-xs font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">Kebo AI Akıllı Analiz Motoru</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {aiAnalizleri.length === 0 ? (
@@ -579,18 +579,18 @@ export default function StokPage() {
 
         {/* BULK SEÇİM BAR */}
         {seciliUrunIds.size > 0 && (
-          <div className="rounded-2xl border border-amber-500/30 bg-[#0c0f1a] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="rounded-2xl border border-amber-500/30 bg-[#ffffff] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <CheckSquare className="text-amber-400 h-4 w-4" />
+              <CheckSquare className="text-amber-600 h-4 w-4" />
               <span className="text-xs font-bold">{seciliUrunIds.size} malzeme topluca seçildi</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <input type="number" placeholder="Çoklu Stok..." value={cokluStokMiktar} onChange={e => setCokluStokMiktar(e.target.value)}
-                className="bg-[#060810] border border-[#1a2236] text-white text-xs h-9 px-3 rounded-xl outline-none w-28" />
+                className="bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none w-28" />
               <input type="text" placeholder="Toplu Başlık..." value={cokluKategori} onChange={e => setCokluKategori(e.target.value)}
-                className="bg-[#060810] border border-[#1a2236] text-white text-xs h-9 px-3 rounded-xl outline-none w-36" />
+                className="bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none w-36" />
               <select value={cokluPeriyot} onChange={e => setCokluPeriyot(e.target.value)}
-                className="bg-[#060810] border border-[#1a2236] text-white text-xs h-9 px-3 rounded-xl outline-none">
+                className="bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none">
                 <option value="">Toplu Döngü</option>
                 {PERIYOTLAR.map(p => <option key={p.v} value={p.v}>{p.l}</option>)}
               </select>
@@ -600,23 +600,23 @@ export default function StokPage() {
         )}
 
         {/* FİLTRELER */}
-        <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] p-4 flex flex-col md:flex-row gap-3">
+        <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] p-4 flex flex-col md:flex-row gap-3">
           <div className="flex-1 relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600"/>
             <input type="text" placeholder="Malzeme adı veya başlık/alt başlık ara..." value={arama} onChange={e => setArama(e.target.value)}
-              className="w-full bg-[#080b14] border border-[#1a2236] text-white text-sm h-9 pl-9 pr-3 rounded-xl outline-none"/>
+              className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 pl-9 pr-3 rounded-xl outline-none"/>
           </div>
-          <select value={filtreKategori} onChange={e => setFiltreKategori(e.target.value)} className="bg-[#080b14] border border-[#1a2236] text-white text-xs px-3 h-9 rounded-xl outline-none">
+          <select value={filtreKategori} onChange={e => setFiltreKategori(e.target.value)} className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs px-3 h-9 rounded-xl outline-none">
             <option value="">Tüm Ana Başlıklar</option>
             {dinamikKategoriler.map(k => <option key={k} value={k}>{k}</option>)}
           </select>
-          <select value={filtrePeriyot} onChange={e => setFiltrePeriyot(e.target.value)} className="bg-[#080b14] border border-[#1a2236] text-white text-xs px-3 h-9 rounded-xl outline-none">
+          <select value={filtrePeriyot} onChange={e => setFiltrePeriyot(e.target.value)} className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs px-3 h-9 rounded-xl outline-none">
             <option value="">Tüm Döngüler</option>
             {PERIYOTLAR.map(p => <option key={p.v} value={p.v}>{p.l}</option>)}
           </select>
           <button onClick={() => setSadeceKritik(!sadeceKritik)}
             className={`text-xs font-semibold px-4 py-2 rounded-xl border transition-colors flex items-center gap-1.5 ${
-              sadeceKritik ? "bg-amber-500/15 border-amber-500/40 text-amber-400" : "bg-[#080b14] border-[#1a2236] text-gray-500"
+              sadeceKritik ? "bg-amber-500/15 border-amber-500/40 text-amber-600" : "bg-[#f7f8fa] border-[#e2e5eb] text-gray-500"
             }`}>
             <AlertTriangle size={12}/> Sadece Kritik
           </button>
@@ -625,18 +625,18 @@ export default function StokPage() {
         {/* HİERARŞİK GÖRÜNÜM */}
         <div className="space-y-6">
           {Object.keys(hiyerarsikUrunGruplari).length === 0 ? (
-            <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] py-12 text-center text-gray-600 text-xs">Aranan kriterlerde malzeme bulunamadı.</div>
+            <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] py-12 text-center text-gray-600 text-xs">Aranan kriterlerde malzeme bulunamadı.</div>
           ) : (
             Object.entries(hiyerarsikUrunGruplari).map(([anaBaslik, altGruplar]) => (
               <div key={anaBaslik} className="space-y-3">
                 <div className="flex items-center gap-2 border-b border-gray-800 pb-1.5 px-1 mt-2">
-                  <Layers size={14} className="text-emerald-400" />
-                  <h2 className="text-sm font-black uppercase tracking-wider text-emerald-400">{anaBaslik}</h2>
+                  <Layers size={14} className="text-emerald-600" />
+                  <h2 className="text-sm font-black uppercase tracking-wider text-emerald-600">{anaBaslik}</h2>
                 </div>
 
                 {Object.entries(altGruplar).map(([altBaslik, liste]) => (
-                  <div key={altBaslik} className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden shadow-lg pl-1">
-                    <div className="px-4 py-2 bg-[#060810]/40 border-b border-[#1a2236] flex items-center justify-between">
+                  <div key={altBaslik} className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden shadow-lg pl-1">
+                    <div className="px-4 py-2 bg-[#f4f5f7]/40 border-b border-[#e2e5eb] flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400">
                         <Clock size={11} className="text-gray-600" />
                         <span>{altBaslik}</span>
@@ -647,7 +647,7 @@ export default function StokPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
                         <thead>
-                          <tr className="border-b border-[#1a2236] bg-[#060810]/10 text-gray-600">
+                          <tr className="border-b border-[#e2e5eb] bg-[#f4f5f7]/10 text-gray-600">
                             <th className="px-4 py-2 text-left w-10">
                               <button onClick={tumunuSecVeyaBirak} className="text-gray-600"><Square size={13} /></button>
                             </th>
@@ -671,10 +671,10 @@ export default function StokPage() {
                             const secili = seciliUrunIds.has(urun.id);
 
                             return (
-                              <tr key={urun.id} className={`hover:bg-white/[0.01] transition-colors group ${tukenmis ? "bg-red-950/10" : kritik ? "bg-amber-950/10" : ""} ${secili ? "bg-amber-500/5" : ""}`}>
+                              <tr key={urun.id} className={`hover:bg-white/[0.01] transition-colors group ${tukenmis ? "bg-red-100/60" : kritik ? "bg-amber-100/60" : ""} ${secili ? "bg-amber-500/5" : ""}`}>
                                 <td className="px-4 py-3">
                                   <button type="button" onClick={() => secimDegis(urun.id)} className="text-gray-600">
-                                    {secili ? <CheckSquare size={13} className="text-amber-500" /> : <Square size={13} />}
+                                    {secili ? <CheckSquare size={13} className="text-amber-700" /> : <Square size={13} />}
                                   </button>
                                 </td>
 
@@ -682,35 +682,35 @@ export default function StokPage() {
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-1 text-gray-500">
                                       <button type="button" onClick={() => elemanYeriDegistir(globalIndex, "yukari")} disabled={globalIndex === 0}
-                                        className="p-1 hover:text-purple-400 bg-white/5 rounded disabled:opacity-20" title="Yukarı Taşı">
+                                        className="p-1 hover:text-purple-600 bg-black/[0.04] rounded disabled:opacity-20" title="Yukarı Taşı">
                                         <ArrowUp size={11} />
                                       </button>
                                       <button type="button" onClick={() => elemanYeriDegistir(globalIndex, "asagi")} disabled={globalIndex === urunler.length - 1}
-                                        className="p-1 hover:text-purple-400 bg-white/5 rounded disabled:opacity-20" title="Aşağı Taşı">
+                                        className="p-1 hover:text-purple-600 bg-black/[0.04] rounded disabled:opacity-20" title="Aşağı Taşı">
                                         <ArrowDown size={11} />
                                       </button>
                                     </div>
                                   </td>
                                 )}
 
-                                <td className="px-4 py-3 font-semibold text-gray-200">
-                                  <Link href={`/stok/${urun.id}`} className="hover:text-blue-400 transition-colors">{urun.urun_adi}</Link>
+                                <td className="px-4 py-3 font-semibold text-gray-800">
+                                  <Link href={`/stok/${urun.id}`} className="hover:text-blue-600 transition-colors">{urun.urun_adi}</Link>
                                 </td>
                                 <td className="px-4 py-3 text-gray-400 capitalize">{urun.sayim_periyodu || "gunluk"}</td>
-                                <td className={`px-4 py-3 font-black ${tukenmis ? "text-red-400" : kritik ? "text-amber-400" : "text-white"}`}>
+                                <td className={`px-4 py-3 font-black ${tukenmis ? "text-red-600" : kritik ? "text-amber-600" : "text-[#1a1f2e]"}`}>
                                   {fmt(urun.mevcut_stok)} <span className="text-[10px] text-gray-600 font-normal">{urun.birim}</span>
                                 </td>
                                 <td className="px-4 py-3 text-gray-500">{urun.min_stok > 0 ? `${fmt(urun.min_stok)} ${urun.birim}` : "—"}</td>
-                                <td className="px-4 py-3 text-purple-400 font-semibold">{ort > 0 ? `${fmt(ort, 2)} ${urun.birim}` : "—"}</td>
+                                <td className="px-4 py-3 text-purple-600 font-semibold">{ort > 0 ? `${fmt(ort, 2)} ${urun.birim}` : "—"}</td>
                                 <td className="px-4 py-3">
-                                  {kalanGun !== null ? <span className={`font-semibold ${kalanGun <= 3 ? "text-red-400" : "text-emerald-400"}`}>~{kalanGun} gün</span> : <span className="text-gray-700">—</span>}
+                                  {kalanGun !== null ? <span className={`font-semibold ${kalanGun <= 3 ? "text-red-600" : "text-emerald-600"}`}>~{kalanGun} gün</span> : <span className="text-gray-700">—</span>}
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => setSayimUrun(urun)} className="p-1.5 text-blue-400 hover:bg-blue-500/10 rounded-lg"><ClipboardCheck size={12}/></button>
-                                    <button onClick={() => setMalGirisUrun(urun)} className="p-1.5 text-amber-400 hover:bg-amber-500/10 rounded-lg"><Truck size={12}/></button>
-                                    <button onClick={() => setDuzenleUrun(urun)} className="p-1.5 text-gray-400 hover:bg-white/5 rounded-lg"><Edit3 size={12}/></button>
-                                    {isAdmin && <button onClick={() => urunSil(urun)} className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg"><Trash2 size={12}/></button>}
+                                    <button onClick={() => setSayimUrun(urun)} className="p-1.5 text-blue-600 hover:bg-blue-500/10 rounded-lg"><ClipboardCheck size={12}/></button>
+                                    <button onClick={() => setMalGirisUrun(urun)} className="p-1.5 text-amber-600 hover:bg-amber-500/10 rounded-lg"><Truck size={12}/></button>
+                                    <button onClick={() => setDuzenleUrun(urun)} className="p-1.5 text-gray-400 hover:bg-black/[0.04] rounded-lg"><Edit3 size={12}/></button>
+                                    {isAdmin && <button onClick={() => urunSil(urun)} className="p-1.5 text-red-600 hover:bg-red-500/10 rounded-lg"><Trash2 size={12}/></button>}
                                   </div>
                                 </td>
                               </tr>
@@ -730,23 +730,23 @@ export default function StokPage() {
       {/* 4 SEKMELİ TOPLU SAYIM MODAL */}
       {topluSayimAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-blue-500/30 rounded-2xl w-full max-w-3xl shadow-2xl max-h-[85vh] flex flex-col">
-            <div className="px-5 py-4 border-b border-[#1a2236] flex items-center justify-between bg-[#080b14] rounded-t-2xl">
+          <div className="bg-[#ffffff] border border-blue-500/30 rounded-2xl w-full max-w-3xl shadow-2xl max-h-[85vh] flex flex-col">
+            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between bg-[#f7f8fa] rounded-t-2xl">
               <div className="flex items-center gap-2">
-                <ClipboardCheck size={16} className="text-blue-400"/>
-                <h3 className="text-sm font-black text-white">Gelişmiş Çoklu Stok Sayım Listesi</h3>
+                <ClipboardCheck size={16} className="text-blue-600"/>
+                <h3 className="text-sm font-black text-[#1a1f2e]">Gelişmiş Çoklu Stok Sayım Listesi</h3>
               </div>
-              <button onClick={() => { setTopluSayimAcik(false); setTopluMiktarlar({}); setTopluNotlar({}); }} className="p-1 text-gray-600 hover:text-white"><X size={16}/></button>
+              <button onClick={() => { setTopluSayimAcik(false); setTopluMiktarlar({}); setTopluNotlar({}); }} className="p-1 text-gray-600 hover:text-[#1a1f2e]"><X size={16}/></button>
             </div>
 
-            <div className="p-4 bg-[#0e1322] border-b border-[#1a2236] space-y-3">
+            <div className="p-4 bg-[#f7f8fa] border-b border-[#e2e5eb] space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <span className="text-xs text-gray-400 flex items-center gap-1"><Calendar size={13}/> Giriş Yapılacak Sayım Günü Tarihi:</span>
                 <input type="date" value={topluSayimTarih} onChange={e => setTopluSayimTarih(e.target.value)}
-                  className="bg-[#060810] border border-[#1a2236] text-white text-xs font-bold h-9 px-3 rounded-xl outline-none" />
+                  className="bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs font-bold h-9 px-3 rounded-xl outline-none" />
               </div>
               
-              <div className="grid grid-cols-4 gap-1 bg-[#060810] p-1 rounded-xl border border-[#1a2236]">
+              <div className="grid grid-cols-4 gap-1 bg-[#f4f5f7] p-1 rounded-xl border border-[#e2e5eb]">
                 {[
                   { id: "gunluk", l: "⏱ Günlük Liste" },
                   { id: "haftalik", l: "📅 Haftalık Liste" },
@@ -754,30 +754,30 @@ export default function StokPage() {
                   { id: "all", l: "📦 Tüm Liste" }
                 ].map(tab => (
                   <button key={tab.id} type="button" onClick={() => setTopluSayimSekme(tab.id as any)}
-                    className={`py-2 text-[11px] font-bold rounded-lg transition-all text-center ${topluSayimSekme === tab.id ? "bg-blue-600 text-white shadow" : "text-gray-50 hover:text-white"}`}>
+                    className={`py-2 text-[11px] font-bold rounded-lg transition-all text-center ${topluSayimSekme === tab.id ? "bg-blue-600 text-white shadow" : "text-gray-50 hover:text-[#1a1f2e]"}`}>
                     {tab.l}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#060810]/50">
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#f4f5f7]/50">
               {topluSayimSekmeFiltreliUrunler.length === 0 ? (
                 <div className="text-center text-gray-600 text-xs py-8">Bu sayım periyoduna ait malzeme bulunmuyor.</div>
               ) : topluSayimSekmeFiltreliUrunler.map(urun => {
                 const mukerrer = tarihteSayimVarMi(urun.id, topluSayimTarih);
                 return (
-                  <div key={urun.id} className={`flex flex-col sm:flex-row sm:items-center gap-3 bg-[#080b14] border rounded-xl px-4 py-2 transition-colors ${mukerrer ? "border-amber-500/30 bg-amber-500/[0.01]" : "border-[#1a2236]"}`}>
+                  <div key={urun.id} className={`flex flex-col sm:flex-row sm:items-center gap-3 bg-[#f7f8fa] border rounded-xl px-4 py-2 transition-colors ${mukerrer ? "border-amber-500/30 bg-amber-500/[0.01]" : "border-[#e2e5eb]"}`}>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-xs font-bold text-white">{urun.urun_adi}</p>
+                        <p className="text-xs font-bold text-[#1a1f2e]">{urun.urun_adi}</p>
                         <span className="text-[9px] text-gray-600 font-mono italic">({urun.kategori || "Kategorisiz"})</span>
                       </div>
                       <p className="text-[10px] text-gray-600 mt-0.5">Sistem Stoğu: <span className="text-gray-400 font-bold">{fmt(urun.mevcut_stok)} {urun.birim}</span></p>
                     </div>
 
                     {mukerrer && (
-                      <div className="text-[9px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded flex items-center gap-0.5 shrink-0">
+                      <div className="text-[9px] text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded flex items-center gap-0.5 shrink-0">
                         <AlertTriangle size={10}/> Bugün zaten sayılmış!
                       </div>
                     )}
@@ -788,22 +788,22 @@ export default function StokPage() {
                           const val = e.target.value;
                           setTopluNotlar(prev => ({ ...prev, [urun.id]: val }));
                         }}
-                        className="bg-[#0c0f1a] border border-[#1a2236] text-gray-300 text-[11px] h-8 px-2 w-36 rounded-lg outline-none" />
+                        className="bg-[#ffffff] border border-[#e2e5eb] text-gray-700 text-[11px] h-8 px-2 w-36 rounded-lg outline-none" />
                       <input type="number" step="0.01" value={topluMiktarlar[urun.id] || ""}
                         onChange={e => {
                           const val = e.target.value;
                           setTopluMiktarlar(prev => ({ ...prev, [urun.id]: val }));
                         }}
                         placeholder={`0 ${urun.birim}`}
-                        className="w-24 bg-[#0c0f1a] border border-[#1a2236] text-white text-xs font-black h-8 px-2 rounded-lg text-right outline-none focus:border-blue-500/50" />
+                        className="w-24 bg-[#ffffff] border border-[#e2e5eb] text-[#1a1f2e] text-xs font-black h-8 px-2 rounded-lg text-right outline-none focus:border-blue-500/50" />
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            <div className="px-5 py-4 border-t border-[#1a2236] flex justify-end gap-2 bg-[#080b14] rounded-b-2xl">
-              <button onClick={() => { setTopluSayimAcik(false); setTopluMiktarlar({}); setTopluNotlar({}); }} className="text-xs font-semibold text-gray-500 border border-[#1a2236] px-4 py-2 rounded-xl">Kapat</button>
+            <div className="px-5 py-4 border-t border-[#e2e5eb] flex justify-end gap-2 bg-[#f7f8fa] rounded-b-2xl">
+              <button onClick={() => { setTopluSayimAcik(false); setTopluMiktarlar({}); setTopluNotlar({}); }} className="text-xs font-semibold text-gray-500 border border-[#e2e5eb] px-4 py-2 rounded-xl">Kapat</button>
               <button onClick={gelişmişTopluSayımKaydet} disabled={saving} className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-blue-900/30">
                 {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>} Sayımları Kaydet
               </button>
@@ -815,27 +815,27 @@ export default function StokPage() {
       {/* YENİ / DÜZENLEME MODAL */}
       {yeniUrunAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="px-5 py-4 border-b border-[#1a2236] flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white">{duzenleUrun ? "Malzeme Düzenle" : "Yeni Malzeme Tanımla"}</h3>
-              <button onClick={yeniUrunReset} className="p-1 text-gray-600 hover:text-white"><X size={16}/></button>
+          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[#1a1f2e]">{duzenleUrun ? "Malzeme Düzenle" : "Yeni Malzeme Tanımla"}</h3>
+              <button onClick={yeniUrunReset} className="p-1 text-gray-600 hover:text-[#1a1f2e]"><X size={16}/></button>
             </div>
             <form onSubmit={yeniUrunKaydet} className="p-5 space-y-3">
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Malzeme Adı *</label>
                 <input type="text" value={yUrunAdi} onChange={e => setYUrunAdi(e.target.value)} required
-                  className="w-full bg-[#080b14] border border-[#1a2236] text-white text-sm h-9 px-3 rounded-xl outline-none"/>
+                  className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none"/>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Başlık (Örn: Soğuk Hava / A Firması)</label>
                   <input type="text" placeholder="Grup / Alt Grup" value={yKategori} onChange={e => setYKategori(e.target.value)}
-                    className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs h-9 px-3 rounded-xl outline-none" />
+                    className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none" />
                 </div>
                 <div>
                   <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Birim</label>
                   <select value={yBirim} onChange={e => setYBirim(e.target.value)}
-                    className="w-full bg-[#080b14] border border-[#1a2236] text-white text-sm h-9 px-3 rounded-xl outline-none">
+                    className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none">
                     {BIRIMLER.map(b => <option key={b} value={b}>{b}</option>)}
                   </select>
                 </div>
@@ -844,7 +844,7 @@ export default function StokPage() {
                 <div>
                   <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Sayım Periyodu</label>
                   <select value={yPeriyot} onChange={e => setYPeriyot(e.target.value)}
-                    className="w-full bg-[#080b14] border border-[#1a2236] text-white text-sm h-9 px-3 rounded-xl outline-none">
+                    className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none">
                     <option value="gunluk">Günlük Sayım</option>
                     <option value="haftalik">Haftalık Sayım</option>
                     <option value="aylik">Aylık Sayım</option>
@@ -853,18 +853,18 @@ export default function StokPage() {
                 <div>
                   <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Min. Stok</label>
                   <input type="number" step="0.01" value={yMinStok} onChange={e => setYMinStok(e.target.value)}
-                    className="w-full bg-[#080b14] border border-[#1a2236] text-white text-sm h-9 px-3 rounded-xl outline-none"/>
+                    className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none"/>
                 </div>
               </div>
               {!duzenleUrun && (
                 <div>
                   <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Başlangıç Eldeki Stok</label>
                   <input type="number" step="0.01" value={yIlkStok} onChange={e => setYIlkStok(e.target.value)}
-                    className="w-full bg-[#080b14] border border-[#1a2236] text-white text-sm h-9 px-3 rounded-xl outline-none"/>
+                    className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none"/>
                 </div>
               )}
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={yeniUrunReset} className="text-xs font-semibold text-gray-500 border border-[#1a2236] px-4 py-2 rounded-xl">İptal</button>
+                <button type="button" onClick={yeniUrunReset} className="text-xs font-semibold text-gray-500 border border-[#e2e5eb] px-4 py-2 rounded-xl">İptal</button>
                 <button type="submit" disabled={saving} className="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-6 py-2 rounded-xl flex items-center gap-2">
                   {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>} Kaydet
                 </button>
@@ -877,29 +877,29 @@ export default function StokPage() {
       {/* TEKLİ SAYIM MODAL */}
       {sayimUrun && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-blue-500/20 rounded-2xl w-full max-w-sm shadow-2xl">
-            <div className="px-5 py-4 border-b border-[#1a2236] flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white">Münferit Sayım Gir</h3>
-              <button onClick={() => setSayimUrun(null)} className="p-1 text-gray-600 hover:text-white"><X size={16}/></button>
+          <div className="bg-[#ffffff] border border-blue-500/20 rounded-2xl w-full max-w-sm shadow-2xl">
+            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[#1a1f2e]">Münferit Sayım Gir</h3>
+              <button onClick={() => setSayimUrun(null)} className="p-1 text-gray-600 hover:text-[#1a1f2e]"><X size={16}/></button>
             </div>
             <div className="p-5 space-y-3">
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Sayım Günü Tarihi</label>
                 <input type="date" value={sayimTarih} onChange={e => setSayimTarih(e.target.value)}
-                  className="w-full bg-[#080b14] border border-[#1a2236] text-white text-sm h-9 px-3 rounded-xl outline-none"/>
+                  className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none"/>
               </div>
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Miktar ({sayimUrun.birim})</label>
                 <input type="number" step="0.01" value={sayimMiktar} onChange={e => setSayimMiktar(e.target.value)} autoFocus
-                  className="w-full bg-[#080b14] border border-[#1a2236] text-white text-base h-10 px-3 rounded-xl outline-none"/>
+                  className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-base h-10 px-3 rounded-xl outline-none"/>
               </div>
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Açıklama / Özel Not</label>
                 <input type="text" value={sayimNot} onChange={e => setSayimNot(e.target.value)}
-                  className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs h-8 px-3 rounded-xl outline-none"/>
+                  className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-8 px-3 rounded-xl outline-none"/>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setSayimUrun(null)} className="text-xs font-semibold text-gray-500 border border-[#1a2236] px-4 py-2 rounded-xl">Vazgeç</button>
+                <button onClick={() => setSayimUrun(null)} className="text-xs font-semibold text-gray-500 border border-[#e2e5eb] px-4 py-2 rounded-xl">Vazgeç</button>
                 <button onClick={sayimKaydet} disabled={saving || !sayimMiktar} className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-xl">Listeye İşle</button>
               </div>
             </div>
@@ -910,29 +910,29 @@ export default function StokPage() {
       {/* MAL GİRİŞ MODAL */}
       {malGirisUrun && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-amber-500/20 rounded-2xl w-full max-w-sm shadow-2xl">
-            <div className="px-5 py-4 border-b border-[#1a2236] flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white">Mal Kabul Girişi</h3>
-              <button onClick={() => setMalGirisUrun(null)} className="p-1 text-gray-600 hover:text-white"><X size={16}/></button>
+          <div className="bg-[#ffffff] border border-amber-500/20 rounded-2xl w-full max-w-sm shadow-2xl">
+            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[#1a1f2e]">Mal Kabul Girişi</h3>
+              <button onClick={() => setMalGirisUrun(null)} className="p-1 text-gray-600 hover:text-[#1a1f2e]"><X size={16}/></button>
             </div>
             <div className="p-5 space-y-3">
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Kabul Tarihi</label>
                 <input type="date" value={girisTarih} onChange={e => setGirisTarih(e.target.value)}
-                  className="w-full bg-[#080b14] border border-[#1a2236] text-white text-sm h-9 px-3 rounded-xl outline-none"/>
+                  className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none"/>
               </div>
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Gelen Fatura Miktarı ({malGirisUrun.birim})</label>
                 <input type="number" step="0.01" value={girisMiktar} onChange={e => setGirisMiktar(e.target.value)} autoFocus
-                  className="w-full bg-[#080b14] border border-[#1a2236] text-white text-base h-10 px-3 rounded-xl outline-none"/>
+                  className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-base h-10 px-3 rounded-xl outline-none"/>
               </div>
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Birim Alış Fiyatı (₺)</label>
                 <input type="number" step="0.01" value={girisFiyat} onChange={e => setGirisFiyat(e.target.value)}
-                  className="w-full bg-[#080b14] border border-[#1a2236] text-white text-base h-10 px-3 rounded-xl outline-none"/>
+                  className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-base h-10 px-3 rounded-xl outline-none"/>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setMalGirisUrun(null)} className="text-xs font-semibold text-gray-500 border border-[#1a2236] px-4 py-2 rounded-xl">İptal</button>
+                <button onClick={() => setMalGirisUrun(null)} className="text-xs font-semibold text-gray-500 border border-[#e2e5eb] px-4 py-2 rounded-xl">İptal</button>
                 <button onClick={malGirisKaydet} disabled={saving || !girisMiktar} className="text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 px-6 py-2 rounded-xl">Depoya Ekle</button>
               </div>
             </div>
@@ -943,30 +943,30 @@ export default function StokPage() {
       {/* CHATBOT ASİSTANI */}
       <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
         {chatAcik && (
-          <div className="w-80 sm:w-96 h-[400px] border border-blue-500/30 bg-[#0c0f1a]/95 backdrop-blur-xl rounded-2xl shadow-2xl flex flex-col mb-3">
-            <div className="px-4 py-3 bg-[#080b14] border-b border-[#1a2236] rounded-t-2xl flex items-center justify-between">
+          <div className="w-80 sm:w-96 h-[400px] border border-blue-500/30 bg-[#ffffff]/95 backdrop-blur-xl rounded-2xl shadow-2xl flex flex-col mb-3">
+            <div className="px-4 py-3 bg-[#f7f8fa] border-b border-[#e2e5eb] rounded-t-2xl flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Bot size={16} className="text-blue-400 animate-pulse" />
-                <span className="text-xs font-black text-white">KEBO AI STOK ASİSTANI</span>
+                <Bot size={16} className="text-blue-600 animate-pulse" />
+                <span className="text-xs font-black text-[#1a1f2e]">KEBO AI STOK ASİSTANI</span>
               </div>
-              <button onClick={() => setChatAcik(false)} className="text-gray-500 hover:text-white"><X size={14} /></button>
+              <button onClick={() => setChatAcik(false)} className="text-gray-500 hover:text-[#1a1f2e]"><X size={14} /></button>
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
               {chatGecmisi.map((m, idx) => (
                 <div key={idx} className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[80%] rounded-xl px-3 py-2 leading-relaxed ${m.sender === "user" ? "bg-blue-600 text-white rounded-br-none" : "bg-[#161d30] text-gray-200 rounded-bl-none"}`}>
+                  <div className={`max-w-[80%] rounded-xl px-3 py-2 leading-relaxed ${m.sender === "user" ? "bg-blue-600 text-white rounded-br-none" : "bg-[#f1f2f5] text-gray-800 rounded-bl-none"}`}>
                     {m.text}
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="p-2 border-t border-[#1a2236] bg-[#080b14] rounded-b-2xl flex items-center gap-2">
+            <div className="p-2 border-t border-[#e2e5eb] bg-[#f7f8fa] rounded-b-2xl flex items-center gap-2">
               <input type="text" placeholder="AI'a danış (örn: kritik durumlar)..." value={chatGirdisi}
                 onChange={e => setChatGirdisi(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && chatGonder()}
-                className="flex-1 bg-[#060810] border border-[#1a2236] text-white text-xs h-8 px-3 rounded-lg outline-none" />
+                className="flex-1 bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-8 px-3 rounded-lg outline-none" />
               <button onClick={chatGonder} className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
                 <Send size={12} />
               </button>

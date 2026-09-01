@@ -77,22 +77,22 @@ const gunFarki = (t: string) => {
 function DurumBadge({ durum, beklenenTarih }: { durum: string; beklenenTarih: string }) {
   const gecti = beklenenTarih && new Date(beklenenTarih) < new Date() && durum === "bekliyor";
   if (gecti) return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-red-500/15 text-red-400">
+    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-red-500/15 text-red-600">
       <AlertCircle size={10} /> Gecikmiş
     </span>
   );
   if (durum === "tamamlandi") return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-400">
+    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-600">
       <CheckCircle2 size={10} /> Tahsil Edildi
     </span>
   );
   if (durum === "kismen") return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-400">
+    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-600">
       <Clock size={10} /> Kısmi
     </span>
   );
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-blue-500/15 text-blue-400">
+    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-blue-500/15 text-blue-600">
       <Clock size={10} /> Bekliyor
     </span>
   );
@@ -352,34 +352,34 @@ export default function PlatformTahsilatPage() {
   }, [filtreliKayitlar]);
 
   if (loading) return (
-    <div className="h-screen bg-[#060810] flex flex-col items-center justify-center gap-3">
+    <div className="h-screen bg-[#f4f5f7] flex flex-col items-center justify-center gap-3">
       <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
       <span className="text-[10px] text-gray-600 uppercase tracking-[0.3em]">Yükleniyor</span>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#060810] text-white font-sans antialiased">
+    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased">
 
       {/* ── HEADER ── */}
-      <div className="sticky top-0 z-40 border-b border-[#0f1624] bg-[#060810]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-purple-600 flex items-center justify-center shadow-lg shadow-purple-900/40">
               <Wallet className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-black tracking-tight text-white leading-none">Platform Tahsilat Takibi</h1>
+              <h1 className="text-sm font-black tracking-tight text-[#1a1f2e] leading-none">Platform Tahsilat Takibi</h1>
               <p className="text-[10px] text-gray-600 leading-none mt-0.5">Online platform ödemeleri ve kesinti analizi</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => exportCSV(filtreliKayitlar)}
-              className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-emerald-400 border border-[#1a2236] hover:border-emerald-500/30 px-3 py-2 rounded-xl transition-colors">
+              className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-emerald-600 border border-[#e2e5eb] hover:border-emerald-500/30 px-3 py-2 rounded-xl transition-colors">
               <FileDown size={13} /> CSV
             </button>
             <button onClick={veriCek}
-              className="p-2 text-gray-600 hover:text-white border border-[#1a2236] hover:border-[#2a3550] rounded-xl transition-colors">
+              className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] rounded-xl transition-colors">
               <RefreshCw size={14} />
             </button>
             <button onClick={() => setFormAcik(true)}
@@ -394,15 +394,15 @@ export default function PlatformTahsilatPage() {
 
         {/* ── KRİTİK UYARILAR ── */}
         {istatistik.gecikmisTutar > 0 && (
-          <div className="rounded-2xl border border-red-500/20 bg-[#130a0a] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="rounded-2xl border border-red-500/20 bg-[#fef2f2] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-3">
               <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 shrink-0">
-                <AlertTriangle className="h-4 w-4 text-red-400 animate-pulse" />
+                <AlertTriangle className="h-4 w-4 text-red-600 animate-pulse" />
               </div>
               <div>
-                <p className="text-xs font-bold text-red-400 uppercase tracking-widest">Gecikmiş Tahsilat</p>
+                <p className="text-xs font-bold text-red-600 uppercase tracking-widest">Gecikmiş Tahsilat</p>
                 <p className="text-[11px] text-gray-500 mt-0.5">
-                  Vadesi geçmiş toplam: <strong className="text-red-300">₺{fmt(istatistik.gecikmisTutar)}</strong> — ilgili platformlarla iletişime geçin
+                  Vadesi geçmiş toplam: <strong className="text-red-700">₺{fmt(istatistik.gecikmisTutar)}</strong> — ilgili platformlarla iletişime geçin
                 </p>
               </div>
             </div>
@@ -414,25 +414,25 @@ export default function PlatformTahsilatPage() {
         )}
 
         {/* ── ÖZETLERİ PLATFORM BAZINDA ── */}
-        <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden">
+        <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden">
           <button onClick={() => setOzet(!ozet)}
-            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors">
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-black/[0.03] transition-colors">
             <div className="flex items-center gap-3">
               <div className="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                <BarChart3 className="h-3.5 w-3.5 text-purple-400" />
+                <BarChart3 className="h-3.5 w-3.5 text-purple-600" />
               </div>
-              <span className="text-sm font-semibold text-gray-200">Dönem Özeti</span>
+              <span className="text-sm font-semibold text-gray-800">Dönem Özeti</span>
               {/* Dönem filtresi inline */}
-              <div onClick={e => e.stopPropagation()} className="flex items-center gap-1.5 bg-[#080b14] border border-[#1a2236] px-3 py-1 rounded-xl">
+              <div onClick={e => e.stopPropagation()} className="flex items-center gap-1.5 bg-[#f7f8fa] border border-[#e2e5eb] px-3 py-1 rounded-xl">
                 <Calendar size={11} className="text-gray-600" />
                 <select value={secilenAy} onChange={e => setSecilenAy(e.target.value)}
-                  className="bg-transparent text-xs font-semibold text-gray-300 outline-none cursor-pointer">
-                  {AYLAR.map(m => <option key={m.v} value={m.v} className="bg-[#0c0f1a]">{m.l}</option>)}
+                  className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer">
+                  {AYLAR.map(m => <option key={m.v} value={m.v} className="bg-[#ffffff]">{m.l}</option>)}
                 </select>
                 <span className="text-gray-700">/</span>
                 <select value={secilenYil} onChange={e => setSecilenYil(e.target.value)}
-                  className="bg-transparent text-xs font-semibold text-gray-300 outline-none cursor-pointer">
-                  {["2024","2025","2026","2027"].map(y => <option key={y} value={y} className="bg-[#0c0f1a]">{y}</option>)}
+                  className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer">
+                  {["2024","2025","2026","2027"].map(y => <option key={y} value={y} className="bg-[#ffffff]">{y}</option>)}
                 </select>
               </div>
             </div>
@@ -440,14 +440,14 @@ export default function PlatformTahsilatPage() {
           </button>
 
           {ozet && (
-            <div className="border-t border-[#1a2236] p-5 space-y-5">
+            <div className="border-t border-[#e2e5eb] p-5 space-y-5">
               {/* KPI kartları */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                  { label: "Toplam Satış", value: `₺${fmt(istatistik.toplamSatis)}`, color: "text-blue-400", bg: "bg-blue-500/5 border-blue-500/10" },
-                  { label: "Tahsil Edilen", value: `₺${fmt(istatistik.toplamYatan)}`, color: "text-emerald-400", bg: "bg-emerald-500/5 border-emerald-500/10" },
-                  { label: "Bekleyen", value: `₺${fmt(istatistik.bekleyenTutar)}`, color: "text-amber-400", bg: "bg-amber-500/5 border-amber-500/10" },
-                  { label: "Toplam Kesinti", value: `₺${fmt(istatistik.toplamKesinti)}`, color: "text-red-400", bg: "bg-red-500/5 border-red-500/10" },
+                  { label: "Toplam Satış", value: `₺${fmt(istatistik.toplamSatis)}`, color: "text-blue-600", bg: "bg-blue-500/5 border-blue-500/10" },
+                  { label: "Tahsil Edilen", value: `₺${fmt(istatistik.toplamYatan)}`, color: "text-emerald-600", bg: "bg-emerald-500/5 border-emerald-500/10" },
+                  { label: "Bekleyen", value: `₺${fmt(istatistik.bekleyenTutar)}`, color: "text-amber-600", bg: "bg-amber-500/5 border-amber-500/10" },
+                  { label: "Toplam Kesinti", value: `₺${fmt(istatistik.toplamKesinti)}`, color: "text-red-600", bg: "bg-red-500/5 border-red-500/10" },
                 ].map(c => (
                   <div key={c.label} className={`rounded-xl border ${c.bg} px-4 py-3`}>
                     <p className="text-[10px] text-gray-600 uppercase tracking-widest">{c.label}</p>
@@ -458,10 +458,10 @@ export default function PlatformTahsilatPage() {
 
               {/* Platform bazlı tablo */}
               {platformOzet.length > 0 && (
-                <div className="overflow-x-auto rounded-xl border border-[#1a2236]">
+                <div className="overflow-x-auto rounded-xl border border-[#e2e5eb]">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-[#080b14] border-b border-[#1a2236]">
+                      <tr className="bg-[#f7f8fa] border-b border-[#e2e5eb]">
                         {["Platform", "Toplam Satış", "Tahsil Edilen", "Kesinti", "Fark / Kayıp", "Bekleyen", "Durum"].map((h, i) => (
                           <th key={i} className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-600">{h}</th>
                         ))}
@@ -473,22 +473,22 @@ export default function PlatformTahsilatPage() {
                         const pct = d.satis > 0 ? Math.round((d.yatan / d.satis) * 100) : 0;
                         const renk = PLATFORM_MAP[platform]?.renk || "#6B7280";
                         return (
-                          <tr key={platform} className="hover:bg-white/[0.02]">
+                          <tr key={platform} className="hover:bg-black/[0.03]">
                             <td className="px-4 py-3"><PlatformBadge platform={platform} /></td>
-                            <td className="px-4 py-3 text-gray-300 font-semibold">₺{fmt(d.satis)}</td>
-                            <td className="px-4 py-3 text-emerald-400 font-bold">₺{fmt(d.yatan)}</td>
-                            <td className="px-4 py-3 text-red-400">₺{fmt(d.kesinti)}</td>
+                            <td className="px-4 py-3 text-gray-700 font-semibold">₺{fmt(d.satis)}</td>
+                            <td className="px-4 py-3 text-emerald-600 font-bold">₺{fmt(d.yatan)}</td>
+                            <td className="px-4 py-3 text-red-600">₺{fmt(d.kesinti)}</td>
                             <td className="px-4 py-3">
-                              <span className={`font-bold ${fark > 0 ? "text-amber-400" : "text-gray-600"}`}>
+                              <span className={`font-bold ${fark > 0 ? "text-amber-600" : "text-gray-600"}`}>
                                 {fark > 0 ? `-₺${fmt(fark)}` : "—"}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-amber-400 font-semibold">
+                            <td className="px-4 py-3 text-amber-600 font-semibold">
                               {d.bekleyen > 0 ? `₺${fmt(d.bekleyen)}` : <span className="text-gray-600">—</span>}
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
-                                <div className="flex-1 h-1.5 bg-[#1a2236] rounded-full overflow-hidden">
+                                <div className="flex-1 h-1.5 bg-[#e2e5eb] rounded-full overflow-hidden">
                                   <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: renk }} />
                                 </div>
                                 <span className="text-[10px] text-gray-500 w-8">{pct}%</span>
@@ -506,13 +506,13 @@ export default function PlatformTahsilatPage() {
         </div>
 
         {/* ── DETAY LİSTESİ ── */}
-        <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden shadow-xl">
+        <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden shadow-xl">
           {/* Filtreler */}
-          <div className="px-5 py-4 border-b border-[#1a2236] space-y-3">
+          <div className="px-5 py-4 border-b border-[#e2e5eb] space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-gray-200">Satış & Tahsilat Detayları</h3>
+              <h3 className="text-sm font-semibold text-gray-800">Satış & Tahsilat Detayları</h3>
               <div className="flex sm:hidden gap-1">
-                <button onClick={() => exportCSV(filtreliKayitlar)} className="text-[10px] text-gray-600 hover:text-emerald-400 border border-[#1a2236] px-2.5 py-1.5 rounded-lg transition-colors">CSV</button>
+                <button onClick={() => exportCSV(filtreliKayitlar)} className="text-[10px] text-gray-600 hover:text-emerald-600 border border-[#e2e5eb] px-2.5 py-1.5 rounded-lg transition-colors">CSV</button>
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
@@ -520,20 +520,20 @@ export default function PlatformTahsilatPage() {
                 <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
                 <input value={aramaMetni} onChange={e => setAramaMetni(e.target.value)}
                   placeholder="Platform veya not ara..."
-                  className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs h-8 pl-8 pr-3 rounded-xl outline-none focus:border-purple-500/40 placeholder:text-gray-700" />
+                  className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-8 pl-8 pr-3 rounded-xl outline-none focus:border-purple-500/40 placeholder:text-gray-700" />
               </div>
               <select value={platformFiltre} onChange={e => setPlatformFiltre(e.target.value)}
-                className="bg-[#080b14] border border-[#1a2236] text-gray-300 text-xs h-8 px-3 rounded-xl outline-none cursor-pointer">
+                className="bg-[#f7f8fa] border border-[#e2e5eb] text-gray-700 text-xs h-8 px-3 rounded-xl outline-none cursor-pointer">
                 <option value="hepsi">Tüm Platformlar</option>
-                {PLATFORMLAR.map(p => <option key={p.isim} value={p.isim} className="bg-[#0c0f1a]">{p.isim}</option>)}
+                {PLATFORMLAR.map(p => <option key={p.isim} value={p.isim} className="bg-[#ffffff]">{p.isim}</option>)}
               </select>
               <select value={durumFiltre} onChange={e => setDurumFiltre(e.target.value)}
-                className="bg-[#080b14] border border-[#1a2236] text-gray-300 text-xs h-8 px-3 rounded-xl outline-none cursor-pointer">
+                className="bg-[#f7f8fa] border border-[#e2e5eb] text-gray-700 text-xs h-8 px-3 rounded-xl outline-none cursor-pointer">
                 <option value="hepsi">Tüm Durumlar</option>
-                <option value="bekliyor" className="bg-[#0c0f1a]">Bekliyor</option>
-                <option value="kismen" className="bg-[#0c0f1a]">Kısmi Tahsil</option>
-                <option value="tamamlandi" className="bg-[#0c0f1a]">Tamamlandı</option>
-                <option value="gecmis" className="bg-[#0c0f1a]">Gecikmiş</option>
+                <option value="bekliyor" className="bg-[#ffffff]">Bekliyor</option>
+                <option value="kismen" className="bg-[#ffffff]">Kısmi Tahsil</option>
+                <option value="tamamlandi" className="bg-[#ffffff]">Tamamlandı</option>
+                <option value="gecmis" className="bg-[#ffffff]">Gecikmiş</option>
               </select>
             </div>
           </div>
@@ -542,7 +542,7 @@ export default function PlatformTahsilatPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-[#080b14] border-b border-[#1a2236]">
+                <tr className="bg-[#f7f8fa] border-b border-[#e2e5eb]">
                   {["Platform", "Satış Tarihi", "Satış Tutarı", "Beklenen Ödeme", "Gerçekleşen", "Yatan Tutar", "Kesinti", "Net Fark", "Durum", ""].map((h, i) => (
                     <th key={i} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-600">{h}</th>
                   ))}
@@ -559,27 +559,27 @@ export default function PlatformTahsilatPage() {
                     <tr key={k.id} className="hover:bg-white/[0.015] transition-colors group">
                       <td className="px-4 py-3"><PlatformBadge platform={k.platform} /></td>
                       <td className="px-4 py-3 text-gray-400">{fmtTarih(k.satis_tarihi)}</td>
-                      <td className="px-4 py-3 text-white font-bold">₺{fmt(k.satis_tutari)}</td>
+                      <td className="px-4 py-3 text-[#1a1f2e] font-bold">₺{fmt(k.satis_tutari)}</td>
                       <td className="px-4 py-3">
-                        <span className={`${gecti ? "text-red-400" : "text-gray-400"}`}>
+                        <span className={`${gecti ? "text-red-600" : "text-gray-400"}`}>
                           {fmtTarih(k.beklenen_odeme_tarihi)}
                         </span>
                         {k.durum === "bekliyor" && (
-                          <span className={`block text-[10px] mt-0.5 ${gecti ? "text-red-500" : vadeyeKalanGun <= 3 ? "text-amber-500" : "text-gray-600"}`}>
+                          <span className={`block text-[10px] mt-0.5 ${gecti ? "text-red-700" : vadeyeKalanGun <= 3 ? "text-amber-700" : "text-gray-600"}`}>
                             {gecti ? `${Math.abs(vadeyeKalanGun)} gün geçti` : vadeyeKalanGun === 0 ? "Bugün!" : `${vadeyeKalanGun} gün kaldı`}
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-500">{fmtTarih(k.gerceklesen_odeme_tarihi || "")}</td>
-                      <td className="px-4 py-3 text-emerald-400 font-bold">
+                      <td className="px-4 py-3 text-emerald-600 font-bold">
                         {k.gerceklesen_tutar ? `₺${fmt(k.gerceklesen_tutar)}` : <span className="text-gray-700">—</span>}
                       </td>
-                      <td className="px-4 py-3 text-red-400">
+                      <td className="px-4 py-3 text-red-600">
                         {k.kesinti_tutari ? `-₺${fmt(k.kesinti_tutari)}` : <span className="text-gray-700">—</span>}
                       </td>
                       <td className="px-4 py-3">
                         {k.durum === "tamamlandi" ? (
-                          <span className={`font-bold text-xs ${fark > 1 ? "text-red-400" : "text-emerald-400"}`}>
+                          <span className={`font-bold text-xs ${fark > 1 ? "text-red-600" : "text-emerald-600"}`}>
                             {fark > 1 ? `-₺${fmt(fark)}` : "✓ Tam"}
                           </span>
                         ) : <span className="text-gray-700">—</span>}
@@ -591,13 +591,13 @@ export default function PlatformTahsilatPage() {
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           {k.durum !== "tamamlandi" && (
                             <button onClick={() => { setTahsilatFormAcik(k.id); setTSatirlar([{ id: Date.now(), tarih: bugunStr(), tutar: String(k.satis_tutari), kesinti: "", aciklama: "" }]); setTDurum("tamamlandi"); }}
-                              className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap">
+                              className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap">
                               Tahsilat İşle
                             </button>
                           )}
                           {isAdmin && (
                             <button onClick={() => setDeleteTarget(k.id)}
-                              className="p-1.5 text-gray-700 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
+                              className="p-1.5 text-gray-700 hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-colors">
                               <Trash2 size={12} />
                             </button>
                           )}
@@ -612,13 +612,13 @@ export default function PlatformTahsilatPage() {
         </div>
 
         {/* Platform ödeme süreleri bilgi kartı */}
-        <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] p-5">
+        <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] p-5">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Platform Varsayılan Ödeme Süreleri</p>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {PLATFORMLAR.map(p => (
-              <div key={p.isim} className="rounded-xl border border-[#1a2236] bg-[#080b14] px-3 py-2 text-center">
+              <div key={p.isim} className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] px-3 py-2 text-center">
                 <div className="w-2 h-2 rounded-full mx-auto mb-1.5" style={{ backgroundColor: p.renk }} />
-                <p className="text-[11px] font-semibold text-gray-300">{p.isim}</p>
+                <p className="text-[11px] font-semibold text-gray-700">{p.isim}</p>
                 <p className="text-xs font-black mt-0.5" style={{ color: p.renk }}>{p.gecikmeGun} gün</p>
               </div>
             ))}
@@ -633,26 +633,26 @@ export default function PlatformTahsilatPage() {
       {/* ── YENİ SATIŞ KAYDI FORMU ── */}
       {formAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-[#1a2236] flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <PlusCircle className="h-4 w-4 text-purple-400" /> Yeni Satış Kaydı
+          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[#1a1f2e] flex items-center gap-2">
+                <PlusCircle className="h-4 w-4 text-purple-600" /> Yeni Satış Kaydı
               </h3>
-              <button onClick={() => setFormAcik(false)} className="p-1.5 text-gray-600 hover:text-white border border-[#1a2236] rounded-xl transition-colors"><X size={14} /></button>
+              <button onClick={() => setFormAcik(false)} className="p-1.5 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-xl transition-colors"><X size={14} /></button>
             </div>
             <form onSubmit={handleYeniKayit} className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-2">Platform</label>
                   <select value={fPlatform} onChange={e => handlePlatformSec(e.target.value)}
-                    className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs h-9 rounded-xl px-3 outline-none focus:border-purple-500/50">
-                    {PLATFORMLAR.map(p => <option key={p.isim} value={p.isim} className="bg-[#0c0f1a]">{p.isim}</option>)}
+                    className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 rounded-xl px-3 outline-none focus:border-purple-500/50">
+                    {PLATFORMLAR.map(p => <option key={p.isim} value={p.isim} className="bg-[#ffffff]">{p.isim}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-2">Satış Tarihi</label>
                   <input type="date" value={fSatisTarihi} onChange={e => handleSatisTarihiSec(e.target.value)}
-                    className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs h-9 rounded-xl px-3 outline-none focus:border-purple-500/50" required />
+                    className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 rounded-xl px-3 outline-none focus:border-purple-500/50" required />
                 </div>
               </div>
               <div>
@@ -661,7 +661,7 @@ export default function PlatformTahsilatPage() {
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-sm font-bold">₺</span>
                   <input type="text" placeholder="0,00" value={fSatisTutari}
                     onChange={e => setFSatisTutari(e.target.value)}
-                    className="w-full bg-[#080b14] border border-[#1a2236] text-white text-base font-black h-11 pl-8 pr-3 rounded-xl outline-none focus:border-purple-500/50" required />
+                    className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-base font-black h-11 pl-8 pr-3 rounded-xl outline-none focus:border-purple-500/50" required />
                 </div>
               </div>
               <div>
@@ -670,17 +670,17 @@ export default function PlatformTahsilatPage() {
                   <span className="normal-case text-gray-700 ml-1">({PLATFORM_MAP[fPlatform]?.gecikmeGun} gün otomatik)</span>
                 </label>
                 <input type="date" value={fBeklenenTarih} onChange={e => setFBeklenenTarih(e.target.value)}
-                  className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs h-9 rounded-xl px-3 outline-none focus:border-purple-500/50" required />
+                  className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 rounded-xl px-3 outline-none focus:border-purple-500/50" required />
               </div>
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-2">Not (Opsiyonel)</label>
                 <input type="text" placeholder="Referans no, açıklama..." value={fAciklama}
                   onChange={e => setFAciklama(e.target.value)}
-                  className="w-full bg-[#080b14] border border-[#1a2236] text-white text-sm h-9 px-3 rounded-xl outline-none focus:border-purple-500/50 placeholder:text-gray-700" />
+                  className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none focus:border-purple-500/50 placeholder:text-gray-700" />
               </div>
               <div className="flex gap-2 pt-1">
                 <button type="button" onClick={() => setFormAcik(false)}
-                  className="flex-1 text-xs font-semibold text-gray-500 hover:text-white border border-[#1a2236] py-2.5 rounded-xl transition-colors">İptal</button>
+                  className="flex-1 text-xs font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] py-2.5 rounded-xl transition-colors">İptal</button>
                 <button type="submit" disabled={saving}
                   className="flex-1 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-40 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors">
                   {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Kaydet
@@ -704,35 +704,35 @@ export default function PlatformTahsilatPage() {
         const kalan = ak.satis_tutari - genelToplam - genelKesinti;
         return (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-            <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+            <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
               {/* Header */}
-              <div className="px-5 py-4 border-b border-[#1a2236] flex items-center justify-between">
+              <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-[#1a1f2e] flex items-center gap-2">
                     <PlatformBadge platform={ak.platform} /> Tahsilat Girişi
                   </h3>
                   <p className="text-[10px] text-gray-600 mt-1">
-                    Satış: {fmtTarih(ak.satis_tarihi)} · Brüt: <strong className="text-white">₺{fmt(ak.satis_tutari)}</strong>
-                    {mevcutToplam > 0 && <> · Daha önce yatan: <strong className="text-emerald-400">₺{fmt(mevcutToplam)}</strong></>}
+                    Satış: {fmtTarih(ak.satis_tarihi)} · Brüt: <strong className="text-[#1a1f2e]">₺{fmt(ak.satis_tutari)}</strong>
+                    {mevcutToplam > 0 && <> · Daha önce yatan: <strong className="text-emerald-600">₺{fmt(mevcutToplam)}</strong></>}
                   </p>
                 </div>
-                <button onClick={() => setTahsilatFormAcik(null)} className="p-1.5 text-gray-600 hover:text-white border border-[#1a2236] rounded-xl transition-colors"><X size={14} /></button>
+                <button onClick={() => setTahsilatFormAcik(null)} className="p-1.5 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-xl transition-colors"><X size={14} /></button>
               </div>
 
               <form onSubmit={handleTahsilatEkle} className="p-5 space-y-4">
 
                 {/* Mevcut tahsilat geçmişi */}
                 {ak.gunluk_tahsilatlar && ak.gunluk_tahsilatlar.length > 0 && (
-                  <div className="rounded-xl border border-[#1a2236] bg-[#080b14] overflow-hidden">
-                    <div className="px-3 py-2 border-b border-[#1a2236]">
+                  <div className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] overflow-hidden">
+                    <div className="px-3 py-2 border-b border-[#e2e5eb]">
                       <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Önceki Tahsilatlar</p>
                     </div>
                     <div className="divide-y divide-[#0f1624]">
                       {ak.gunluk_tahsilatlar.map((g, i) => (
                         <div key={i} className="grid grid-cols-3 gap-2 px-3 py-2 text-xs">
                           <span className="text-gray-500">{fmtTarih(g.tarih)}</span>
-                          <span className="text-emerald-400 font-bold">₺{fmt(g.tutar)}</span>
-                          <span className="text-red-400/70">{g.kesinti > 0 ? `-₺${fmt(g.kesinti)}` : "—"}</span>
+                          <span className="text-emerald-600 font-bold">₺{fmt(g.tutar)}</span>
+                          <span className="text-red-600/70">{g.kesinti > 0 ? `-₺${fmt(g.kesinti)}` : "—"}</span>
                         </div>
                       ))}
                     </div>
@@ -744,7 +744,7 @@ export default function PlatformTahsilatPage() {
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-[10px] text-gray-600 uppercase tracking-widest font-medium">Yeni Tahsilat Satırları</label>
                     <button type="button" onClick={tSatirEkle}
-                      className="text-[10px] text-gray-600 hover:text-emerald-400 border border-[#1a2236] hover:border-emerald-500/30 px-2 py-1 rounded-lg transition-colors flex items-center gap-1">
+                      className="text-[10px] text-gray-600 hover:text-emerald-600 border border-[#e2e5eb] hover:border-emerald-500/30 px-2 py-1 rounded-lg transition-colors flex items-center gap-1">
                       + Gün Ekle
                     </button>
                   </div>
@@ -757,35 +757,35 @@ export default function PlatformTahsilatPage() {
                       <span className="col-span-3 text-[9px] text-gray-700 uppercase tracking-wider">Not</span>
                     </div>
                     {tSatirlar.map((s, idx) => (
-                      <div key={s.id} className="grid grid-cols-12 gap-1.5 items-center bg-[#080b14] border border-[#1a2236] rounded-xl p-2">
+                      <div key={s.id} className="grid grid-cols-12 gap-1.5 items-center bg-[#f7f8fa] border border-[#e2e5eb] rounded-xl p-2">
                         {/* Tarih */}
                         <div className="col-span-3">
                           <input type="date" value={s.tarih}
                             onChange={e => tSatirDegistir(s.id, "tarih", e.target.value)}
-                            className="w-full bg-[#0c0f1a] border border-[#1a2236] text-white text-[11px] h-7 rounded-lg px-1.5 outline-none focus:border-emerald-500/40"/>
+                            className="w-full bg-[#ffffff] border border-[#e2e5eb] text-[#1a1f2e] text-[11px] h-7 rounded-lg px-1.5 outline-none focus:border-emerald-500/40"/>
                         </div>
                         {/* Yatan tutar */}
                         <div className="col-span-3 relative">
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-[10px]">₺</span>
                           <input type="text" placeholder="0" value={s.tutar}
                             onChange={e => tSatirDegistir(s.id, "tutar", e.target.value)}
-                            className="w-full bg-[#0c0f1a] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-1 rounded-lg outline-none focus:border-emerald-500/40"/>
+                            className="w-full bg-[#ffffff] border border-[#e2e5eb] text-[#1a1f2e] text-xs font-bold h-7 pl-5 pr-1 rounded-lg outline-none focus:border-emerald-500/40"/>
                         </div>
                         {/* Kesinti */}
                         <div className="col-span-3 relative">
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-[10px]">₺</span>
                           <input type="text" placeholder="0" value={s.kesinti}
                             onChange={e => tSatirDegistir(s.id, "kesinti", e.target.value)}
-                            className="w-full bg-[#0c0f1a] border border-[#1a2236] text-white text-xs h-7 pl-5 pr-1 rounded-lg outline-none focus:border-red-500/30"/>
+                            className="w-full bg-[#ffffff] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-7 pl-5 pr-1 rounded-lg outline-none focus:border-red-500/30"/>
                         </div>
                         {/* Not + sil */}
                         <div className="col-span-3 flex gap-1">
                           <input type="text" placeholder="Not..." value={s.aciklama}
                             onChange={e => tSatirDegistir(s.id, "aciklama", e.target.value)}
-                            className="flex-1 bg-[#0c0f1a] border border-[#1a2236] text-white text-[10px] h-7 px-2 rounded-lg outline-none focus:border-blue-500/30 placeholder:text-gray-700 min-w-0"/>
+                            className="flex-1 bg-[#ffffff] border border-[#e2e5eb] text-[#1a1f2e] text-[10px] h-7 px-2 rounded-lg outline-none focus:border-blue-500/30 placeholder:text-gray-700 min-w-0"/>
                           {tSatirlar.length > 1 && (
                             <button type="button" onClick={() => tSatirSil(s.id)}
-                              className="text-gray-700 hover:text-red-400 p-1 rounded shrink-0">
+                              className="text-gray-700 hover:text-red-600 p-1 rounded shrink-0">
                               <Trash2 size={11}/>
                             </button>
                           )}
@@ -796,18 +796,18 @@ export default function PlatformTahsilatPage() {
                 </div>
 
                 {/* Özet */}
-                <div className="rounded-xl border border-[#1a2236] bg-[#080b14] p-3 grid grid-cols-3 gap-3 text-center">
+                <div className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] p-3 grid grid-cols-3 gap-3 text-center">
                   <div>
                     <p className="text-[9px] text-gray-600 uppercase tracking-widest">Toplam Yatan</p>
-                    <p className="text-sm font-black text-emerald-400 mt-0.5">₺{fmt(genelToplam)}</p>
+                    <p className="text-sm font-black text-emerald-600 mt-0.5">₺{fmt(genelToplam)}</p>
                   </div>
                   <div>
                     <p className="text-[9px] text-gray-600 uppercase tracking-widest">Toplam Kesinti</p>
-                    <p className="text-sm font-black text-red-400 mt-0.5">₺{fmt(genelKesinti)}</p>
+                    <p className="text-sm font-black text-red-600 mt-0.5">₺{fmt(genelKesinti)}</p>
                   </div>
                   <div>
                     <p className="text-[9px] text-gray-600 uppercase tracking-widest">Kalan</p>
-                    <p className={`text-sm font-black mt-0.5 ${kalan > 0 ? "text-amber-400" : "text-gray-600"}`}>
+                    <p className={`text-sm font-black mt-0.5 ${kalan > 0 ? "text-amber-600" : "text-gray-600"}`}>
                       {kalan > 0 ? `₺${fmt(kalan)}` : "✓ Tam"}
                     </p>
                   </div>
@@ -821,7 +821,7 @@ export default function PlatformTahsilatPage() {
                       <button key={t} type="button" onClick={() => setTDurum(t)}
                         className={`text-xs font-bold py-2.5 rounded-xl border transition-colors ${tDurum === t
                           ? t === "tamamlandi" ? "bg-emerald-600 border-emerald-500 text-white" : "bg-amber-600 border-amber-500 text-white"
-                          : "bg-[#080b14] border-[#1a2236] text-gray-500 hover:text-gray-300"}`}>
+                          : "bg-[#f7f8fa] border-[#e2e5eb] text-gray-500 hover:text-gray-900"}`}>
                         {t === "tamamlandi" ? "✓ Tamamlandı" : "⏳ Kısmi (Devam Edecek)"}
                       </button>
                     ))}
@@ -829,7 +829,7 @@ export default function PlatformTahsilatPage() {
                 </div>
 
                 {tDurum === "tamamlandi" && (
-                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-2.5 text-[11px] text-emerald-400 flex items-center gap-2">
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-2.5 text-[11px] text-emerald-600 flex items-center gap-2">
                     <CheckCircle2 size={12} className="shrink-0" />
                     Yatılan tutarlar otomatik olarak kasa hesabına eklenecek.
                   </div>
@@ -837,7 +837,7 @@ export default function PlatformTahsilatPage() {
 
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setTahsilatFormAcik(null)}
-                    className="flex-1 text-xs font-semibold text-gray-500 hover:text-white border border-[#1a2236] py-2.5 rounded-xl transition-colors">İptal</button>
+                    className="flex-1 text-xs font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] py-2.5 rounded-xl transition-colors">İptal</button>
                   <button type="submit" disabled={saving}
                     className="flex-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors">
                     {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Kaydet
@@ -852,18 +852,18 @@ export default function PlatformTahsilatPage() {
       {/* ── SİLME ONAY ── */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-red-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+          <div className="bg-[#ffffff] border border-red-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-                <AlertTriangle className="h-5 w-5 text-red-400" />
+                <AlertTriangle className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <p className="text-sm font-bold text-white">Kaydı Sil</p>
+                <p className="text-sm font-bold text-[#1a1f2e]">Kaydı Sil</p>
                 <p className="text-[11px] text-gray-500">Bu işlem geri alınamaz</p>
               </div>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 text-xs font-semibold text-gray-400 border border-[#1a2236] hover:text-white py-2.5 rounded-xl transition-colors">İptal</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 text-xs font-semibold text-gray-400 border border-[#e2e5eb] hover:text-[#1a1f2e] py-2.5 rounded-xl transition-colors">İptal</button>
               <button onClick={handleSil} className="flex-1 text-xs font-bold text-white bg-red-600 hover:bg-red-700 py-2.5 rounded-xl transition-colors">Sil</button>
             </div>
           </div>

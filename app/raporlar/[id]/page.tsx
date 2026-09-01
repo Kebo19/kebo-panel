@@ -94,7 +94,7 @@ export default function ReportDetailPage() {
 
     return (
 
-      <main className="min-h-screen bg-[#07090d] text-white flex items-center justify-center">
+      <main className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] flex items-center justify-center">
 
         <div className="text-center">
 
@@ -115,15 +115,15 @@ export default function ReportDetailPage() {
 
     return (
 
-      <main className="min-h-screen bg-[#07090d] text-white flex items-center justify-center p-6">
+      <main className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] flex items-center justify-center p-6">
 
-        <Card className="bg-[#111315] border border-red-500/30 rounded-2xl p-6 max-w-2xl w-full">
+        <Card className="bg-[#ffffff] border border-red-500/30 rounded-2xl p-6 max-w-2xl w-full">
 
-          <h1 className="text-3xl font-black text-red-400">
+          <h1 className="text-3xl font-black text-red-600">
             HATA
           </h1>
 
-          <pre className="text-sm text-gray-300 mt-5 whitespace-pre-wrap overflow-auto">
+          <pre className="text-sm text-gray-700 mt-5 whitespace-pre-wrap overflow-auto">
             {errorText}
           </pre>
 
@@ -147,7 +147,7 @@ export default function ReportDetailPage() {
 
   return (
 
-    <main className="min-h-screen bg-[#07090d] text-white p-4">
+    <main className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] p-4">
 
       {/* TOPBAR */}
 
@@ -157,7 +157,7 @@ export default function ReportDetailPage() {
 
           <Link
             href="/raporlar"
-            className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-orange-400 transition-all"
+            className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-orange-600 transition-all"
           >
 
             <ArrowLeft size={16} />
@@ -166,7 +166,7 @@ export default function ReportDetailPage() {
 
           </Link>
 
-          <p className="text-orange-400 text-[10px] uppercase tracking-[0.3em] font-bold mt-4">
+          <p className="text-orange-600 text-[10px] uppercase tracking-[0.3em] font-bold mt-4">
             RAPOR DETAYI
           </p>
 
@@ -194,7 +194,7 @@ export default function ReportDetailPage() {
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
 
-        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-4">
+        <Card className="bg-[#ffffff] border border-white/5 rounded-2xl p-4">
 
           <div className="flex items-center justify-between">
 
@@ -214,7 +214,7 @@ export default function ReportDetailPage() {
 
               <TrendingUp
                 size={20}
-                className="text-green-400"
+                className="text-green-600"
               />
 
             </div>
@@ -223,7 +223,7 @@ export default function ReportDetailPage() {
 
         </Card>
 
-        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-4">
+        <Card className="bg-[#ffffff] border border-white/5 rounded-2xl p-4">
 
           <div className="flex items-center justify-between">
 
@@ -243,7 +243,7 @@ export default function ReportDetailPage() {
 
               <Wallet
                 size={20}
-                className="text-blue-400"
+                className="text-blue-600"
               />
 
             </div>
@@ -252,7 +252,7 @@ export default function ReportDetailPage() {
 
         </Card>
 
-        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-4">
+        <Card className="bg-[#ffffff] border border-white/5 rounded-2xl p-4">
 
           <div className="flex items-center justify-between">
 
@@ -272,7 +272,7 @@ export default function ReportDetailPage() {
 
               <CreditCard
                 size={20}
-                className="text-orange-400"
+                className="text-orange-600"
               />
 
             </div>
@@ -281,7 +281,7 @@ export default function ReportDetailPage() {
 
         </Card>
 
-        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-4">
+        <Card className="bg-[#ffffff] border border-white/5 rounded-2xl p-4">
 
           <div className="flex items-center justify-between">
 
@@ -301,7 +301,7 @@ export default function ReportDetailPage() {
 
               <Receipt
                 size={20}
-                className="text-red-400"
+                className="text-red-600"
               />
 
             </div>
@@ -318,13 +318,13 @@ export default function ReportDetailPage() {
 
         {/* ONLINE */}
 
-        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-5">
+        <Card className="bg-[#ffffff] border border-white/5 rounded-2xl p-5">
 
           <div className="flex items-center gap-2 mb-5">
 
             <Globe
               size={18}
-              className="text-orange-400"
+              className="text-orange-600"
             />
 
             <h2 className="text-xl font-black">
@@ -351,13 +351,13 @@ export default function ReportDetailPage() {
 
         {/* KAPIDA */}
 
-        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-5">
+        <Card className="bg-[#ffffff] border border-white/5 rounded-2xl p-5">
 
           <div className="flex items-center gap-2 mb-5">
 
             <Truck
               size={18}
-              className="text-green-400"
+              className="text-green-600"
             />
 
             <h2 className="text-xl font-black">
@@ -384,13 +384,13 @@ export default function ReportDetailPage() {
 
         {/* ÖDEME */}
 
-        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-5">
+        <Card className="bg-[#ffffff] border border-white/5 rounded-2xl p-5">
 
           <div className="flex items-center gap-2 mb-5">
 
             <BadgeDollarSign
               size={18}
-              className="text-blue-400"
+              className="text-blue-600"
             />
 
             <h2 className="text-xl font-black">
@@ -401,7 +401,7 @@ export default function ReportDetailPage() {
 
           <div className="space-y-4">
 
-            <div className="bg-[#0d1117] rounded-xl p-4 flex items-center justify-between">
+            <div className="bg-[#f7f8fa] rounded-xl p-4 flex items-center justify-between">
 
               <span className="text-gray-400">
                 Nakit
@@ -413,7 +413,7 @@ export default function ReportDetailPage() {
 
             </div>
 
-            <div className="bg-[#0d1117] rounded-xl p-4 flex items-center justify-between">
+            <div className="bg-[#f7f8fa] rounded-xl p-4 flex items-center justify-between">
 
               <span className="text-gray-400">
                 Kredi Kartı
@@ -425,7 +425,7 @@ export default function ReportDetailPage() {
 
             </div>
 
-            <div className="bg-[#0d1117] rounded-xl p-4 flex items-center justify-between">
+            <div className="bg-[#f7f8fa] rounded-xl p-4 flex items-center justify-between">
 
               <span className="text-gray-400">
                 Edenred
@@ -443,13 +443,13 @@ export default function ReportDetailPage() {
 
         {/* GIDER */}
 
-        <Card className="bg-[#111315] border border-white/5 rounded-2xl p-5">
+        <Card className="bg-[#ffffff] border border-white/5 rounded-2xl p-5">
 
           <div className="flex items-center gap-2 mb-5">
 
             <Receipt
               size={18}
-              className="text-red-400"
+              className="text-red-600"
             />
 
             <h2 className="text-xl font-black">
@@ -460,7 +460,7 @@ export default function ReportDetailPage() {
 
           <div className="space-y-4">
 
-            <div className="bg-[#0d1117] rounded-xl p-4">
+            <div className="bg-[#f7f8fa] rounded-xl p-4">
 
               <p className="text-xs text-gray-500 uppercase">
                 Gider Türü
@@ -472,7 +472,7 @@ export default function ReportDetailPage() {
 
             </div>
 
-            <div className="bg-[#0d1117] rounded-xl p-4">
+            <div className="bg-[#f7f8fa] rounded-xl p-4">
 
               <p className="text-xs text-gray-500 uppercase">
                 Açıklama
@@ -492,7 +492,7 @@ export default function ReportDetailPage() {
 
       {/* FOOTER */}
 
-      <Card className="bg-[#111315] border border-white/5 rounded-2xl p-5 mt-5">
+      <Card className="bg-[#ffffff] border border-white/5 rounded-2xl p-5 mt-5">
 
         <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
 
@@ -502,7 +502,7 @@ export default function ReportDetailPage() {
 
               <User
                 size={22}
-                className="text-orange-400"
+                className="text-orange-600"
               />
 
             </div>

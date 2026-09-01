@@ -43,8 +43,10 @@ The content is organized as follows:
 app/
   api/
     chat/
-      keepalive/
-        route.ts
+      route.ts
+    keepalive/
+      route.ts
+    rapor-tara/
       route.ts
   ayarlar/
     page.tsx
@@ -120,15 +122,16 @@ vercel.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="app/api/chat/keepalive/route.ts">
+<file path="app/api/keepalive/route.ts">
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// Bu endpoint Vercel Cron tarafından günlük olarak tetiklenir. Amacı,
-// Supabase projesinin uzun süre işlem görmediği için duraklatılmasını
+// Bu endpoint Vercel Cron tarafından günlük olarak tetiklenir (bkz. vercel.json).
+// Amacı, Supabase projesinin uzun süre işlem görmediği için duraklatılmasını
 // (free plan cold start / pause) önlemektir. Böylece kullanıcılar panele
 // giriş yaptığında Supabase her zaman "uyanık" olur ve middleware
-// zaman aşımı (504 MIDDLEWARE_INVOCATION_TIMEOUT) yaşanmaz.
+// zaman aşımı (504 MIDDLEWARE_INVOCATION_TIMEOUT) ya da eksik veri (personel
+// listesi, kullanıcı adları vb. gelmemesi) yaşanmaz.
 export async function GET(request: Request) {
   // Vercel dışından rastgele çağrılmasını engellemek için CRON_SECRET
   // kontrolü. Vercel bu değeri cron isteklerine otomatik ekler; projene
@@ -163,6 +166,153 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("[keepalive] Beklenmeyen hata:", error);
     return NextResponse.json({ ok: false }, { status: 500 });
+  }
+}
+</file>
+
+<file path="app/api/rapor-tara/route.ts">
+import { NextResponse } from "next/server";
+
+// "Fişten Doldur" özelliği: kullanıcı KEBO kağıt kasa raporunun fotoğrafını
+// yükler, Claude görseli okuyup dijital forma birebir eşlenen JSON döndürür.
+// Anahtar sadece burada, sunucu tarafında kullanılır.
+
+const SISTEM_PROMPT = `Sen KEBO ERP için bir kağıt rapor okuma asistanısın. Sana KEBO'nun standart
+kağıt "Günlük Kasa Kapanış Formu" fotoğrafı verilecek. Bu formun sabit bir düzeni var:
+
+SAYFA 1:
+- Üstte Tarih (GG/AA/YYYY) ve Giren (Ad Soyad)
+- "ONLINE SATIŞLAR" bölümü, iki alt-marka: KEBO ve CHICK'N FRIDE
+  Her markada 3 satır: Yemeksepeti (Tutar, Paket Sayısı, İndirim), Trendyol (Tutar, Paket Sayısı, İndirim),
+  Migros / Migros Yemek (Tutar, Paket Sayısı — indirim yok)
+- "KAPIDA ÖDEME" bölümü, aynı iki marka, her markada 4 satır: Yemeksepeti, Trendyol (indirimli),
+  Migros Yemek, Alo Paket (indirimsiz)
+- "KASA" bölümü: Nakit, Pos, Edenred, Metropol, Kasa Toplamı
+
+SAYFA 2:
+- "GİDERLER" tablosu: serbest satırlar, Açıklama + Tutar
+- "PERSONEL AVANS" tablosu: Personel Adı, Ne alındı/sebep, Tutar
+- "PERSONEL KESİNTİSİ" tablosu: Personel Adı, Sebep, Tutar
+- "İPTAL - İADE FİŞLERİ" tablosu: Açıklama, Tutar
+- "KURYE (ROADRUNNER)" — iki alt tablo:
+  - Sabit Kurye: "Kurye 1: ____" ve "Kurye 2: ____" satırları (isim elle yazılmış olabilir), her biri Nakit, Kredi/Pos, Paket Sayısı
+  - Havuz Kurye: serbest satırlar, Kurye/Firma Adı, Nakit, Kredi/Pos, Paket Sayısı
+- "NOTLAR" serbest metin alanı
+
+GÖREV: Fotoğraftaki el yazısı rakamları ve metinleri oku, aşağıdaki JSON şemasına birebir uyacak
+şekilde çıktı ver. SADECE JSON döndür, başka hiçbir açıklama, markdown backtick veya metin ekleme.
+
+KURALLAR:
+- Boş bırakılmış (hiç yazı olmayan) hücreler için 0 (sayısal alanlarda) veya "" (metin alanlarında) yaz.
+- Ondalık ayracı olarak virgül kullanılmış olabilir (örn. "1.234,50") — bunu 1234.5 gibi noktalı sayıya çevir.
+- Bir rakam okunuyor ama el yazısı belirsizse (silik, üstü çizili, yorumlanması zor), YİNE DE en iyi tahminini
+  JSON'a yaz, AMA o alanın dot-path anahtarını mutlaka "belirsiz_alanlar" listesine ekle.
+- Bir hücre TAMAMEN boşsa ve doldurulması bekleniyorsa (örn. Kasa bölümündeki Nakit hücresi boşsa),
+  değeri 0 yap ve yine "belirsiz_alanlar" listesine ekleme — gerçekten boşsa bu normal, kullanıcı o günü doldurmamış olabilir.
+  Sadece OKUNAMAYAN/BELİRSİZ olanları belirsiz_alanlar'a ekle, boş olanları değil.
+- Tarihi GG.AA.YYYY olarak okuyup YYYY-AA-GG (ISO) formatına çevir. 2 haneli yıl varsa 20xx kabul et.
+- Kurye/Personel isimleri tam olarak el yazısındaki gibi, ilk harfi büyük şekilde yaz.
+
+JSON ŞEMASI (tam olarak bu anahtarları kullan, eksik bırakma):
+{
+  "tarih": "YYYY-AA-GG" | null,
+  "giren": "string",
+  "online": {
+    "kebo": {
+      "ys": {"tutar": number, "paket": number, "indirim": number},
+      "trendyol": {"tutar": number, "paket": number, "indirim": number},
+      "migros": {"tutar": number, "paket": number}
+    },
+    "cnf": {
+      "ys": {"tutar": number, "paket": number, "indirim": number},
+      "trendyol": {"tutar": number, "paket": number, "indirim": number},
+      "migrosYemek": {"tutar": number, "paket": number}
+    }
+  },
+  "kapida": {
+    "kebo": {
+      "ys": {"tutar": number, "paket": number, "indirim": number},
+      "trendyol": {"tutar": number, "paket": number, "indirim": number},
+      "migrosYemek": {"tutar": number, "paket": number},
+      "alo": {"tutar": number, "paket": number}
+    },
+    "cnf": {
+      "ys": {"tutar": number, "paket": number, "indirim": number},
+      "trendyol": {"tutar": number, "paket": number, "indirim": number},
+      "migrosYemek": {"tutar": number, "paket": number},
+      "alo": {"tutar": number, "paket": number}
+    }
+  },
+  "kasa": {"nakit": number, "pos": number, "edenred": number, "metropol": number},
+  "giderler": [{"aciklama": "string", "tutar": number}],
+  "avanslar": [{"personel": "string", "aciklama": "string", "tutar": number}],
+  "kesintiler": [{"personel": "string", "aciklama": "string", "tutar": number}],
+  "iadeler": [{"aciklama": "string", "tutar": number}],
+  "kuryeSabit": [{"isim": "string", "nakit": number, "pos": number, "paket": number}],
+  "kuryeHavuz": [{"isim": "string", "nakit": number, "pos": number, "paket": number}],
+  "notlar": "string",
+  "belirsiz_alanlar": ["dot.path.gibi.anahtarlar"]
+}
+
+Boş satırları (giderler, avanslar, kesintiler, iadeler, kuryeHavuz) dizilere hiç ekleme —
+sadece gerçekten bir şey yazılmış satırları diziye koy.`;
+
+export async function POST(req: Request) {
+  try {
+    const { imageBase64, mediaType } = await req.json();
+
+    if (!imageBase64) {
+      return NextResponse.json({ error: "Görsel bulunamadı" }, { status: 400 });
+    }
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || "",
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 3000,
+        system: SISTEM_PROMPT,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: { type: "base64", media_type: mediaType || "image/jpeg", data: imageBase64 },
+              },
+              { type: "text", text: "Bu KEBO kağıt kasa raporunu oku ve yalnızca JSON döndür." },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("Rapor tarama API hatası:", data);
+      return NextResponse.json({ error: "API hatası", details: data }, { status: response.status });
+    }
+
+    const metin = (data.content || []).map((c: any) => c.text || "").join("").trim();
+    const temiz = metin.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+
+    let ayrisik;
+    try {
+      ayrisik = JSON.parse(temiz);
+    } catch (e) {
+      console.error("JSON parse hatası:", temiz);
+      return NextResponse.json({ error: "Model geçerli JSON döndürmedi", raw: metin }, { status: 502 });
+    }
+
+    return NextResponse.json(ayrisik);
+  } catch (error: any) {
+    console.error("Rapor tarama sunucu hatası:", error);
+    return NextResponse.json({ error: "Sunucu hatası: " + error.message }, { status: 500 });
   }
 }
 </file>
@@ -38838,47 +38988,38 @@ export default function Anasayfa() {
 
 <file path="app/api/chat/route.ts">
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
-// Bu endpoint Vercel Cron tarafından günlük olarak tetiklenir. Amacı,
-// Supabase projesinin uzun süre işlem görmediği için duraklatılmasını
-// (free plan cold start / pause) önlemektir. Böylece kullanıcılar panele
-// giriş yaptığında Supabase her zaman "uyanık" olur ve middleware
-// zaman aşımı (504 MIDDLEWARE_INVOCATION_TIMEOUT) yaşanmaz.
-export async function GET(request: Request) {
-  // Vercel dışından rastgele çağrılmasını engellemek için CRON_SECRET
-  // kontrolü. Vercel bu değeri cron isteklerine otomatik ekler; projene
-  // env variable olarak CRON_SECRET eklersen bu koruma aktif olur.
-  const authHeader = request.headers.get("authorization");
-  if (
-    process.env.CRON_SECRET &&
-    authHeader !== `Bearer ${process.env.CRON_SECRET}`
-  ) {
-    return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 401 });
-  }
-
+// AI Analiz (raporlar sayfasındaki "AI Analiz" paneli) ve genel amaçlı
+// Claude tamamlama istekleri buradan geçer. Anahtar sadece burada,
+// sunucu tarafında kullanılır — tarayıcıya asla gönderilmez.
+//
+// NOT: Supabase "keepalive" (uyanık tutma) görevi artık burada değil,
+// /api/keepalive altında — vercel.json'daki cron tanımıyla eşleşsin diye.
+export async function POST(req: Request) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const body = await req.json();
 
-    // Hafif bir sorgu ile Supabase'i aktif tutuyoruz. RLS nedeniyle satır
-    // dönmeyebilir, önemli olan bağlantının kurulup projeyi "uyandırması".
-    const { error } = await supabase.from("profiles").select("id").limit(1);
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || "",
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify(body),
+    });
 
-    if (error) {
-      console.error("[keepalive] Supabase sorgu hatası:", error.message);
-      return NextResponse.json(
-        { ok: false, error: error.message },
-        { status: 500 }
-      );
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("API Hatası:", data);
+      return NextResponse.json({ error: "API Hatası", details: data }, { status: response.status });
     }
 
-    return NextResponse.json({ ok: true, checkedAt: new Date().toISOString() });
+    return NextResponse.json(data);
   } catch (error) {
-    console.error("[keepalive] Beklenmeyen hata:", error);
-    return NextResponse.json({ ok: false }, { status: 500 });
+    console.error("Sunucu Hatası:", error);
+    return NextResponse.json({ error: "Sunucu Hatası" }, { status: 500 });
   }
 }
 </file>
@@ -45017,7 +45158,9 @@ import {
 
   RefreshCw, Download, FileDown, StickyNote, DollarSign, Package,
 
-  RotateCcw, Save, Slash, TrendingDown, Hash, Building2, Search, Sparkles
+  RotateCcw, Save, Slash, TrendingDown, Hash, Building2, Search, Sparkles,
+
+  Banknote, CreditCard, Percent, Truck, Users2, Camera, ImageUp
 
 } from "lucide-react";
 
@@ -45035,13 +45178,17 @@ interface KuryeRaporu {
 
   id: number; isim: string; nakit: string; pos: string; paketSayisi: string;
 
+  tip?: "sabit" | "havuz" | "kendi"; // sabit = Roadrunner garantili kurye, havuz = garantisiz ek kurye, kendi = 14.08.2026 öncesi kendi personel kurye
+
 }
+
+interface PlatformGiris { tutar: string; paket: string; }
 
 interface SatirRaporu {
 
-  id: number; aciklama: string; tutar: string; tip?: "normal" | "firma";
+  id: number; aciklama: string; tutar: string; tip?: "normal" | "firma" | "personel";
 
-  firmaId?: string; firmaUnvan?: string;
+  firmaId?: string; firmaUnvan?: string; personelIsim?: string;
 
 }
 
@@ -45049,11 +45196,34 @@ interface GunlukRapor {
 
   id: string; tarih: string;
 
+  // Legacy (eski, tek platform bazlı — geçmiş raporlarda okuma amaçlı hâlâ tutuluyor)
   os_yemeksepeti: number; os_getir: number; os_trendyol: number; os_migros: number; os_chicknfride: number;
 
   ko_yemeksepeti: number; ko_getir: number; ko_trendyol: number; ko_migros: number; ko_alo_paket: number; ko_chicknfride: number;
 
-  kasa_nakit: number; kasa_pos: number; kasa_edenred: number;
+  // Online — Kebo
+  os_kebo_ys: number; os_kebo_ys_paket: number; os_kebo_ys_indirim: number;
+  os_kebo_trendyol: number; os_kebo_trendyol_paket: number; os_kebo_trendyol_indirim: number;
+  os_kebo_migros: number; os_kebo_migros_paket: number;
+
+  // Online — Chick'N Fride
+  os_cnf_ys: number; os_cnf_ys_paket: number; os_cnf_ys_indirim: number;
+  os_cnf_trendyol: number; os_cnf_trendyol_paket: number; os_cnf_trendyol_indirim: number;
+  os_cnf_migros_yemek: number; os_cnf_migros_yemek_paket: number;
+
+  // Kapıda Ödeme — Kebo
+  ko_kebo_ys: number; ko_kebo_ys_paket: number; ko_kebo_ys_indirim: number;
+  ko_kebo_trendyol: number; ko_kebo_trendyol_paket: number; ko_kebo_trendyol_indirim: number;
+  ko_kebo_migros_yemek: number; ko_kebo_migros_yemek_paket: number;
+  ko_kebo_alo: number; ko_kebo_alo_paket: number;
+
+  // Kapıda Ödeme — Chick'N Fride
+  ko_cnf_ys: number; ko_cnf_ys_paket: number; ko_cnf_ys_indirim: number;
+  ko_cnf_trendyol: number; ko_cnf_trendyol_paket: number; ko_cnf_trendyol_indirim: number;
+  ko_cnf_migros_yemek: number; ko_cnf_migros_yemek_paket: number;
+  ko_cnf_alo: number; ko_cnf_alo_paket: number;
+
+  kasa_nakit: number; kasa_pos: number; kasa_edenred: number; kasa_metropol: number;
 
   gunluk_gider: number; gider_aciklama?: string;
 
@@ -45166,7 +45336,7 @@ const brutHesapla = (r: GunlukRapor): number => {
 
   const tO = (r.os_yemeksepeti||0)+(r.os_getir||0)+(r.os_trendyol||0)+(r.os_migros||0)+(r.os_chicknfride||0);
 
-  const tKasa = (r.kasa_nakit||0)+(r.kasa_pos||0)+(r.kasa_edenred||0);
+  const tKasa = (r.kasa_nakit||0)+(r.kasa_pos||0)+(r.kasa_edenred||0)+(r.kasa_metropol||0);
 
   const gider = r.gunluk_gider||0;
 
@@ -45182,7 +45352,7 @@ const netHesapla = (r: GunlukRapor): number => {
 
   const tO = (r.os_yemeksepeti||0)+(r.os_getir||0)+(r.os_trendyol||0)+(r.os_migros||0)+(r.os_chicknfride||0);
 
-  const tKasa = (r.kasa_nakit||0)+(r.kasa_pos||0)+(r.kasa_edenred||0);
+  const tKasa = (r.kasa_nakit||0)+(r.kasa_pos||0)+(r.kasa_edenred||0)+(r.kasa_metropol||0);
 
   return tO + tKasa - (r.iade_tutar||0);
 
@@ -45258,21 +45428,21 @@ function EksikRaporBanner({enSonRaporTarihi, onEkle}: {enSonRaporTarihi:string|n
 
   return (
 
-    <div className="relative overflow-hidden rounded-2xl border border-red-500/20 bg-[#130a0a] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="relative overflow-hidden rounded-2xl border border-red-500/20 bg-[#fef2f2] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 
-      <div className="absolute inset-0 bg-gradient-to-r from-red-950/30 to-transparent pointer-events-none"/>
+      <div className="absolute inset-0 bg-gradient-to-r from-red-100/60 to-transparent pointer-events-none"/>
 
       <div className="relative flex items-start gap-3">
 
         <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 shrink-0">
 
-          <Bell className="h-4 w-4 text-red-400 animate-pulse"/>
+          <Bell className="h-4 w-4 text-red-600 animate-pulse"/>
 
         </div>
 
         <div>
 
-          <p className="text-xs font-bold text-red-400 uppercase tracking-widest">{eksik.length} Günlük Rapor Eksik</p>
+          <p className="text-xs font-bold text-red-600 uppercase tracking-widest">{eksik.length} Günlük Rapor Eksik</p>
 
           <p className="text-[11px] text-gray-500 mt-0.5">
 
@@ -45470,9 +45640,9 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
             tooltip:{
 
-              backgroundColor:"#0f1623", borderColor:"#1e2a3a", borderWidth:1,
+              backgroundColor:"#ffffff", borderColor:"#d8dde5", borderWidth:1,
 
-              titleColor:"#94a3b8", bodyColor:"#e2e8f0",
+              titleColor:"#5a6478", bodyColor:"#1a1f2e",
 
               callbacks:{label:(ctx:any)=>ctx.parsed.y===0?`${ctx.dataset.label}: Rapor yok`:`${ctx.dataset.label}: ₺${fmt(ctx.parsed.y)}`}
 
@@ -45482,9 +45652,9 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
           scales:{
 
-            x:{ticks:{color:"#4b5563",font:{size:10},maxRotation:45,autoSkip:true,maxTicksLimit:12},grid:{color:"rgba(255,255,255,0.03)"}},
+            x:{ticks:{color:"#6b7280",font:{size:10},maxRotation:45,autoSkip:true,maxTicksLimit:12},grid:{color:"rgba(0,0,0,0.05)"}},
 
-            y:{ticks:{color:"#4b5563",font:{size:10},callback:(v:number)=>`₺${(v/1000).toFixed(0)}K`},grid:{color:"rgba(255,255,255,0.04)"}}
+            y:{ticks:{color:"#6b7280",font:{size:10},callback:(v:number)=>`₺${(v/1000).toFixed(0)}K`},grid:{color:"rgba(0,0,0,0.06)"}}
 
           }
 
@@ -45510,23 +45680,23 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
   return (
 
-    <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden shadow-2xl">
+    <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden shadow-2xl">
 
       <button onClick={()=>setAcik(!acik)}
 
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors">
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-black/[0.03] transition-colors">
 
         <div className="flex items-center gap-3">
 
           <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
 
-            <Activity className="h-3.5 w-3.5 text-blue-400"/>
+            <Activity className="h-3.5 w-3.5 text-blue-600"/>
 
           </div>
 
-          <span className="text-sm font-semibold text-gray-200 tracking-tight">Dönem Analizi</span>
+          <span className="text-sm font-semibold text-gray-800 tracking-tight">Dönem Analizi</span>
 
-          <span className="text-[10px] text-gray-600 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">{raporlar.length} gün</span>
+          <span className="text-[10px] text-gray-600 bg-black/[0.04] border border-white/10 px-2 py-0.5 rounded-full">{raporlar.length} gün</span>
 
         </div>
 
@@ -45538,7 +45708,7 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
       {acik && (
 
-        <div className="border-t border-[#1a2236] p-5 space-y-5">
+        <div className="border-t border-[#e2e5eb] p-5 space-y-5">
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
 
@@ -45554,7 +45724,7 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
             ].map(card=>(
 
-              <div key={card.label} className="bg-[#080b14] rounded-xl border border-[#1a2236] p-4 hover:border-[#243050] transition-colors">
+              <div key={card.label} className="bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4 hover:border-[#d8dde5] transition-colors">
 
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-2">{card.label}</p>
 
@@ -45582,7 +45752,7 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
           <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
 
-            <div className="xl:col-span-2 bg-[#080b14] rounded-xl border border-[#1a2236] p-4">
+            <div className="xl:col-span-2 bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
 
               <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-3 flex items-center gap-1.5">
 
@@ -45612,7 +45782,7 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
                         <div className="flex items-center gap-2">
 
-                          <span className="text-[11px] font-bold text-white">₺{fmt(d.value)}</span>
+                          <span className="text-[11px] font-bold text-[#1a1f2e]">₺{fmt(d.value)}</span>
 
                           <span className="text-[10px] text-gray-600 w-7 text-right">{Math.round(pct)}%</span>
 
@@ -45620,7 +45790,7 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
                       </div>
 
-                      <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-1 bg-black/[0.04] rounded-full overflow-hidden">
 
                         <div className="h-full rounded-full transition-all duration-700"
 
@@ -45640,7 +45810,7 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
 
 
 
-            <div className="xl:col-span-3 bg-[#080b14] rounded-xl border border-[#1a2236] p-4">
+            <div className="xl:col-span-3 bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
 
               <div className="flex items-center justify-between mb-3">
 
@@ -45694,7 +45864,14 @@ function PrintModal({rapor, onClose}: {rapor:GunlukRapor, onClose:()=>void}) {
 
   const tK=(rapor.ko_yemeksepeti||0)+(rapor.ko_getir||0)+(rapor.ko_trendyol||0)+(rapor.ko_migros||0)+(rapor.ko_alo_paket||0)+(rapor.ko_chicknfride||0);
 
-  const tKasa=(rapor.kasa_nakit||0)+(rapor.kasa_pos||0)+(rapor.kasa_edenred||0);
+  const tKasa=(rapor.kasa_nakit||0)+(rapor.kasa_pos||0)+(rapor.kasa_edenred||0)+(rapor.kasa_metropol||0);
+
+  // Yeni (Kebo/Chick'N Fride marka bazlı) yapıyla girilmiş mi? — eski raporlarda bu alanlar 0/undefined olur.
+  const yeniYapiVarMi = !!((rapor.os_kebo_ys||rapor.os_kebo_trendyol||rapor.os_kebo_migros||rapor.os_cnf_ys||rapor.os_cnf_trendyol||rapor.os_cnf_migros_yemek||
+    rapor.ko_kebo_ys||rapor.ko_kebo_trendyol||rapor.ko_kebo_migros_yemek||rapor.ko_cnf_ys||rapor.ko_cnf_trendyol||rapor.ko_cnf_migros_yemek));
+
+  const tIndirimPT = (rapor.os_kebo_ys_indirim||0)+(rapor.os_cnf_ys_indirim||0)+(rapor.ko_kebo_ys_indirim||0)+(rapor.ko_cnf_ys_indirim||0);
+  const tIndirimTY = (rapor.os_kebo_trendyol_indirim||0)+(rapor.os_cnf_trendyol_indirim||0)+(rapor.ko_kebo_trendyol_indirim||0)+(rapor.ko_cnf_trendyol_indirim||0);
 
   const brutCiro = brutHesapla(rapor);
 
@@ -45820,7 +45997,30 @@ function PrintModal({rapor, onClose}: {rapor:GunlukRapor, onClose:()=>void}) {
 
             {rapor.kasa_edenred>0&&<div className="row"><span>Edenred / Sodexo</span><span>₺{fmt(rapor.kasa_edenred)}</span></div>}
 
+            {rapor.kasa_metropol>0&&<div className="row"><span>Metropol</span><span>₺{fmt(rapor.kasa_metropol)}</span></div>}
+
             <div className="row bold"><span>Kasa Toplam</span><span>₺{fmt(tKasa)}</span></div>
+
+            {yeniYapiVarMi && (
+              <>
+                <hr className="divider"/>
+                <div className="section-title">Marka Detayı (Kebo / Chick'N Fride)</div>
+                <div className="row"><span style={{fontWeight:700}}>Kebo</span><span></span></div>
+                {(rapor.os_kebo_ys||rapor.ko_kebo_ys)>0&&<div className="row"><span>· Yemeksepeti ({(rapor.os_kebo_ys_paket||0)+(rapor.ko_kebo_ys_paket||0)} pkt)</span><span>₺{fmt((rapor.os_kebo_ys||0)+(rapor.ko_kebo_ys||0))}</span></div>}
+                {(rapor.os_kebo_trendyol||rapor.ko_kebo_trendyol)>0&&<div className="row"><span>· Trendyol ({(rapor.os_kebo_trendyol_paket||0)+(rapor.ko_kebo_trendyol_paket||0)} pkt)</span><span>₺{fmt((rapor.os_kebo_trendyol||0)+(rapor.ko_kebo_trendyol||0))}</span></div>}
+                {(rapor.os_kebo_migros||rapor.ko_kebo_migros_yemek)>0&&<div className="row"><span>· Migros ({(rapor.os_kebo_migros_paket||0)+(rapor.ko_kebo_migros_yemek_paket||0)} pkt)</span><span>₺{fmt((rapor.os_kebo_migros||0)+(rapor.ko_kebo_migros_yemek||0))}</span></div>}
+                {rapor.ko_kebo_alo>0&&<div className="row"><span>· Alo Paket ({rapor.ko_kebo_alo_paket||0} pkt)</span><span>₺{fmt(rapor.ko_kebo_alo)}</span></div>}
+                <div className="row"><span style={{fontWeight:700,marginTop:"4px"}}>Chick'N Fride</span><span></span></div>
+                {(rapor.os_cnf_ys||rapor.ko_cnf_ys)>0&&<div className="row"><span>· Yemeksepeti ({(rapor.os_cnf_ys_paket||0)+(rapor.ko_cnf_ys_paket||0)} pkt)</span><span>₺{fmt((rapor.os_cnf_ys||0)+(rapor.ko_cnf_ys||0))}</span></div>}
+                {(rapor.os_cnf_trendyol||rapor.ko_cnf_trendyol)>0&&<div className="row"><span>· Trendyol ({(rapor.os_cnf_trendyol_paket||0)+(rapor.ko_cnf_trendyol_paket||0)} pkt)</span><span>₺{fmt((rapor.os_cnf_trendyol||0)+(rapor.ko_cnf_trendyol||0))}</span></div>}
+                {(rapor.os_cnf_migros_yemek||rapor.ko_cnf_migros_yemek)>0&&<div className="row"><span>· Migros Yemek ({(rapor.os_cnf_migros_yemek_paket||0)+(rapor.ko_cnf_migros_yemek_paket||0)} pkt)</span><span>₺{fmt((rapor.os_cnf_migros_yemek||0)+(rapor.ko_cnf_migros_yemek||0))}</span></div>}
+                {rapor.ko_cnf_alo>0&&<div className="row"><span>· Alo Paket ({rapor.ko_cnf_alo_paket||0} pkt)</span><span>₺{fmt(rapor.ko_cnf_alo)}</span></div>}
+                {(tIndirimPT+tIndirimTY)>0&&<>
+                  <div className="row" style={{color:"#dc2626"}}><span>(-) Yemeksepeti İndirim</span><span>-₺{fmt(tIndirimPT)}</span></div>
+                  <div className="row" style={{color:"#dc2626"}}><span>(-) Trendyol İndirim</span><span>-₺{fmt(tIndirimTY)}</span></div>
+                </>}
+              </>
+            )}
 
             <hr className="divider"/>
 
@@ -46024,11 +46224,11 @@ function CurrencyInput({label, value, onChange, disabled=false, accent="gray"}:
 
     <div className="group">
 
-      <label className="block text-[10px] text-gray-600 uppercase tracking-wide font-medium mb-1">{label}</label>
+      <label className="block text-[12px] text-gray-700 font-semibold mb-1.5">{label}</label>
 
       <div className="relative">
 
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-xs font-medium">₺</span>
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[13px] font-semibold">₺</span>
 
         <input
 
@@ -46036,7 +46236,7 @@ function CurrencyInput({label, value, onChange, disabled=false, accent="gray"}:
 
           onChange={e=>onChange(fmtStr(e.target.value))}
 
-          className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 text-white text-sm font-bold h-9 pl-7 pr-3 rounded-xl outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-700"
+          className="w-full bg-[#f7f8fa] border border-[#dde1e8] hover:border-[#b9c2d1] focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 text-[#1a1f2e] text-[15px] font-bold h-10 pl-7 pr-3 rounded-xl outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"
 
           placeholder="0"
 
@@ -46051,6 +46251,69 @@ function CurrencyInput({label, value, onChange, disabled=false, accent="gray"}:
 }
 
 
+
+// ─── KURYE DÖNEM YAPISI ────────────────────────────────────────────────────────
+// 13.08.2026: Geçiş günü — hem kendi kurye hem Roadrunner havuz kuryesi çalıştı (garanti yok).
+// 14.08.2026'dan itibaren: Roadrunner 2 sabit kurye (30 paket garantili) + havuz kurye.
+// Bu tarihten öncesi: sadece kendi personel kuryesi (garanti yok).
+const ROADRUNNER_GECIS_GUNU = "2026-08-13";
+const ROADRUNNER_TAM_BASLANGIC = "2026-08-14";
+
+function kuryeYapisiHesapla(tarihStr: string): KuryeRaporu[] {
+  if (!tarihStr || tarihStr < ROADRUNNER_GECIS_GUNU) {
+    return [{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:"",tip:"kendi"}];
+  }
+  if (tarihStr === ROADRUNNER_GECIS_GUNU) {
+    return [
+      {id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:"",tip:"kendi"},
+      {id:Date.now()+1,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",tip:"havuz"},
+    ];
+  }
+  return [
+    {id:1,isim:"Kurye 1",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
+    {id:2,isim:"Kurye 2",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
+    {id:3,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",tip:"havuz"},
+  ];
+}
+
+// ─── PLATFORM SATIRI (tutar + paket sayısı + opsiyonel indirim) ───────────────
+
+function PlatformSatir({label, value, onChange, indirim, onIndirimChange, disabled=false}:
+  {label:string, value:PlatformGiris, onChange:(v:PlatformGiris)=>void,
+   indirim?:string, onIndirimChange?:(v:string)=>void, disabled?:boolean}) {
+  return (
+    <div className="rounded-xl border border-[#dde1e8] bg-[#f7f8fa] p-3 hover:border-[#d8dde5] transition-colors">
+      <p className="text-[13px] text-gray-800 font-semibold mb-2">{label}</p>
+      <div className="flex items-center gap-2">
+        <div className="relative flex-[1.4]">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[13px] font-semibold pointer-events-none">₺</span>
+          <input type="text" value={value.tutar} disabled={disabled}
+            onChange={e=>onChange({...value, tutar: fmtStr(e.target.value)})}
+            placeholder="0"
+            className="w-full bg-[#f7f8fa] border border-[#dde1e8] hover:border-[#b9c2d1] focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 text-[#1a1f2e] text-[15px] font-bold h-10 pl-7 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"/>
+        </div>
+        <div className="relative flex-1">
+          <Package size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-700/70 pointer-events-none"/>
+          <input type="number" value={value.paket} disabled={disabled}
+            onChange={e=>onChange({...value, paket: e.target.value})}
+            placeholder="0"
+            title="Paket sayısı"
+            className="w-full bg-[#f7f8fa] border border-[#dde1e8] hover:border-[#b9c2d1] focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/15 text-amber-700 text-[15px] font-bold h-10 pl-8 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"/>
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-600 font-medium pointer-events-none hidden sm:block">pkt</span>
+        </div>
+      </div>
+      {onIndirimChange && (
+        <div className="relative mt-2">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-red-600/90 pointer-events-none">İndirim ₺</span>
+          <input type="text" value={indirim||""} disabled={disabled}
+            onChange={e=>onIndirimChange(fmtStr(e.target.value))}
+            placeholder="0"
+            className="w-full bg-[#fef2f2] border border-red-500/15 hover:border-red-500/30 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/15 text-red-700 text-[13px] font-bold h-8 pl-[68px] pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-700 text-right"/>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── AKILLI GİDER INPUT ───────────────────────────────────────────────────────
 
@@ -46128,13 +46391,13 @@ function AkilliGiderInput({
 
         onFocus={() => setAcik(true)}
 
-        className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/40 text-white text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"
+        className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/40 text-[#1a1f2e] text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"
 
       />
 
       {acik && !disabled && filtreli.length > 0 && (
 
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#0d1120] border border-[#1a2236] rounded-xl shadow-2xl overflow-hidden">
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#ffffff] border border-[#e2e5eb] rounded-xl shadow-2xl overflow-hidden">
 
           {filtreli.map((o, i) => (
 
@@ -46146,11 +46409,11 @@ function AkilliGiderInput({
 
               onMouseDown={() => { onChange(o); setAcik(false); setArama(""); }}
 
-              className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-blue-500/10 hover:text-white transition-colors flex items-center gap-2"
+              className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-500/10 hover:text-[#1a1f2e] transition-colors flex items-center gap-2"
 
             >
 
-              <Sparkles size={9} className="text-blue-500/50 shrink-0"/>
+              <Sparkles size={9} className="text-blue-700/50 shrink-0"/>
 
               {o}
 
@@ -46158,7 +46421,7 @@ function AkilliGiderInput({
 
           ))}
 
-          <div className="border-t border-[#1a2236] px-3 py-1 text-[10px] text-gray-700">
+          <div className="border-t border-[#e2e5eb] px-3 py-1 text-[10px] text-gray-700">
 
             Diğer: istediğinizi yazabilirsiniz
 
@@ -46264,31 +46527,62 @@ export default function RaporlarPage() {
 
   const [adminOnayliGecis, setAdminOnayliGecis] = useState(false);
 
-  const [osYS, setOsYS] = useState(""); const [osGetir, setOsGetir] = useState("");
+  // ── Online — Kebo ──
+  const [osKeboYs, setOsKeboYs] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [osKeboYsIndirim, setOsKeboYsIndirim] = useState("");
+  const [osKeboTrendyol, setOsKeboTrendyol] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [osKeboTrendyolIndirim, setOsKeboTrendyolIndirim] = useState("");
+  const [osKeboMigros, setOsKeboMigros] = useState<PlatformGiris>({tutar:"",paket:""});
 
-  const [osChickNFride, setOsChickNFride] = useState("");
+  // ── Online — Chick'N Fride ──
+  const [osCnfYs, setOsCnfYs] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [osCnfYsIndirim, setOsCnfYsIndirim] = useState("");
+  const [osCnfTrendyol, setOsCnfTrendyol] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [osCnfTrendyolIndirim, setOsCnfTrendyolIndirim] = useState("");
+  const [osCnfMigrosYemek, setOsCnfMigrosYemek] = useState<PlatformGiris>({tutar:"",paket:""});
 
-  const [osTrendyol, setOsTrendyol] = useState(""); const [osMigros, setOsMigros] = useState("");
+  // ── Kapıda Ödeme — Kebo ──
+  const [koKeboYs, setKoKeboYs] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [koKeboYsIndirim, setKoKeboYsIndirim] = useState("");
+  const [koKeboTrendyol, setKoKeboTrendyol] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [koKeboTrendyolIndirim, setKoKeboTrendyolIndirim] = useState("");
+  const [koKeboMigrosYemek, setKoKeboMigrosYemek] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [koKeboAlo, setKoKeboAlo] = useState<PlatformGiris>({tutar:"",paket:""});
 
-  const [koYS, setKoYS] = useState(""); const [koGetir, setKoGetir] = useState("");
-
-  const [koTrendyol, setKoTrendyol] = useState(""); const [koMigros, setKoMigros] = useState("");
-
-  const [koAlo, setKoAlo] = useState("");
-
-  const [koChickNFride, setKoChickNFride] = useState("");
+  // ── Kapıda Ödeme — Chick'N Fride ──
+  const [koCnfYs, setKoCnfYs] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [koCnfYsIndirim, setKoCnfYsIndirim] = useState("");
+  const [koCnfTrendyol, setKoCnfTrendyol] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [koCnfTrendyolIndirim, setKoCnfTrendyolIndirim] = useState("");
+  const [koCnfMigrosYemek, setKoCnfMigrosYemek] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [koCnfAlo, setKoCnfAlo] = useState<PlatformGiris>({tutar:"",paket:""});
 
   const [kasaNakit, setKasaNakit] = useState(""); const [kasaPos, setKasaPos] = useState("");
 
-  const [kasaEdenred, setKasaEdenred] = useState("");
+  const [kasaEdenred, setKasaEdenred] = useState(""); const [kasaMetropol, setKasaMetropol] = useState("");
 
   const [giderler, setGiderler] = useState<SatirRaporu[]>([{id:Date.now(),aciklama:"",tutar:"",tip:"normal"}]);
 
-  const [iadeler, setIadeler] = useState<SatirRaporu[]>([{id:Date.now(),aciklama:"",tutar:""}]);
+  const [iadeler, setIadeler] = useState<SatirRaporu[]>([{id:Date.now(),aciklama:"",tutar:""}]); // İptal-İade Fişleri
 
-  const [kuryeler, setKuryeler] = useState<KuryeRaporu[]>([{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:""}]);
+  const [kuryeler, setKuryeler] = useState<KuryeRaporu[]>([
+    {id:1,isim:"Kurye 1",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
+    {id:2,isim:"Kurye 2",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
+    {id:3,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",tip:"havuz"},
+  ]);
 
   const [notlar, setNotlar] = useState("");
+
+  // Personel Avans / Yemek Kesintisi hızlı giriş (Giderler bölümünden) — tüm aktif personeli listeler
+  const [avansPersonelListesi, setAvansPersonelListesi] = useState<string[]>([]);
+  // Not: Personel Avans artık ayrı bir state değil — Giderler listesinde tip:"personel" olan satırlar bu işi görüyor.
+  const [kesintiSatirlari, setKesintiSatirlari] = useState<{id:number; personelIsim:string; tutar:string; aciklama:string}[]>([]);
+
+  // ── Fişten Doldur (AI tarama) ──
+  const [taramaYukleniyor, setTaramaYukleniyor] = useState(false);
+  const [taramaHata, setTaramaHata] = useState("");
+  const [taramaBelirsizAlanlar, setTaramaBelirsizAlanlar] = useState<string[]>([]);
+  const dosyaInputRef = useRef<HTMLInputElement>(null);
 
 
 
@@ -46341,6 +46635,11 @@ export default function RaporlarPage() {
     const {data:personelData} = await supabase.from("personeller").select("isim").eq("durum","aktif").eq("departman","Kurye").order("isim");
 
     if (personelData?.length) setPersonelListesi(personelData.map((p:any)=>p.isim));
+
+    // Avans/Kesinti hızlı girişi için tüm aktif personel (departman farketmeksizin)
+    const {data:tumPersonelData} = await supabase.from("personeller").select("isim").eq("durum","aktif").order("isim");
+
+    if (tumPersonelData?.length) setAvansPersonelListesi(tumPersonelData.map((p:any)=>p.isim));
 
 
 
@@ -46428,6 +46727,9 @@ export default function RaporlarPage() {
 
     setTarih(val); setAdminOnayliGecis(false); setDuplikaTarihHata(false);
 
+    // Yeni rapor eklerken (düzenleme değil) seçilen tarihe göre doğru kurye yapısını (kendi/geçiş/Roadrunner) otomatik kur.
+    if (!selectedRapor) setKuryeler(kuryeYapisiHesapla(val));
+
     if (!val||selectedRapor||!enSonRaporTarihi) { setTarihHataVarMi(false); return; }
 
     if (mevcutTarihler.has(val)) { setDuplikaTarihHata(true); setTarihHataVarMi(false); return; }
@@ -46442,19 +46744,31 @@ export default function RaporlarPage() {
 
   const formuTemizle = () => {
 
-    setOsYS("");setOsGetir("");setOsTrendyol("");setOsMigros("");setOsChickNFride("");
+    const bosPG = ():PlatformGiris=>({tutar:"",paket:""});
 
-    setKoYS("");setKoGetir("");setKoTrendyol("");setKoMigros("");setKoAlo("");setKoChickNFride("");
+    setOsKeboYs(bosPG());setOsKeboYsIndirim("");setOsKeboTrendyol(bosPG());setOsKeboTrendyolIndirim("");setOsKeboMigros(bosPG());
 
-    setKasaNakit("");setKasaPos("");setKasaEdenred("");
+    setOsCnfYs(bosPG());setOsCnfYsIndirim("");setOsCnfTrendyol(bosPG());setOsCnfTrendyolIndirim("");setOsCnfMigrosYemek(bosPG());
+
+    setKoKeboYs(bosPG());setKoKeboYsIndirim("");setKoKeboTrendyol(bosPG());setKoKeboTrendyolIndirim("");setKoKeboMigrosYemek(bosPG());setKoKeboAlo(bosPG());
+
+    setKoCnfYs(bosPG());setKoCnfYsIndirim("");setKoCnfTrendyol(bosPG());setKoCnfTrendyolIndirim("");setKoCnfMigrosYemek(bosPG());setKoCnfAlo(bosPG());
+
+    setKasaNakit("");setKasaPos("");setKasaEdenred("");setKasaMetropol("");
 
     setGiderler([{id:Date.now(),aciklama:"",tutar:"",tip:"normal"}]);
 
     setIadeler([{id:Date.now(),aciklama:"",tutar:""}]);
 
+    setKesintiSatirlari([]);
+
     setTarih("");setTarihHataVarMi(false);setAdminOnayliGecis(false);setDuplikaTarihHata(false);
 
-    setKuryeler([{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:""}]);
+    setKuryeler([
+      {id:1,isim:"Kurye 1",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
+      {id:2,isim:"Kurye 2",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
+      {id:3,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",tip:"havuz"},
+    ]);
 
     setNotlar("");setSelectedRapor(null);setIsEditMode(false);
 
@@ -46596,15 +46910,25 @@ export default function RaporlarPage() {
 
     setTarih(r.tarih); setTarihHataVarMi(false); setAdminOnayliGecis(false); setDuplikaTarihHata(false);
 
-    setOsYS(fmt(r.os_yemeksepeti)); setOsGetir(fmt(r.os_getir));
+    setOsKeboYs({tutar:fmt(r.os_kebo_ys), paket:String(r.os_kebo_ys_paket||"")}); setOsKeboYsIndirim(fmt(r.os_kebo_ys_indirim));
+    setOsKeboTrendyol({tutar:fmt(r.os_kebo_trendyol), paket:String(r.os_kebo_trendyol_paket||"")}); setOsKeboTrendyolIndirim(fmt(r.os_kebo_trendyol_indirim));
+    setOsKeboMigros({tutar:fmt(r.os_kebo_migros), paket:String(r.os_kebo_migros_paket||"")});
 
-    setOsTrendyol(fmt(r.os_trendyol)); setOsMigros(fmt(r.os_migros));
+    setOsCnfYs({tutar:fmt(r.os_cnf_ys), paket:String(r.os_cnf_ys_paket||"")}); setOsCnfYsIndirim(fmt(r.os_cnf_ys_indirim));
+    setOsCnfTrendyol({tutar:fmt(r.os_cnf_trendyol), paket:String(r.os_cnf_trendyol_paket||"")}); setOsCnfTrendyolIndirim(fmt(r.os_cnf_trendyol_indirim));
+    setOsCnfMigrosYemek({tutar:fmt(r.os_cnf_migros_yemek), paket:String(r.os_cnf_migros_yemek_paket||"")});
 
-    setKoYS(fmt(r.ko_yemeksepeti)); setKoGetir(fmt(r.ko_getir));
+    setKoKeboYs({tutar:fmt(r.ko_kebo_ys), paket:String(r.ko_kebo_ys_paket||"")}); setKoKeboYsIndirim(fmt(r.ko_kebo_ys_indirim));
+    setKoKeboTrendyol({tutar:fmt(r.ko_kebo_trendyol), paket:String(r.ko_kebo_trendyol_paket||"")}); setKoKeboTrendyolIndirim(fmt(r.ko_kebo_trendyol_indirim));
+    setKoKeboMigrosYemek({tutar:fmt(r.ko_kebo_migros_yemek), paket:String(r.ko_kebo_migros_yemek_paket||"")});
+    setKoKeboAlo({tutar:fmt(r.ko_kebo_alo), paket:String(r.ko_kebo_alo_paket||"")});
 
-    setKoTrendyol(fmt(r.ko_trendyol)); setKoMigros(fmt(r.ko_migros)); setKoAlo(fmt(r.ko_alo_paket)); setKoChickNFride(fmt(r.ko_chicknfride));
+    setKoCnfYs({tutar:fmt(r.ko_cnf_ys), paket:String(r.ko_cnf_ys_paket||"")}); setKoCnfYsIndirim(fmt(r.ko_cnf_ys_indirim));
+    setKoCnfTrendyol({tutar:fmt(r.ko_cnf_trendyol), paket:String(r.ko_cnf_trendyol_paket||"")}); setKoCnfTrendyolIndirim(fmt(r.ko_cnf_trendyol_indirim));
+    setKoCnfMigrosYemek({tutar:fmt(r.ko_cnf_migros_yemek), paket:String(r.ko_cnf_migros_yemek_paket||"")});
+    setKoCnfAlo({tutar:fmt(r.ko_cnf_alo), paket:String(r.ko_cnf_alo_paket||"")});
 
-    setKasaNakit(fmt(r.kasa_nakit)); setKasaPos(fmt(r.kasa_pos)); setKasaEdenred(fmt(r.kasa_edenred));
+    setKasaNakit(fmt(r.kasa_nakit)); setKasaPos(fmt(r.kasa_pos)); setKasaEdenred(fmt(r.kasa_edenred)); setKasaMetropol(fmt(r.kasa_metropol));
 
     setKuryeler(r.kurye_raporlari?.length
 
@@ -46660,6 +46984,22 @@ export default function RaporlarPage() {
 
           }
 
+          // Personel avans tespiti (önek "[Personel Avans] Ad — açıklama" biçiminde)
+          const personelPrefix = "[Personel Avans] ";
+          if (aciklama.startsWith(personelPrefix)) {
+            const govde = aciklama.substring(personelPrefix.length);
+            const ayrimIdx = govde.indexOf(" — ");
+            const personelIsim = ayrimIdx>-1 ? govde.substring(0, ayrimIdx) : govde;
+            const detay = ayrimIdx>-1 ? govde.substring(ayrimIdx+3) : "";
+            return {
+              id: Date.now()+i,
+              aciklama: detay,
+              tutar,
+              tip: "personel" as const,
+              personelIsim,
+            };
+          }
+
           return {
 
             id: Date.now()+i,
@@ -46700,11 +47040,30 @@ export default function RaporlarPage() {
 
   const ch = useMemo(()=>{
 
-    const tOnline=tv(osYS)+tv(osGetir)+tv(osTrendyol)+tv(osMigros)+tv(osChickNFride);
+    const pk = (p:PlatformGiris)=>parseInt(p.paket)||0;
 
-    const tKapida=tv(koYS)+tv(koGetir)+tv(koTrendyol)+tv(koMigros)+tv(koAlo)+tv(koChickNFride);
+    // ── Online ──
+    const tOnlineKebo = tv(osKeboYs.tutar)+tv(osKeboTrendyol.tutar)+tv(osKeboMigros.tutar);
+    const tOnlineCnf  = tv(osCnfYs.tutar)+tv(osCnfTrendyol.tutar)+tv(osCnfMigrosYemek.tutar);
+    const tOnline = tOnlineKebo + tOnlineCnf;
+    const tOnlinePaket = pk(osKeboYs)+pk(osKeboTrendyol)+pk(osKeboMigros)+pk(osCnfYs)+pk(osCnfTrendyol)+pk(osCnfMigrosYemek);
 
-    const tKasa=tv(kasaNakit)+tv(kasaPos)+tv(kasaEdenred);
+    // ── Kapıda Ödeme ──
+    const tKapidaKebo = tv(koKeboYs.tutar)+tv(koKeboTrendyol.tutar)+tv(koKeboMigrosYemek.tutar)+tv(koKeboAlo.tutar);
+    const tKapidaCnf  = tv(koCnfYs.tutar)+tv(koCnfTrendyol.tutar)+tv(koCnfMigrosYemek.tutar)+tv(koCnfAlo.tutar);
+    const tKapida = tKapidaKebo + tKapidaCnf;
+    const tKapidaPaket = pk(koKeboYs)+pk(koKeboTrendyol)+pk(koKeboMigrosYemek)+pk(koKeboAlo)+pk(koCnfYs)+pk(koCnfTrendyol)+pk(koCnfMigrosYemek)+pk(koCnfAlo);
+
+    // ── İndirim Analizi (Yemeksepeti + Trendyol, Kebo + CNF, online + kapıda) ──
+    const tIndirimYS = tv(osKeboYsIndirim)+tv(osCnfYsIndirim)+tv(koKeboYsIndirim)+tv(koCnfYsIndirim);
+    const tIndirimTrendyol = tv(osKeboTrendyolIndirim)+tv(osCnfTrendyolIndirim)+tv(koKeboTrendyolIndirim)+tv(koCnfTrendyolIndirim);
+    const tIndirim = tIndirimYS + tIndirimTrendyol;
+    const paketCiroToplami = tOnline + tKapida; // indirim oranı, platformlardaki brüt paket cirosuna göre
+    const indirimOrani = paketCiroToplami>0 ? (tIndirim/paketCiroToplami)*100 : 0;
+    const indirimUyari = indirimOrani > 15;
+
+    // ── Kasa ──
+    const tKasa=tv(kasaNakit)+tv(kasaPos)+tv(kasaEdenred)+tv(kasaMetropol);
 
     const tGider=giderler.reduce((a,g)=>a+tv(g.tutar),0);
 
@@ -46714,17 +47073,31 @@ export default function RaporlarPage() {
 
     const netCiro  = brutCiro - tGider - tIade; // matematiksel: tOnline + tKasa - tIade
 
-    const tKuryePaket=kuryeler.reduce((a,k)=>a+(parseInt(k.paketSayisi)||0),0);
-
+    // ── Kuryeler: SADECE tip==="sabit" (Roadrunner, 14.08.2026+) olan satırlarda min. 30 paket garantisi var.
+    // "havuz" ve "kendi" (14.08.2026 öncesi kendi personel kurye / geçiş günü) satırlarında garanti yok.
+    const KURYE_GARANTI = 30;
+    const kuryelerHesap = kuryeler.map(k=>{
+      const gercek = parseInt(k.paketSayisi)||0;
+      const uygulanan = k.tip==="sabit" ? Math.max(gercek, KURYE_GARANTI) : gercek;
+      return { ...k, gercekPaket:gercek, uygulananPaket:uygulanan, garantiUygulandi: k.tip==="sabit" && gercek<KURYE_GARANTI };
+    });
+    const tKuryePaket=kuryelerHesap.reduce((a,k)=>a+k.uygulananPaket,0);
+    const tKuryeGercekPaket=kuryelerHesap.reduce((a,k)=>a+k.gercekPaket,0);
     const tKuryeTahsilat=kuryeler.reduce((a,k)=>a+tv(k.nakit)+tv(k.pos),0);
 
     const paketOrt=(tOnline+tKapida)>0&&tKuryePaket>0?Math.round((tOnline+tKapida)/tKuryePaket):0;
 
     const kuryeFark=tKapida-tKuryeTahsilat;
 
-    return {tOnline,tKapida,tKasa,brutCiro,tGider,tIade,netCiro,tKuryePaket,tKuryeTahsilat,paketOrt,kuryeFark};
+    return {tOnline,tOnlineKebo,tOnlineCnf,tOnlinePaket,tKapida,tKapidaKebo,tKapidaCnf,tKapidaPaket,
+      tIndirimYS,tIndirimTrendyol,tIndirim,indirimOrani,indirimUyari,
+      tKasa,brutCiro,tGider,tIade,netCiro,kuryelerHesap,tKuryePaket,tKuryeGercekPaket,tKuryeTahsilat,paketOrt,kuryeFark};
 
-  },[osYS,osGetir,osTrendyol,osMigros,osChickNFride,koYS,koGetir,koTrendyol,koMigros,koAlo,koChickNFride,kasaNakit,kasaPos,kasaEdenred,giderler,iadeler,kuryeler]);
+  },[osKeboYs,osKeboYsIndirim,osKeboTrendyol,osKeboTrendyolIndirim,osKeboMigros,
+     osCnfYs,osCnfYsIndirim,osCnfTrendyol,osCnfTrendyolIndirim,osCnfMigrosYemek,
+     koKeboYs,koKeboYsIndirim,koKeboTrendyol,koKeboTrendyolIndirim,koKeboMigrosYemek,koKeboAlo,
+     koCnfYs,koCnfYsIndirim,koCnfTrendyol,koCnfTrendyolIndirim,koCnfMigrosYemek,koCnfAlo,
+     kasaNakit,kasaPos,kasaEdenred,kasaMetropol,giderler,iadeler,kuryeler]);
 
 
 
@@ -46756,13 +47129,13 @@ export default function RaporlarPage() {
 
   // ── Handlers ──
 
-  const giderEkle = (tip: "normal"|"firma" = "normal") =>
+  const giderEkle = (tip: "normal"|"firma"|"personel" = "normal") =>
 
-    setGiderler([...giderler,{id:Date.now(),aciklama:"",tutar:"",tip}]);
+    setGiderler([...giderler,{id:Date.now(),aciklama:tip==="personel"?"Personel tüketim (yemek/içecek)":"",tutar:"",tip}]);
 
   const giderSil = (id:number)=>setGiderler(giderler.filter(g=>g.id!==id));
 
-  const giderDegistir = (id:number,field:"aciklama"|"tutar"|"firmaId"|"firmaUnvan",val:string)=>
+  const giderDegistir = (id:number,field:"aciklama"|"tutar"|"firmaId"|"firmaUnvan"|"personelIsim",val:string)=>
 
     setGiderler(giderler.map(g=>g.id===id?{...g,[field]:field==="tutar"?fmtStr(val):val}:g));
 
@@ -46778,7 +47151,7 @@ export default function RaporlarPage() {
 
 
 
-  const kuryeEkle = ()=>setKuryeler([...kuryeler,{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:""}]);
+  const kuryeEkle = ()=>setKuryeler([...kuryeler,{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:"",tip:"havuz"}]);
 
   const kuryeSil = (id:number)=>setKuryeler(kuryeler.filter(k=>k.id!==id));
 
@@ -46788,6 +47161,93 @@ export default function RaporlarPage() {
 
     setKuryeler(kuryeler.map(k=>k.id===id?{...k,[field]:v}:k));
 
+  };
+
+  // ── Fişten Doldur: kağıt raporu fotoğraflayıp/yükleyip AI'ye okutma ──
+  const nToStr = (n:number|undefined) => (n && n>0) ? fmt(n) : "";
+
+  const handleFisTara = async (file: File) => {
+    if (!file) return;
+    setTaramaYukleniyor(true); setTaramaHata(""); setTaramaBelirsizAlanlar([]);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const response = await fetch("/api/rapor-tara", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64, mediaType: file.type || "image/jpeg" }),
+      });
+      const veri = await response.json();
+      if (!response.ok || veri.error) {
+        setTaramaHata(veri.error || "Fiş okunamadı, tekrar deneyin."); return;
+      }
+
+      // Tarih (sadece yeni rapor eklerken, düzenleme modunda tarihi ezme)
+      if (veri.tarih && !selectedRapor) handleTarihChange(veri.tarih);
+
+      const pg = (o:any): PlatformGiris => ({ tutar: nToStr(o?.tutar), paket: o?.paket ? String(o.paket) : "" });
+
+      const ok = veri.online?.kebo || {}; const oc = veri.online?.cnf || {};
+      setOsKeboYs(pg(ok.ys)); setOsKeboYsIndirim(nToStr(ok.ys?.indirim));
+      setOsKeboTrendyol(pg(ok.trendyol)); setOsKeboTrendyolIndirim(nToStr(ok.trendyol?.indirim));
+      setOsKeboMigros(pg(ok.migros));
+      setOsCnfYs(pg(oc.ys)); setOsCnfYsIndirim(nToStr(oc.ys?.indirim));
+      setOsCnfTrendyol(pg(oc.trendyol)); setOsCnfTrendyolIndirim(nToStr(oc.trendyol?.indirim));
+      setOsCnfMigrosYemek(pg(oc.migrosYemek));
+
+      const kk = veri.kapida?.kebo || {}; const kc = veri.kapida?.cnf || {};
+      setKoKeboYs(pg(kk.ys)); setKoKeboYsIndirim(nToStr(kk.ys?.indirim));
+      setKoKeboTrendyol(pg(kk.trendyol)); setKoKeboTrendyolIndirim(nToStr(kk.trendyol?.indirim));
+      setKoKeboMigrosYemek(pg(kk.migrosYemek)); setKoKeboAlo(pg(kk.alo));
+      setKoCnfYs(pg(kc.ys)); setKoCnfYsIndirim(nToStr(kc.ys?.indirim));
+      setKoCnfTrendyol(pg(kc.trendyol)); setKoCnfTrendyolIndirim(nToStr(kc.trendyol?.indirim));
+      setKoCnfMigrosYemek(pg(kc.migrosYemek)); setKoCnfAlo(pg(kc.alo));
+
+      if (veri.kasa) {
+        setKasaNakit(nToStr(veri.kasa.nakit)); setKasaPos(nToStr(veri.kasa.pos));
+        setKasaEdenred(nToStr(veri.kasa.edenred)); setKasaMetropol(nToStr(veri.kasa.metropol));
+      }
+
+      const yeniGiderler: SatirRaporu[] = [];
+      (veri.giderler||[]).forEach((g:any,i:number) => {
+        if (g.tutar || g.aciklama) yeniGiderler.push({ id: Date.now()+i, aciklama: g.aciklama||"", tutar: nToStr(g.tutar), tip: "normal" });
+      });
+      (veri.avanslar||[]).forEach((a:any,i:number) => {
+        if (a.tutar || a.personel) yeniGiderler.push({ id: Date.now()+100+i, aciklama: a.aciklama||"", tutar: nToStr(a.tutar), tip: "personel", personelIsim: a.personel||"" });
+      });
+      if (yeniGiderler.length) setGiderler(yeniGiderler);
+
+      const yeniKesintiler = (veri.kesintiler||[]).filter((k:any)=>k.tutar||k.personel)
+        .map((k:any,i:number)=>({ id: Date.now()+200+i, personelIsim: k.personel||"", tutar: nToStr(k.tutar), aciklama: k.aciklama||"" }));
+      if (yeniKesintiler.length) setKesintiSatirlari(yeniKesintiler);
+
+      const yeniIadeler = (veri.iadeler||[]).filter((i:any)=>i.tutar||i.aciklama)
+        .map((i:any,idx:number)=>({ id: Date.now()+300+idx, aciklama: i.aciklama||"", tutar: nToStr(i.tutar) }));
+      if (yeniIadeler.length) setIadeler(yeniIadeler);
+
+      const sabitler = (veri.kuryeSabit||[]);
+      const havuzlar = (veri.kuryeHavuz||[]).filter((k:any)=>k.isim||k.paket||k.tutar);
+      const yeniKuryeler: KuryeRaporu[] = [
+        { id:1, isim: sabitler[0]?.isim||"Kurye 1", nakit: nToStr(sabitler[0]?.nakit), pos: nToStr(sabitler[0]?.pos), paketSayisi: sabitler[0]?.paket?String(sabitler[0].paket):"", tip:"sabit" },
+        { id:2, isim: sabitler[1]?.isim||"Kurye 2", nakit: nToStr(sabitler[1]?.nakit), pos: nToStr(sabitler[1]?.pos), paketSayisi: sabitler[1]?.paket?String(sabitler[1].paket):"", tip:"sabit" },
+        ...havuzlar.map((k:any,i:number)=>({ id: Date.now()+400+i, isim: k.isim||"Havuz Kurye", nakit: nToStr(k.nakit), pos: nToStr(k.pos), paketSayisi: k.paket?String(k.paket):"", tip:"havuz" as const })),
+      ];
+      setKuryeler(yeniKuryeler);
+
+      if (veri.notlar) setNotlar(veri.notlar);
+
+      setTaramaBelirsizAlanlar(veri.belirsiz_alanlar || []);
+    } catch (err:any) {
+      setTaramaHata("Bağlantı hatası: " + err.message);
+    } finally {
+      setTaramaYukleniyor(false);
+      if (dosyaInputRef.current) dosyaInputRef.current.value = "";
+    }
   };
 
 
@@ -46952,7 +47412,9 @@ Soru: ${soruFinal}`
 
         .map(g=>{
 
-          const ad = g.tip==="firma" && g.firmaUnvan ? `[Firma] ${g.firmaUnvan}` : (g.aciklama||"Belirtilmemiş");
+          const ad = g.tip==="firma" && g.firmaUnvan ? `[Firma] ${g.firmaUnvan}`
+            : g.tip==="personel" && g.personelIsim ? `[Personel Avans] ${g.personelIsim} — ${g.aciklama||"Belirtilmemiş"}`
+            : (g.aciklama||"Belirtilmemiş");
 
           return `${ad}: ₺${g.tutar}`;
 
@@ -46972,11 +47434,40 @@ Soru: ${soruFinal}`
 
         tarih,
 
-        os_yemeksepeti:tv(osYS), os_getir:tv(osGetir), os_trendyol:tv(osTrendyol), os_migros:tv(osMigros), os_chicknfride:tv(osChickNFride),
+        // Legacy alanlar: eski rapor-analiz / dashboard ekranları bozulmasın diye
+        // marka bazlı yeni alanların toplamıyla dolduruluyor (Getir artık formda yok -> 0).
+        os_yemeksepeti:tv(osKeboYs.tutar)+tv(osCnfYs.tutar), os_getir:0,
+        os_trendyol:tv(osKeboTrendyol.tutar)+tv(osCnfTrendyol.tutar),
+        os_migros:tv(osKeboMigros.tutar)+tv(osCnfMigrosYemek.tutar), os_chicknfride:ch.tOnlineCnf,
 
-        ko_yemeksepeti:tv(koYS), ko_getir:tv(koGetir), ko_trendyol:tv(koTrendyol), ko_migros:tv(koMigros), ko_alo_paket:tv(koAlo), ko_chicknfride:tv(koChickNFride),
+        ko_yemeksepeti:tv(koKeboYs.tutar)+tv(koCnfYs.tutar), ko_getir:0,
+        ko_trendyol:tv(koKeboTrendyol.tutar)+tv(koCnfTrendyol.tutar),
+        ko_migros:tv(koKeboMigrosYemek.tutar)+tv(koCnfMigrosYemek.tutar),
+        ko_alo_paket:tv(koKeboAlo.tutar)+tv(koCnfAlo.tutar), ko_chicknfride:ch.tKapidaCnf,
 
-        kasa_nakit:tv(kasaNakit), kasa_pos:tv(kasaPos), kasa_edenred:tv(kasaEdenred),
+        // Online — Kebo
+        os_kebo_ys:tv(osKeboYs.tutar), os_kebo_ys_paket:parseInt(osKeboYs.paket)||0, os_kebo_ys_indirim:tv(osKeboYsIndirim),
+        os_kebo_trendyol:tv(osKeboTrendyol.tutar), os_kebo_trendyol_paket:parseInt(osKeboTrendyol.paket)||0, os_kebo_trendyol_indirim:tv(osKeboTrendyolIndirim),
+        os_kebo_migros:tv(osKeboMigros.tutar), os_kebo_migros_paket:parseInt(osKeboMigros.paket)||0,
+
+        // Online — Chick'N Fride
+        os_cnf_ys:tv(osCnfYs.tutar), os_cnf_ys_paket:parseInt(osCnfYs.paket)||0, os_cnf_ys_indirim:tv(osCnfYsIndirim),
+        os_cnf_trendyol:tv(osCnfTrendyol.tutar), os_cnf_trendyol_paket:parseInt(osCnfTrendyol.paket)||0, os_cnf_trendyol_indirim:tv(osCnfTrendyolIndirim),
+        os_cnf_migros_yemek:tv(osCnfMigrosYemek.tutar), os_cnf_migros_yemek_paket:parseInt(osCnfMigrosYemek.paket)||0,
+
+        // Kapıda Ödeme — Kebo
+        ko_kebo_ys:tv(koKeboYs.tutar), ko_kebo_ys_paket:parseInt(koKeboYs.paket)||0, ko_kebo_ys_indirim:tv(koKeboYsIndirim),
+        ko_kebo_trendyol:tv(koKeboTrendyol.tutar), ko_kebo_trendyol_paket:parseInt(koKeboTrendyol.paket)||0, ko_kebo_trendyol_indirim:tv(koKeboTrendyolIndirim),
+        ko_kebo_migros_yemek:tv(koKeboMigrosYemek.tutar), ko_kebo_migros_yemek_paket:parseInt(koKeboMigrosYemek.paket)||0,
+        ko_kebo_alo:tv(koKeboAlo.tutar), ko_kebo_alo_paket:parseInt(koKeboAlo.paket)||0,
+
+        // Kapıda Ödeme — Chick'N Fride
+        ko_cnf_ys:tv(koCnfYs.tutar), ko_cnf_ys_paket:parseInt(koCnfYs.paket)||0, ko_cnf_ys_indirim:tv(koCnfYsIndirim),
+        ko_cnf_trendyol:tv(koCnfTrendyol.tutar), ko_cnf_trendyol_paket:parseInt(koCnfTrendyol.paket)||0, ko_cnf_trendyol_indirim:tv(koCnfTrendyolIndirim),
+        ko_cnf_migros_yemek:tv(koCnfMigrosYemek.tutar), ko_cnf_migros_yemek_paket:parseInt(koCnfMigrosYemek.paket)||0,
+        ko_cnf_alo:tv(koCnfAlo.tutar), ko_cnf_alo_paket:parseInt(koCnfAlo.paket)||0,
+
+        kasa_nakit:tv(kasaNakit), kasa_pos:tv(kasaPos), kasa_edenred:tv(kasaEdenred), kasa_metropol:tv(kasaMetropol),
 
         gunluk_gider:ch.tGider, gider_aciklama:giderAciklamaFinal,
 
@@ -47040,21 +47531,24 @@ Soru: ${soruFinal}`
 
       const PLATFORM_GECIKME: Record<string, number> = {
 
-        "Yemeksepeti": 14, "Getir": 7, "Trendyol": 14, "Migros": 15, "Alo Paket": 2,
+        "Yemeksepeti (Kebo)": 14, "Yemeksepeti (Chick'N Fride)": 14,
+        "Trendyol (Kebo)": 14, "Trendyol (Chick'N Fride)": 14,
+        "Migros (Kebo)": 15, "Migros Yemek (Chick'N Fride)": 15,
+        "Alo Paket (Kebo)": 2, "Alo Paket (Chick'N Fride)": 2,
 
       };
 
+      // Marka bazlı ayrım korunuyor — her marka platformda ayrı hesap/tahsilat olarak takip edilir.
       const platformSatislar = [
 
-        { platform: "Yemeksepeti", tutar: tv(osYS) + tv(koYS) },
-
-        { platform: "Getir",       tutar: tv(osGetir) + tv(koGetir) },
-
-        { platform: "Trendyol",    tutar: tv(osTrendyol) + tv(koTrendyol) },
-
-        { platform: "Migros",      tutar: tv(osMigros) + tv(koMigros) },
-
-        { platform: "Alo Paket",   tutar: tv(koAlo) },
+        { platform: "Yemeksepeti (Kebo)",           tutar: tv(osKeboYs.tutar) + tv(koKeboYs.tutar) },
+        { platform: "Yemeksepeti (Chick'N Fride)",  tutar: tv(osCnfYs.tutar) + tv(koCnfYs.tutar) },
+        { platform: "Trendyol (Kebo)",               tutar: tv(osKeboTrendyol.tutar) + tv(koKeboTrendyol.tutar) },
+        { platform: "Trendyol (Chick'N Fride)",     tutar: tv(osCnfTrendyol.tutar) + tv(koCnfTrendyol.tutar) },
+        { platform: "Migros (Kebo)",                 tutar: tv(osKeboMigros.tutar) + tv(koKeboMigrosYemek.tutar) },
+        { platform: "Migros Yemek (Chick'N Fride)", tutar: tv(osCnfMigrosYemek.tutar) + tv(koCnfMigrosYemek.tutar) },
+        { platform: "Alo Paket (Kebo)",              tutar: tv(koKeboAlo.tutar) },
+        { platform: "Alo Paket (Chick'N Fride)",    tutar: tv(koCnfAlo.tutar) },
 
       ];
 
@@ -47116,7 +47610,30 @@ Soru: ${soruFinal}`
 
       }
 
-
+      // Personel Avans — Giderler listesindeki tip:"personel" satırları (kasadan fiş çıkan personel tüketimi)
+      // otomatik olarak ilgili personelin avans geçmişine işlenir. Kasa/gider toplamına zaten dahil (giderler dizisinde).
+      // NOT: rapor düzenlenip tekrar kaydedilirse çift kayıt oluşmasın diye, bu rapora ait
+      // önceki otomatik avans/kesinti kayıtları (aynı tarih + işaretli odeme_yontemi/aciklama) önce silinir.
+      await supabase.from("avanslar").delete().eq("tarih", tarih).eq("odeme_yontemi", "Ürün / Fiş (Kasa Gideri)");
+      for (const g of giderler) {
+        if (g.tip !== "personel" || !g.personelIsim || !tv(g.tutar)) continue;
+        await supabase.from("avanslar").insert({
+          personel_isim: g.personelIsim, tutar: tv(g.tutar), tarih,
+          odeme_yontemi: "Ürün / Fiş (Kasa Gideri)", kasa_kaynagi: "Nakit Kasa",
+          aciklama: g.aciklama || `Personel tüketim — ${fmtTarih(tarih)}`,
+        });
+      }
+      // Personel Kesintisi — kasayı etkilemez, sadece ay sonu maaş hesabında düşülür.
+      // "[Rapor] " öneki bu kaydın günlük rapordan geldiğini işaretler; düzenlemede aynı tarihli
+      // işaretli eski kayıtlar silinip güncel haliyle yeniden eklenir (çift kayıt olmasın diye).
+      await supabase.from("kesintiler").delete().eq("tarih", tarih).like("aciklama", "[Rapor]%");
+      for (const k of kesintiSatirlari) {
+        if (!k.personelIsim || !tv(k.tutar)) continue;
+        await supabase.from("kesintiler").insert({
+          personel_isim: k.personelIsim, tutar: tv(k.tutar), tarih,
+          aciklama: `[Rapor] ${k.aciklama || fmtTarih(tarih)}`,
+        });
+      }
 
       formuTemizle(); setFormAcik(false); veriCek();
 
@@ -47140,17 +47657,21 @@ Soru: ${soruFinal}`
 
   const platformOzetSatirlar = [
 
-    { label: "Yemeksepeti", online: tv(osYS), kapida: tv(koYS), color: "#FF6B35" },
+    { label: "Kebo · Yemeksepeti",  online: tv(osKeboYs.tutar), kapida: tv(koKeboYs.tutar), color: "#FF6B35" },
 
-    { label: "Getir",       online: tv(osGetir), kapida: tv(koGetir), color: "#8B5CF6" },
+    { label: "Kebo · Trendyol",     online: tv(osKeboTrendyol.tutar), kapida: tv(koKeboTrendyol.tutar), color: "#F97316" },
 
-    { label: "Trendyol",    online: tv(osTrendyol), kapida: tv(koTrendyol), color: "#F97316" },
+    { label: "Kebo · Migros",       online: tv(osKeboMigros.tutar), kapida: tv(koKeboMigrosYemek.tutar), color: "#10B981" },
 
-    { label: "Migros",      online: tv(osMigros), kapida: tv(koMigros), color: "#10B981" },
+    { label: "Kebo · Alo Paket",    online: 0, kapida: tv(koKeboAlo.tutar), color: "#3B82F6" },
 
-    { label: "Alo Paket",   online: 0, kapida: tv(koAlo), color: "#3B82F6" },
+    { label: "CNF · Yemeksepeti",   online: tv(osCnfYs.tutar), kapida: tv(koCnfYs.tutar), color: "#FDBA74" },
 
-    { label: "Chick'N Fride", online: tv(osChickNFride), kapida: tv(koChickNFride), color: "#EF4444" },
+    { label: "CNF · Trendyol",      online: tv(osCnfTrendyol.tutar), kapida: tv(koCnfTrendyol.tutar), color: "#FB923C" },
+
+    { label: "CNF · Migros Yemek",  online: tv(osCnfMigrosYemek.tutar), kapida: tv(koCnfMigrosYemek.tutar), color: "#EF4444" },
+
+    { label: "CNF · Alo Paket",     online: 0, kapida: tv(koCnfAlo.tutar), color: "#F87171" },
 
   ].filter(p => p.online + p.kapida > 0);
 
@@ -47174,9 +47695,9 @@ Soru: ${soruFinal}`
 
           <div className="flex items-center gap-3 text-[11px] text-gray-600">
 
-            <span className="flex items-center gap-1.5"><User size={11} className="text-blue-400"/>{selectedRapor.ekleyen_kullanici}</span>
+            <span className="flex items-center gap-1.5"><User size={11} className="text-blue-600"/>{selectedRapor.ekleyen_kullanici}</span>
 
-            {selectedRapor.created_at && <span className="flex items-center gap-1.5"><Clock size={11} className="text-blue-400"/>{new Date(selectedRapor.created_at).toLocaleString("tr-TR")}</span>}
+            {selectedRapor.created_at && <span className="flex items-center gap-1.5"><Clock size={11} className="text-blue-600"/>{new Date(selectedRapor.created_at).toLocaleString("tr-TR")}</span>}
 
           </div>
 
@@ -47186,7 +47707,7 @@ Soru: ${soruFinal}`
 
               <button type="button" onClick={()=>setIsEditMode(true)}
 
-                className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-3 py-1.5 rounded-lg hover:bg-amber-400/15 transition-colors">
+                className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-400/10 border border-amber-400/20 px-3 py-1.5 rounded-lg hover:bg-amber-400/15 transition-colors">
 
                 <Edit3 size={12}/> Düzenle
 
@@ -47196,7 +47717,7 @@ Soru: ${soruFinal}`
 
               <button type="button" onClick={()=>selectedRapor && handleRaporSil(selectedRapor)}
 
-                className="flex items-center gap-1.5 text-xs font-semibold text-red-400 bg-red-400/10 border border-red-400/20 px-3 py-1.5 rounded-lg hover:bg-red-400/15 transition-colors">
+                className="flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-400/10 border border-red-400/20 px-3 py-1.5 rounded-lg hover:bg-red-400/15 transition-colors">
 
                 <Trash2 size={12}/> Sil
 
@@ -47214,13 +47735,48 @@ Soru: ${soruFinal}`
 
 
 
+      {/* FİŞTEN DOLDUR (AI Tarama) */}
+      {!isReadOnly && (
+        <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center shrink-0">
+              {taramaYukleniyor ? <Loader2 size={14} className="text-indigo-600 animate-spin"/> : <Camera size={14} className="text-indigo-600"/>}
+            </div>
+            <div>
+              <p className="text-xs font-bold text-indigo-700">Fişten Doldur</p>
+              <p className="text-[10px] text-gray-500">Kağıt raporun fotoğrafını yükle, AI okuyup formu doldursun</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input ref={dosyaInputRef} type="file" accept="image/*" capture="environment" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleFisTara(f); }}/>
+            <button type="button" disabled={taramaYukleniyor} onClick={() => dosyaInputRef.current?.click()}
+              className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 px-3.5 py-2 rounded-xl transition-colors">
+              {taramaYukleniyor ? "Okunuyor..." : <><Camera size={13}/> Tara</>}
+            </button>
+          </div>
+        </div>
+      )}
+      {taramaHata && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2.5 flex items-center gap-2">
+          <AlertTriangle size={13} className="text-red-600 shrink-0"/>
+          <p className="text-xs text-red-700">{taramaHata}</p>
+        </div>
+      )}
+      {taramaBelirsizAlanlar.length > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-2.5">
+          <p className="text-xs font-bold text-amber-600 flex items-center gap-1.5 mb-1"><AlertTriangle size={12}/> AI bazı alanlardan emin olamadı — lütfen kontrol et:</p>
+          <p className="text-[11px] text-amber-200/80">{taramaBelirsizAlanlar.join(", ")}</p>
+        </div>
+      )}
+
       {/* TARİH + CANLI METRİKLER */}
 
       <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-center">
 
         <div className="sm:col-span-1">
 
-          <label className="block text-[10px] text-amber-400 uppercase tracking-widest font-medium mb-1">Rapor Tarihi</label>
+          <label className="block text-[10px] text-amber-600 uppercase tracking-widest font-medium mb-1">Rapor Tarihi</label>
 
           <div className="flex flex-col gap-1">
 
@@ -47232,17 +47788,17 @@ Soru: ${soruFinal}`
 
               max={!isAdmin&&!selectedRapor&&beklenenTarih?beklenenTarih:undefined}
 
-              className={`bg-[#080b14] text-white font-bold text-center h-9 text-xs rounded-xl px-3 w-full outline-none focus:ring-1 transition-all border ${
+              className={`bg-[#f7f8fa] text-[#1a1f2e] font-bold text-center h-9 text-xs rounded-xl px-3 w-full outline-none focus:ring-1 transition-all border ${
 
-                duplikaTarihHata ? "border-orange-500 text-orange-400"
+                duplikaTarihHata ? "border-orange-500 text-orange-600"
 
-                : tarihHataVarMi&&!adminOnayliGecis ? "border-red-500 text-red-400"
+                : tarihHataVarMi&&!adminOnayliGecis ? "border-red-500 text-red-600"
 
-                : "border-[#1a2236] focus:border-amber-500/50"
+                : "border-[#e2e5eb] focus:border-amber-500/50"
 
               }`} required/>
 
-            {duplikaTarihHata && <p className="text-[10px] text-orange-400 flex items-center gap-1"><AlertTriangle size={9}/> Bu tarih mevcut</p>}
+            {duplikaTarihHata && <p className="text-[10px] text-orange-600 flex items-center gap-1"><AlertTriangle size={9}/> Bu tarih mevcut</p>}
 
             {enSonRaporTarihi && <p className="text-[9px] text-gray-700">Son: {fmtTarih(enSonRaporTarihi)}</p>}
 
@@ -47252,21 +47808,21 @@ Soru: ${soruFinal}`
 
         {[
 
-          {label:"Brüt Ciro", value:`₺${fmt(ch.brutCiro)}`, color:"text-blue-400", border:"border-blue-500/10 bg-blue-500/5"},
+          {label:"Brüt Ciro", value:`₺${fmt(ch.brutCiro)}`, color:"text-blue-600", border:"border-blue-500/10 bg-blue-500/5"},
 
-          {label:"Net Ciro",  value:`₺${fmt(ch.netCiro)}`,  color:"text-emerald-400", border:"border-emerald-500/10 bg-emerald-500/5"},
+          {label:"Net Ciro",  value:`₺${fmt(ch.netCiro)}`,  color:"text-emerald-600", border:"border-emerald-500/10 bg-emerald-500/5"},
 
-          {label:"Paket",     value:`${fmt(ch.tKuryePaket)}`, color:"text-amber-400", border:"border-amber-500/10 bg-amber-500/5"},
+          {label:"Paket",     value:`${fmt(ch.tKuryePaket)}`, color:"text-amber-600", border:"border-amber-500/10 bg-amber-500/5"},
 
-          {label:"Ort. Sepet",value:`₺${fmt(ch.paketOrt)}`, color:"text-purple-400", border:"border-purple-500/10 bg-purple-500/5"},
+          {label:"Ort. Sepet",value:`₺${fmt(ch.paketOrt)}`, color:"text-purple-600", border:"border-purple-500/10 bg-purple-500/5"},
 
         ].map(c=>(
 
-          <div key={c.label} className={`rounded-xl border ${c.border} px-3 py-2`}>
+          <div key={c.label} className={`rounded-xl border ${c.border} px-3.5 py-2.5`}>
 
-            <p className="text-[9px] text-gray-600 uppercase tracking-widest">{c.label}</p>
+            <p className="text-[11px] text-gray-400 font-medium">{c.label}</p>
 
-            <p className={`text-sm font-black tracking-tight ${c.color}`}>{c.value}</p>
+            <p className={`text-base font-black tracking-tight ${c.color}`}>{c.value}</p>
 
           </div>
 
@@ -47280,13 +47836,13 @@ Soru: ${soruFinal}`
 
       {tarihHataVarMi && isAdmin && !adminOnayliGecis && !isReadOnly && (
 
-        <div className="rounded-xl border border-amber-500/20 bg-amber-950/20 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="rounded-xl border border-amber-500/20 bg-amber-100/60 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
 
-          <p className="text-xs text-amber-400 flex items-center gap-2">
+          <p className="text-xs text-amber-600 flex items-center gap-2">
 
             <AlertTriangle size={12}/>
 
-            <strong className="text-white">{beklenenTarih?fmtTarih(beklenenTarih):""}</strong> eklenmeden devam edilsin mi?
+            <strong className="text-[#1a1f2e]">{beklenenTarih?fmtTarih(beklenenTarih):""}</strong> eklenmeden devam edilsin mi?
 
           </p>
 
@@ -47308,15 +47864,15 @@ Soru: ${soruFinal}`
 
       {tarihHataVarMi && !isAdmin && !isReadOnly && (
 
-        <div className="rounded-xl border border-red-500/20 bg-[#130a0a] p-6 text-center">
+        <div className="rounded-xl border border-red-500/20 bg-[#fef2f2] p-6 text-center">
 
-          <ShieldAlert className="h-10 w-10 text-red-500 mx-auto mb-3 animate-bounce"/>
+          <ShieldAlert className="h-10 w-10 text-red-700 mx-auto mb-3 animate-bounce"/>
 
-          <p className="text-sm font-black text-white mb-1 uppercase">Gün Atlayamazsınız</p>
+          <p className="text-sm font-black text-[#1a1f2e] mb-1 uppercase">Gün Atlayamazsınız</p>
 
           <p className="text-gray-500 text-xs mb-4">
 
-            Sıradaki gün: <strong className="text-red-400">{beklenenTarih?fmtTarih(beklenenTarih):""}</strong>
+            Sıradaki gün: <strong className="text-red-600">{beklenenTarih?fmtTarih(beklenenTarih):""}</strong>
 
           </p>
 
@@ -47334,9 +47890,9 @@ Soru: ${soruFinal}`
 
         {!tarih && !isReadOnly && (
 
-          <div className="flex items-center justify-center gap-2 py-8 text-gray-600 text-xs border border-dashed border-[#1a2236] rounded-xl">
+          <div className="flex items-center justify-center gap-2 py-8 text-gray-600 text-xs border border-dashed border-[#e2e5eb] rounded-xl">
 
-            <Lock size={12} className="text-amber-500"/> Tarih seçilince form aktif olur
+            <Lock size={12} className="text-amber-700"/> Tarih seçilince form aktif olur
 
           </div>
 
@@ -47350,98 +47906,116 @@ Soru: ${soruFinal}`
 
 
 
-            {/* CİRO GİRİŞLERİ: 3 kolon */}
+            {/* CİRO GİRİŞLERİ: Online / Kapıda Ödeme (Kebo + Chick'N Fride) + Kasa */}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
-
-
-              <div className="rounded-xl border border-blue-500/15 bg-[#0c0f1a] overflow-hidden">
-
-                <div className="px-3 py-2 border-b border-blue-500/15 flex items-center justify-between">
-
-                  <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider flex items-center gap-1.5"><Monitor size={11}/>Online</span>
-
-                  <span className="text-xs font-black text-blue-400">₺{fmt(ch.tOnline)}</span>
-
+              {/* ── ONLINE ── */}
+              <div className="rounded-xl border border-blue-500/20 bg-[#ffffff] overflow-hidden">
+                <div className="px-4 py-3 border-b border-blue-500/15 flex items-center justify-between bg-blue-500/[0.03]">
+                  <span className="text-[13px] font-bold text-blue-700 flex items-center gap-2"><Monitor size={14}/>Online Satışlar</span>
+                  <span className="text-sm font-black text-blue-700">₺{fmt(ch.tOnline)} <span className="text-gray-500 font-medium text-[11px]">· {ch.tOnlinePaket} paket</span></span>
                 </div>
-
-                <div className="p-3 space-y-2">
-
-                  <CurrencyInput label="Yemeksepeti" value={osYS} onChange={setOsYS} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Getir" value={osGetir} onChange={setOsGetir} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Trendyol" value={osTrendyol} onChange={setOsTrendyol} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Migros" value={osMigros} onChange={setOsMigros} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Chick'N Fride" value={osChickNFride} onChange={setOsChickNFride} disabled={isReadOnly}/>
-
-                </div>
-
-              </div>
-
-
-
-              <div className="rounded-xl border border-purple-500/15 bg-[#0c0f1a] overflow-hidden">
-
-                <div className="px-3 py-2 border-b border-purple-500/15 flex items-center justify-between">
-
-                  <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider flex items-center gap-1.5"><Home size={11}/>Kapıda Ödeme</span>
-
-                  <div className="flex items-center gap-1.5">
-
-                    <span className="text-[9px] text-purple-600 bg-purple-500/10 px-1.5 py-0.5 rounded-full">Kasaya dahil</span>
-
-                    <span className="text-xs font-black text-purple-400">₺{fmt(ch.tKapida)}</span>
-
+                <div className="p-3 space-y-4">
+                  <div>
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full mb-2">🍔 Kebo</span>
+                    <div className="space-y-2">
+                      <PlatformSatir label="Yemeksepeti" value={osKeboYs} onChange={setOsKeboYs} indirim={osKeboYsIndirim} onIndirimChange={setOsKeboYsIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Trendyol" value={osKeboTrendyol} onChange={setOsKeboTrendyol} indirim={osKeboTrendyolIndirim} onIndirimChange={setOsKeboTrendyolIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Migros" value={osKeboMigros} onChange={setOsKeboMigros} disabled={isReadOnly}/>
+                    </div>
                   </div>
-
+                  <div>
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-red-700 bg-red-500/10 border border-red-500/25 px-2.5 py-1 rounded-full mb-2">🍗 Chick'N Fride</span>
+                    <div className="space-y-2">
+                      <PlatformSatir label="Yemeksepeti" value={osCnfYs} onChange={setOsCnfYs} indirim={osCnfYsIndirim} onIndirimChange={setOsCnfYsIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Trendyol" value={osCnfTrendyol} onChange={setOsCnfTrendyol} indirim={osCnfTrendyolIndirim} onIndirimChange={setOsCnfTrendyolIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Migros Yemek" value={osCnfMigrosYemek} onChange={setOsCnfMigrosYemek} disabled={isReadOnly}/>
+                    </div>
+                  </div>
                 </div>
-
-                <div className="p-3 space-y-2">
-
-                  <CurrencyInput label="YS Kapıda" value={koYS} onChange={setKoYS} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Getir Kapıda" value={koGetir} onChange={setKoGetir} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Trendyol" value={koTrendyol} onChange={setKoTrendyol} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Migros" value={koMigros} onChange={setKoMigros} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Alo Paket" value={koAlo} onChange={setKoAlo} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Chick'N Fride" value={koChickNFride} onChange={setKoChickNFride} disabled={isReadOnly}/>
-
-                </div>
-
               </div>
 
-
-
-              <div className="rounded-xl border border-emerald-500/15 bg-[#0c0f1a] overflow-hidden">
-
-                <div className="px-3 py-2 border-b border-emerald-500/15 flex items-center justify-between">
-
-                  <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5"><Wallet size={11}/>Fiziki Kasa</span>
-
-                  <span className="text-xs font-black text-emerald-400">₺{fmt(ch.tKasa)}</span>
-
+              {/* ── KAPIDA ÖDEME ── */}
+              <div className="rounded-xl border border-purple-500/20 bg-[#ffffff] overflow-hidden">
+                <div className="px-4 py-3 border-b border-purple-500/15 flex items-center justify-between bg-purple-500/[0.03]">
+                  <span className="text-[13px] font-bold text-purple-700 flex items-center gap-2"><Home size={14}/>Kapıda Ödeme</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-semibold text-purple-700 bg-purple-500/15 border border-purple-500/25 px-2 py-0.5 rounded-full">Kasaya dahil</span>
+                    <span className="text-sm font-black text-purple-700">₺{fmt(ch.tKapida)} <span className="text-gray-500 font-medium text-[11px]">· {ch.tKapidaPaket} paket</span></span>
+                  </div>
                 </div>
-
-                <div className="p-3 space-y-2">
-
-                  <CurrencyInput label="Nakit" value={kasaNakit} onChange={setKasaNakit} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="POS / Kart" value={kasaPos} onChange={setKasaPos} disabled={isReadOnly}/>
-
-                  <CurrencyInput label="Edenred" value={kasaEdenred} onChange={setKasaEdenred} disabled={isReadOnly}/>
-
+                <div className="p-3 space-y-4">
+                  <div>
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full mb-2">🍔 Kebo</span>
+                    <div className="space-y-2">
+                      <PlatformSatir label="Yemeksepeti" value={koKeboYs} onChange={setKoKeboYs} indirim={koKeboYsIndirim} onIndirimChange={setKoKeboYsIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Trendyol" value={koKeboTrendyol} onChange={setKoKeboTrendyol} indirim={koKeboTrendyolIndirim} onIndirimChange={setKoKeboTrendyolIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Migros Yemek" value={koKeboMigrosYemek} onChange={setKoKeboMigrosYemek} disabled={isReadOnly}/>
+                      <PlatformSatir label="Alo Paket" value={koKeboAlo} onChange={setKoKeboAlo} disabled={isReadOnly}/>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-red-700 bg-red-500/10 border border-red-500/25 px-2.5 py-1 rounded-full mb-2">🍗 Chick'N Fride</span>
+                    <div className="space-y-2">
+                      <PlatformSatir label="Yemeksepeti" value={koCnfYs} onChange={setKoCnfYs} indirim={koCnfYsIndirim} onIndirimChange={setKoCnfYsIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Trendyol" value={koCnfTrendyol} onChange={setKoCnfTrendyol} indirim={koCnfTrendyolIndirim} onIndirimChange={setKoCnfTrendyolIndirim} disabled={isReadOnly}/>
+                      <PlatformSatir label="Migros Yemek" value={koCnfMigrosYemek} onChange={setKoCnfMigrosYemek} disabled={isReadOnly}/>
+                      <PlatformSatir label="Alo Paket" value={koCnfAlo} onChange={setKoCnfAlo} disabled={isReadOnly}/>
+                    </div>
+                  </div>
                 </div>
-
               </div>
 
+            </div>
+
+            {/* ── KASA ── */}
+            <div className="rounded-xl border border-emerald-500/20 bg-[#ffffff] overflow-hidden">
+              <div className="px-4 py-3 border-b border-emerald-500/15 flex items-center justify-between bg-emerald-500/[0.03]">
+                <span className="text-[13px] font-bold text-emerald-700 flex items-center gap-2">💰 Kasa</span>
+                <span className="text-sm font-black text-emerald-700">₺{fmt(ch.tKasa)}</span>
+              </div>
+              <div className="p-3 grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                <CurrencyInput label="Nakit" value={kasaNakit} onChange={setKasaNakit} disabled={isReadOnly}/>
+                <CurrencyInput label="Pos" value={kasaPos} onChange={setKasaPos} disabled={isReadOnly}/>
+                <CurrencyInput label="Edenred" value={kasaEdenred} onChange={setKasaEdenred} disabled={isReadOnly}/>
+                <CurrencyInput label="Metropol" value={kasaMetropol} onChange={setKasaMetropol} disabled={isReadOnly}/>
+              </div>
+              <div className="mx-3 mb-3 rounded-lg border border-red-500/20 bg-red-500/5 px-3.5 py-2.5 flex items-center justify-between">
+                <span className="text-[12px] text-red-700 font-semibold flex items-center gap-1.5"><TrendingDown size={13}/>Gider (salt okunur)</span>
+                <span className="text-[15px] font-black text-red-700">₺{fmt(ch.tGider)}</span>
+              </div>
+              <p className="px-3.5 pb-3 text-[11px] text-gray-500 leading-relaxed">Gider için aşağıdaki <span className="text-gray-700 font-semibold">Giderler</span> bölümünü kullan — buraya doğrudan giriş yapılamaz, orada eklediğin her satır bu toplama otomatik yansır.</p>
+            </div>
+
+            {/* ── İNDİRİM ANALİZİ ── */}
+            <div className={`rounded-xl border overflow-hidden ${ch.indirimUyari ? "border-red-500/40 bg-red-500/5" : "border-[#dde1e8] bg-[#ffffff]"}`}>
+              <div className={`px-4 py-3 border-b flex items-center justify-between ${ch.indirimUyari ? "border-red-500/25 bg-red-500/[0.04]" : "border-[#dde1e8] bg-black/[0.03]"}`}>
+                <span className={`text-[13px] font-bold flex items-center gap-2 ${ch.indirimUyari?"text-red-700":"text-gray-800"}`}>
+                  <Percent size={14}/>İndirim Analizi
+                </span>
+                <span className={`text-sm font-black ${ch.indirimUyari?"text-red-700":"text-[#1a1f2e]"}`}>%{ch.indirimOrani.toFixed(1)}</span>
+              </div>
+              <div className="p-3.5 grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-[11px] text-gray-400 font-medium">Yemeksepeti</p>
+                  <p className="text-[15px] font-black text-red-700">₺{fmt(ch.tIndirimYS)}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-400 font-medium">Trendyol</p>
+                  <p className="text-[15px] font-black text-red-700">₺{fmt(ch.tIndirimTrendyol)}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-400 font-medium">Toplam</p>
+                  <p className="text-[15px] font-black text-[#1a1f2e]">₺{fmt(ch.tIndirim)}</p>
+                </div>
+              </div>
+              {ch.indirimUyari && (
+                <div className="mx-3.5 mb-3.5 flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3.5 py-2.5">
+                  <AlertTriangle size={14} className="text-red-600 shrink-0"/>
+                  <p className="text-[12px] text-red-200">İndirim oranı platform cirosunun <span className="font-black">%15'ini</span> geçti — kontrol et.</p>
+                </div>
+              )}
             </div>
 
 
@@ -47450,11 +48024,11 @@ Soru: ${soruFinal}`
 
             {platformOzetSatirlar.length > 0 && (
 
-              <div className="rounded-xl border border-[#1a2236] bg-[#080b14] px-4 py-3">
+              <div className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] px-4 py-3">
 
-                <p className="text-[9px] text-gray-600 uppercase tracking-widest font-semibold mb-2 flex items-center gap-1.5">
+                <p className="text-[11px] text-gray-400 font-semibold mb-2.5 flex items-center gap-1.5">
 
-                  <PieChart size={9}/> Platform Bazlı Toplam (Online + Kapıda) — Bilgi Amaçlı
+                  <PieChart size={11}/> Platform Bazlı Toplam (Online + Kapıda) — Bilgi Amaçlı
 
                 </p>
 
@@ -47462,13 +48036,13 @@ Soru: ${soruFinal}`
 
                   {platformOzetSatirlar.map(p => (
 
-                    <div key={p.label} className="flex items-center gap-2 bg-white/[0.03] border border-white/5 rounded-lg px-2.5 py-1.5">
+                    <div key={p.label} className="flex items-center gap-2 bg-black/[0.04] border border-white/5 rounded-lg px-2.5 py-1.5">
 
                       <div className="w-2 h-2 rounded-full shrink-0" style={{backgroundColor:p.color}}/>
 
                       <span className="text-[10px] text-gray-400">{p.label}</span>
 
-                      <span className="text-[11px] font-bold text-white">₺{fmt(p.online+p.kapida)}</span>
+                      <span className="text-[11px] font-bold text-[#1a1f2e]">₺{fmt(p.online+p.kapida)}</span>
 
                       {p.kapida > 0 && (
 
@@ -47500,15 +48074,15 @@ Soru: ${soruFinal}`
 
               {/* Giderler */}
 
-              <div className="rounded-xl border border-red-500/15 bg-[#0c0f1a] overflow-hidden">
+              <div className="rounded-xl border border-red-500/20 bg-[#ffffff] overflow-hidden">
 
-                <div className="px-3 py-2 border-b border-red-500/15 flex items-center justify-between">
+                <div className="px-4 py-3 border-b border-red-500/15 flex flex-wrap items-center justify-between gap-2 bg-red-500/[0.03]">
 
-                  <span className="text-[10px] font-semibold text-red-400 uppercase tracking-wider flex items-center gap-1.5"><TrendingDown size={11}/>Giderler</span>
+                  <span className="text-[13px] font-bold text-red-700 flex items-center gap-2">💸 Giderler</span>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
 
-                    <span className="text-xs font-black text-red-400">₺{fmt(ch.tGider)}</span>
+                    <span className="text-sm font-black text-red-700">₺{fmt(ch.tGider)}</span>
 
                     {!isReadOnly && (
 
@@ -47516,7 +48090,7 @@ Soru: ${soruFinal}`
 
                         <button type="button" onClick={()=>giderEkle("normal")}
 
-                          className="text-[10px] text-gray-600 hover:text-red-400 border border-[#1a2236] hover:border-red-500/30 px-2 py-0.5 rounded transition-colors">
+                          className="text-[11px] font-semibold text-gray-700 hover:text-red-700 bg-black/[0.04] hover:bg-red-500/10 border border-[#d8dde5] hover:border-red-500/30 px-2.5 py-1 rounded-lg transition-colors">
 
                           + Normal
 
@@ -47524,9 +48098,17 @@ Soru: ${soruFinal}`
 
                         <button type="button" onClick={()=>giderEkle("firma")}
 
-                          className="text-[10px] text-gray-600 hover:text-blue-400 border border-[#1a2236] hover:border-blue-500/30 px-2 py-0.5 rounded transition-colors flex items-center gap-1">
+                          className="text-[11px] font-semibold text-gray-700 hover:text-blue-700 bg-black/[0.04] hover:bg-blue-500/10 border border-[#d8dde5] hover:border-blue-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
 
-                          <Building2 size={9}/> Firma
+                          <Building2 size={11}/> Firma
+
+                        </button>
+
+                        <button type="button" onClick={()=>giderEkle("personel")}
+
+                          className="text-[11px] font-semibold text-gray-700 hover:text-teal-700 bg-black/[0.04] hover:bg-teal-500/10 border border-[#d8dde5] hover:border-teal-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
+
+                          <Users2 size={11}/> Personel
 
                         </button>
 
@@ -47546,11 +48128,21 @@ Soru: ${soruFinal}`
 
                       {item.tip === "firma" ? (
 
-                        <div className="flex items-center gap-1 mb-1">
+                        <div className="flex items-center gap-1.5 mb-1">
 
-                          <Building2 size={9} className="text-blue-400"/>
+                          <Building2 size={11} className="text-blue-600"/>
 
-                          <span className="text-[9px] text-blue-400 uppercase tracking-wider">Firma Ödemesi</span>
+                          <span className="text-[11px] font-semibold text-blue-700">Firma Ödemesi</span>
+
+                        </div>
+
+                      ) : item.tip === "personel" ? (
+
+                        <div className="flex items-center gap-1.5 mb-1">
+
+                          <Users2 size={11} className="text-teal-600"/>
+
+                          <span className="text-[11px] font-semibold text-teal-700">Personel Tüketimi — kasadan fiş çıkar, otomatik avans olarak işlenir</span>
 
                         </div>
 
@@ -47562,7 +48154,7 @@ Soru: ${soruFinal}`
 
                         isReadOnly ? (
 
-                          <div className="w-full bg-[#080b14] border border-blue-500/20 text-blue-300 text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5">
+                          <div className="w-full bg-[#f7f8fa] border border-blue-500/20 text-blue-700 text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5">
 
                             <Building2 size={9}/> {item.firmaUnvan || item.aciklama}
 
@@ -47596,7 +48188,7 @@ Soru: ${soruFinal}`
 
                               }}
 
-                              className="w-full bg-[#080b14] border border-blue-500/20 text-white text-xs h-7 pl-6 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40 appearance-none"
+                              className="w-full bg-[#f7f8fa] border border-blue-500/20 text-[#1a1f2e] text-xs h-7 pl-6 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40 appearance-none"
 
                             >
 
@@ -47604,7 +48196,7 @@ Soru: ${soruFinal}`
 
                               {cariListesi.map(c => (
 
-                                <option key={c.id} value={c.id} className="bg-[#0c0f1a]">
+                                <option key={c.id} value={c.id} className="bg-[#ffffff]">
 
                                   {c.unvan} {c.cari_kodu ? `(${c.cari_kodu})` : ""}
 
@@ -47618,6 +48210,18 @@ Soru: ${soruFinal}`
 
                         )
 
+                      ) : item.tip === "personel" ? (
+                        <div className="space-y-1.5">
+                          <select disabled={isReadOnly} value={item.personelIsim || ""}
+                            onChange={e => giderDegistir(item.id, "personelIsim", e.target.value)}
+                            className="w-full bg-[#f7f8fa] border border-teal-500/20 text-[#1a1f2e] text-xs h-7 px-2.5 rounded-lg outline-none focus:border-teal-500/40 disabled:opacity-40 appearance-none">
+                            <option value="">Personel seçiniz...</option>
+                            {avansPersonelListesi.map((p,i)=>(<option key={i} value={p} className="bg-[#ffffff]">{p}</option>))}
+                          </select>
+                          <input type="text" placeholder="Ne tüketti? (örn: 1 adet kola)" disabled={isReadOnly} value={item.aciklama}
+                            onChange={e=>giderDegistir(item.id, "aciklama", e.target.value)}
+                            className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-teal-500/40 text-[#1a1f2e] text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
+                        </div>
                       ) : (
 
                         <AkilliGiderInput
@@ -47636,11 +48240,11 @@ Soru: ${soruFinal}`
 
 
 
-                      <div className="flex gap-1">
+                      <div className="flex gap-1.5">
 
                         <div className="relative flex-1">
 
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-xs">₺</span>
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 text-[13px] font-semibold">₺</span>
 
                           <input
 
@@ -47648,7 +48252,7 @@ Soru: ${soruFinal}`
 
                             onChange={e=>giderDegistir(item.id,"tutar",e.target.value)}
 
-                            className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"
+                            className="w-full bg-[#f7f8fa] border border-[#dde1e8] text-[#1a1f2e] text-[14px] font-bold h-9 pl-7 pr-2 rounded-lg outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/15 disabled:opacity-40"
 
                           />
 
@@ -47656,13 +48260,13 @@ Soru: ${soruFinal}`
 
                         {!isReadOnly && giderler.length>1 && (
 
-                          <button type="button" onClick={()=>giderSil(item.id)} className="text-gray-700 hover:text-red-400 px-1"><Trash2 size={11}/></button>
+                          <button type="button" onClick={()=>giderSil(item.id)} className="text-gray-500 hover:text-red-600 px-1.5"><Trash2 size={13}/></button>
 
                         )}
 
                       </div>
 
-                      {idx < giderler.length-1 && <div className="border-t border-[#1a2236] mt-1"/>}
+                      {idx < giderler.length-1 && <div className="border-t border-[#e2e5eb] mt-1"/>}
 
                     </div>
 
@@ -47678,21 +48282,59 @@ Soru: ${soruFinal}`
 
               <div className="space-y-3">
 
-
+                {/* Personel Kesintisi — kasayı/gideri etkilemez, sadece ay sonu maaştan düşülür */}
+                <div className="rounded-xl border border-rose-500/15 bg-[#ffffff] overflow-hidden">
+                  <div className="px-3 py-2 border-b border-rose-500/15 flex items-center justify-between">
+                    <span className="text-[10px] font-semibold text-rose-600 uppercase tracking-wider flex items-center gap-1.5"><Users2 size={11}/>Personel Kesintisi</span>
+                    {!isReadOnly && (
+                      <button type="button" onClick={()=>setKesintiSatirlari([...kesintiSatirlari,{id:Date.now(),personelIsim:"",tutar:"",aciklama:""}])}
+                        className="text-[10px] text-gray-600 hover:text-rose-600 border border-[#e2e5eb] hover:border-rose-500/30 px-2 py-0.5 rounded transition-colors">+ Kesinti</button>
+                    )}
+                  </div>
+                  <div className="p-3 space-y-2">
+                    <p className="text-[9px] text-gray-600">Kasayı / gideri etkilemez (örn. eksik ürün gönderimi cezası) — sadece ay sonu maaştan düşülür.</p>
+                    {kesintiSatirlari.length===0 && (
+                      <p className="text-[10px] text-gray-600 text-center py-1">Bu raporda kesinti girilmedi.</p>
+                    )}
+                    {kesintiSatirlari.map(k=>(
+                      <div key={k.id} className="space-y-1">
+                        <div className="grid grid-cols-12 gap-1.5">
+                          <select disabled={isReadOnly} value={k.personelIsim}
+                            onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,personelIsim:e.target.value}:x))}
+                            className="col-span-6 bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs rounded-lg px-2 outline-none focus:border-rose-500/40 disabled:opacity-40">
+                            <option value="">Personel seç...</option>
+                            {avansPersonelListesi.map((p,i)=>(<option key={i} value={p}>{p}</option>))}
+                          </select>
+                          <div className="col-span-5 relative">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-[10px]">₺</span>
+                            <input type="text" placeholder="0" disabled={isReadOnly} value={k.tutar}
+                              onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,tutar:fmtStr(e.target.value)}:x))}
+                              className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-rose-500/40 disabled:opacity-40"/>
+                          </div>
+                          {!isReadOnly && <button type="button" onClick={()=>setKesintiSatirlari(kesintiSatirlari.filter(x=>x.id!==k.id))} className="col-span-1 text-gray-700 hover:text-red-600 flex items-center justify-center"><Trash2 size={11}/></button>}
+                        </div>
+                        <input type="text" placeholder="Kesinti sebebi (örn: eksik ürün gönderimi)" disabled={isReadOnly} value={k.aciklama}
+                          onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,aciklama:e.target.value}:x))}
+                          className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-[11px] h-6 px-2 rounded-lg outline-none focus:border-rose-500/40 disabled:opacity-40 placeholder:text-gray-700"/>
+                      </div>
+                    ))}
+                    <p className="text-[9px] text-gray-600">Kaydedince ilgili personelin profilindeki Kesinti geçmişine işlenir; ay sonu maaş hesabında oradan görünür.</p>
+                  </div>
+                </div>
 
                 {/* İadeler */}
 
-                <div className="rounded-xl border border-orange-500/15 bg-[#0c0f1a] overflow-hidden">
+                <div className="rounded-xl border border-orange-500/15 bg-[#ffffff] overflow-hidden">
 
                   <div className="px-3 py-2 border-b border-orange-500/15 flex items-center justify-between">
 
-                    <span className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider flex items-center gap-1.5"><RotateCcw size={11}/>İade</span>
+                    <span className="text-[10px] font-semibold text-orange-600 uppercase tracking-wider flex items-center gap-1.5"><RotateCcw size={11}/>İptal-İade Fişleri</span>
 
                     <div className="flex items-center gap-1.5">
 
-                      <span className="text-xs font-black text-orange-400">₺{fmt(ch.tIade)}</span>
+                      <span className="text-xs font-black text-orange-600">₺{fmt(ch.tIade)}</span>
 
-                      {!isReadOnly && <button type="button" onClick={iadeEkle} className="text-[10px] text-gray-600 hover:text-orange-400 border border-[#1a2236] hover:border-orange-500/30 w-5 h-5 rounded flex items-center justify-center transition-colors">+</button>}
+                      {!isReadOnly && <button type="button" onClick={iadeEkle} className="text-[10px] text-gray-600 hover:text-orange-600 border border-[#e2e5eb] hover:border-orange-500/30 w-5 h-5 rounded flex items-center justify-center transition-colors">+</button>}
 
                     </div>
 
@@ -47704,11 +48346,11 @@ Soru: ${soruFinal}`
 
                       <div key={item.id} className="space-y-1.5">
 
-                        <input type="text" placeholder="İptal sebebi..." disabled={isReadOnly} value={item.aciklama}
+                        <input type="text" placeholder="İptal / iade fiş açıklaması..." disabled={isReadOnly} value={item.aciklama}
 
                           onChange={e=>iadeDegistir(item.id,"aciklama",e.target.value)}
 
-                          className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/40 text-white text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
+                          className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/40 text-[#1a1f2e] text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
 
                         <div className="flex gap-1">
 
@@ -47720,15 +48362,15 @@ Soru: ${soruFinal}`
 
                               onChange={e=>iadeDegistir(item.id,"tutar",e.target.value)}
 
-                              className="w-full bg-[#080b14] border border-[#1a2236] text-white text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"/>
+                              className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"/>
 
                           </div>
 
-                          {!isReadOnly && iadeler.length>1 && <button type="button" onClick={()=>iadeSil(item.id)} className="text-gray-700 hover:text-red-400 px-1"><Trash2 size={11}/></button>}
+                          {!isReadOnly && iadeler.length>1 && <button type="button" onClick={()=>iadeSil(item.id)} className="text-gray-700 hover:text-red-600 px-1"><Trash2 size={11}/></button>}
 
                         </div>
 
-                        {idx < iadeler.length-1 && <div className="border-t border-[#1a2236] mt-1"/>}
+                        {idx < iadeler.length-1 && <div className="border-t border-[#e2e5eb] mt-1"/>}
 
                       </div>
 
@@ -47742,23 +48384,23 @@ Soru: ${soruFinal}`
 
                 {/* Kuryeler */}
 
-                <div className="rounded-xl border border-amber-500/15 bg-[#0c0f1a] overflow-hidden">
+                <div className="rounded-xl border border-amber-500/15 bg-[#ffffff] overflow-hidden">
 
                   <div className="px-3 py-2 border-b border-amber-500/15 flex items-center justify-between">
 
-                    <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5"><Bike size={11}/>Kurye Mutabakatı</span>
+                    <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider flex items-center gap-1.5"><Truck size={11}/>Kurye (Roadrunner)</span>
 
                     <div className="flex items-center gap-2">
 
                       {ch.kuryeFark===0
 
-                        ? <span className="text-[10px] text-emerald-400 flex items-center gap-1"><CheckCircle2 size={10}/>Dengede</span>
+                        ? <span className="text-[10px] text-emerald-600 flex items-center gap-1"><CheckCircle2 size={10}/>Dengede</span>
 
-                        : <span className="text-[10px] text-red-400 flex items-center gap-1"><AlertTriangle size={10}/>{ch.kuryeFark>0?`₺${fmt(ch.kuryeFark)} eksik`:`₺${fmt(Math.abs(ch.kuryeFark))} fazla`}</span>
+                        : <span className="text-[10px] text-red-600 flex items-center gap-1"><AlertTriangle size={10}/>{ch.kuryeFark>0?`₺${fmt(ch.kuryeFark)} eksik`:`₺${fmt(Math.abs(ch.kuryeFark))} fazla`}</span>
 
                       }
 
-                      {!isReadOnly && <button type="button" onClick={kuryeEkle} className="text-[10px] text-gray-600 hover:text-amber-400 border border-[#1a2236] hover:border-amber-500/30 px-2 py-0.5 rounded transition-colors">+ Kurye</button>}
+                      {!isReadOnly && <button type="button" onClick={kuryeEkle} className="text-[10px] text-gray-600 hover:text-amber-600 border border-[#e2e5eb] hover:border-amber-500/30 px-2 py-0.5 rounded transition-colors">+ Havuz Kurye</button>}
 
                     </div>
 
@@ -47766,11 +48408,13 @@ Soru: ${soruFinal}`
 
                   <div className="p-3 space-y-3">
 
+                    <p className="text-[10px] text-gray-600">Sabit kuryede (Roadrunner) günlük en az <span className="text-amber-600 font-bold">30 paket</span> garantisi var — altında kalınırsa ödemede 30 esas alınır. Havuz kuryede garanti yok.</p>
+
                     <div className="grid grid-cols-12 gap-1.5">
 
-                      <div className="col-span-4 text-[9px] text-gray-600 uppercase tracking-wider">Kurye</div>
+                      <div className="col-span-3 text-[9px] text-gray-600 uppercase tracking-wider">Kurye</div>
 
-                      <div className="col-span-2 text-[9px] text-gray-600 uppercase tracking-wider text-center">Paket</div>
+                      <div className="col-span-3 text-[9px] text-gray-600 uppercase tracking-wider text-center">Gerçek / Esas Paket</div>
 
                       <div className="col-span-3 text-[9px] text-amber-600 uppercase tracking-wider">Nakit</div>
 
@@ -47778,9 +48422,9 @@ Soru: ${soruFinal}`
 
                     </div>
 
-                    {kuryeler.map((k)=>{
+                    {ch.kuryelerHesap.map((k)=>{
 
-                      const secilenler=kuryeler.filter(x=>x.id!==k.id&&x.isim).map(x=>x.isim);
+                      const sabit = k.tip==="sabit";
 
                       return (
 
@@ -47788,53 +48432,29 @@ Soru: ${soruFinal}`
 
                           <div className="grid grid-cols-12 gap-1.5 items-center">
 
-                            <div className="col-span-4">
+                            <div className="col-span-3">
 
                               {isReadOnly ? (
 
-                                <div className="bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2 flex items-center">
+                                <div className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs rounded-lg px-2 flex items-center gap-1">
 
-                                  {k.isim || "—"}
+                                  {sabit && <Truck size={9} className="text-amber-700 shrink-0"/>}{k.isim || "—"}
 
                                 </div>
 
                               ) : (
 
-                                <select disabled={isReadOnly} value={k.isim} onChange={e=>kuryeDegistir(k.id,"isim",e.target.value)}
+                                <div className="relative">
 
-                                  className="w-full bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs rounded-lg px-2 outline-none focus:border-blue-500/40 disabled:opacity-40">
+                                  {sabit && <Truck size={9} className="absolute left-2 top-1/2 -translate-y-1/2 text-amber-700"/>}
 
-                                  <option value="">Seçiniz...</option>
+                                  <input type="text" placeholder={sabit?"Kurye adı":"Havuz kurye / firma"} disabled={isReadOnly} value={k.isim}
 
-                                  {personelListesi.map((p,i)=>(
+                                    onChange={e=>kuryeDegistir(k.id,"isim",e.target.value)}
 
-                                    <option key={i} value={p} disabled={secilenler.includes(p)}>{p}{secilenler.includes(p)?" ✓":""}</option>
-
-                                  ))}
-
-                                </select>
-
-                              )}
-
-                            </div>
-
-                            <div className="col-span-2">
-
-                              {isReadOnly ? (
-
-                                <div className="bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs font-bold rounded-lg flex items-center justify-center">
-
-                                  {k.paketSayisi || "0"}
+                                    className={`w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs rounded-lg ${sabit?"pl-6":"pl-2"} pr-2 outline-none focus:border-amber-500/40 disabled:opacity-40`}/>
 
                                 </div>
-
-                              ) : (
-
-                                <input type="number" placeholder="0" disabled={isReadOnly} value={k.paketSayisi}
-
-                                  onChange={e=>kuryeDegistir(k.id,"paketSayisi",e.target.value)}
-
-                                  className="w-full bg-[#080b14] border border-[#1a2236] text-white h-7 text-xs font-bold px-2 rounded-lg outline-none disabled:opacity-40 text-center"/>
 
                               )}
 
@@ -47842,13 +48462,57 @@ Soru: ${soruFinal}`
 
                             <div className="col-span-3">
 
-                              <div className={`relative rounded-lg border ${isReadOnly ? "border-amber-500/20 bg-amber-500/5" : "border-[#1a2236]"}`}>
+                              <div className="flex items-center gap-1">
+
+                                {isReadOnly ? (
+
+                                  <div className="flex-1 bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs font-bold rounded-lg flex items-center justify-center">
+
+                                    {k.gercekPaket}
+
+                                  </div>
+
+                                ) : (
+
+                                  <input type="number" placeholder="0" disabled={isReadOnly} value={k.paketSayisi}
+
+                                    onChange={e=>kuryeDegistir(k.id,"paketSayisi",e.target.value)}
+
+                                    className="flex-1 w-0 bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs font-bold px-2 rounded-lg outline-none disabled:opacity-40 text-center"/>
+
+                                )}
+
+                                {sabit && (
+
+                                  <span title="Ödemede esas alınan paket (garanti uygulandıysa)"
+
+                                    className={`shrink-0 w-9 h-7 flex items-center justify-center text-[10px] font-black rounded-lg border ${k.garantiUygulandi ? "border-amber-500/40 bg-amber-500/10 text-amber-700" : "border-[#e2e5eb] text-gray-600"}`}>
+
+                                    {k.uygulananPaket}
+
+                                  </span>
+
+                                )}
+
+                              </div>
+
+                              {sabit && k.garantiUygulandi && (
+
+                                <p className="text-[9px] text-amber-700 mt-0.5">Garanti uygulandı (30)</p>
+
+                              )}
+
+                            </div>
+
+                            <div className="col-span-3">
+
+                              <div className={`relative rounded-lg border ${isReadOnly ? "border-amber-500/20 bg-amber-500/5" : "border-[#e2e5eb]"}`}>
 
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-amber-600 text-[10px] font-bold">₺</span>
 
                                 {isReadOnly ? (
 
-                                  <div className="h-7 pl-5 pr-2 flex items-center text-xs font-bold text-amber-300">
+                                  <div className="h-7 pl-5 pr-2 flex items-center text-xs font-bold text-amber-700">
 
                                     {k.nakit ? fmt(Number(k.nakit)) : "0"}
 
@@ -47860,7 +48524,7 @@ Soru: ${soruFinal}`
 
                                     onChange={e=>kuryeDegistir(k.id,"nakit",e.target.value)}
 
-                                    className="w-full bg-[#080b14] text-white h-7 text-xs font-bold pl-5 pr-1 rounded-lg outline-none focus:border-amber-500/40 disabled:opacity-40"/>
+                                    className="w-full bg-[#f7f8fa] text-[#1a1f2e] h-7 text-xs font-bold pl-5 pr-1 rounded-lg outline-none focus:border-amber-500/40 disabled:opacity-40"/>
 
                                 )}
 
@@ -47870,13 +48534,13 @@ Soru: ${soruFinal}`
 
                             <div className="col-span-3">
 
-                              <div className={`relative rounded-lg border ${isReadOnly ? "border-blue-500/20 bg-blue-500/5" : "border-[#1a2236]"}`}>
+                              <div className={`relative rounded-lg border ${isReadOnly ? "border-blue-500/20 bg-blue-500/5" : "border-[#e2e5eb]"}`}>
 
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-blue-600 text-[10px] font-bold">₺</span>
 
                                 {isReadOnly ? (
 
-                                  <div className="h-7 pl-5 pr-2 flex items-center text-xs font-bold text-blue-300">
+                                  <div className="h-7 pl-5 pr-2 flex items-center text-xs font-bold text-blue-700">
 
                                     {k.pos ? fmt(Number(k.pos)) : "0"}
 
@@ -47888,7 +48552,7 @@ Soru: ${soruFinal}`
 
                                     onChange={e=>kuryeDegistir(k.id,"pos",e.target.value)}
 
-                                    className="w-full bg-[#080b14] text-white h-7 text-xs font-bold pl-5 pr-1 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"/>
+                                    className="w-full bg-[#f7f8fa] text-[#1a1f2e] h-7 text-xs font-bold pl-5 pr-1 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"/>
 
                                 )}
 
@@ -47898,11 +48562,11 @@ Soru: ${soruFinal}`
 
                           </div>
 
-                          {!isReadOnly && kuryeler.length>1 && (
+                          {!isReadOnly && k.tip!=="sabit" && (
 
                             <button type="button" onClick={()=>kuryeSil(k.id)}
 
-                              className="absolute -right-5 top-1/2 -translate-y-1/2 text-gray-700 hover:text-red-400 transition-colors">
+                              className="absolute -right-5 top-1/2 -translate-y-1/2 text-gray-700 hover:text-red-600 transition-colors">
 
                               <Trash2 size={11}/>
 
@@ -47916,6 +48580,14 @@ Soru: ${soruFinal}`
 
                     })}
 
+                    <div className="pt-1 border-t border-[#e2e5eb] flex items-center justify-between text-[10px]">
+
+                      <span className="text-gray-600">Gerçek toplam: <span className="text-gray-700 font-bold">{ch.tKuryeGercekPaket} pkt</span></span>
+
+                      <span className="text-gray-600">Ödemeye esas toplam: <span className="text-amber-600 font-bold">{ch.tKuryePaket} pkt</span></span>
+
+                    </div>
+
                   </div>
 
                 </div>
@@ -47924,9 +48596,9 @@ Soru: ${soruFinal}`
 
                 {/* Notlar */}
 
-                <div className="rounded-xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden">
+                <div className="rounded-xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden">
 
-                  <div className="px-3 py-2 border-b border-[#1a2236]">
+                  <div className="px-3 py-2 border-b border-[#e2e5eb]">
 
                     <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5"><StickyNote size={11}/>Notlar</span>
 
@@ -47940,7 +48612,7 @@ Soru: ${soruFinal}`
 
                       rows={2}
 
-                      className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/40 text-white text-xs px-3 py-2 rounded-lg outline-none transition-all resize-none disabled:opacity-40 placeholder:text-gray-700"/>
+                      className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/40 text-[#1a1f2e] text-xs px-3 py-2 rounded-lg outline-none transition-all resize-none disabled:opacity-40 placeholder:text-gray-700"/>
 
                   </div>
 
@@ -47956,7 +48628,7 @@ Soru: ${soruFinal}`
 
             {/* ÖZET BANT */}
 
-            <div className="rounded-xl border border-[#1a2236] bg-[#080b14] px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1">
+            <div className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1">
 
               <div className="flex flex-wrap items-center gap-4 text-xs">
 
@@ -47964,7 +48636,7 @@ Soru: ${soruFinal}`
 
                   <p className="text-[9px] text-gray-600 uppercase tracking-widest">Online</p>
 
-                  <p className="text-sm font-black text-blue-400">₺{fmt(ch.tOnline)}</p>
+                  <p className="text-sm font-black text-blue-600">₺{fmt(ch.tOnline)}</p>
 
                 </div>
 
@@ -47974,7 +48646,7 @@ Soru: ${soruFinal}`
 
                   <p className="text-[9px] text-gray-600 uppercase tracking-widest">Kasa</p>
 
-                  <p className="text-sm font-black text-emerald-400">₺{fmt(ch.tKasa)}</p>
+                  <p className="text-sm font-black text-emerald-600">₺{fmt(ch.tKasa)}</p>
 
                 </div>
 
@@ -47984,7 +48656,7 @@ Soru: ${soruFinal}`
 
                   <p className="text-[9px] text-gray-600 uppercase tracking-widest">Gider</p>
 
-                  <p className="text-sm font-black text-red-300">₺{fmt(ch.tGider)}</p>
+                  <p className="text-sm font-black text-red-700">₺{fmt(ch.tGider)}</p>
 
                 </div>
 
@@ -47994,21 +48666,21 @@ Soru: ${soruFinal}`
 
                   <p className="text-[9px] text-blue-600 uppercase tracking-widest font-bold">Brüt</p>
 
-                  <p className="text-sm font-black text-blue-300">₺{fmt(ch.brutCiro)}</p>
+                  <p className="text-sm font-black text-blue-700">₺{fmt(ch.brutCiro)}</p>
 
                 </div>
 
                 <span className="text-gray-800 hidden sm:block">−</span>
 
-                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">Gider</p><p className="text-sm font-black text-red-400">₺{fmt(ch.tGider)}</p></div>
+                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">Gider</p><p className="text-sm font-black text-red-600">₺{fmt(ch.tGider)}</p></div>
 
                 <span className="text-gray-800 hidden sm:block">−</span>
 
-                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">İade</p><p className="text-sm font-black text-orange-400">₺{fmt(ch.tIade)}</p></div>
+                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">İade</p><p className="text-sm font-black text-orange-600">₺{fmt(ch.tIade)}</p></div>
 
                 <span className="text-gray-800 hidden sm:block">=</span>
 
-                <div><p className="text-[9px] text-emerald-700 uppercase tracking-widest font-bold">Net Ciro</p><p className="text-base font-black text-emerald-400">₺{fmt(ch.netCiro)}</p></div>
+                <div><p className="text-[9px] text-emerald-700 uppercase tracking-widest font-bold">Net Ciro</p><p className="text-base font-black text-emerald-600">₺{fmt(ch.netCiro)}</p></div>
 
               </div>
 
@@ -48016,7 +48688,7 @@ Soru: ${soruFinal}`
 
                 <button type="button" onClick={()=>{formuTemizle();setFormAcik(false);}}
 
-                  className="text-xs font-semibold text-gray-500 hover:text-white border border-[#1a2236] hover:border-[#2a3550] px-4 py-2 rounded-xl transition-colors">
+                  className="text-xs font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] px-4 py-2 rounded-xl transition-colors">
 
                   İptal
 
@@ -48058,7 +48730,7 @@ Soru: ${soruFinal}`
 
   if (loading) return (
 
-    <div className="h-screen bg-[#060810] flex flex-col items-center justify-center gap-3">
+    <div className="h-screen bg-[#f4f5f7] flex flex-col items-center justify-center gap-3">
 
       <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"/>
 
@@ -48074,13 +48746,13 @@ Soru: ${soruFinal}`
 
   return (
 
-    <div className="min-h-screen bg-[#060810] text-white font-sans antialiased">
+    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased">
 
 
 
       {/* NAV HEADER */}
 
-      <div className="sticky top-0 z-40 border-b border-[#0f1624] bg-[#060810]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
 
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
 
@@ -48094,7 +48766,7 @@ Soru: ${soruFinal}`
 
             <div>
 
-              <h1 className="text-sm font-black tracking-tight text-white leading-none">KEBO ERP</h1>
+              <h1 className="text-sm font-black tracking-tight text-[#1a1f2e] leading-none">KEBO ERP</h1>
 
               <p className="text-[10px] text-gray-600 leading-none mt-0.5">Kasa Kapanış Sistemi</p>
 
@@ -48110,7 +48782,7 @@ Soru: ${soruFinal}`
 
                 <button onClick={()=>exportCSV(raporlar,secilenAy,secilenYil)}
 
-                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-emerald-400 border border-[#1a2236] hover:border-emerald-500/30 px-3 py-2 rounded-xl transition-colors">
+                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-emerald-600 border border-[#e2e5eb] hover:border-emerald-500/30 px-3 py-2 rounded-xl transition-colors">
 
                   <FileDown size={13}/> CSV
 
@@ -48118,7 +48790,7 @@ Soru: ${soruFinal}`
 
                 <button onClick={()=>exportPDF(raporlar,secilenAy,secilenYil)}
 
-                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-red-400 border border-[#1a2236] hover:border-red-500/30 px-3 py-2 rounded-xl transition-colors">
+                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-red-600 border border-[#e2e5eb] hover:border-red-500/30 px-3 py-2 rounded-xl transition-colors">
 
                   <FileDown size={13}/> PDF
 
@@ -48132,7 +48804,7 @@ Soru: ${soruFinal}`
 
               className={`flex items-center gap-1.5 text-[11px] font-semibold border px-3 py-2 rounded-xl transition-colors ${
 
-                aiAcik ? "text-purple-300 border-purple-500/40 bg-purple-500/10" : "text-gray-500 hover:text-purple-400 border-[#1a2236] hover:border-purple-500/30"
+                aiAcik ? "text-purple-700 border-purple-500/40 bg-purple-500/10" : "text-gray-500 hover:text-purple-600 border-[#e2e5eb] hover:border-purple-500/30"
 
               }`}>
 
@@ -48142,7 +48814,7 @@ Soru: ${soruFinal}`
 
             <button onClick={veriCek}
 
-              className="p-2 text-gray-600 hover:text-white border border-[#1a2236] hover:border-[#2a3550] rounded-xl transition-colors">
+              className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] rounded-xl transition-colors">
 
               <RefreshCw size={14}/>
 
@@ -48154,7 +48826,7 @@ Soru: ${soruFinal}`
 
                 className={`relative flex items-center gap-1.5 text-[11px] font-semibold border px-3 py-2 rounded-xl transition-colors ${
 
-                  onayBekleyenler.length>0 ? "text-amber-300 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/15" : "text-gray-500 hover:text-white border-[#1a2236] hover:border-[#2a3550]"
+                  onayBekleyenler.length>0 ? "text-amber-700 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/15" : "text-gray-500 hover:text-[#1a1f2e] border-[#e2e5eb] hover:border-[#d8dde5]"
 
                 }`}>
 
@@ -48194,19 +48866,19 @@ Soru: ${soruFinal}`
 
         {aiAcik && (
 
-          <div className="rounded-2xl border border-purple-500/20 bg-[#0d0a1a] overflow-hidden">
+          <div className="rounded-2xl border border-purple-500/20 bg-[#faf9ff] overflow-hidden">
 
             <div className="px-5 py-3 border-b border-purple-500/20 flex items-center gap-3">
 
               <div className="w-6 h-6 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
 
-                <Sparkles className="h-3.5 w-3.5 text-purple-400"/>
+                <Sparkles className="h-3.5 w-3.5 text-purple-600"/>
 
               </div>
 
-              <span className="text-sm font-semibold text-purple-300">AI Rapor Analizi</span>
+              <span className="text-sm font-semibold text-purple-700">AI Rapor Analizi</span>
 
-              <span className="text-[10px] text-gray-600 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] text-gray-600 bg-black/[0.04] border border-white/10 px-2 py-0.5 rounded-full">
 
                 {AYLAR.find(m=>m.value===secilenAy)?.label} {secilenYil} · {raporlar.length} gün
 
@@ -48230,7 +48902,7 @@ Soru: ${soruFinal}`
 
                   placeholder="Örnek: Bu ay en iyi günlerim hangileri? Giderlerim neden yüksek?"
 
-                  className="flex-1 bg-[#080b14] border border-purple-500/20 focus:border-purple-500/40 text-white text-sm px-4 py-2.5 rounded-xl outline-none transition-all placeholder:text-gray-600"
+                  className="flex-1 bg-[#f7f8fa] border border-purple-500/20 focus:border-purple-500/40 text-[#1a1f2e] text-sm px-4 py-2.5 rounded-xl outline-none transition-all placeholder:text-gray-600"
 
                 />
 
@@ -48274,7 +48946,7 @@ Soru: ${soruFinal}`
 
                     disabled={aiYukleniyor || raporlar.length===0}
 
-                    className="text-[10px] text-gray-500 hover:text-purple-300 border border-[#1a2236] hover:border-purple-500/30 disabled:opacity-40 px-2.5 py-1 rounded-lg transition-colors">
+                    className="text-[10px] text-gray-500 hover:text-purple-700 border border-[#e2e5eb] hover:border-purple-500/30 disabled:opacity-40 px-2.5 py-1 rounded-lg transition-colors">
 
                     {s}
 
@@ -48288,7 +48960,7 @@ Soru: ${soruFinal}`
 
               {aiCevap && (
 
-                <div className="bg-[#080b14] border border-purple-500/10 rounded-xl p-4 text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+                <div className="bg-[#f7f8fa] border border-purple-500/10 rounded-xl p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
 
                   {aiCevap}
 
@@ -48318,21 +48990,21 @@ Soru: ${soruFinal}`
 
         {formAcik && (
 
-          <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden shadow-2xl">
+          <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden shadow-2xl">
 
-            <div className="px-5 py-4 border-b border-[#1a2236] flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
 
               <div className="flex items-center gap-3">
 
                 <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/20 flex items-center justify-center">
 
-                  <TrendingUp className="h-3.5 w-3.5 text-blue-400"/>
+                  <TrendingUp className="h-3.5 w-3.5 text-blue-600"/>
 
                 </div>
 
                 <div>
 
-                  <h2 className="text-sm font-bold text-white">
+                  <h2 className="text-sm font-bold text-[#1a1f2e]">
 
                     {selectedRapor ? (isEditMode ? "Raporu Düzenle" : "Rapor Detayı") : "Yeni Gün Sonu Raporu"}
 
@@ -48350,7 +49022,7 @@ Soru: ${soruFinal}`
 
                   <button onClick={()=>setPrintRapor(selectedRapor)}
 
-                    className="p-2 text-gray-600 hover:text-white border border-[#1a2236] hover:border-[#2a3550] rounded-xl transition-colors">
+                    className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] rounded-xl transition-colors">
 
                     <Printer size={14}/>
 
@@ -48360,7 +49032,7 @@ Soru: ${soruFinal}`
 
                 <button onClick={()=>{formuTemizle();setFormAcik(false);}}
 
-                  className="p-2 text-gray-600 hover:text-white border border-[#1a2236] hover:border-[#2a3550] rounded-xl transition-colors">
+                  className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] rounded-xl transition-colors">
 
                   <X size={14}/>
 
@@ -48384,13 +49056,13 @@ Soru: ${soruFinal}`
 
         {!formAcik && (
 
-          <div className="rounded-2xl border border-[#1a2236] bg-[#0c0f1a] overflow-hidden shadow-xl">
+          <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden shadow-xl">
 
-            <div className="px-5 py-4 border-b border-[#1a2236] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="px-5 py-4 border-b border-[#e2e5eb] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 
               <div className="flex items-center gap-3">
 
-                <div className="w-7 h-7 rounded-lg bg-white/5 border border-[#1a2236] flex items-center justify-center">
+                <div className="w-7 h-7 rounded-lg bg-black/[0.04] border border-[#e2e5eb] flex items-center justify-center">
 
                   <FileText className="h-3.5 w-3.5 text-gray-400"/>
 
@@ -48398,7 +49070,7 @@ Soru: ${soruFinal}`
 
                 <div>
 
-                  <h3 className="text-sm font-semibold text-gray-200">Kapanış Arşivi</h3>
+                  <h3 className="text-sm font-semibold text-gray-800">Kapanış Arşivi</h3>
 
                   <p className="text-[10px] text-gray-600">
 
@@ -48416,23 +49088,23 @@ Soru: ${soruFinal}`
 
                   <div className="flex sm:hidden items-center gap-1">
 
-                    <button onClick={()=>exportCSV(raporlar,secilenAy,secilenYil)} className="text-[10px] text-gray-600 hover:text-emerald-400 border border-[#1a2236] px-2.5 py-1.5 rounded-lg transition-colors">CSV</button>
+                    <button onClick={()=>exportCSV(raporlar,secilenAy,secilenYil)} className="text-[10px] text-gray-600 hover:text-emerald-600 border border-[#e2e5eb] px-2.5 py-1.5 rounded-lg transition-colors">CSV</button>
 
-                    <button onClick={()=>exportPDF(raporlar,secilenAy,secilenYil)} className="text-[10px] text-gray-600 hover:text-red-400 border border-[#1a2236] px-2.5 py-1.5 rounded-lg transition-colors">PDF</button>
+                    <button onClick={()=>exportPDF(raporlar,secilenAy,secilenYil)} className="text-[10px] text-gray-600 hover:text-red-600 border border-[#e2e5eb] px-2.5 py-1.5 rounded-lg transition-colors">PDF</button>
 
                   </div>
 
                 )}
 
-                <div className="flex items-center gap-2 bg-[#080b14] border border-[#1a2236] px-3 py-2 rounded-xl">
+                <div className="flex items-center gap-2 bg-[#f7f8fa] border border-[#e2e5eb] px-3 py-2 rounded-xl">
 
                   <Calendar size={12} className="text-gray-600"/>
 
                   <select value={secilenAy} onChange={e=>setSecilenAy(e.target.value)}
 
-                    className="bg-transparent text-xs font-semibold text-gray-300 outline-none cursor-pointer">
+                    className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer">
 
-                    {AYLAR.map(m=><option key={m.value} value={m.value} className="bg-[#0c0f1a]">{m.label}</option>)}
+                    {AYLAR.map(m=><option key={m.value} value={m.value} className="bg-[#ffffff]">{m.label}</option>)}
 
                   </select>
 
@@ -48440,9 +49112,9 @@ Soru: ${soruFinal}`
 
                   <select value={secilenYil} onChange={e=>setSecilenYil(e.target.value)}
 
-                    className="bg-transparent text-xs font-semibold text-gray-300 outline-none cursor-pointer">
+                    className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer">
 
-                    {["2024","2025","2026","2027"].map(y=><option key={y} value={y} className="bg-[#0c0f1a]">{y}</option>)}
+                    {["2024","2025","2026","2027"].map(y=><option key={y} value={y} className="bg-[#ffffff]">{y}</option>)}
 
                   </select>
 
@@ -48460,7 +49132,7 @@ Soru: ${soruFinal}`
 
                 <thead>
 
-                  <tr className="border-b border-[#1a2236] bg-[#080b14]">
+                  <tr className="border-b border-[#e2e5eb] bg-[#f7f8fa]">
 
                     {["Tarih","Brüt Ciro","Net Ciro","Paket","Sepet Ort.","Gider+İade",""].map((h,i)=>(
 
@@ -48504,25 +49176,25 @@ Soru: ${soruFinal}`
 
                         onClick={()=>{setSelectedRapor(rapor);raporuFormaYukle(rapor);setIsEditMode(false);setFormAcik(true);}}
 
-                        className="hover:bg-white/[0.02] cursor-pointer transition-colors group">
+                        className="hover:bg-black/[0.03] cursor-pointer transition-colors group">
 
-                        <td className="px-4 py-3.5 font-semibold text-gray-300 group-hover:text-blue-400 transition-colors">
+                        <td className="px-4 py-3.5 font-semibold text-gray-700 group-hover:text-blue-600 transition-colors">
 
                           {new Date(rapor.tarih+"T12:00:00").toLocaleDateString("tr-TR")}
 
-                          {rapor.gider_aciklama?.includes("|| NOT:") && <span className="ml-1.5 text-[9px] text-blue-500/60 bg-blue-500/10 px-1.5 py-0.5 rounded-full">Not</span>}
+                          {rapor.gider_aciklama?.includes("|| NOT:") && <span className="ml-1.5 text-[9px] text-blue-700/60 bg-blue-500/10 px-1.5 py-0.5 rounded-full">Not</span>}
 
                         </td>
 
-                        <td className="px-4 py-3.5 text-blue-400 font-semibold">₺{fmt(brutCiro)}</td>
+                        <td className="px-4 py-3.5 text-blue-600 font-semibold">₺{fmt(brutCiro)}</td>
 
-                        <td className="px-4 py-3.5 text-emerald-400 font-black">₺{fmt(net)}</td>
+                        <td className="px-4 py-3.5 text-emerald-600 font-black">₺{fmt(net)}</td>
 
-                        <td className="px-4 py-3.5 text-amber-400 font-semibold">{paket}</td>
+                        <td className="px-4 py-3.5 text-amber-600 font-semibold">{paket}</td>
 
-                        <td className="px-4 py-3.5 text-purple-400 font-bold">₺{fmt(ort)}</td>
+                        <td className="px-4 py-3.5 text-purple-600 font-bold">₺{fmt(ort)}</td>
 
-                        <td className="px-4 py-3.5 text-red-400 font-medium">{gi>0?`-₺${fmt(gi)}`:"—"}</td>
+                        <td className="px-4 py-3.5 text-red-600 font-medium">{gi>0?`-₺${fmt(gi)}`:"—"}</td>
 
                         <td className="px-4 py-3.5">
 
@@ -48532,7 +49204,7 @@ Soru: ${soruFinal}`
 
                             <button onClick={e=>{e.stopPropagation();setPrintRapor(rapor);}}
 
-                              className="p-1 text-gray-600 hover:text-gray-300 rounded transition-colors ml-1">
+                              className="p-1 text-gray-600 hover:text-gray-900 rounded transition-colors ml-1">
 
                               <Printer size={11}/>
 
@@ -48554,19 +49226,19 @@ Soru: ${soruFinal}`
 
                   <tfoot>
 
-                    <tr className="border-t-2 border-[#1a2236] bg-[#080b14]">
+                    <tr className="border-t-2 border-[#e2e5eb] bg-[#f7f8fa]">
 
                       <td className="px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Dönem Toplamı</td>
 
-                      <td className="px-4 py-3 text-blue-400 font-black">₺{fmt(tabloToplam.brut)}</td>
+                      <td className="px-4 py-3 text-blue-600 font-black">₺{fmt(tabloToplam.brut)}</td>
 
-                      <td className="px-4 py-3 text-emerald-400 font-black text-sm">₺{fmt(tabloToplam.net)}</td>
+                      <td className="px-4 py-3 text-emerald-600 font-black text-sm">₺{fmt(tabloToplam.net)}</td>
 
-                      <td className="px-4 py-3 text-amber-400 font-black">{tabloToplam.paket}</td>
+                      <td className="px-4 py-3 text-amber-600 font-black">{tabloToplam.paket}</td>
 
-                      <td className="px-4 py-3 text-purple-400 font-black">₺{fmt(tabloToplam.paketOrt)}</td>
+                      <td className="px-4 py-3 text-purple-600 font-black">₺{fmt(tabloToplam.paketOrt)}</td>
 
-                      <td className="px-4 py-3 text-red-400 font-black">-₺{fmt(tabloToplam.giderIade)}</td>
+                      <td className="px-4 py-3 text-red-600 font-black">-₺{fmt(tabloToplam.giderIade)}</td>
 
                       <td/>
 
@@ -48604,13 +49276,13 @@ Soru: ${soruFinal}`
 
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
 
-          <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
+          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
 
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#1a2236]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e5eb]">
 
-              <p className="text-sm font-black text-white flex items-center gap-2"><AlertTriangle size={15} className="text-amber-400"/> Rapor Değişiklik Talepleri</p>
+              <p className="text-sm font-black text-[#1a1f2e] flex items-center gap-2"><AlertTriangle size={15} className="text-amber-600"/> Rapor Değişiklik Talepleri</p>
 
-              <button onClick={()=>setOnayModalAcik(false)} className="text-gray-600 hover:text-white"><X size={16}/></button>
+              <button onClick={()=>setOnayModalAcik(false)} className="text-gray-600 hover:text-[#1a1f2e]"><X size={16}/></button>
 
             </div>
 
@@ -48618,7 +49290,7 @@ Soru: ${soruFinal}`
 
               <button onClick={()=>setOnayModalTab("bekleyen")}
 
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${onayModalTab==="bekleyen"?"bg-amber-500/15 text-amber-300 border border-amber-500/30":"text-gray-500 hover:text-white"}`}>
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${onayModalTab==="bekleyen"?"bg-amber-500/15 text-amber-700 border border-amber-500/30":"text-gray-500 hover:text-[#1a1f2e]"}`}>
 
                 Bekleyen ({onayBekleyenler.length})
 
@@ -48626,7 +49298,7 @@ Soru: ${soruFinal}`
 
               <button onClick={()=>setOnayModalTab("gecmis")}
 
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${onayModalTab==="gecmis"?"bg-blue-500/15 text-blue-300 border border-blue-500/30":"text-gray-500 hover:text-white"}`}>
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${onayModalTab==="gecmis"?"bg-blue-500/15 text-blue-700 border border-blue-500/30":"text-gray-500 hover:text-[#1a1f2e]"}`}>
 
                 Geçmiş ({onayGecmisi.length})
 
@@ -48652,7 +49324,7 @@ Soru: ${soruFinal}`
 
                       <div className="flex items-center justify-between mb-2">
 
-                        <p className="text-xs font-bold text-white">{fmtTarih(talep.rapor_tarihi)} tarihli rapor</p>
+                        <p className="text-xs font-bold text-[#1a1f2e]">{fmtTarih(talep.rapor_tarihi)} tarihli rapor</p>
 
                         <p className="text-[10px] text-gray-500">{talep.talep_eden} · {new Date(talep.talep_tarihi).toLocaleString("tr-TR")}</p>
 
@@ -48676,7 +49348,7 @@ Soru: ${soruFinal}`
 
                               <span className="text-gray-600">→</span>
 
-                              <span className="text-emerald-400 font-semibold">{typeof f.yeniDeger==="number"?`₺${fmt(f.yeniDeger)}`:(f.yeniDeger||"—")}</span>
+                              <span className="text-emerald-600 font-semibold">{typeof f.yeniDeger==="number"?`₺${fmt(f.yeniDeger)}`:(f.yeniDeger||"—")}</span>
 
                             </span>
 
@@ -48690,7 +49362,7 @@ Soru: ${soruFinal}`
 
                         <button onClick={()=>handleTalepReddet(talep)} disabled={onayIslemId===talep.id}
 
-                          className="flex-1 text-xs font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 disabled:opacity-40 py-2 rounded-lg transition-colors">
+                          className="flex-1 text-xs font-bold text-red-600 border border-red-500/30 hover:bg-red-500/10 disabled:opacity-40 py-2 rounded-lg transition-colors">
 
                           Reddet
 
@@ -48724,7 +49396,7 @@ Soru: ${soruFinal}`
 
                   <div key={talep.id} className={`rounded-xl border p-3 text-[11px] ${talep.durum==="onaylandi"?"border-emerald-500/20 bg-emerald-500/5":"border-red-500/20 bg-red-500/5"}`}>
 
-                    <p className="text-white font-semibold mb-1">{fmtTarih(talep.rapor_tarihi)} tarihli rapor</p>
+                    <p className="text-[#1a1f2e] font-semibold mb-1">{fmtTarih(talep.rapor_tarihi)} tarihli rapor</p>
 
                     <p className="text-gray-400">
 
@@ -48732,7 +49404,7 @@ Soru: ${soruFinal}`
 
                     </p>
 
-                    <p className={talep.durum==="onaylandi"?"text-emerald-400":"text-red-400"}>
+                    <p className={talep.durum==="onaylandi"?"text-emerald-600":"text-red-600"}>
 
                       <span className="font-semibold">{talep.onaylayan}</span> {talep.durum==="onaylandi"?"onayladı":"reddetti"} ({talep.onay_tarihi ? new Date(talep.onay_tarihi).toLocaleString("tr-TR") : "—"})
 

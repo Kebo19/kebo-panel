@@ -28,13 +28,13 @@ const DEPARTMANLAR = ["Mutfak", "Banko", "Kurye", "Temizlik", "Yönetim", "Diğe
 const KASALAR = ["Nakit Kasa", "POS", "Banka Havalesi", "Diğer"];
 const fmt = (v: number) => new Intl.NumberFormat("tr-TR").format(v);
 const fmtTarih = (t?: string) => { if (!t) return "—"; const [y, m, d] = t.split("-"); return `${d}.${m}.${y}`; };
-const inputCls = "w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/15 text-white text-sm h-10 px-3 rounded-xl outline-none transition-all placeholder:text-gray-700 disabled:opacity-40";
+const inputCls = "w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/15 text-[#1a1f2e] text-sm h-10 px-3 rounded-xl outline-none transition-all placeholder:text-gray-700 disabled:opacity-40";
 
 // ─── FIELD CARD ───────────────────────────────────────────────────────────────
 
 function FieldCard({ icon, label, color = "text-gray-400", children }: { icon: React.ReactNode; label: string; color?: string; children: React.ReactNode; }) {
   return (
-    <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-4">
+    <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
       <div className="flex items-center gap-2.5 mb-3">
         <div className={`${color} opacity-80`}>{icon}</div>
         <label className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">{label}</label>
@@ -50,10 +50,10 @@ function Modal({ baslik, acik, onKapat, children }: { baslik: string; acik: bool
   if (!acik) return null;
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-6 w-full max-w-md shadow-2xl">
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-sm font-black text-white">{baslik}</h3>
-          <button onClick={onKapat} className="text-gray-600 hover:text-white transition-colors"><X size={16} /></button>
+          <h3 className="text-sm font-black text-[#1a1f2e]">{baslik}</h3>
+          <button onClick={onKapat} className="text-gray-600 hover:text-[#1a1f2e] transition-colors"><X size={16} /></button>
         </div>
         {children}
       </div>
@@ -257,38 +257,38 @@ export default function PersonelDetayPage() {
   const odenmemisPrim = primler.filter(p => !p.odendi).reduce((s, p) => s + p.tutar, 0);
   const toplamKesinti = kesintiler.reduce((s, k) => s + k.tutar, 0);
 
-  if (loading) return <div className="min-h-screen bg-[#060810] flex items-center justify-center"><div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>;
-  if (!personel) return <div className="min-h-screen bg-[#060810] flex items-center justify-center text-gray-500 text-sm">Personel bulunamadı.</div>;
+  if (loading) return <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center"><div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>;
+  if (!personel) return <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center text-gray-500 text-sm">Personel bulunamadı.</div>;
 
   const calismaSuresi = personel.ise_giris_tarihi
     ? Math.floor((new Date().getTime() - new Date(personel.ise_giris_tarihi).getTime()) / (1000 * 60 * 60 * 24 * 30))
     : null;
 
   return (
-    <div className="min-h-screen bg-[#060810] text-white font-sans antialiased pb-10">
+    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased pb-10">
 
       {/* TOAST */}
       {toast && (
-        <div className={`fixed top-5 right-5 z-[80] flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-2xl text-sm font-semibold animate-in slide-in-from-top duration-300 ${toast.tip === "basari" ? "bg-emerald-950 border-emerald-500/30 text-emerald-400" : "bg-red-950 border-red-500/30 text-red-400"}`}>
+        <div className={`fixed top-5 right-5 z-[80] flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-2xl text-sm font-semibold animate-in slide-in-from-top duration-300 ${toast.tip === "basari" ? "bg-emerald-950 border-emerald-500/30 text-emerald-600" : "bg-red-950 border-red-500/30 text-red-600"}`}>
           {toast.tip === "basari" ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
           {toast.mesaj}
         </div>
       )}
 
       {/* HEADER */}
-      <div className="sticky top-0 z-40 border-b border-[#0f1624] bg-[#060810]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Link href="/personel" className="p-2 text-gray-600 hover:text-white border border-[#1a2236] rounded-xl transition-colors">
+            <Link href="/personel" className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-xl transition-colors">
               <ArrowLeft size={15} />
             </Link>
             <div>
               <p className="text-[10px] text-gray-600 uppercase tracking-widest">Personel Detayı</p>
-              <h1 className="text-sm font-bold text-white leading-none mt-0.5">{personel.isim}</h1>
+              <h1 className="text-sm font-bold text-[#1a1f2e] leading-none mt-0.5">{personel.isim}</h1>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border ${personel.durum === "aktif" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-red-500/10 border-red-500/20 text-red-400"}`}>
+            <span className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border ${personel.durum === "aktif" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600" : "bg-red-500/10 border-red-500/20 text-red-600"}`}>
               {personel.durum === "aktif" ? "● Aktif" : "● Ayrıldı"}
             </span>
             {aktifTab === "bilgiler" && (
@@ -309,7 +309,7 @@ export default function PersonelDetayPage() {
             { key: "kesinti", label: `Kesinti (${kesintiler.length})` },
           ].map(t => (
             <button key={t.key} onClick={() => setAktifTab(t.key as any)}
-              className={`text-xs font-bold px-4 py-2 rounded-xl transition-colors ${aktifTab === t.key ? "bg-blue-600 text-white" : "text-gray-500 hover:text-white"}`}>
+              className={`text-xs font-bold px-4 py-2 rounded-xl transition-colors ${aktifTab === t.key ? "bg-blue-600 text-white" : "text-gray-500 hover:text-[#1a1f2e]"}`}>
               {t.label}
             </button>
           ))}
@@ -319,33 +319,33 @@ export default function PersonelDetayPage() {
       <div className="max-w-4xl mx-auto px-4 py-5 space-y-5">
 
         {/* ── KİŞİ KARTI ── */}
-        <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-              <span className="text-xl font-black text-blue-400">{personel.isim.split(" ").map(n => n[0]).slice(0, 2).join("")}</span>
+              <span className="text-xl font-black text-blue-600">{personel.isim.split(" ").map(n => n[0]).slice(0, 2).join("")}</span>
             </div>
             <div>
-              <p className="text-xl font-black text-white">{personel.isim}</p>
+              <p className="text-xl font-black text-[#1a1f2e]">{personel.isim}</p>
               <p className="text-[11px] text-gray-600 mt-1 flex items-center gap-3 flex-wrap">
                 {personel.departman && <span>{personel.departman}</span>}
                 {calismaSuresi !== null && <span>· {calismaSuresi} aydır çalışıyor</span>}
-                {personel.maas && <span className="text-emerald-500">· ₺{fmt(personel.maas)}</span>}
+                {personel.maas && <span className="text-emerald-700">· ₺{fmt(personel.maas)}</span>}
               </p>
             </div>
           </div>
           {/* Finansal özet */}
           <div className="flex gap-3 flex-wrap">
             <div className="text-center bg-amber-500/5 border border-amber-500/20 rounded-xl px-3 py-2">
-              <p className="text-[10px] text-amber-400 uppercase tracking-widest">Avans</p>
-              <p className="text-sm font-black text-amber-400">₺{fmt(toplamAvans)}</p>
+              <p className="text-[10px] text-amber-600 uppercase tracking-widest">Avans</p>
+              <p className="text-sm font-black text-amber-600">₺{fmt(toplamAvans)}</p>
             </div>
             <div className="text-center bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-3 py-2">
-              <p className="text-[10px] text-emerald-400 uppercase tracking-widest">Bekleyen Prim</p>
-              <p className="text-sm font-black text-emerald-400">₺{fmt(odenmemisPrim)}</p>
+              <p className="text-[10px] text-emerald-600 uppercase tracking-widest">Bekleyen Prim</p>
+              <p className="text-sm font-black text-emerald-600">₺{fmt(odenmemisPrim)}</p>
             </div>
             <div className="text-center bg-red-500/5 border border-red-500/20 rounded-xl px-3 py-2">
-              <p className="text-[10px] text-red-400 uppercase tracking-widest">Kesinti</p>
-              <p className="text-sm font-black text-red-400">₺{fmt(toplamKesinti)}</p>
+              <p className="text-[10px] text-red-600 uppercase tracking-widest">Kesinti</p>
+              <p className="text-sm font-black text-red-600">₺{fmt(toplamKesinti)}</p>
             </div>
           </div>
         </div>
@@ -354,51 +354,51 @@ export default function PersonelDetayPage() {
         {aktifTab === "bilgiler" && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <FieldCard icon={<Phone size={15} />} label="Telefon" color="text-orange-400">
+              <FieldCard icon={<Phone size={15} />} label="Telefon" color="text-orange-600">
                 <input type="tel" value={personel.telefon || ""} placeholder="05__ ___ __ __"
                   onChange={e => setPersonel({ ...personel, telefon: e.target.value })} className={inputCls} />
               </FieldCard>
-              <FieldCard icon={<CreditCard size={15} />} label="TC Kimlik No" color="text-blue-400">
+              <FieldCard icon={<CreditCard size={15} />} label="TC Kimlik No" color="text-blue-600">
                 <input type="text" value={personel.tc_kimlik || ""} placeholder="11 haneli TC no" maxLength={11}
                   onChange={e => setPersonel({ ...personel, tc_kimlik: e.target.value.replace(/\D/g, "") })} className={inputCls} />
               </FieldCard>
-              <FieldCard icon={<Landmark size={15} />} label="IBAN" color="text-emerald-400">
+              <FieldCard icon={<Landmark size={15} />} label="IBAN" color="text-emerald-600">
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-bold">TR</span>
                   <input type="text" value={personel.iban || ""} placeholder="__ ____ ____ ____ ____ __"
                     onChange={e => setPersonel({ ...personel, iban: e.target.value })} className={`${inputCls} pl-9`} />
                 </div>
               </FieldCard>
-              <FieldCard icon={<Users size={15} />} label="Departman" color="text-purple-400">
+              <FieldCard icon={<Users size={15} />} label="Departman" color="text-purple-600">
                 <select value={personel.departman || ""} onChange={e => setPersonel({ ...personel, departman: e.target.value })} className={inputCls}>
                   <option value="">Seçiniz...</option>
-                  {DEPARTMANLAR.map(d => <option key={d} value={d} className="bg-[#0c0f1a]">{d}</option>)}
+                  {DEPARTMANLAR.map(d => <option key={d} value={d} className="bg-[#ffffff]">{d}</option>)}
                 </select>
               </FieldCard>
-              <FieldCard icon={<Wallet size={15} />} label="Aylık Maaş" color="text-amber-400">
+              <FieldCard icon={<Wallet size={15} />} label="Aylık Maaş" color="text-amber-600">
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-xs">₺</span>
                   <input type="number" value={personel.maas || ""} placeholder="0"
                     onChange={e => setPersonel({ ...personel, maas: parseFloat(e.target.value) || 0 })} className={`${inputCls} pl-7`} />
                 </div>
               </FieldCard>
-              <FieldCard icon={<CalendarDays size={15} />} label="İşe Giriş Tarihi" color="text-pink-400">
+              <FieldCard icon={<CalendarDays size={15} />} label="İşe Giriş Tarihi" color="text-pink-600">
                 <input type="date" value={personel.ise_giris_tarihi || ""}
                   onChange={e => setPersonel({ ...personel, ise_giris_tarihi: e.target.value })} className={inputCls} />
               </FieldCard>
             </div>
-            <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-4">
+            <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
               <div className="flex items-center gap-2.5 mb-3">
                 <FileText size={15} className="text-gray-500" />
                 <label className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Notlar</label>
               </div>
               <textarea value={personel.notlar || ""} onChange={e => setPersonel({ ...personel, notlar: e.target.value })}
                 placeholder="Personel hakkında özel notlar..." rows={3}
-                className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/50 text-white text-sm px-3 py-2.5 rounded-xl outline-none transition-all resize-none placeholder:text-gray-700" />
+                className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/50 text-[#1a1f2e] text-sm px-3 py-2.5 rounded-xl outline-none transition-all resize-none placeholder:text-gray-700" />
             </div>
-            <div className={`rounded-2xl border p-4 ${personel.durum === "ayrildi" ? "border-red-500/20 bg-red-950/10" : "border-[#1a2236] bg-[#0c0f1a]"}`}>
+            <div className={`rounded-2xl border p-4 ${personel.durum === "ayrildi" ? "border-red-500/20 bg-red-100/60" : "border-[#e2e5eb] bg-[#ffffff]"}`}>
               <div className="flex items-center gap-2.5 mb-3">
-                <CalendarDays size={15} className="text-red-400" />
+                <CalendarDays size={15} className="text-red-600" />
                 <label className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">İşten Çıkış Tarihi</label>
               </div>
               <input type="date" value={personel.isten_cikis_tarihi || ""}
@@ -406,12 +406,12 @@ export default function PersonelDetayPage() {
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {personel.durum === "ayrildi" && isAdmin && (
-                <button onClick={handleAktiflesir} className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 rounded-xl hover:bg-emerald-500/15 transition-colors">
+                <button onClick={handleAktiflesir} className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 rounded-xl hover:bg-emerald-500/15 transition-colors">
                   <RotateCcw size={12} /> Tekrar Aktifleştir
                 </button>
               )}
               {isAdmin && (
-                <button onClick={() => setSilmeOnayAcik(true)} className="flex items-center gap-1.5 text-xs font-semibold text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-xl hover:bg-red-500/15 transition-colors">
+                <button onClick={() => setSilmeOnayAcik(true)} className="flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-xl hover:bg-red-500/15 transition-colors">
                   <Trash2 size={12} /> Personeli Sil
                 </button>
               )}
@@ -424,7 +424,7 @@ export default function PersonelDetayPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500">Toplam avans: <span className="text-amber-400 font-black">₺{fmt(toplamAvans)}</span></p>
+                <p className="text-xs text-gray-500">Toplam avans: <span className="text-amber-600 font-black">₺{fmt(toplamAvans)}</span></p>
               </div>
               <button onClick={() => setAvansModal(true)}
                 className="flex items-center gap-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-xl transition-colors">
@@ -432,22 +432,22 @@ export default function PersonelDetayPage() {
               </button>
             </div>
             {avanslar.length === 0 ? (
-              <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl py-12 text-center text-gray-600 text-xs uppercase tracking-widest">Avans kaydı yok</div>
+              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl py-12 text-center text-gray-600 text-xs uppercase tracking-widest">Avans kaydı yok</div>
             ) : (
               <div className="space-y-2">
                 {avanslar.map(a => (
-                  <div key={a.id} className="bg-[#0c0f1a] border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between gap-3">
+                  <div key={a.id} className="bg-[#ffffff] border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-                        <TrendingDown size={15} className="text-amber-400" />
+                        <TrendingDown size={15} className="text-amber-600" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-white">₺{fmt(a.tutar)}</p>
+                        <p className="text-sm font-bold text-[#1a1f2e]">₺{fmt(a.tutar)}</p>
                         <p className="text-[11px] text-gray-500">{fmtTarih(a.tarih)} · {a.kasa_kaynagi}</p>
                         {a.aciklama && <p className="text-[11px] text-gray-600 truncate">{a.aciklama}</p>}
                       </div>
                     </div>
-                    <button onClick={() => avansKaldir(a.id)} className="text-gray-700 hover:text-red-400 transition-colors shrink-0">
+                    <button onClick={() => avansKaldir(a.id)} className="text-gray-700 hover:text-red-600 transition-colors shrink-0">
                       <Trash2 size={13} />
                     </button>
                   </div>
@@ -462,8 +462,8 @@ export default function PersonelDetayPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <p className="text-xs text-gray-500">Toplam: <span className="text-emerald-400 font-black">₺{fmt(toplamPrim)}</span></p>
-                <p className="text-xs text-gray-500">Ödenmemiş: <span className="text-yellow-400 font-black">₺{fmt(odenmemisPrim)}</span></p>
+                <p className="text-xs text-gray-500">Toplam: <span className="text-emerald-600 font-black">₺{fmt(toplamPrim)}</span></p>
+                <p className="text-xs text-gray-500">Ödenmemiş: <span className="text-yellow-600 font-black">₺{fmt(odenmemisPrim)}</span></p>
               </div>
               <button onClick={() => setPrimModal(true)}
                 className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl transition-colors">
@@ -471,17 +471,17 @@ export default function PersonelDetayPage() {
               </button>
             </div>
             {primler.length === 0 ? (
-              <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl py-12 text-center text-gray-600 text-xs uppercase tracking-widest">Prim kaydı yok</div>
+              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl py-12 text-center text-gray-600 text-xs uppercase tracking-widest">Prim kaydı yok</div>
             ) : (
               <div className="space-y-2">
                 {primler.map(p => (
-                  <div key={p.id} className={`bg-[#0c0f1a] border rounded-2xl p-4 flex items-center justify-between gap-3 ${p.odendi ? "border-emerald-500/20" : "border-yellow-500/20"}`}>
+                  <div key={p.id} className={`bg-[#ffffff] border rounded-2xl p-4 flex items-center justify-between gap-3 ${p.odendi ? "border-emerald-500/20" : "border-yellow-500/20"}`}>
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${p.odendi ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-yellow-500/10 border border-yellow-500/20"}`}>
-                        <TrendingUp size={15} className={p.odendi ? "text-emerald-400" : "text-yellow-400"} />
+                        <TrendingUp size={15} className={p.odendi ? "text-emerald-600" : "text-yellow-600"} />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-white">₺{fmt(p.tutar)}</p>
+                        <p className="text-sm font-bold text-[#1a1f2e]">₺{fmt(p.tutar)}</p>
                         <p className="text-[11px] text-gray-500">{fmtTarih(p.tarih)}{p.odeme_tarihi ? ` · Ödendi: ${fmtTarih(p.odeme_tarihi)}` : ""}</p>
                         {p.aciklama && <p className="text-[11px] text-gray-600 truncate">{p.aciklama}</p>}
                       </div>
@@ -489,12 +489,12 @@ export default function PersonelDetayPage() {
                     <div className="flex items-center gap-2 shrink-0">
                       {!p.odendi && (
                         <button onClick={() => primOdendi(p.id)}
-                          className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-colors">
+                          className="text-xs font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-colors">
                           Ödendi
                         </button>
                       )}
-                      {p.odendi && <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-1 rounded-lg">✓ Ödendi</span>}
-                      <button onClick={() => primKaldir(p.id)} className="text-gray-700 hover:text-red-400 transition-colors">
+                      {p.odendi && <span className="text-[10px] text-emerald-600 font-bold bg-emerald-500/10 px-2 py-1 rounded-lg">✓ Ödendi</span>}
+                      <button onClick={() => primKaldir(p.id)} className="text-gray-700 hover:text-red-600 transition-colors">
                         <Trash2 size={13} />
                       </button>
                     </div>
@@ -509,29 +509,29 @@ export default function PersonelDetayPage() {
         {aktifTab === "kesinti" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-gray-500">Toplam kesinti: <span className="text-red-400 font-black">₺{fmt(toplamKesinti)}</span></p>
+              <p className="text-xs text-gray-500">Toplam kesinti: <span className="text-red-600 font-black">₺{fmt(toplamKesinti)}</span></p>
               <button onClick={() => setKesintiModal(true)}
                 className="flex items-center gap-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-xl transition-colors">
                 <Plus size={13} /> Kesinti Ekle
               </button>
             </div>
             {kesintiler.length === 0 ? (
-              <div className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl py-12 text-center text-gray-600 text-xs uppercase tracking-widest">Kesinti kaydı yok</div>
+              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl py-12 text-center text-gray-600 text-xs uppercase tracking-widest">Kesinti kaydı yok</div>
             ) : (
               <div className="space-y-2">
                 {kesintiler.map(k => (
-                  <div key={k.id} className="bg-[#0c0f1a] border border-red-500/20 rounded-2xl p-4 flex items-center justify-between gap-3">
+                  <div key={k.id} className="bg-[#ffffff] border border-red-500/20 rounded-2xl p-4 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
-                        <Minus size={15} className="text-red-400" />
+                        <Minus size={15} className="text-red-600" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-white">₺{fmt(k.tutar)}</p>
+                        <p className="text-sm font-bold text-[#1a1f2e]">₺{fmt(k.tutar)}</p>
                         <p className="text-[11px] text-gray-500">{fmtTarih(k.tarih)}</p>
                         {k.aciklama && <p className="text-[11px] text-gray-600 truncate">{k.aciklama}</p>}
                       </div>
                     </div>
-                    <button onClick={() => kesintiKaldir(k.id)} className="text-gray-700 hover:text-red-400 transition-colors shrink-0">
+                    <button onClick={() => kesintiKaldir(k.id)} className="text-gray-700 hover:text-red-600 transition-colors shrink-0">
                       <Trash2 size={13} />
                     </button>
                   </div>
@@ -557,7 +557,7 @@ export default function PersonelDetayPage() {
           <div>
             <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Kasa Kaynağı</p>
             <select value={yeniAvans.kasa_kaynagi} onChange={e => setYeniAvans({ ...yeniAvans, kasa_kaynagi: e.target.value })} className={inputCls}>
-              {KASALAR.map(k => <option key={k} value={k} className="bg-[#0c0f1a]">{k}</option>)}
+              {KASALAR.map(k => <option key={k} value={k} className="bg-[#ffffff]">{k}</option>)}
             </select>
           </div>
           <div>
@@ -566,7 +566,7 @@ export default function PersonelDetayPage() {
               placeholder="Opsiyonel açıklama..." className={inputCls} />
           </div>
           <div className="flex gap-2 pt-2">
-            <button onClick={() => setAvansModal(false)} className="flex-1 text-xs font-semibold text-gray-500 hover:text-white border border-[#1a2236] py-2.5 rounded-xl transition-colors">İptal</button>
+            <button onClick={() => setAvansModal(false)} className="flex-1 text-xs font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] py-2.5 rounded-xl transition-colors">İptal</button>
             <button onClick={avansKaydet} disabled={formSaving || !yeniAvans.tutar}
               className="flex-1 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-40 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
               {formSaving ? <Loader2 size={12} className="animate-spin" /> : null} Kaydet
@@ -593,7 +593,7 @@ export default function PersonelDetayPage() {
               placeholder="Prim nedeni..." className={inputCls} />
           </div>
           <div className="flex gap-2 pt-2">
-            <button onClick={() => setPrimModal(false)} className="flex-1 text-xs font-semibold text-gray-500 hover:text-white border border-[#1a2236] py-2.5 rounded-xl transition-colors">İptal</button>
+            <button onClick={() => setPrimModal(false)} className="flex-1 text-xs font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] py-2.5 rounded-xl transition-colors">İptal</button>
             <button onClick={primKaydet} disabled={formSaving || !yeniPrim.tutar}
               className="flex-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
               {formSaving ? <Loader2 size={12} className="animate-spin" /> : null} Kaydet
@@ -620,7 +620,7 @@ export default function PersonelDetayPage() {
               placeholder="Kesinti nedeni..." className={inputCls} />
           </div>
           <div className="flex gap-2 pt-2">
-            <button onClick={() => setKesintiModal(false)} className="flex-1 text-xs font-semibold text-gray-500 hover:text-white border border-[#1a2236] py-2.5 rounded-xl transition-colors">İptal</button>
+            <button onClick={() => setKesintiModal(false)} className="flex-1 text-xs font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] py-2.5 rounded-xl transition-colors">İptal</button>
             <button onClick={kesintiKaydet} disabled={formSaving || !yeniKesinti.tutar}
               className="flex-1 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
               {formSaving ? <Loader2 size={12} className="animate-spin" /> : null} Kaydet
@@ -632,11 +632,11 @@ export default function PersonelDetayPage() {
       {/* ÇIKIŞ ONAY */}
       {cikisOnayAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-red-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-            <p className="text-sm font-bold text-white mb-2">İşten Çıkış Onayı</p>
+          <div className="bg-[#ffffff] border border-red-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <p className="text-sm font-bold text-[#1a1f2e] mb-2">İşten Çıkış Onayı</p>
             <p className="text-xs text-gray-400 mb-5">{personel.isim} ayrılanlar listesine taşınacak. Onaylıyor musunuz?</p>
             <div className="flex gap-2">
-              <button onClick={() => setCikisOnayAcik(false)} className="flex-1 text-xs font-semibold text-gray-500 border border-[#1a2236] py-2.5 rounded-xl">İptal</button>
+              <button onClick={() => setCikisOnayAcik(false)} className="flex-1 text-xs font-semibold text-gray-500 border border-[#e2e5eb] py-2.5 rounded-xl">İptal</button>
               <button onClick={cikisiOnayla} className="flex-1 text-xs font-bold text-white bg-red-600 hover:bg-red-700 py-2.5 rounded-xl">Onayla</button>
             </div>
           </div>
@@ -646,11 +646,11 @@ export default function PersonelDetayPage() {
       {/* SİLME ONAY */}
       {silmeOnayAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0c0f1a] border border-red-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-            <p className="text-sm font-bold text-white mb-2">Personeli Sil</p>
-            <p className="text-xs text-gray-400 mb-5"><strong className="text-white">{personel.isim}</strong> silinecek. Bu işlem geri alınamaz.</p>
+          <div className="bg-[#ffffff] border border-red-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <p className="text-sm font-bold text-[#1a1f2e] mb-2">Personeli Sil</p>
+            <p className="text-xs text-gray-400 mb-5"><strong className="text-[#1a1f2e]">{personel.isim}</strong> silinecek. Bu işlem geri alınamaz.</p>
             <div className="flex gap-2">
-              <button onClick={() => setSilmeOnayAcik(false)} className="flex-1 text-xs font-semibold text-gray-500 border border-[#1a2236] py-2.5 rounded-xl">İptal</button>
+              <button onClick={() => setSilmeOnayAcik(false)} className="flex-1 text-xs font-semibold text-gray-500 border border-[#e2e5eb] py-2.5 rounded-xl">İptal</button>
               <button onClick={handleSil} className="flex-1 text-xs font-bold text-white bg-red-600 hover:bg-red-700 py-2.5 rounded-xl">Evet, Sil</button>
             </div>
           </div>

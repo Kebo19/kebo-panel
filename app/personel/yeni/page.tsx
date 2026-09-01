@@ -54,39 +54,39 @@ export default function YeniPersonelPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#060810] text-white font-sans antialiased py-6">
+    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased py-6">
       <div className="max-w-xl mx-auto px-4">
 
         <div className="flex items-center justify-between mb-6">
-          <Link href="/personel" className="flex items-center gap-2 text-xs text-gray-400 hover:text-white transition-colors">
+          <Link href="/personel" className="flex items-center gap-2 text-xs text-gray-400 hover:text-[#1a1f2e] transition-colors">
             <ArrowLeft size={14} /> Listeye Dön
           </Link>
-          <h1 className="text-sm font-black tracking-tight text-white uppercase">Yeni Personel Ekle</h1>
+          <h1 className="text-sm font-black tracking-tight text-[#1a1f2e] uppercase">Yeni Personel Ekle</h1>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-[#0c0f1a] border border-[#1a2236] rounded-2xl p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-6 space-y-4">
 
-          {hata && <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl">{hata}</div>}
+          {hata && <div className="bg-red-500/10 border border-red-500/20 text-red-600 text-xs p-3 rounded-xl">{hata}</div>}
 
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><User size={12} /> Adı Soyadı *</label>
             <input type="text" required value={form.isim} onChange={e => setForm({ ...form, isim: e.target.value })}
               placeholder="Ahmet Yılmaz"
-              className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40" />
+              className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40" />
           </div>
 
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><Phone size={12} /> Telefon</label>
             <input type="text" value={form.telefon} onChange={e => setForm({ ...form, telefon: e.target.value.replace(/\D/g, "").slice(0, 11) })}
               placeholder="05xxxxxxxxx"
-              className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40" />
+              className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40" />
           </div>
 
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><CreditCard size={12} /> TC Kimlik No</label>
             <input type="text" value={form.tc_kimlik} onChange={e => setForm({ ...form, tc_kimlik: e.target.value.replace(/\D/g, "").slice(0, 11) })}
               placeholder="11 haneli TC No"
-              className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 font-mono" />
+              className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 font-mono" />
           </div>
 
           <div className="space-y-1.5">
@@ -94,14 +94,14 @@ export default function YeniPersonelPage() {
             <input type="text" value={form.iban} maxLength={26}
               onChange={e => { const v = e.target.value.toUpperCase().replace("TR", "").replace(/[^0-9]/g, "").slice(0, 24); setForm({ ...form, iban: "TR" + v }); }}
               placeholder="TR"
-              className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 font-mono" />
+              className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 font-mono" />
           </div>
 
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><Briefcase size={12} /> Departman</label>
             <select value={form.departman} onChange={e => setForm({ ...form, departman: e.target.value })}
-              className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 appearance-none">
-              {DEPARTMANLAR.map(d => <option key={d} value={d} className="bg-[#0c0f1a]">{d}</option>)}
+              className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 appearance-none">
+              {DEPARTMANLAR.map(d => <option key={d} value={d} className="bg-[#ffffff]">{d}</option>)}
             </select>
           </div>
 
@@ -111,14 +111,14 @@ export default function YeniPersonelPage() {
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-xs">₺</span>
               <input type="number" value={form.maas} onChange={e => setForm({ ...form, maas: e.target.value })}
                 placeholder="0"
-                className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 pl-7 pr-3 rounded-xl outline-none focus:border-blue-500/40" />
+                className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 pl-7 pr-3 rounded-xl outline-none focus:border-blue-500/40" />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><Calendar size={12} /> İşe Giriş Tarihi</label>
             <input type="date" value={form.ise_giris_tarihi} onChange={e => setForm({ ...form, ise_giris_tarihi: e.target.value })}
-              className="w-full bg-[#060810] border border-[#1a2236] text-white text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40" />
+              className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40" />
           </div>
 
           <button type="submit" disabled={loading}
