@@ -1084,11 +1084,11 @@ function CurrencyInput({label, value, onChange, disabled=false, accent="gray"}:
 
     <div className="group">
 
-      <label className="block text-[10px] text-gray-600 uppercase tracking-wide font-medium mb-1">{label}</label>
+      <label className="block text-[12px] text-gray-300 font-semibold mb-1.5">{label}</label>
 
       <div className="relative">
 
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-xs font-medium">₺</span>
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[13px] font-semibold">₺</span>
 
         <input
 
@@ -1096,7 +1096,7 @@ function CurrencyInput({label, value, onChange, disabled=false, accent="gray"}:
 
           onChange={e=>onChange(fmtStr(e.target.value))}
 
-          className="w-full bg-[#080b14] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 text-white text-sm font-bold h-9 pl-7 pr-3 rounded-xl outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-700"
+          className="w-full bg-[#11151f] border border-[#232d45] hover:border-[#324066] focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 text-white text-[15px] font-bold h-10 pl-7 pr-3 rounded-xl outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"
 
           placeholder="0"
 
@@ -1142,32 +1142,33 @@ function PlatformSatir({label, value, onChange, indirim, onIndirimChange, disabl
   {label:string, value:PlatformGiris, onChange:(v:PlatformGiris)=>void,
    indirim?:string, onIndirimChange?:(v:string)=>void, disabled?:boolean}) {
   return (
-    <div className="rounded-lg border border-[#1a2236] bg-[#080b14] p-2">
-      <p className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold mb-1.5">{label}</p>
-      <div className="flex items-center gap-1.5">
-        <div className="relative flex-1">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-600 text-[11px] font-medium">₺</span>
+    <div className="rounded-xl border border-[#232d45] bg-[#0a0e18] p-3 hover:border-[#2e3a58] transition-colors">
+      <p className="text-[13px] text-gray-200 font-semibold mb-2">{label}</p>
+      <div className="flex items-center gap-2">
+        <div className="relative flex-[1.4]">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[13px] font-semibold pointer-events-none">₺</span>
           <input type="text" value={value.tutar} disabled={disabled}
             onChange={e=>onChange({...value, tutar: fmtStr(e.target.value)})}
             placeholder="0"
-            className="w-full bg-[#0c0f1a] border border-[#1a2236] hover:border-[#243050] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 text-white text-xs font-bold h-8 pl-6 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-700"/>
+            className="w-full bg-[#11151f] border border-[#232d45] hover:border-[#324066] focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 text-white text-[15px] font-bold h-10 pl-7 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"/>
         </div>
-        <div className="relative w-[64px] shrink-0">
-          <Package size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600"/>
+        <div className="relative flex-1">
+          <Package size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500/70 pointer-events-none"/>
           <input type="number" value={value.paket} disabled={disabled}
             onChange={e=>onChange({...value, paket: e.target.value})}
             placeholder="0"
             title="Paket sayısı"
-            className="w-full bg-[#0c0f1a] border border-[#1a2236] hover:border-[#243050] focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 text-amber-300 text-xs font-bold h-8 pl-6 pr-1.5 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-700"/>
+            className="w-full bg-[#11151f] border border-[#232d45] hover:border-[#324066] focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/15 text-amber-300 text-[15px] font-bold h-10 pl-8 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"/>
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-600 font-medium pointer-events-none hidden sm:block">pkt</span>
         </div>
       </div>
       {onIndirimChange && (
-        <div className="relative mt-1.5">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-red-500/70 text-[10px] font-medium">-₺</span>
+        <div className="relative mt-2">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-red-400/90 pointer-events-none">İndirim ₺</span>
           <input type="text" value={indirim||""} disabled={disabled}
             onChange={e=>onIndirimChange(fmtStr(e.target.value))}
-            placeholder="İndirim"
-            className="w-full bg-[#0c0f1a] border border-red-500/10 hover:border-red-500/25 focus:border-red-500/40 focus:ring-1 focus:ring-red-500/15 text-red-300 text-[11px] font-semibold h-7 pl-6 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-700"/>
+            placeholder="0"
+            className="w-full bg-[#150c0e] border border-red-500/15 hover:border-red-500/30 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/15 text-red-300 text-[13px] font-bold h-8 pl-[68px] pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-700 text-right"/>
         </div>
       )}
     </div>
@@ -2677,11 +2678,11 @@ Soru: ${soruFinal}`
 
         ].map(c=>(
 
-          <div key={c.label} className={`rounded-xl border ${c.border} px-3 py-2`}>
+          <div key={c.label} className={`rounded-xl border ${c.border} px-3.5 py-2.5`}>
 
-            <p className="text-[9px] text-gray-600 uppercase tracking-widest">{c.label}</p>
+            <p className="text-[11px] text-gray-400 font-medium">{c.label}</p>
 
-            <p className={`text-sm font-black tracking-tight ${c.color}`}>{c.value}</p>
+            <p className={`text-base font-black tracking-tight ${c.color}`}>{c.value}</p>
 
           </div>
 
@@ -2770,23 +2771,23 @@ Soru: ${soruFinal}`
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
               {/* ── ONLINE ── */}
-              <div className="rounded-xl border border-blue-500/15 bg-[#0c0f1a] overflow-hidden">
-                <div className="px-3 py-2 border-b border-blue-500/15 flex items-center justify-between">
-                  <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider flex items-center gap-1.5"><Monitor size={11}/>Online</span>
-                  <span className="text-xs font-black text-blue-400">₺{fmt(ch.tOnline)} <span className="text-gray-600 font-normal">· {ch.tOnlinePaket} pkt</span></span>
+              <div className="rounded-xl border border-blue-500/20 bg-[#0c0f1a] overflow-hidden">
+                <div className="px-4 py-3 border-b border-blue-500/15 flex items-center justify-between bg-blue-500/[0.03]">
+                  <span className="text-[13px] font-bold text-blue-300 flex items-center gap-2"><Monitor size={14}/>Online Satışlar</span>
+                  <span className="text-sm font-black text-blue-300">₺{fmt(ch.tOnline)} <span className="text-gray-500 font-medium text-[11px]">· {ch.tOnlinePaket} paket</span></span>
                 </div>
-                <div className="p-3 space-y-3">
+                <div className="p-3 space-y-4">
                   <div>
-                    <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1.5">Kebo</p>
-                    <div className="space-y-1.5">
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full mb-2">🍔 Kebo</span>
+                    <div className="space-y-2">
                       <PlatformSatir label="Yemeksepeti" value={osKeboYs} onChange={setOsKeboYs} indirim={osKeboYsIndirim} onIndirimChange={setOsKeboYsIndirim} disabled={isReadOnly}/>
                       <PlatformSatir label="Trendyol" value={osKeboTrendyol} onChange={setOsKeboTrendyol} indirim={osKeboTrendyolIndirim} onIndirimChange={setOsKeboTrendyolIndirim} disabled={isReadOnly}/>
                       <PlatformSatir label="Migros" value={osKeboMigros} onChange={setOsKeboMigros} disabled={isReadOnly}/>
                     </div>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1.5">Chick'N Fride</p>
-                    <div className="space-y-1.5">
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-red-300 bg-red-500/10 border border-red-500/25 px-2.5 py-1 rounded-full mb-2">🍗 Chick'N Fride</span>
+                    <div className="space-y-2">
                       <PlatformSatir label="Yemeksepeti" value={osCnfYs} onChange={setOsCnfYs} indirim={osCnfYsIndirim} onIndirimChange={setOsCnfYsIndirim} disabled={isReadOnly}/>
                       <PlatformSatir label="Trendyol" value={osCnfTrendyol} onChange={setOsCnfTrendyol} indirim={osCnfTrendyolIndirim} onIndirimChange={setOsCnfTrendyolIndirim} disabled={isReadOnly}/>
                       <PlatformSatir label="Migros Yemek" value={osCnfMigrosYemek} onChange={setOsCnfMigrosYemek} disabled={isReadOnly}/>
@@ -2796,18 +2797,18 @@ Soru: ${soruFinal}`
               </div>
 
               {/* ── KAPIDA ÖDEME ── */}
-              <div className="rounded-xl border border-purple-500/15 bg-[#0c0f1a] overflow-hidden">
-                <div className="px-3 py-2 border-b border-purple-500/15 flex items-center justify-between">
-                  <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider flex items-center gap-1.5"><Home size={11}/>Kapıda Ödeme</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[9px] text-purple-600 bg-purple-500/10 px-1.5 py-0.5 rounded-full">Kasaya dahil</span>
-                    <span className="text-xs font-black text-purple-400">₺{fmt(ch.tKapida)} <span className="text-gray-600 font-normal">· {ch.tKapidaPaket} pkt</span></span>
+              <div className="rounded-xl border border-purple-500/20 bg-[#0c0f1a] overflow-hidden">
+                <div className="px-4 py-3 border-b border-purple-500/15 flex items-center justify-between bg-purple-500/[0.03]">
+                  <span className="text-[13px] font-bold text-purple-300 flex items-center gap-2"><Home size={14}/>Kapıda Ödeme</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-semibold text-purple-300 bg-purple-500/15 border border-purple-500/25 px-2 py-0.5 rounded-full">Kasaya dahil</span>
+                    <span className="text-sm font-black text-purple-300">₺{fmt(ch.tKapida)} <span className="text-gray-500 font-medium text-[11px]">· {ch.tKapidaPaket} paket</span></span>
                   </div>
                 </div>
-                <div className="p-3 space-y-3">
+                <div className="p-3 space-y-4">
                   <div>
-                    <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1.5">Kebo</p>
-                    <div className="space-y-1.5">
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full mb-2">🍔 Kebo</span>
+                    <div className="space-y-2">
                       <PlatformSatir label="Yemeksepeti" value={koKeboYs} onChange={setKoKeboYs} indirim={koKeboYsIndirim} onIndirimChange={setKoKeboYsIndirim} disabled={isReadOnly}/>
                       <PlatformSatir label="Trendyol" value={koKeboTrendyol} onChange={setKoKeboTrendyol} indirim={koKeboTrendyolIndirim} onIndirimChange={setKoKeboTrendyolIndirim} disabled={isReadOnly}/>
                       <PlatformSatir label="Migros Yemek" value={koKeboMigrosYemek} onChange={setKoKeboMigrosYemek} disabled={isReadOnly}/>
@@ -2815,8 +2816,8 @@ Soru: ${soruFinal}`
                     </div>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1.5">Chick'N Fride</p>
-                    <div className="space-y-1.5">
+                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-red-300 bg-red-500/10 border border-red-500/25 px-2.5 py-1 rounded-full mb-2">🍗 Chick'N Fride</span>
+                    <div className="space-y-2">
                       <PlatformSatir label="Yemeksepeti" value={koCnfYs} onChange={setKoCnfYs} indirim={koCnfYsIndirim} onIndirimChange={setKoCnfYsIndirim} disabled={isReadOnly}/>
                       <PlatformSatir label="Trendyol" value={koCnfTrendyol} onChange={setKoCnfTrendyol} indirim={koCnfTrendyolIndirim} onIndirimChange={setKoCnfTrendyolIndirim} disabled={isReadOnly}/>
                       <PlatformSatir label="Migros Yemek" value={koCnfMigrosYemek} onChange={setKoCnfMigrosYemek} disabled={isReadOnly}/>
@@ -2829,50 +2830,50 @@ Soru: ${soruFinal}`
             </div>
 
             {/* ── KASA ── */}
-            <div className="rounded-xl border border-emerald-500/15 bg-[#0c0f1a] overflow-hidden">
-              <div className="px-3 py-2 border-b border-emerald-500/15 flex items-center justify-between">
-                <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5"><Wallet size={11}/>Kasa</span>
-                <span className="text-xs font-black text-emerald-400">₺{fmt(ch.tKasa)}</span>
+            <div className="rounded-xl border border-emerald-500/20 bg-[#0c0f1a] overflow-hidden">
+              <div className="px-4 py-3 border-b border-emerald-500/15 flex items-center justify-between bg-emerald-500/[0.03]">
+                <span className="text-[13px] font-bold text-emerald-300 flex items-center gap-2">💰 Kasa</span>
+                <span className="text-sm font-black text-emerald-300">₺{fmt(ch.tKasa)}</span>
               </div>
-              <div className="p-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="p-3 grid grid-cols-2 md:grid-cols-4 gap-2.5">
                 <CurrencyInput label="Nakit" value={kasaNakit} onChange={setKasaNakit} disabled={isReadOnly}/>
                 <CurrencyInput label="Pos" value={kasaPos} onChange={setKasaPos} disabled={isReadOnly}/>
                 <CurrencyInput label="Edenred" value={kasaEdenred} onChange={setKasaEdenred} disabled={isReadOnly}/>
                 <CurrencyInput label="Metropol" value={kasaMetropol} onChange={setKasaMetropol} disabled={isReadOnly}/>
               </div>
-              <div className="mx-3 mb-3 rounded-lg border border-red-500/15 bg-red-500/5 px-3 py-2 flex items-center justify-between">
-                <span className="text-[10px] text-red-400 uppercase tracking-wide font-medium flex items-center gap-1.5"><TrendingDown size={11}/>Gider (salt okunur)</span>
-                <span className="text-sm font-black text-red-400">₺{fmt(ch.tGider)}</span>
+              <div className="mx-3 mb-3 rounded-lg border border-red-500/20 bg-red-500/5 px-3.5 py-2.5 flex items-center justify-between">
+                <span className="text-[12px] text-red-300 font-semibold flex items-center gap-1.5"><TrendingDown size={13}/>Gider (salt okunur)</span>
+                <span className="text-[15px] font-black text-red-300">₺{fmt(ch.tGider)}</span>
               </div>
-              <p className="px-3 pb-2.5 text-[10px] text-gray-600">Gider için aşağıdaki <span className="text-gray-400 font-semibold">Giderler</span> bölümünü kullan — buraya doğrudan giriş yapılamaz, orada eklediğin her satır bu toplama otomatik yansır.</p>
+              <p className="px-3.5 pb-3 text-[11px] text-gray-500 leading-relaxed">Gider için aşağıdaki <span className="text-gray-300 font-semibold">Giderler</span> bölümünü kullan — buraya doğrudan giriş yapılamaz, orada eklediğin her satır bu toplama otomatik yansır.</p>
             </div>
 
             {/* ── İNDİRİM ANALİZİ ── */}
-            <div className={`rounded-xl border overflow-hidden ${ch.indirimUyari ? "border-red-500/40 bg-red-500/5" : "border-[#1a2236] bg-[#0c0f1a]"}`}>
-              <div className="px-3 py-2 border-b border-[#1a2236] flex items-center justify-between">
-                <span className={`text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5 ${ch.indirimUyari?"text-red-400":"text-gray-400"}`}>
-                  <Percent size={11}/>İndirim Analizi
+            <div className={`rounded-xl border overflow-hidden ${ch.indirimUyari ? "border-red-500/40 bg-red-500/5" : "border-[#232d45] bg-[#0c0f1a]"}`}>
+              <div className={`px-4 py-3 border-b flex items-center justify-between ${ch.indirimUyari ? "border-red-500/25 bg-red-500/[0.04]" : "border-[#232d45] bg-white/[0.02]"}`}>
+                <span className={`text-[13px] font-bold flex items-center gap-2 ${ch.indirimUyari?"text-red-300":"text-gray-200"}`}>
+                  <Percent size={14}/>İndirim Analizi
                 </span>
-                <span className={`text-xs font-black ${ch.indirimUyari?"text-red-400":"text-white"}`}>%{ch.indirimOrani.toFixed(1)}</span>
+                <span className={`text-sm font-black ${ch.indirimUyari?"text-red-300":"text-white"}`}>%{ch.indirimOrani.toFixed(1)}</span>
               </div>
-              <div className="p-3 grid grid-cols-3 gap-2 text-center">
+              <div className="p-3.5 grid grid-cols-3 gap-2 text-center">
                 <div>
-                  <p className="text-[9px] text-gray-600 uppercase tracking-widest">Yemeksepeti İndirim</p>
-                  <p className="text-sm font-black text-red-400">₺{fmt(ch.tIndirimYS)}</p>
+                  <p className="text-[11px] text-gray-400 font-medium">Yemeksepeti</p>
+                  <p className="text-[15px] font-black text-red-300">₺{fmt(ch.tIndirimYS)}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] text-gray-600 uppercase tracking-widest">Trendyol İndirim</p>
-                  <p className="text-sm font-black text-red-400">₺{fmt(ch.tIndirimTrendyol)}</p>
+                  <p className="text-[11px] text-gray-400 font-medium">Trendyol</p>
+                  <p className="text-[15px] font-black text-red-300">₺{fmt(ch.tIndirimTrendyol)}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] text-gray-600 uppercase tracking-widest">Toplam İndirim</p>
-                  <p className="text-sm font-black text-white">₺{fmt(ch.tIndirim)}</p>
+                  <p className="text-[11px] text-gray-400 font-medium">Toplam</p>
+                  <p className="text-[15px] font-black text-white">₺{fmt(ch.tIndirim)}</p>
                 </div>
               </div>
               {ch.indirimUyari && (
-                <div className="mx-3 mb-3 flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
-                  <AlertTriangle size={13} className="text-red-400 shrink-0"/>
-                  <p className="text-[11px] text-red-300">İndirim oranı platform cirosunun <span className="font-black">%15'ini</span> geçti — kontrol et.</p>
+                <div className="mx-3.5 mb-3.5 flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3.5 py-2.5">
+                  <AlertTriangle size={14} className="text-red-400 shrink-0"/>
+                  <p className="text-[12px] text-red-200">İndirim oranı platform cirosunun <span className="font-black">%15'ini</span> geçti — kontrol et.</p>
                 </div>
               )}
             </div>
@@ -2885,9 +2886,9 @@ Soru: ${soruFinal}`
 
               <div className="rounded-xl border border-[#1a2236] bg-[#080b14] px-4 py-3">
 
-                <p className="text-[9px] text-gray-600 uppercase tracking-widest font-semibold mb-2 flex items-center gap-1.5">
+                <p className="text-[11px] text-gray-400 font-semibold mb-2.5 flex items-center gap-1.5">
 
-                  <PieChart size={9}/> Platform Bazlı Toplam (Online + Kapıda) — Bilgi Amaçlı
+                  <PieChart size={11}/> Platform Bazlı Toplam (Online + Kapıda) — Bilgi Amaçlı
 
                 </p>
 
