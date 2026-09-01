@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 
 // "Fişten Doldur" özelliği: kullanıcı KEBO kağıt kasa raporunun fotoğrafını
-// yükler, Claude görseli okuyup dijital forma birebir eşlenen JSON döndürür.
-// Anahtar sadece burada, sunucu tarafında kullanılır.
+// yükler, Gemini görseli okuyup dijital forma birebir eşlenen JSON döndürür.
+// Gemini API'nin ücretsiz katmanı (Flash modeli) kullanılıyor — Anthropic API
+// kredisi gerektirmez. Anahtar sadece burada, sunucu tarafında kullanılır.
 
 const SISTEM_PROMPT = `Sen KEBO ERP için bir kağıt rapor okuma asistanısın. Sana KEBO'nun standart
 kağıt "Günlük Kasa Kapanış Formu" fotoğrafı verilecek. Bu formun sabit bir düzeni var:
@@ -92,40 +93,42 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Görsel bulunamadı" }, { status: 400 });
     }
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || "",
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-5-20250929",
-        max_tokens: 3000,
-        system: SISTEM_PROMPT,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: mediaType || "image/jpeg", data: imageBase64 },
-              },
-              { type: "text", text: "Bu KEBO kağıt kasa raporunu oku ve yalnızca JSON döndür." },
-            ],
+    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: SISTEM_PROMPT }] },
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { inline_data: { mime_type: mediaType || "image/jpeg", data: imageBase64 } },
+                { text: "Bu KEBO kağıt kasa raporunu oku ve yalnızca JSON döndür." },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
           },
-        ],
-      }),
-    });
+        }),
+      }
+    );
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Rapor tarama API hatası:", data);
+      console.error("Rapor tarama API hatası (Gemini):", data);
       return NextResponse.json({ error: "API hatası", details: data }, { status: response.status });
     }
 
-    const metin = (data.content || []).map((c: any) => c.text || "").join("").trim();
+    const metin = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
     const temiz = metin.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
 
     let ayrisik;
