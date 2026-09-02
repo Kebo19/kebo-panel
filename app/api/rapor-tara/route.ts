@@ -103,6 +103,54 @@ const MAX_OUTPUT_TOKENS = 16384;
 // Gemini API bazen (özellikle soğuk başlangıçta) uzun sürebiliyor; kullanıcıyı
 // süresiz bekletmemek için kendi zaman aşımımızı koyuyoruz.
 const GEMINI_TIMEOUT_MS = 45000;
+// "This model is currently experiencing high demand" (503/UNAVAILABLE) ve
+// hız sınırı (429) hataları geçici — Google da "genelde kısa sürede
+// düzeliyor, tekrar deneyin" diyor. Kullanıcıyı hemen hatayla karşılamak
+// yerine kısa aralıklarla birkaç kez otomatik deniyoruz.
+const MAX_DENEME = 3;
+const bekle = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+const gemeniIstegiGonder = (apiKey: string, imageBase64: string, mediaType: string) => {
+  const controller = new AbortController();
+  const zamanAsimi = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+  return fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SISTEM_PROMPT }] },
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { inline_data: { mime_type: mediaType || "image/jpeg", data: imageBase64 } },
+              { text: "Bu KEBO kağıt kasa raporunu oku ve yalnızca JSON döndür." },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+          // ÖNEMLİ: Flash modelleri varsayılan olarak "thinking" (iç
+          // muhakeme) modunda çalışıyor ve bu iç muhakeme de aynı token
+          // bütçesini paylaşıyor. Basit bir OCR + şemaya JSON basma
+          // görevinde modelin bütçenin büyük kısmını "düşünmeye"
+          // harcayıp görünür cevabı boş/eksik bırakması (finishReason:
+          // MAX_TOKENS) bilinen ve sık karşılaşılan bir davranış.
+          // gemini-3.6-flash'ta (2.5-flash'ın aksine) thinking tamamen
+          // kapatılamıyor, o yüzden "minimal" seviyeye çekip yukarıdaki
+          // MAX_OUTPUT_TOKENS'ı yükselterek dengeliyoruz.
+          thinkingConfig: { thinkingLevel: "minimal" },
+        },
+      }),
+    }
+  ).finally(() => clearTimeout(zamanAsimi));
+};
 
 export async function POST(req: Request) {
   try {
@@ -128,69 +176,36 @@ export async function POST(req: Request) {
       );
     }
 
-    const controller = new AbortController();
-    const zamanAsimi = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
-
-    let response: Response;
-    try {
-      response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": apiKey,
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: SISTEM_PROMPT }] },
-            contents: [
-              {
-                role: "user",
-                parts: [
-                  { inline_data: { mime_type: mediaType || "image/jpeg", data: imageBase64 } },
-                  { text: "Bu KEBO kağıt kasa raporunu oku ve yalnızca JSON döndür." },
-                ],
-              },
-            ],
-            generationConfig: {
-              responseMimeType: "application/json",
-              maxOutputTokens: MAX_OUTPUT_TOKENS,
-              // ÖNEMLİ: Flash modelleri varsayılan olarak "thinking" (iç
-              // muhakeme) modunda çalışıyor ve bu iç muhakeme de aynı token
-              // bütçesini paylaşıyor. Basit bir OCR + şemaya JSON basma
-              // görevinde modelin bütçenin büyük kısmını "düşünmeye"
-              // harcayıp görünür cevabı boş/eksik bırakması (finishReason:
-              // MAX_TOKENS) bilinen ve sık karşılaşılan bir davranış.
-              // gemini-3.6-flash'ta (2.5-flash'ın aksine) thinking tamamen
-              // kapatılamıyor, o yüzden "minimal" seviyeye çekip yukarıdaki
-              // MAX_OUTPUT_TOKENS'ı yükselterek dengeliyoruz.
-              thinkingConfig: { thinkingLevel: "minimal" },
-            },
-          }),
-        }
-      );
-    } finally {
-      clearTimeout(zamanAsimi);
-    }
-
+    let response: Response | undefined;
     let data: any;
-    try {
-      data = await response.json();
-    } catch {
-      console.error("[rapor-tara] Gemini'den geçerli JSON gelmedi, HTTP", response.status);
-      return NextResponse.json(
-        { error: `Gemini API beklenmedik bir cevap döndürdü (HTTP ${response.status}).` },
-        { status: 502 }
-      );
+    for (let deneme = 1; deneme <= MAX_DENEME; deneme++) {
+      response = await gemeniIstegiGonder(apiKey, imageBase64, mediaType);
+
+      try {
+        data = await response.json();
+      } catch {
+        console.error("[rapor-tara] Gemini'den geçerli JSON gelmedi, HTTP", response.status);
+        return NextResponse.json(
+          { error: `Gemini API beklenmedik bir cevap döndürdü (HTTP ${response.status}).` },
+          { status: 502 }
+        );
+      }
+
+      const gecici = response.status === 503 || response.status === 429;
+      if (gecici && deneme < MAX_DENEME) {
+        console.warn(`[rapor-tara] Geçici Gemini hatası (HTTP ${response.status}), ${deneme}. deneme, tekrar denenecek`);
+        await bekle(1200 * deneme);
+        continue;
+      }
+      break;
     }
 
-    if (!response.ok) {
+    if (!response!.ok) {
       console.error("Rapor tarama API hatası (Gemini):", JSON.stringify(data));
       const detay = data?.error?.message || "Bilinmeyen hata";
       return NextResponse.json(
         { error: `Gemini API hatası: ${detay}`, details: data },
-        { status: response.status }
+        { status: response!.status }
       );
     }
 
