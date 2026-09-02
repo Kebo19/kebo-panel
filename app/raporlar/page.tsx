@@ -38,6 +38,10 @@ interface KuryeRaporu {
 
   id: number; isim: string; nakit: string; pos: string; paketSayisi: string;
 
+  // 02.09.2026: Roadrunner bazı paketleri farklı ücretlendiriyor — uzak paketler 1.5 kat,
+  // 9km üzeri paketler 2 kat. paketSayisi = normal (1x) ücretli paket sayısı; bu ikisi ayrı tutulur.
+  uzakPaket?: string; paket9km?: string;
+
   tip?: "sabit" | "havuz" | "kendi"; // sabit = Roadrunner garantili kurye, havuz = garantisiz ek kurye, kendi = 14.08.2026 öncesi kendi personel kurye
 
 }
@@ -188,7 +192,7 @@ const fmtTarih = (t: string) => { if(!t) return ""; const [y,m,d]=t.split("-"); 
 
 // ─── BRÜT/NET HESAPLAMA YARDIMCILARI ──────────────────────────────────────────
 
-// Brüt Ciro = toplam_ciro (DB'de online + kasa + gider olarak kaydedilir)
+// Brüt Ciro = toplam_ciro (DB'de online + kapıda + kasa + gider olarak kaydedilir)
 
 // Geriye uyumluluk: eski raporlarda gider brüte dahil değilse de bu fonksiyon doğru sonuç verir.
 
@@ -196,25 +200,30 @@ const brutHesapla = (r: GunlukRapor): number => {
 
   const tO = (r.os_yemeksepeti||0)+(r.os_getir||0)+(r.os_trendyol||0)+(r.os_migros||0)+(r.os_chicknfride||0);
 
+  // 02.09.2026: Kapıda ödeme kasaya girmiyor (kuryeler tahsil ediyor) — ayrıca eklenir.
+  const tK = (r.ko_yemeksepeti||0)+(r.ko_getir||0)+(r.ko_trendyol||0)+(r.ko_migros||0)+(r.ko_alo_paket||0)+(r.ko_chicknfride||0);
+
   const tKasa = (r.kasa_nakit||0)+(r.kasa_pos||0)+(r.kasa_edenred||0)+(r.kasa_metropol||0);
 
   const gider = r.gunluk_gider||0;
 
-  // Yeni mantık: brüt = online + kasa + gider (gider kasadan çıktığı için brüte dahil)
+  // Yeni mantık: brüt = online + kapıda + kasa + gider (gider kasadan çıktığı için brüte dahil)
 
-  return tO + tKasa + gider;
+  return tO + tK + tKasa + gider;
 
 };
 
 const netHesapla = (r: GunlukRapor): number => {
 
-  // Net = Brüt - Gider - İade = (online + kasa + gider) - gider - iade = online + kasa - iade
+  // Net = Brüt - Gider - İade = (online + kapıda + kasa + gider) - gider - iade = online + kapıda + kasa - iade
 
   const tO = (r.os_yemeksepeti||0)+(r.os_getir||0)+(r.os_trendyol||0)+(r.os_migros||0)+(r.os_chicknfride||0);
 
+  const tK = (r.ko_yemeksepeti||0)+(r.ko_getir||0)+(r.ko_trendyol||0)+(r.ko_migros||0)+(r.ko_alo_paket||0)+(r.ko_chicknfride||0);
+
   const tKasa = (r.kasa_nakit||0)+(r.kasa_pos||0)+(r.kasa_edenred||0)+(r.kasa_metropol||0);
 
-  return tO + tKasa - (r.iade_tutar||0);
+  return tO + tK + tKasa - (r.iade_tutar||0);
 
 };
 
@@ -1121,18 +1130,18 @@ const ROADRUNNER_TAM_BASLANGIC = "2026-08-14";
 
 function kuryeYapisiHesapla(tarihStr: string): KuryeRaporu[] {
   if (!tarihStr || tarihStr < ROADRUNNER_GECIS_GUNU) {
-    return [{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:"",tip:"kendi"}];
+    return [{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"kendi"}];
   }
   if (tarihStr === ROADRUNNER_GECIS_GUNU) {
     return [
-      {id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:"",tip:"kendi"},
-      {id:Date.now()+1,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",tip:"havuz"},
+      {id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"kendi"},
+      {id:Date.now()+1,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"havuz"},
     ];
   }
   return [
-    {id:1,isim:"Kurye 1",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
-    {id:2,isim:"Kurye 2",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
-    {id:3,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",tip:"havuz"},
+    {id:1,isim:"Kurye 1",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"sabit"},
+    {id:2,isim:"Kurye 2",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"sabit"},
+    {id:3,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"havuz"},
   ];
 }
 
@@ -1426,9 +1435,9 @@ export default function RaporlarPage() {
   const [iadeler, setIadeler] = useState<SatirRaporu[]>([{id:Date.now(),aciklama:"",tutar:""}]); // İptal-İade Fişleri
 
   const [kuryeler, setKuryeler] = useState<KuryeRaporu[]>([
-    {id:1,isim:"Kurye 1",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
-    {id:2,isim:"Kurye 2",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
-    {id:3,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",tip:"havuz"},
+    {id:1,isim:"Kurye 1",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"sabit"},
+    {id:2,isim:"Kurye 2",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"sabit"},
+    {id:3,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"havuz"},
   ]);
 
   const [notlar, setNotlar] = useState("");
@@ -1625,9 +1634,9 @@ export default function RaporlarPage() {
     setTarih("");setTarihHataVarMi(false);setAdminOnayliGecis(false);setDuplikaTarihHata(false);
 
     setKuryeler([
-      {id:1,isim:"Kurye 1",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
-      {id:2,isim:"Kurye 2",nakit:"",pos:"",paketSayisi:"",tip:"sabit"},
-      {id:3,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",tip:"havuz"},
+      {id:1,isim:"Kurye 1",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"sabit"},
+      {id:2,isim:"Kurye 2",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"sabit"},
+      {id:3,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"havuz"},
     ]);
 
     setNotlar("");setSelectedRapor(null);setIsEditMode(false);
@@ -1792,9 +1801,9 @@ export default function RaporlarPage() {
 
     setKuryeler(r.kurye_raporlari?.length
 
-      ? r.kurye_raporlari.map(k=>({...k,nakit:fmt(Number(k.nakit)),pos:fmt(Number(k.pos))}))
+      ? r.kurye_raporlari.map(k=>({...k,nakit:fmt(Number(k.nakit)),pos:fmt(Number(k.pos)),uzakPaket:k.uzakPaket||"",paket9km:k.paket9km||""}))
 
-      : [{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:""}]);
+      : [{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:""}]);
 
     const giderAciklamaHam = r.gider_aciklama || "";
 
@@ -1929,20 +1938,31 @@ export default function RaporlarPage() {
 
     const tIade=iadeler.reduce((a,i)=>a+tv(i.tutar),0);
 
-    const brutCiro = tOnline + tKasa + tGider;
+    // 02.09.2026: Kapıda ödeme (kapıda tahsil edilen) tutarları kasaya hiç girmiyor —
+    // kuryeler (Roadrunner) tahsil edip ayrıca mutabık kalınıyor — bu yüzden brüte
+    // ayrıca eklenmesi gerekiyor, aksi halde ciroda hiç görünmüyordu.
+    const brutCiro = tOnline + tKapida + tKasa + tGider;
 
-    const netCiro  = brutCiro - tGider - tIade; // matematiksel: tOnline + tKasa - tIade
+    const netCiro  = brutCiro - tGider - tIade; // matematiksel: tOnline + tKapida + tKasa - tIade
 
     // ── Kuryeler: SADECE tip==="sabit" (Roadrunner, 14.08.2026+) olan satırlarda min. 30 paket garantisi var.
     // "havuz" ve "kendi" (14.08.2026 öncesi kendi personel kurye / geçiş günü) satırlarında garanti yok.
     const KURYE_GARANTI = 30;
     const kuryelerHesap = kuryeler.map(k=>{
-      const gercek = parseInt(k.paketSayisi)||0;
+      // 02.09.2026: "gerçek" paket, mesafe farkı gözetmeksizin o gün atılan TÜM paketler
+      // (normal + uzak + 9km üzeri) — 30 paket garantisi toplam teslimat sayısına bakar,
+      // ücretlendirme farkı (1.5x/2x) Rapor Analiz > Roadrunner Mutabakatı'nda hesaplanır.
+      const normalPaket = parseInt(k.paketSayisi)||0;
+      const uzakPaket = parseInt(k.uzakPaket||"")||0;
+      const paket9km = parseInt(k.paket9km||"")||0;
+      const gercek = normalPaket + uzakPaket + paket9km;
       const uygulanan = k.tip==="sabit" ? Math.max(gercek, KURYE_GARANTI) : gercek;
-      return { ...k, gercekPaket:gercek, uygulananPaket:uygulanan, garantiUygulandi: k.tip==="sabit" && gercek<KURYE_GARANTI };
+      return { ...k, normalPaket, uzakPaket, paket9km, gercekPaket:gercek, uygulananPaket:uygulanan, garantiUygulandi: k.tip==="sabit" && gercek<KURYE_GARANTI };
     });
     const tKuryePaket=kuryelerHesap.reduce((a,k)=>a+k.uygulananPaket,0);
     const tKuryeGercekPaket=kuryelerHesap.reduce((a,k)=>a+k.gercekPaket,0);
+    const tKuryeUzakPaket=kuryelerHesap.reduce((a,k)=>a+k.uzakPaket,0);
+    const tKuryePaket9km=kuryelerHesap.reduce((a,k)=>a+k.paket9km,0);
     const tKuryeTahsilat=kuryeler.reduce((a,k)=>a+tv(k.nakit)+tv(k.pos),0);
 
     const paketOrt=(tOnline+tKapida)>0&&tKuryePaket>0?Math.round((tOnline+tKapida)/tKuryePaket):0;
@@ -1951,7 +1971,8 @@ export default function RaporlarPage() {
 
     return {tOnline,tOnlineKebo,tOnlineCnf,tOnlinePaket,tKapida,tKapidaKebo,tKapidaCnf,tKapidaPaket,
       tIndirimYS,tIndirimTrendyol,tIndirim,indirimOrani,indirimUyari,
-      tKasa,brutCiro,tGider,tIade,netCiro,kuryelerHesap,tKuryePaket,tKuryeGercekPaket,tKuryeTahsilat,paketOrt,kuryeFark};
+      tKasa,brutCiro,tGider,tIade,netCiro,kuryelerHesap,tKuryePaket,tKuryeGercekPaket,
+      tKuryeUzakPaket,tKuryePaket9km,tKuryeTahsilat,paketOrt,kuryeFark};
 
   },[osKeboYs,osKeboYsIndirim,osKeboTrendyol,osKeboTrendyolIndirim,osKeboMigros,
      osCnfYs,osCnfYsIndirim,osCnfTrendyol,osCnfTrendyolIndirim,osCnfMigrosYemek,
@@ -2011,7 +2032,7 @@ export default function RaporlarPage() {
 
 
 
-  const kuryeEkle = ()=>setKuryeler([...kuryeler,{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:"",tip:"havuz"}]);
+  const kuryeEkle = ()=>setKuryeler([...kuryeler,{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"havuz"}]);
 
   const kuryeSil = (id:number)=>setKuryeler(kuryeler.filter(k=>k.id!==id));
 
@@ -2093,9 +2114,9 @@ export default function RaporlarPage() {
       const sabitler = (veri.kuryeSabit||[]);
       const havuzlar = (veri.kuryeHavuz||[]).filter((k:any)=>k.isim||k.paket||k.tutar);
       const yeniKuryeler: KuryeRaporu[] = [
-        { id:1, isim: sabitler[0]?.isim||"Kurye 1", nakit: nToStr(sabitler[0]?.nakit), pos: nToStr(sabitler[0]?.pos), paketSayisi: sabitler[0]?.paket?String(sabitler[0].paket):"", tip:"sabit" },
-        { id:2, isim: sabitler[1]?.isim||"Kurye 2", nakit: nToStr(sabitler[1]?.nakit), pos: nToStr(sabitler[1]?.pos), paketSayisi: sabitler[1]?.paket?String(sabitler[1].paket):"", tip:"sabit" },
-        ...havuzlar.map((k:any,i:number)=>({ id: Date.now()+400+i, isim: k.isim||"Havuz Kurye", nakit: nToStr(k.nakit), pos: nToStr(k.pos), paketSayisi: k.paket?String(k.paket):"", tip:"havuz" as const })),
+        { id:1, isim: sabitler[0]?.isim||"Kurye 1", nakit: nToStr(sabitler[0]?.nakit), pos: nToStr(sabitler[0]?.pos), paketSayisi: sabitler[0]?.paket?String(sabitler[0].paket):"", uzakPaket:"", paket9km:"", tip:"sabit" },
+        { id:2, isim: sabitler[1]?.isim||"Kurye 2", nakit: nToStr(sabitler[1]?.nakit), pos: nToStr(sabitler[1]?.pos), paketSayisi: sabitler[1]?.paket?String(sabitler[1].paket):"", uzakPaket:"", paket9km:"", tip:"sabit" },
+        ...havuzlar.map((k:any,i:number)=>({ id: Date.now()+400+i, isim: k.isim||"Havuz Kurye", nakit: nToStr(k.nakit), pos: nToStr(k.pos), paketSayisi: k.paket?String(k.paket):"", uzakPaket:"", paket9km:"", tip:"havuz" as const })),
       ];
       setKuryeler(yeniKuryeler);
 
@@ -3138,6 +3159,14 @@ Soru: ${soruFinal}`
 
                 </div>
 
+                {/* 02.09.2026: Platform indirimleri (Yemeksepeti + Trendyol, online + kapıda) burada
+                    da salt okunur olarak özetleniyor — hesaplama İndirim Analizi kartındaki ch.tIndirim
+                    değerinden geliyor, buradan ayrıca giriş yapılmaz. */}
+                <div className="mx-3 mb-3 rounded-lg border border-orange-500/20 bg-orange-500/5 px-3.5 py-2.5 flex items-center justify-between">
+                  <span className="text-[12px] text-orange-700 font-semibold flex items-center gap-1.5"><Percent size={13}/>Toplam Platform İndirimleri (salt okunur)</span>
+                  <span className="text-[15px] font-black text-orange-700">₺{fmt(ch.tIndirim)}</span>
+                </div>
+
               </div>
 
 
@@ -3426,6 +3455,29 @@ Soru: ${soruFinal}`
 
                           </div>
 
+                          {/* 02.09.2026: Roadrunner uzak (1.5x) ve 9km üzeri (2x) paketleri farklı
+                              ücretlendiriyor — haftalık mutabakat hesabı Rapor Analiz'de bunları kullanır. */}
+                          {(!isReadOnly || tv(k.uzakPaket)>0 || tv(k.paket9km)>0) && (
+                            <div className="flex items-center gap-1.5 mt-1.5 pl-1">
+                              <span className="text-[9px] text-orange-600 font-semibold shrink-0">Uzak (1.5x)</span>
+                              {isReadOnly ? (
+                                <span className="text-[11px] font-bold text-orange-700">{k.uzakPaket||0}</span>
+                              ) : (
+                                <input type="number" placeholder="0" disabled={isReadOnly} value={k.uzakPaket||""}
+                                  onChange={e=>kuryeDegistir(k.id,"uzakPaket",e.target.value)}
+                                  className="w-14 bg-[#f7f8fa] border border-orange-500/20 text-[#1a1f2e] h-6 text-[11px] font-bold px-1.5 rounded-lg outline-none focus:border-orange-500/40 disabled:opacity-40 text-center"/>
+                              )}
+                              <span className="text-[9px] text-red-600 font-semibold shrink-0 ml-2">9km+ (2x)</span>
+                              {isReadOnly ? (
+                                <span className="text-[11px] font-bold text-red-700">{k.paket9km||0}</span>
+                              ) : (
+                                <input type="number" placeholder="0" disabled={isReadOnly} value={k.paket9km||""}
+                                  onChange={e=>kuryeDegistir(k.id,"paket9km",e.target.value)}
+                                  className="w-14 bg-[#f7f8fa] border border-red-500/20 text-[#1a1f2e] h-6 text-[11px] font-bold px-1.5 rounded-lg outline-none focus:border-red-500/40 disabled:opacity-40 text-center"/>
+                              )}
+                            </div>
+                          )}
+
                           {!isReadOnly && k.tip!=="sabit" && (
 
                             <button type="button" onClick={()=>kuryeSil(k.id)}
@@ -3451,6 +3503,13 @@ Soru: ${soruFinal}`
                       <span className="text-gray-600">Ödemeye esas toplam: <span className="text-amber-600 font-bold">{ch.tKuryePaket} pkt</span></span>
 
                     </div>
+
+                    {(ch.tKuryeUzakPaket>0 || ch.tKuryePaket9km>0) && (
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-gray-600">Uzak (1.5x): <span className="text-orange-700 font-bold">{ch.tKuryeUzakPaket} pkt</span></span>
+                        <span className="text-gray-600">9km üzeri (2x): <span className="text-red-700 font-bold">{ch.tKuryePaket9km} pkt</span></span>
+                      </div>
+                    )}
 
                   </div>
 

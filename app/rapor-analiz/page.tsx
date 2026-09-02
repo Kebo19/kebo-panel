@@ -6,7 +6,7 @@ import {
   BarChart3, Calendar, RefreshCw, Bot, Send, Loader2,
   ArrowUpRight, ArrowDownRight, Wallet, TrendingUp,
   TrendingDown, PieChart, AlertTriangle, X, Sparkles,
-  ChevronRight, MessageSquare, Zap
+  ChevronRight, MessageSquare, Zap, Truck, Percent, CheckCircle2
 } from "lucide-react";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, YAxis } from "recharts";
 
@@ -16,9 +16,15 @@ interface GunlukRapor {
   id: string; tarih: string;
   os_yemeksepeti: number; os_getir: number; os_trendyol: number; os_migros: number;
   ko_yemeksepeti: number; ko_getir: number; ko_trendyol: number; ko_migros: number; ko_alo_paket: number;
-  kasa_nakit: number; kasa_pos: number; kasa_edenred: number;
+  kasa_nakit: number; kasa_pos: number; kasa_edenred: number; kasa_metropol?: number;
   gunluk_gider: number; iade_tutar: number; toplam_ciro: number;
   kurye_raporlari?: any[];
+  // 02.09.2026: MagicPay karşılaştırması için — platform indirim alanları (select("*")
+  // zaten hepsini getiriyor, burada sadece TypeScript'e tanıtıyoruz).
+  os_kebo_ys_indirim?: number; os_cnf_ys_indirim?: number;
+  os_kebo_trendyol_indirim?: number; os_cnf_trendyol_indirim?: number;
+  ko_kebo_ys_indirim?: number; ko_cnf_ys_indirim?: number;
+  ko_kebo_trendyol_indirim?: number; ko_cnf_trendyol_indirim?: number;
 }
 
 interface ChatMesaj { rol: "user" | "assistant"; icerik: string; zaman: Date; }
@@ -41,7 +47,21 @@ const RAPOR_TURLERI = [
   { key: "kasa", label: "Kasa Dağılımı", desc: "Nakit, POS, Edenred ödeme yöntemleri" },
   { key: "gunluk", label: "Gün Gün Liste", desc: "Seçilen tarih aralığında her günün detayı" },
   { key: "karsilastirma", label: "Platform Karşılaştırma", desc: "Platformları yan yana karşılaştır" },
+  { key: "roadrunner", label: "Roadrunner Mutabakatı", desc: "Seçilen dönem için kurye paket ücreti, POS komisyonu ve tahsilat mutabakatı (haftalık hesap için tarih aralığını o haftaya ayarlayın)" },
+  { key: "magicpay", label: "MagicPay Karşılaştırma", desc: "MagicPay (kebo-admin-ui) POS/online sipariş sisteminden çekilen rakamlarla, buraya elle girilen raporun karşılaştırması" },
 ];
+
+// 02.09.2026: Roadrunner kurye mutabakatı — rapor girişindeki günlük kurye verilerinden
+// (paket sayısı, uzak/9km üzeri paket, nakit/pos tahsilat) seçilen tarih aralığı için
+// otomatik hesaplanır. Sabit kuryede (Roadrunner) günlük en az 30 paket garantisi var;
+// altında kalınırsa 30 üzerinden ücretlendirilir. Rakamlar (₺100/paket, %5 POS komisyonu,
+// 1.5x/2x mesafe katsayıları) canın 02.09.2026 tarihli talimatına göre girildi — Roadrunner
+// ile yapılan gerçek sözleşme farklıysa bu sabitleri güncellemek yeterli.
+const RR_PAKET_UCRETI = 100; // ₺ / normal (1x) paket
+const RR_UZAK_KATSAYI = 1.5; // uzak paketler
+const RR_KM9_KATSAYI = 2; // 9km üzeri paketler
+const RR_POS_KOMISYON_ORANI = 0.05; // kapıda ödeme POS tahsilatından kesilen komisyon
+const RR_KURYE_GARANTI = 30; // sabit kurye günlük min. paket garantisi
 
 const PLATFORM_COLORS: Record<string, string> = {
   Yemeksepeti: "#FF6B35", Getir: "#8B5CF6", Trendyol: "#F97316", Migros: "#10B981", "Alo Paket": "#3B82F6",
@@ -110,6 +130,12 @@ export default function RaporAnalizPage() {
   const [otomatikAnaliz, setOtomatikAnaliz] = useState<AIAnaliz | null>(null);
   const [analizYukleniyor, setAnalizYukleniyor] = useState(false);
   const chatSonRef = useRef<HTMLDivElement>(null);
+
+  // MagicPay karşılaştırma (02.09.2026) — dış API'ye her tab açılışında değil, sadece
+  // kullanıcı "Karşılaştır" butonuna bastığında istek atıyoruz.
+  const [mpVeri, setMpVeri] = useState<{ gunler: any[]; kurye: any } | null>(null);
+  const [mpYukleniyor, setMpYukleniyor] = useState(false);
+  const [mpHata, setMpHata] = useState("");
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -203,6 +229,64 @@ export default function RaporAnalizPage() {
     };
   }, [raporlar, oncekiRaporlar, seciliPlatformlar, odemeFiltre]);
 
+  // ── Roadrunner Mutabakatı: seçilen dönemdeki tüm günlerin kurye satırlarını
+  // (rapor girişindeki paketSayisi/uzakPaket/paket9km/nakit/pos) topluyor, kurye
+  // bazında ve dönem toplamında paket ücreti + POS komisyonu hesaplıyor.
+  const roadrunnerStats = useMemo(() => {
+    const isimBazinda: Record<string, {
+      isim: string; tip: string; normal: number; uzak: number; km9: number;
+      gercek: number; uygulanan: number; garantiFarki: number; ucret: number; nakit: number; pos: number;
+    }> = {};
+
+    raporlar.forEach(r => {
+      (r.kurye_raporlari || []).forEach((k: any) => {
+        const sabit = k?.tip === "sabit";
+        const normal = parseInt(k?.paketSayisi) || 0;
+        const uzak = parseInt(k?.uzakPaket) || 0;
+        const km9 = parseInt(k?.paket9km) || 0;
+        const gercek = normal + uzak + km9;
+        const uygulanan = sabit ? Math.max(gercek, RR_KURYE_GARANTI) : gercek;
+        const garantiFarki = uygulanan - gercek; // sadece sabit kuryede ve 30'un altında kalındığında >0
+        const ucret = normal * RR_PAKET_UCRETI
+          + uzak * RR_PAKET_UCRETI * RR_UZAK_KATSAYI
+          + km9 * RR_PAKET_UCRETI * RR_KM9_KATSAYI
+          + garantiFarki * RR_PAKET_UCRETI; // garanti farkı normal (1x) ücretten tamamlanır
+        const nakit = Number(k?.nakit) || 0;
+        const pos = Number(k?.pos) || 0;
+
+        const isim = (k?.isim || "").trim() || (sabit ? "Sabit Kurye" : "Havuz Kurye");
+        const key = `${isim}__${sabit ? "sabit" : "havuz"}`;
+        if (!isimBazinda[key]) isimBazinda[key] = { isim, tip: sabit ? "sabit" : "havuz", normal: 0, uzak: 0, km9: 0, gercek: 0, uygulanan: 0, garantiFarki: 0, ucret: 0, nakit: 0, pos: 0 };
+        const acc = isimBazinda[key];
+        acc.normal += normal; acc.uzak += uzak; acc.km9 += km9; acc.gercek += gercek;
+        acc.uygulanan += uygulanan; acc.garantiFarki += garantiFarki; acc.ucret += ucret;
+        acc.nakit += nakit; acc.pos += pos;
+      });
+    });
+
+    const kuryeListesi = Object.values(isimBazinda).sort((a, b) => (a.tip === b.tip ? b.ucret - a.ucret : a.tip === "sabit" ? -1 : 1));
+
+    const topla = (fn: (k: typeof kuryeListesi[number]) => number) => kuryeListesi.reduce((a, k) => a + fn(k), 0);
+    const toplamNormal = topla(k => k.normal);
+    const toplamUzak = topla(k => k.uzak);
+    const toplamKm9 = topla(k => k.km9);
+    const toplamGercek = topla(k => k.gercek);
+    const toplamUygulanan = topla(k => k.uygulanan);
+    const toplamGarantiFarki = topla(k => k.garantiFarki);
+    const toplamPaketUcreti = topla(k => k.ucret);
+    const toplamNakit = topla(k => k.nakit);
+    const toplamPos = topla(k => k.pos);
+    const posKomisyonu = toplamPos * RR_POS_KOMISYON_ORANI;
+    const toplamBorc = toplamPaketUcreti + posKomisyonu; // Roadrunner'a ödenmesi/mahsup edilmesi gereken
+    const toplamTahsilat = toplamNakit + toplamPos; // kuryelerin müşteriden kapıda tahsil ettiği toplam
+    const mutabakatFarki = toplamTahsilat - toplamBorc; // (+) biz alacaklıyız, (-) biz borçluyuz
+
+    return {
+      kuryeListesi, toplamNormal, toplamUzak, toplamKm9, toplamGercek, toplamUygulanan, toplamGarantiFarki,
+      toplamPaketUcreti, toplamNakit, toplamPos, posKomisyonu, toplamBorc, toplamTahsilat, mutabakatFarki,
+    };
+  }, [raporlar]);
+
   // ── Detaylı İşletme Özeti oluştur ──
   const isletmeOzeti = useMemo(() => {
     if (!raporlar.length) return "";
@@ -248,6 +332,23 @@ GÜNLÜK PERFORMANS:
 - Son 7 Gün Trendi: ${gunlukTrendler || "Yeterli veri yok"}
     `.trim();
   }, [raporlar, stats, baslangic, bitis, odemeFiltre]);
+
+  // ── MagicPay Karşılaştırma ──
+  const magicpayKarsilastir = async () => {
+    if (!baslangic || !bitis) return;
+    setMpYukleniyor(true);
+    setMpHata("");
+    try {
+      const res = await fetch(`/api/magicpay-karsilastirma?start=${baslangic}&end=${bitis}`);
+      const d = await res.json();
+      if (!res.ok) throw new Error(d?.error || "MagicPay verisi alınamadı.");
+      setMpVeri(d);
+    } catch (err: any) {
+      setMpHata(err?.message || "MagicPay verisi alınamadı.");
+      setMpVeri(null);
+    }
+    setMpYukleniyor(false);
+  };
 
   // ── Güçlü AI Analiz ──
   const analizYap = async () => {
@@ -655,6 +756,231 @@ ${isletmeOzeti}`,
               </div>
             )}
 
+            {/* ── ROADRUNNER MUTABAKATI ── */}
+            {raporTuru === "roadrunner" && (
+              <div className="space-y-4">
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 text-[11px] text-gray-700 leading-relaxed flex items-start gap-2.5">
+                  <Truck size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                  <p>
+                    Bu hesap, seçilen tarih aralığındaki rapor girişlerinden (Kurye bölümü) otomatik toplanır.
+                    Paket başı <span className="font-bold text-amber-700">₺{RR_PAKET_UCRETI}</span>, uzak paketlerde{" "}
+                    <span className="font-bold text-orange-700">{RR_UZAK_KATSAYI}x</span>, 9km üzeri paketlerde{" "}
+                    <span className="font-bold text-red-700">{RR_KM9_KATSAYI}x</span> ücretlendirilir; sabit kuryede
+                    (Roadrunner) günlük en az <span className="font-bold text-amber-700">{RR_KURYE_GARANTI} paket</span> garantisi vardır.
+                    Kapıda ödemelerin POS ile tahsil edilen kısmından <span className="font-bold text-blue-700">%{RR_POS_KOMISYON_ORANI * 100}</span> komisyon
+                    düşülüp Roadrunner&apos;a borcumuza eklenir. Haftalık mutabakat için üstteki tarih aralığını o haftaya ayarlayın.
+                  </p>
+                </div>
+
+                {roadrunnerStats.kuryeListesi.length === 0 ? (
+                  <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl py-16 text-center text-gray-600 text-sm">
+                    Bu tarih aralığında kurye verisi bulunamadı.
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                      {[
+                        { label: "Paket Ücreti", value: roadrunnerStats.toplamPaketUcreti, color: "#60A5FA" },
+                        { label: "POS Komisyonu (%5)", value: roadrunnerStats.posKomisyonu, color: "#F97316" },
+                        { label: "Toplam Borç (Roadrunner'a)", value: roadrunnerStats.toplamBorc, color: "#F87171" },
+                        { label: "Toplam Tahsilat (Nakit+POS)", value: roadrunnerStats.toplamTahsilat, color: "#34D399" },
+                      ].map(k => (
+                        <div key={k.label} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
+                          <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">{k.label}</p>
+                          <p className="text-lg font-black" style={{ color: k.color }}>₺{fmt(k.value)}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Net mutabakat */}
+                    <div className={`rounded-2xl border p-5 flex items-center justify-between ${roadrunnerStats.mutabakatFarki >= 0 ? "border-emerald-500/30 bg-emerald-500/5" : "border-red-500/30 bg-red-500/5"}`}>
+                      <div className="flex items-center gap-2.5">
+                        {roadrunnerStats.mutabakatFarki >= 0 ? <CheckCircle2 size={18} className="text-emerald-600" /> : <AlertTriangle size={18} className="text-red-600" />}
+                        <div>
+                          <p className={`text-xs font-bold uppercase tracking-widest ${roadrunnerStats.mutabakatFarki >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                            {roadrunnerStats.mutabakatFarki >= 0 ? "Roadrunner'dan Alacaklıyız" : "Roadrunner'a Borçluyuz"}
+                          </p>
+                          <p className="text-[11px] text-gray-500 mt-0.5">Tahsilat − (Paket Ücreti + POS Komisyonu)</p>
+                        </div>
+                      </div>
+                      <p className={`text-2xl font-black ${roadrunnerStats.mutabakatFarki >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        ₺{fmt(Math.abs(roadrunnerStats.mutabakatFarki))}
+                      </p>
+                    </div>
+
+                    {/* Paket dağılımı */}
+                    <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
+                      <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-4 flex items-center gap-1.5"><Percent size={12} /> Paket Dağılımı</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">Normal (1x)</p><p className="text-base font-black text-[#1a1f2e]">{fmt(roadrunnerStats.toplamNormal)}</p></div>
+                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">Uzak (1.5x)</p><p className="text-base font-black text-orange-600">{fmt(roadrunnerStats.toplamUzak)}</p></div>
+                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">9km+ (2x)</p><p className="text-base font-black text-red-600">{fmt(roadrunnerStats.toplamKm9)}</p></div>
+                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">Garanti Farkı</p><p className="text-base font-black text-amber-600">{fmt(roadrunnerStats.toplamGarantiFarki)}</p></div>
+                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">Ödemeye Esas Toplam</p><p className="text-base font-black text-blue-600">{fmt(roadrunnerStats.toplamUygulanan)}</p></div>
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-3">Gerçek teslim edilen toplam paket: <span className="font-bold text-gray-700">{fmt(roadrunnerStats.toplamGercek)}</span></p>
+                    </div>
+
+                    {/* Kurye bazında tablo */}
+                    <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
+                      <div className="px-5 py-3 border-b border-[#e2e5eb]">
+                        <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><Truck size={11} /> Kurye Bazında Mutabakat</p>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-[#e2e5eb]">
+                              {["Kurye", "Tip", "Normal", "Uzak", "9km+", "Garanti Farkı", "Esas Paket", "Paket Ücreti", "Nakit", "POS"].map(h => (
+                                <th key={h} className="text-left px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold whitespace-nowrap">{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#0f1624]">
+                            {roadrunnerStats.kuryeListesi.map(k => (
+                              <tr key={`${k.isim}__${k.tip}`} className="hover:bg-black/[0.03] transition-colors">
+                                <td className="px-4 py-3 font-bold text-[#1a1f2e] whitespace-nowrap">{k.isim}</td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${k.tip === "sabit" ? "bg-amber-500/10 text-amber-700" : "bg-black/[0.05] text-gray-500"}`}>
+                                    {k.tip === "sabit" ? "Sabit (Roadrunner)" : "Havuz"}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3">{fmt(k.normal)}</td>
+                                <td className="px-4 py-3 text-orange-600 font-bold">{fmt(k.uzak)}</td>
+                                <td className="px-4 py-3 text-red-600 font-bold">{fmt(k.km9)}</td>
+                                <td className="px-4 py-3 text-amber-600 font-bold">{fmt(k.garantiFarki)}</td>
+                                <td className="px-4 py-3 font-black text-blue-600">{fmt(k.uygulanan)}</td>
+                                <td className="px-4 py-3 font-black">₺{fmt(k.ucret)}</td>
+                                <td className="px-4 py-3 text-emerald-600">₺{fmt(k.nakit)}</td>
+                                <td className="px-4 py-3 text-blue-600">₺{fmt(k.pos)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t border-[#e2e5eb] bg-[#f7f8fa]">
+                              <td className="px-4 py-3 text-[10px] text-gray-600 uppercase font-bold" colSpan={2}>TOPLAM</td>
+                              <td className="px-4 py-3 font-black">{fmt(roadrunnerStats.toplamNormal)}</td>
+                              <td className="px-4 py-3 text-orange-600 font-black">{fmt(roadrunnerStats.toplamUzak)}</td>
+                              <td className="px-4 py-3 text-red-600 font-black">{fmt(roadrunnerStats.toplamKm9)}</td>
+                              <td className="px-4 py-3 text-amber-600 font-black">{fmt(roadrunnerStats.toplamGarantiFarki)}</td>
+                              <td className="px-4 py-3 font-black text-blue-600">{fmt(roadrunnerStats.toplamUygulanan)}</td>
+                              <td className="px-4 py-3 font-black">₺{fmt(roadrunnerStats.toplamPaketUcreti)}</td>
+                              <td className="px-4 py-3 text-emerald-600 font-black">₺{fmt(roadrunnerStats.toplamNakit)}</td>
+                              <td className="px-4 py-3 text-blue-600 font-black">₺{fmt(roadrunnerStats.toplamPos)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* ── MAGICPAY KARŞILAŞTIRMA ── */}
+            {raporTuru === "magicpay" && (
+              <div className="space-y-4">
+                <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-4 text-[11px] text-gray-700 leading-relaxed flex items-start gap-2.5">
+                  <RefreshCw size={15} className="text-blue-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p>MagicPay (kebo-admin-ui) POS/online sipariş sisteminden çekilen rakamlar, buraya elle girilen günlük raporla karşılaştırılır. Hiçbir veri otomatik değiştirilmez veya kaydedilmez.</p>
+                    <p className="mt-1.5 text-gray-500">
+                      Not: MagicPay&apos;in &quot;Brüt&quot; (indirim öncesi) ve &quot;Net&quot; (indirim sonrası, gider/iade düşülmeden) tanımları
+                      Kebo Panel&apos;deki Brüt/Net Ciro tanımından farklı — bu ikisi ayrı sütunlarda gösterilir, aralarındaki fark tek başına
+                      hata anlamına gelmez. İndirim, İade ve Nakit karşılaştırmaları ise birebir aynı tanımı kullandığı için daha güvenilirdir.
+                    </p>
+                  </div>
+                </div>
+
+                <button onClick={magicpayKarsilastir} disabled={mpYukleniyor}
+                  className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 px-4 py-2.5 rounded-xl transition-colors">
+                  {mpYukleniyor ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                  {mpVeri ? "Yenile" : "MagicPay ile Karşılaştır"}
+                </button>
+
+                {mpHata && (
+                  <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 text-xs text-red-700 flex items-start gap-2">
+                    <AlertTriangle size={14} className="shrink-0 mt-0.5" /> {mpHata}
+                  </div>
+                )}
+
+                {mpVeri && (
+                  <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
+                    <div className="px-5 py-3 border-b border-[#e2e5eb]">
+                      <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold">Gün Gün Karşılaştırma</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-[#e2e5eb]">
+                            {["Tarih", "Kebo Brüt", "MP Brüt", "Kebo Net", "MP Net", "Kebo İndirim", "MP İndirim", "Fark", "Kebo İade", "MP İade", "Fark", "Kebo Nakit", "MP Nakit", "Fark"].map(h => (
+                              <th key={h} className="text-left px-3 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold whitespace-nowrap">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#0f1624]">
+                          {mpVeri.gunler.map(g => {
+                            const kr = raporlar.find(r => r.tarih === g.tarih);
+                            const keboIndirim = kr ? (Number(kr.os_kebo_ys_indirim) || 0) + (Number(kr.os_cnf_ys_indirim) || 0)
+                              + (Number(kr.os_kebo_trendyol_indirim) || 0) + (Number(kr.os_cnf_trendyol_indirim) || 0)
+                              + (Number(kr.ko_kebo_ys_indirim) || 0) + (Number(kr.ko_cnf_ys_indirim) || 0)
+                              + (Number(kr.ko_kebo_trendyol_indirim) || 0) + (Number(kr.ko_cnf_trendyol_indirim) || 0) : null;
+                            const keboBrut = kr ? (kr.toplam_ciro || 0) : null;
+                            const keboNet = kr ? (kr.toplam_ciro || 0) - (kr.gunluk_gider || 0) - (kr.iade_tutar || 0) : null;
+                            const keboIade = kr ? (kr.iade_tutar || 0) : null;
+                            const keboNakit = kr ? (kr.kasa_nakit || 0) : null;
+                            const farkli = (a: number | null, b: number, tol = 1) => a !== null && Math.abs(a - b) > tol;
+                            return (
+                              <tr key={g.tarih} className="hover:bg-black/[0.03] transition-colors">
+                                <td className="px-3 py-3 font-medium text-gray-700 whitespace-nowrap">{fmtTarih(g.tarih)}</td>
+                                <td className="px-3 py-3">{kr ? `₺${fmt(keboBrut as number)}` : "—"}</td>
+                                <td className="px-3 py-3 text-blue-600">₺{fmt(g.brutMP)}</td>
+                                <td className="px-3 py-3">{kr ? `₺${fmt(keboNet as number)}` : "—"}</td>
+                                <td className="px-3 py-3 text-blue-600">₺{fmt(g.netMP)}</td>
+                                <td className="px-3 py-3">{kr ? `₺${fmt(keboIndirim as number)}` : "—"}</td>
+                                <td className="px-3 py-3 text-orange-600">₺{fmt(g.indirimMP)}</td>
+                                <td className={`px-3 py-3 font-bold ${kr && farkli(keboIndirim, g.indirimMP) ? "text-red-600" : "text-emerald-600"}`}>
+                                  {kr ? (farkli(keboIndirim, g.indirimMP) ? `₺${fmt(Math.abs((keboIndirim as number) - g.indirimMP))}` : "✓") : "—"}
+                                </td>
+                                <td className="px-3 py-3">{kr ? `₺${fmt(keboIade as number)}` : "—"}</td>
+                                <td className="px-3 py-3 text-orange-600">₺{fmt(g.iadeMP)}</td>
+                                <td className={`px-3 py-3 font-bold ${kr && farkli(keboIade, g.iadeMP) ? "text-red-600" : "text-emerald-600"}`}>
+                                  {kr ? (farkli(keboIade, g.iadeMP) ? `₺${fmt(Math.abs((keboIade as number) - g.iadeMP))}` : "✓") : "—"}
+                                </td>
+                                <td className="px-3 py-3">{kr ? `₺${fmt(keboNakit as number)}` : "—"}</td>
+                                <td className="px-3 py-3 text-orange-600">₺{fmt(g.nakitMP)}</td>
+                                <td className={`px-3 py-3 font-bold ${kr && farkli(keboNakit, g.nakitMP) ? "text-red-600" : "text-emerald-600"}`}>
+                                  {kr ? (farkli(keboNakit, g.nakitMP) ? `₺${fmt(Math.abs((keboNakit as number) - g.nakitMP))}` : "✓") : "—"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    {mpVeri.gunler.some(g => !raporlar.find(r => r.tarih === g.tarih)) && (
+                      <p className="px-5 py-3 text-[10px] text-gray-500 border-t border-[#e2e5eb]">&quot;—&quot; gösterilen günler için Kebo Panel&apos;de bu tarihte kaydedilmiş bir rapor bulunamadı.</p>
+                    )}
+                  </div>
+                )}
+
+                {mpVeri?.kurye && (
+                  <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
+                    <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-3 flex items-center gap-1.5"><Truck size={12} /> MagicPay Kurye Teslimat (seçili gün)</p>
+                    <div className="space-y-2">
+                      {mpVeri.kurye.kuryeler.map((k: any) => (
+                        <div key={k.isim} className="flex flex-wrap items-center justify-between gap-2 bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] px-4 py-2.5">
+                          <span className="font-bold text-[#1a1f2e]">{k.isim}</span>
+                          <span className="text-gray-500">{k.teslimat} teslimat</span>
+                          <span className="text-emerald-600 font-bold">₺{fmt(k.tahsilat)} tahsilat</span>
+                          {k.iadeGerekenTutar > 0 && <span className="text-red-600 font-bold">₺{fmt(k.iadeGerekenTutar)} Kebo&apos;ya iade gerekiyor</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ════════════════════════════════════════════════════════ */}
             {/* AI İŞ ANALİZ BÖLÜMÜ                                    */}
             {/* ════════════════════════════════════════════════════════ */}
@@ -871,4 +1197,4 @@ ${isletmeOzeti}`,
       </div>
     </div>
   );
-}
+}
