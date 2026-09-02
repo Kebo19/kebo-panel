@@ -85,6 +85,15 @@ JSON ŞEMASI (tam olarak bu anahtarları kullan, eksik bırakma):
 Boş satırları (giderler, avanslar, kesintiler, iadeler, kuryeHavuz) dizilere hiç ekleme —
 sadece gerçekten bir şey yazılmış satırları diziye koy.`;
 
+// Gemini'nin görseli okuyup JSON üretmesi için makul bir üst sınır. Bu
+// görevde tüm satırlar (giderler, avanslar, kuryeler vb.) tek bir günlük
+// forma ait olduğundan bu limit rahatlıkla yeterli, ama modelin yanıtı
+// yarıda kesip boş/eksik JSON dönmesini engellemek için açıkça belirtiyoruz.
+const MAX_OUTPUT_TOKENS = 8192;
+// Gemini API bazen (özellikle soğuk başlangıçta) uzun sürebiliyor; kullanıcıyı
+// süresiz bekletmemek için kendi zaman aşımımızı koyuyoruz.
+const GEMINI_TIMEOUT_MS = 45000;
+
 export async function POST(req: Request) {
   try {
     const { imageBase64, mediaType } = await req.json();
@@ -95,40 +104,112 @@ export async function POST(req: Request) {
 
     const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
+    if (!apiKey) {
+      // En sık karşılaşılan "API hatası" nedeni budur: Vercel proje
+      // ayarlarında GEMINI_API_KEY (ya da NEXT_PUBLIC_GEMINI_API_KEY) tanımlı
+      // değil veya yalnızca bazı ortamlarda (Production/Preview) eklenmiş.
+      console.error("[rapor-tara] GEMINI_API_KEY / NEXT_PUBLIC_GEMINI_API_KEY tanımlı değil");
+      return NextResponse.json(
+        {
+          error:
+            "Sunucu yapılandırma hatası: GEMINI_API_KEY tanımlı değil. Vercel > Project Settings > Environment Variables kısmından ekleyip yeniden deploy edin.",
         },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: SISTEM_PROMPT }] },
-          contents: [
-            {
-              role: "user",
-              parts: [
-                { inline_data: { mime_type: mediaType || "image/jpeg", data: imageBase64 } },
-                { text: "Bu KEBO kağıt kasa raporunu oku ve yalnızca JSON döndür." },
-              ],
-            },
-          ],
-          generationConfig: {
-            responseMimeType: "application/json",
-          },
-        }),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("Rapor tarama API hatası (Gemini):", data);
-      return NextResponse.json({ error: "API hatası", details: data }, { status: response.status });
+        { status: 500 }
+      );
     }
 
-    const metin = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
+    const controller = new AbortController();
+    const zamanAsimi = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: SISTEM_PROMPT }] },
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  { inline_data: { mime_type: mediaType || "image/jpeg", data: imageBase64 } },
+                  { text: "Bu KEBO kağıt kasa raporunu oku ve yalnızca JSON döndür." },
+                ],
+              },
+            ],
+            generationConfig: {
+              responseMimeType: "application/json",
+              maxOutputTokens: MAX_OUTPUT_TOKENS,
+              // ÖNEMLİ: gemini-2.5-flash varsayılan olarak "thinking" (iç
+              // muhakeme) modunda çalışıyor ve bu iç muhakeme de aynı token
+              // bütçesini paylaşıyor. Basit bir OCR + şemaya JSON basma
+              // görevinde modelin bütün bütçeyi "düşünmeye" harcayıp görünür
+              // cevabı boş bırakması (finishReason: MAX_TOKENS, boş content)
+              // bilinen ve sık karşılaşılan bir davranış — muhtemelen
+              // yaşadığımız "API hatası"nın asıl kaynağı buydu. Thinking'i
+              // tamamen kapatıyoruz.
+              thinkingConfig: { thinkingBudget: 0 },
+            },
+          }),
+        }
+      );
+    } finally {
+      clearTimeout(zamanAsimi);
+    }
+
+    let data: any;
+    try {
+      data = await response.json();
+    } catch {
+      console.error("[rapor-tara] Gemini'den geçerli JSON gelmedi, HTTP", response.status);
+      return NextResponse.json(
+        { error: `Gemini API beklenmedik bir cevap döndürdü (HTTP ${response.status}).` },
+        { status: 502 }
+      );
+    }
+
+    if (!response.ok) {
+      console.error("Rapor tarama API hatası (Gemini):", JSON.stringify(data));
+      const detay = data?.error?.message || "Bilinmeyen hata";
+      return NextResponse.json(
+        { error: `Gemini API hatası: ${detay}`, details: data },
+        { status: response.status }
+      );
+    }
+
+    const aday = data.candidates?.[0];
+    const bitisNedeni = aday?.finishReason;
+    const metin = aday?.content?.parts?.map((p: any) => p.text || "").join("") || "";
+
+    if (!metin.trim()) {
+      console.error("[rapor-tara] Boş içerik döndü. finishReason:", bitisNedeni, JSON.stringify(data));
+      if (bitisNedeni === "MAX_TOKENS") {
+        return NextResponse.json(
+          {
+            error:
+              "Model yanıtı token sınırına takılıp yarıda kaldı. Lütfen fotoğrafı tekrar yükleyin; sorun devam ederse fotoğrafı biraz daha net/küçük çekmeyi deneyin.",
+          },
+          { status: 502 }
+        );
+      }
+      if (bitisNedeni === "SAFETY" || bitisNedeni === "PROHIBITED_CONTENT") {
+        return NextResponse.json(
+          { error: "Model bu görseli güvenlik filtresi nedeniyle işleyemedi, farklı bir fotoğrafla deneyin." },
+          { status: 502 }
+        );
+      }
+      return NextResponse.json(
+        { error: "Model boş cevap döndürdü, lütfen tekrar deneyin." },
+        { status: 502 }
+      );
+    }
+
     const temiz = metin.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
 
     let ayrisik;
@@ -142,6 +223,12 @@ export async function POST(req: Request) {
     return NextResponse.json(ayrisik);
   } catch (error: any) {
     console.error("Rapor tarama sunucu hatası:", error);
+    if (error?.name === "AbortError") {
+      return NextResponse.json(
+        { error: `Gemini API zaman aşımına uğradı (${GEMINI_TIMEOUT_MS / 1000}sn), lütfen tekrar deneyin.` },
+        { status: 504 }
+      );
+    }
     return NextResponse.json({ error: "Sunucu hatası: " + error.message }, { status: 500 });
   }
-}
+}

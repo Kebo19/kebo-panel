@@ -42,3 +42,8 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# repomix çıktıları (AI'ye kod göndermek için üretiliyor, repoya girmemeli —
+# her seferinde büyüyüp gereksiz yer kaplıyordu)
+repomix-output.*
+repomix.config.json

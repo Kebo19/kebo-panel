@@ -2026,25 +2026,85 @@ export default function RaporlarPage() {
   // ── Fişten Doldur: kağıt raporu fotoğraflayıp/yükleyip AI'ye okutma ──
   const nToStr = (n:number|undefined) => (n && n>0) ? fmt(n) : "";
 
+  // Telefon kameraları genelde 3-15MB arası fotoğraf üretiyor; bunu base64
+  // olarak doğrudan gönderdiğimizde Vercel'in fonksiyon istek boyutu sınırı
+  // olan 4.5MB'a takılıp sunucuya hiç ulaşmadan "413 payload too large"
+  // hatası alıyorduk (ekranda anlamsız bir "API hatası" olarak görünüyordu).
+  // Göndermeden önce görseli tarayıcıda küçültüp JPEG'e sıkıştırıyoruz —
+  // el yazısı okunabilirliği bu boyutta bozulmuyor ama dosya birkaç yüz
+  // KB'a düşüyor.
+  const FIS_MAX_KENAR = 1600;
+  const FIS_JPEG_KALITE = 0.82;
+
+  const fotografiSikistir = (file: File): Promise<{ base64: string; mediaType: string }> =>
+    new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new window.Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        if (width <= 0 || height <= 0) { reject(new Error("Geçersiz görsel boyutu")); return; }
+        if (width > FIS_MAX_KENAR || height > FIS_MAX_KENAR) {
+          if (width >= height) { height = Math.round((height * FIS_MAX_KENAR) / width); width = FIS_MAX_KENAR; }
+          else { width = Math.round((width * FIS_MAX_KENAR) / height); height = FIS_MAX_KENAR; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("Canvas oluşturulamadı")); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", FIS_JPEG_KALITE);
+        const parca = dataUrl.split(",")[1];
+        if (!parca) { reject(new Error("Görsel sıkıştırılamadı")); return; }
+        resolve({ base64: parca, mediaType: "image/jpeg" });
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Görsel açılamadı, dosya bozuk olabilir")); };
+      img.src = url;
+    });
+
+  const dosyayiHamOku = (file: File): Promise<{ base64: string; mediaType: string }> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ base64: (reader.result as string).split(",")[1], mediaType: file.type || "image/jpeg" });
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
   const handleFisTara = async (file: File) => {
     if (!file) return;
     setTaramaYukleniyor(true); setTaramaHata(""); setTaramaBelirsizAlanlar([]);
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve((reader.result as string).split(",")[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      let base64: string, mediaType: string;
+      try {
+        ({ base64, mediaType } = await fotografiSikistir(file));
+      } catch (sikistirmaHatasi) {
+        // Sıkıştırma başarısız olursa (ör. tarayıcı desteklemiyor) orijinal
+        // dosyayı ham haliyle göndermeyi dene — en azından küçük dosyalarda
+        // özellik çalışmaya devam etsin.
+        console.warn("Görsel sıkıştırılamadı, ham dosya gönderiliyor:", sikistirmaHatasi);
+        ({ base64, mediaType } = await dosyayiHamOku(file));
+      }
 
       const response = await fetch("/api/rapor-tara", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64, mediaType: file.type || "image/jpeg" }),
+        body: JSON.stringify({ imageBase64: base64, mediaType }),
       });
-      const veri = await response.json();
+
+      let veri: any;
+      try {
+        veri = await response.json();
+      } catch {
+        setTaramaHata(
+          response.status === 413
+            ? "Fotoğraf çok büyük geldi, lütfen tekrar deneyin."
+            : `Sunucu beklenmedik bir cevap döndürdü (HTTP ${response.status}).`
+        );
+        return;
+      }
       if (!response.ok || veri.error) {
-        setTaramaHata(veri.error || "Fiş okunamadı, tekrar deneyin."); return;
+        const mesaj = typeof veri.error === "string" ? veri.error : veri.error?.message;
+        setTaramaHata(mesaj || "Fiş okunamadı, tekrar deneyin."); return;
       }
 
       // Tarih (sadece yeni rapor eklerken, düzenleme modunda tarihi ezme)
@@ -4296,4 +4356,4 @@ Soru: ${soruFinal}`
 
   );
 
-}
+}
