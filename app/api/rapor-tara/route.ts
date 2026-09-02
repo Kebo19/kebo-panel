@@ -4,6 +4,16 @@ import { NextResponse } from "next/server";
 // yükler, Gemini görseli okuyup dijital forma birebir eşlenen JSON döndürür.
 // Gemini API'nin ücretsiz katmanı (Flash modeli) kullanılıyor — Anthropic API
 // kredisi gerektirmez. Anahtar sadece burada, sunucu tarafında kullanılır.
+//
+// MODEL NOTU (02.09.2026): "gemini-2.5-flash" Google tarafından yeni
+// API anahtarlarına artık açılmıyor ("no longer available to new users",
+// resmi kaldırma tarihinden önce yaşanan bilinen bir durum). Google'ın
+// hata mesajının önerdiği "gemini-3.6-flash" modeline geçildi — bu model
+// de ücretsiz katmanda, görsel girişi destekliyor ve aktif geliştirilen
+// nesil (kaldırma tarihi planlanmamış). Tek fark: bu model ailesinde
+// "thinking" tamamen kapatılamıyor (2.5-flash'taki thinkingBudget:0 gibi),
+// sadece "minimal" seviyeye indirilebiliyor — bu yüzden çıktı token
+// limitini yükselttik (bkz. MAX_OUTPUT_TOKENS).
 
 const SISTEM_PROMPT = `Sen KEBO ERP için bir kağıt rapor okuma asistanısın. Sana KEBO'nun standart
 kağıt "Günlük Kasa Kapanış Formu" fotoğrafı verilecek. Bu formun sabit bir düzeni var:
@@ -89,7 +99,7 @@ sadece gerçekten bir şey yazılmış satırları diziye koy.`;
 // görevde tüm satırlar (giderler, avanslar, kuryeler vb.) tek bir günlük
 // forma ait olduğundan bu limit rahatlıkla yeterli, ama modelin yanıtı
 // yarıda kesip boş/eksik JSON dönmesini engellemek için açıkça belirtiyoruz.
-const MAX_OUTPUT_TOKENS = 8192;
+const MAX_OUTPUT_TOKENS = 16384;
 // Gemini API bazen (özellikle soğuk başlangıçta) uzun sürebiliyor; kullanıcıyı
 // süresiz bekletmemek için kendi zaman aşımımızı koyuyoruz.
 const GEMINI_TIMEOUT_MS = 45000;
@@ -124,7 +134,7 @@ export async function POST(req: Request) {
     let response: Response;
     try {
       response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`,
         {
           method: "POST",
           headers: {
@@ -146,15 +156,16 @@ export async function POST(req: Request) {
             generationConfig: {
               responseMimeType: "application/json",
               maxOutputTokens: MAX_OUTPUT_TOKENS,
-              // ÖNEMLİ: gemini-2.5-flash varsayılan olarak "thinking" (iç
+              // ÖNEMLİ: Flash modelleri varsayılan olarak "thinking" (iç
               // muhakeme) modunda çalışıyor ve bu iç muhakeme de aynı token
               // bütçesini paylaşıyor. Basit bir OCR + şemaya JSON basma
-              // görevinde modelin bütün bütçeyi "düşünmeye" harcayıp görünür
-              // cevabı boş bırakması (finishReason: MAX_TOKENS, boş content)
-              // bilinen ve sık karşılaşılan bir davranış — muhtemelen
-              // yaşadığımız "API hatası"nın asıl kaynağı buydu. Thinking'i
-              // tamamen kapatıyoruz.
-              thinkingConfig: { thinkingBudget: 0 },
+              // görevinde modelin bütçenin büyük kısmını "düşünmeye"
+              // harcayıp görünür cevabı boş/eksik bırakması (finishReason:
+              // MAX_TOKENS) bilinen ve sık karşılaşılan bir davranış.
+              // gemini-3.6-flash'ta (2.5-flash'ın aksine) thinking tamamen
+              // kapatılamıyor, o yüzden "minimal" seviyeye çekip yukarıdaki
+              // MAX_OUTPUT_TOKENS'ı yükselterek dengeliyoruz.
+              thinkingConfig: { thinkingLevel: "minimal" },
             },
           }),
         }
