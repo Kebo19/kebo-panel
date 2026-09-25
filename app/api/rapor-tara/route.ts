@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { oturumKontrol } from "@/lib/supabase/server";
-import { taramaDuzelt, taramaTarihi } from "@/lib/tarama";
+import { taramaDuzelt, taramaTarihi, kurusluAlanlar } from "@/lib/tarama";
 import { geminiIstek } from "@/lib/gemini";
 
 // "Fişten Doldur" özelliği: kullanıcı KEBO kağıt kasa raporunun fotoğrafını
@@ -125,6 +125,8 @@ export async function POST(req: Request) {
     // Binlik ayracı yanlış okunmuş tutarları ve geçersiz tarihi düzelt
     const duzeltilmis = taramaDuzelt(ayrisik);
     duzeltilmis.tarih = taramaTarihi(duzeltilmis.tarih);
+    const belirsiz = Array.isArray(duzeltilmis.belirsiz_alanlar) ? duzeltilmis.belirsiz_alanlar.map(String) : [];
+    duzeltilmis.belirsiz_alanlar = [...new Set([...belirsiz, ...kurusluAlanlar(duzeltilmis)])];
     return NextResponse.json(duzeltilmis);
   } catch (error) {
     console.error("[rapor-tara] Sunucu hatası:", error);

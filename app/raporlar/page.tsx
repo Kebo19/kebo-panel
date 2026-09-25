@@ -20,6 +20,7 @@ import {
   ROADRUNNER_GECIS_GUNU, KURYE_GARANTI_PAKET,
 } from "@/lib/hesap";
 import { useYetki } from "@/lib/useYetki";
+import { alanEtiketi } from "@/lib/tarama";
 import { yuklemeIcinHazirla, jsonCevap } from "@/lib/gorsel";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -759,6 +760,11 @@ export default function RaporlarPage() {
   const [taramaYukleniyor, setTaramaYukleniyor] = useState(false);
   const [taramaHata, setTaramaHata] = useState("");
   const [taramaBelirsizAlanlar, setTaramaBelirsizAlanlar] = useState<string[]>([]);
+  // Fişten doldurulan rapor kaydedilmeden önce kağıtla karşılaştırılıp onaylanır.
+  const [taramaIleDoldu, setTaramaIleDoldu] = useState(false);
+  const [taramaTarihNotu, setTaramaTarihNotu] = useState("");
+  const [kontrolOnay, setKontrolOnay] = useState(false);
+  const formAlaniRef = useRef<HTMLDivElement>(null);
   const dosyaInputRef = useRef<HTMLInputElement>(null);
 
   const personelIdBul = useCallback((isim?: string) =>
@@ -837,6 +843,7 @@ export default function RaporlarPage() {
     setKuryeler(kuryeYapisiHesapla(bugun()));
     setNotlar("");setSelectedRapor(null);setIsEditMode(false);
     setTaramaHata(""); setTaramaBelirsizAlanlar([]);
+    setTaramaIleDoldu(false); setTaramaTarihNotu(""); setKontrolOnay(false);
   };
 
   // ── Rapor Sil ── (rapora bağlı avans/kesinti/firma ödemeleri veritabanında otomatik silinir)
@@ -1070,8 +1077,17 @@ export default function RaporlarPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const veri = hamVeri as any;
       // Tarih (sadece yeni rapor eklerken, düzenleme modunda tarihi ezme)
-      const hedefTarih: string = (veri.tarih && !selectedRapor) ? veri.tarih : tarih;
-      if (veri.tarih && !selectedRapor) handleTarihChange(veri.tarih);
+      // Tarih: formdan okunduysa o; okunamadıysa ve seçili değilse sıradaki rapor günü.
+      // Böylece form hemen açılır; kullanıcı gerekirse tarihi değiştirir.
+      let hedefTarih: string = tarih;
+      if (!selectedRapor) {
+        if (veri.tarih) hedefTarih = veri.tarih;
+        else if (!tarih) {
+          hedefTarih = siradakiTarih() || bugun();
+          setTaramaTarihNotu(`Formda tarih okunamadı; sıradaki rapor günü ${fmtTarih(hedefTarih)} seçildi. Doğru değilse değiştirin.`);
+        }
+        if (hedefTarih !== tarih) handleTarihChange(hedefTarih);
+      }
       const pg = (o:{tutar?:number;paket?:number}|undefined): PlatformGiris => ({ tutar: nToStr(o?.tutar), paket: o?.paket ? String(o.paket) : "" });
       const ok = veri.online?.kebo || {}; const oc = veri.online?.cnf || {};
       setOsKeboYs(pg(ok.ys)); setOsKeboYsIndirim(nToStr(ok.ys?.indirim));
@@ -1125,6 +1141,8 @@ export default function RaporlarPage() {
       }
       if (veri.notlar) setNotlar(veri.notlar);
       setTaramaBelirsizAlanlar(veri.belirsiz_alanlar || []);
+      setTaramaIleDoldu(true); setKontrolOnay(false);
+      setTimeout(() => formAlaniRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
     } catch (err) {
       setTaramaHata(err instanceof Error ? err.message : "Bağlantı hatası, tekrar deneyin.");
     } finally {
@@ -1196,6 +1214,7 @@ Soru: ${soruFinal}`
   const handleRaporKaydet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (duplikaTarihHata) { alert(`${fmtTarih(tarih)} tarihli rapor zaten mevcut!`); return; }
+    if (taramaIleDoldu && !kontrolOnay) { alert("Fişten doldurulan değerleri kağıtla karşılaştırıp onay kutusunu işaretleyin."); return; }
     if (!selectedRapor && tarih > bugun()) { alert("İleri tarihli rapor girilemez."); return; }
     if (!selectedRapor && !adminOnayliGecis && tarihHataVarMi) { alert("Rapor tarihi sırası hatalı."); return; }
     if (ch.brutCiro<=0) { alert("Lütfen en az bir ciro kalemi girin!"); return; }
@@ -1365,10 +1384,20 @@ Soru: ${soruFinal}`
           <p className="text-xs text-red-700">{taramaHata}</p>
         </div>
       )}
-      {taramaBelirsizAlanlar.length > 0 && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-2.5">
-          <p className="text-xs font-bold text-amber-600 flex items-center gap-1.5 mb-1"><AlertTriangle size={12}/> AI bazı alanlardan emin olamadı — lütfen kontrol et:</p>
-          <p className="text-[11px] text-amber-200/80">{taramaBelirsizAlanlar.join(", ")}</p>
+      {taramaIleDoldu && !isReadOnly && (
+        <div className="rounded-xl border border-indigo-500/25 bg-indigo-50 px-4 py-3 space-y-2">
+          <p className="text-xs font-bold text-indigo-800 flex items-center gap-1.5"><Check size={13}/> Form fişten dolduruldu. Aşağıdaki değerleri kağıtla karşılaştırıp gerekirse düzeltin, sonra kaydedin.</p>
+          {taramaTarihNotu && <p className="text-[12px] text-amber-800 font-semibold flex items-center gap-1.5"><AlertTriangle size={12}/> {taramaTarihNotu}</p>}
+          {taramaBelirsizAlanlar.length > 0 && (
+            <div>
+              <p className="text-[12px] font-bold text-amber-800 mb-1">Özellikle şu alanlara bakın (okuma belirsiz):</p>
+              <div className="flex flex-wrap gap-1.5">
+                {taramaBelirsizAlanlar.map(a => (
+                  <span key={a} className="text-[11px] font-semibold text-amber-900 bg-amber-100 border border-amber-300 rounded-lg px-2 py-0.5">{alanEtiketi(a)}</span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
       {/* TARİH + CANLI METRİKLER */}
@@ -1429,7 +1458,7 @@ Soru: ${soruFinal}`
         </div>
       )}
 
-      <div className={`transition-all duration-200 ${formKilitli&&!isReadOnly?"opacity-20 pointer-events-none blur-sm select-none":""}`}>
+      <div ref={formAlaniRef} className={`transition-all duration-200 scroll-mt-4 ${formKilitli&&!isReadOnly?"opacity-20 pointer-events-none blur-sm select-none":""}`}>
 
         {!tarih && !isReadOnly && (
           <div className="flex items-center justify-center gap-2 py-8 text-gray-600 text-xs border border-dashed border-[#e2e5eb] rounded-xl">
@@ -1957,8 +1986,15 @@ Soru: ${soruFinal}`
                   className="text-xs font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] px-4 py-2 rounded-xl transition-colors">
                   İptal
                 </button>
+                {!isReadOnly && taramaIleDoldu && (
+                  <label className="flex items-center gap-2 text-[12px] font-semibold text-indigo-800 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 cursor-pointer select-none">
+                    <input type="checkbox" checked={kontrolOnay} onChange={e=>setKontrolOnay(e.target.checked)} className="w-4 h-4 accent-indigo-600"/>
+                    Kağıt formla karşılaştırdım, değerler doğru
+                  </label>
+                )}
                 {!isReadOnly && (!tarihHataVarMi || adminOnayliGecis) && !duplikaTarihHata && (
-                  <button type="submit" disabled={!tarih||saving}
+                  <button type="submit" disabled={!tarih||saving||(taramaIleDoldu&&!kontrolOnay)}
+                    title={taramaIleDoldu&&!kontrolOnay?"Önce değerleri kağıtla karşılaştırıp onay kutusunu işaretleyin":undefined}
                     className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 px-6 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-blue-900/30">
                     {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>}
                     {selectedRapor ? "Kaydet" : "Raporu Kaydet"}

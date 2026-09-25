@@ -33,3 +33,15 @@ describe("kağıt rapor tarama düzeltmesi", () => {
     expect(taramaTarihi(null)).toBeNull();
   });
 });
+
+import { kurusluAlanlar, alanEtiketi } from "../lib/tarama";
+describe("belirsiz alanlar", () => {
+  it("kuruşlu tutarları işaretler", () => {
+    expect(kurusluAlanlar({ online: { kebo: { ys: { tutar: 3285, indirim: 30.1, paket: 12 } } }, giderler: [{ tutar: 12.5 }] }))
+      .toEqual(["online.kebo.ys.indirim", "giderler.0.tutar"]);
+  });
+  it("alan adlarını Türkçeleştirir", () => {
+    expect(alanEtiketi("online.kebo.ys.indirim")).toBe("Online › KEBO › Yemeksepeti › İndirim");
+    expect(alanEtiketi("giderler.0.tutar")).toBe("Gider › 1. satır › Tutar");
+  });
+});

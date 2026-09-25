@@ -59,3 +59,32 @@ export function taramaTarihi(v: unknown): string | null {
   const yil = d.getUTCFullYear();
   return yil >= 2024 && yil <= 2035 ? v : null;
 }
+
+// ─── Belirsiz alanlar ───────────────────────────────────────────────────────
+// El yazısı formda kuruş neredeyse hiç yazılmaz; kuruşlu okunan tutar büyük
+// ihtimalle yanlış okunmuştur ("301" → 30.1). Bu alanlar kontrol listesine eklenir.
+export function kurusluAlanlar(veri: unknown, yol = ""): string[] {
+  if (Array.isArray(veri)) return veri.flatMap((x, i) => kurusluAlanlar(x, `${yol}.${i}`));
+  if (veri && typeof veri === "object") {
+    return Object.entries(veri as Record<string, unknown>).flatMap(([k, v]) => {
+      const y = yol ? `${yol}.${k}` : k;
+      if (PARA_ALANLARI.has(k) && typeof v === "number" && v > 0 && Math.round(v) !== v) return [y];
+      return kurusluAlanlar(v, y);
+    });
+  }
+  return [];
+}
+
+const ETIKET: Record<string, string> = {
+  online: "Online", kapida: "Kapıda", kebo: "KEBO", cnf: "Chick'n Fride",
+  ys: "Yemeksepeti", trendyol: "Trendyol", migros: "Migros", migrosYemek: "Migros Yemek", alo: "Alo Paket",
+  tutar: "Tutar", paket: "Paket", indirim: "İndirim", kasa: "Kasa", nakit: "Nakit", pos: "POS",
+  edenred: "Edenred", metropol: "Metropol", giderler: "Gider", avanslar: "Avans", kesintiler: "Kesinti",
+  iadeler: "İade", kuryeSabit: "Sabit kurye", kuryeHavuz: "Havuz kurye", isim: "İsim", personel: "Personel",
+  aciklama: "Açıklama", tarih: "Tarih", giren: "Giren", notlar: "Notlar",
+};
+
+/** "online.kebo.ys.indirim" → "Online › KEBO › Yemeksepeti › İndirim" */
+export function alanEtiketi(yol: string): string {
+  return yol.split(".").map(p => /^\d+$/.test(p) ? `${Number(p) + 1}. satır` : (ETIKET[p] || p)).join(" › ");
+}
