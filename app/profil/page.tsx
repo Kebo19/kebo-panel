@@ -15,8 +15,8 @@ export default function ProfilPage() {
       const { data } = await supabase
         .from("profiles")
         .select("full_name, role")
-        .eq("email", user.email)
-        .single();
+        .eq("id", user.id)
+        .maybeSingle();
 
       setProfil(data);
     };

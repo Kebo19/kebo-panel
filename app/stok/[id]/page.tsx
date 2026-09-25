@@ -1,12 +1,22 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine,
+} from "recharts";
+import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { bugun, gunEkle, fmtTarih } from "@/lib/tarih";
+import { useYetki } from "@/lib/useYetki";
+import {
+  kullanimAnalizi, stokDurumu, cikisOzeti, donemKullanimi, miktarOku, nedenEtiketi, varsayilanVakit,
+  CIKIS_NEDENLERI, GUN_ADLARI, type CikisNedeni, type SayimVakti,
+} from "@/lib/stok";
+import VakitSecici from "@/components/VakitSecici";
 import Link from "next/link";
 import {
-  ArrowLeft, ClipboardCheck, Truck, TrendingDown,
-  Edit3, Loader2, Save, X, Trash2, Activity, BarChart3, BrainCircuit
+  ArrowLeft, ClipboardCheck, Truck, PackageMinus, TrendingDown,
+  Edit3, Loader2, Save, X, Trash2, Activity, BarChart3, AlertTriangle,
 } from "lucide-react";
 
 interface Urun {
@@ -17,231 +27,113 @@ interface Urun {
 interface Hareket {
   id: string; urun_id: string; tarih: string;
   tip: "sayim" | "giris" | "cikis" | "duzeltme";
-  miktar: number; kaynak: string | null;
+  miktar: number; neden?: string | null; birim_fiyat?: number | null; kaynak: string | null;
   aciklama: string | null; kullanici: string | null;
   created_at: string;
 }
 
-const fmt = (v: number, d = 2) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: d }).format(v);
-const fmtTarih = (t: string) => { if(!t) return ""; const [y,m,d]=t.split("-"); return `${d}.${m}.${y}`; };
-const bugun = () => new Date().toISOString().split("T")[0];
+const fmt = (v: number, d = 1) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: d }).format(v || 0);
 
+// Tailwind dinamik sınıf üretmediği için renk sınıfları açıkça yazılı.
 const TIP_KONFIG = {
-  sayim:    { label: "Sayım",    color: "blue",    icon: ClipboardCheck },
-  giris:    { label: "Giriş",    color: "amber",   icon: Truck },
-  cikis:    { label: "Çıkış",    color: "red",     icon: TrendingDown },
-  duzeltme: { label: "Düzeltme", color: "purple",  icon: Edit3 },
+  sayim:    { label: "Sayım",    rozet: "bg-blue-500/10 text-blue-600",     yazi: "text-blue-600",   icon: ClipboardCheck },
+  giris:    { label: "Giriş",    rozet: "bg-amber-500/10 text-amber-600",   yazi: "text-amber-600",  icon: Truck },
+  cikis:    { label: "Çıkış",    rozet: "bg-red-500/10 text-red-600",       yazi: "text-red-600",    icon: TrendingDown },
+  duzeltme: { label: "Düzeltme", rozet: "bg-purple-500/10 text-purple-600", yazi: "text-purple-600", icon: Edit3 },
 };
+
+const inputCls = "w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none";
 
 export default function StokDetayPage() {
   const params = useParams();
-  const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const urunId = params?.id as string;
-  const chartRef = useRef<HTMLCanvasElement>(null);
-  const chartInstance = useRef<any>(null);
 
   const [loading, setLoading] = useState(true);
   const [urun, setUrun] = useState<Urun | null>(null);
   const [hareketler, setHareketler] = useState<Hareket[]>([]);
-  const [userEmail, setUserEmail] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const yetki = useYetki();
+  const ekleyen = yetki.kullaniciAdi || "Bilinmiyor";
+  const isAdmin = yetki.tamYetkili;
 
-  const [donemBaslangic, setDonemBaslangic] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 30);
-    return d.toISOString().split("T")[0];
-  });
-  const [donemBitis, setDonemBitis] = useState(bugun());
+  const [donemBaslangic, setDonemBaslangic] = useState(() => gunEkle(bugun(), -30));
+  const [donemBitis, setDonemBitis] = useState(() => gunEkle(bugun(), -1));
 
-  const [sayimAcik, setSayimAcik] = useState(false);
-  const [girisAcik, setGirisAcik] = useState(false);
-  const [sayimMiktar, setSayimMiktar] = useState("");
-  const [sayimTarih, setSayimTarih] = useState(bugun());
-  const [girisMiktar, setGirisMiktar] = useState("");
-  const [girisTarih, setGirisTarih] = useState(bugun());
+  const [modal, setModal] = useState<null | "sayim" | "giris" | "cikis">(null);
+  const [miktar, setMiktar] = useState("");
+  const [fiyat, setFiyat] = useState("");
+  const [tarih, setTarih] = useState(bugun());
+  const [neden, setNeden] = useState<CikisNedeni>("skt");
+  const [vakit, setVakit] = useState<SayimVakti>("sabah");
+  const [not, setNot] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const veriCek = async () => {
+  const veriCek = useCallback(async () => {
     if (!urunId) return;
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    setUserEmail(user?.email || "");
-    setIsAdmin(user?.email === "murat@kebo.com" || user?.email === "bulent@kebo.com");
-
     const [uRes, hRes] = await Promise.all([
       supabase.from("stok_urunler").select("*").eq("id", urunId).single(),
-      supabase.from("stok_hareketler").select("*").eq("urun_id", urunId).order("tarih", { ascending: false }).limit(200),
+      supabase.from("stok_hareketler").select("*").eq("urun_id", urunId).order("tarih", { ascending: false }).order("created_at", { ascending: false }).limit(2000),
     ]);
     if (uRes.data) setUrun(uRes.data as Urun);
     if (hRes.data) setHareketler(hRes.data as Hareket[]);
     setLoading(false);
+  }, [supabase, urunId]);
+
+  useEffect(() => { veriCek(); }, [veriCek]);
+
+  // Liste sayfasıyla aynı hesaplar (lib/stok.ts)
+  const analiz = useMemo(() => kullanimAnalizi(hareketler, urunId), [hareketler, urunId]);
+  const durum = useMemo(() => stokDurumu(hareketler, urunId), [hareketler, urunId]);
+  const donem = useMemo(() => {
+    const k = donemKullanimi(analiz, donemBaslangic, donemBitis);
+    const c = cikisOzeti(hareketler, urunId, donemBaslangic, donemBitis, urun?.son_fiyat);
+    const gelen = hareketler.filter(h => h.tip === "giris" && h.tarih >= donemBaslangic && h.tarih <= donemBitis)
+      .reduce((s, h) => s + Number(h.miktar), 0);
+    return { ...k, ortalama: k.gun ? k.toplam / k.gun : 0, cikis: c, gelen };
+  }, [analiz, hareketler, urunId, urun?.son_fiyat, donemBaslangic, donemBitis]);
+
+  const kullanimGrafik = useMemo(() => analiz.gunler
+    .filter(g => g.tarih >= donemBaslangic && g.tarih <= donemBitis)
+    .map(g => ({ gun: fmtTarih(g.tarih).slice(0, 5), kullanim: Math.round(g.kullanim * 100) / 100, tahmini: g.tahmini })),
+  [analiz, donemBaslangic, donemBitis]);
+
+  const sayimGrafik = useMemo(() => {
+    const m = new Map<string, number>();
+    [...hareketler].filter(h => h.tip === "sayim" && h.tarih >= donemBaslangic && h.tarih <= donemBitis)
+      .sort((a, b) => a.tarih.localeCompare(b.tarih) || a.created_at.localeCompare(b.created_at))
+      .forEach(h => m.set(h.tarih, Number(h.miktar)));
+    return Array.from(m.entries()).map(([t, v]) => ({ gun: fmtTarih(t).slice(0, 5), miktar: v }));
+  }, [hareketler, donemBaslangic, donemBitis]);
+
+  const modalAc = (tip: "sayim" | "giris" | "cikis") => {
+    setModal(tip); setMiktar(""); setFiyat(urun?.son_fiyat ? String(urun.son_fiyat).replace(".", ",") : "");
+    setTarih(bugun()); setNeden("skt"); setNot(""); setVakit(varsayilanVakit());
   };
 
-  useEffect(() => { veriCek(); }, [urunId]);
-
-  const donemAnaliz = useMemo(() => {
-    if (!urun) return null;
-    const sayimlar = hareketler.filter(h => h.tip === "sayim").sort((a, b) => a.tarih.localeCompare(b.tarih));
-
-    const baslangicSayim = sayimlar.filter(s => s.tarih <= donemBaslangic).slice(-1)[0];
-    const bitisSayim = sayimlar.filter(s => s.tarih <= donemBitis).slice(-1)[0];
-
-    if (!baslangicSayim || !bitisSayim || baslangicSayim.tarih === bitisSayim.tarih) {
-      return { kullanim: 0, gunSayisi: 0, gunlukOrt: 0, baslangicStok: 0, bitisStok: 0, aradaGelen: 0 };
-    }
-
-    const aradaGelen = hareketler
-      .filter(h => h.tip === "giris" && h.tarih > baslangicSayim.tarih && h.tarih <= bitisSayim.tarih)
-      .reduce((s, h) => s + h.miktar, 0);
-
-    const gunSayisi = Math.max(
-      Math.round((new Date(bitisSayim.tarih).getTime() - new Date(baslangicSayim.tarih).getTime()) / (1000 * 60 * 60 * 24)),
-      1
-    );
-
-    const kullanim = Math.max((baslangicSayim.miktar + aradaGelen) - bitisSayim.miktar, 0);
-    const gunlukOrt = kullanim / gunSayisi;
-
-    return {
-      kullanim, gunSayisi, gunlukOrt,
-      baslangicStok: baslangicSayim.miktar,
-      bitisStok: bitisSayim.miktar,
-      aradaGelen,
-    };
-  }, [urun, hareketler, donemBaslangic, donemBitis]);
-
-  const aiTrendMesaji = useMemo(() => {
-    if (!donemAnaliz || donemAnaliz.gunlukOrt <= 0 || hareketler.length < 3) return null;
-    
-    const sayimlar = hareketler.filter(h => h.tip === "sayim").sort((a, b) => b.tarih.localeCompare(a.tarih));
-    if (sayimlar.length < 2) return null;
-
-    const sonKullanim = Math.max(sayimlar[1].miktar - sayimlar[0].miktar, 0);
-    const genelOrt = donemAnaliz.gunlukOrt;
-
-    if (sonKullanim > genelOrt * 1.35) {
-      return { stil: "text-amber-600 bg-amber-500/5 border-amber-500/20", metin: "AI Uyarısı: Bu malzemenin tüketim hızı genel ortalamanın %35 üzerine çıktı. Mutfak kullanım yoğunluğu arttı!" };
-    }
-    if (sonKullanim < genelOrt * 0.45 && urun && urun.mevcut_stok > urun.min_stok * 2) {
-      return { stil: "text-purple-600 bg-purple-500/5 border-purple-500/20", metin: "AI Analizi: Tüketim hızı yavaşladı. Depoda fazla bekleme riski var, mal girişini askıya alabilirsiniz." };
-    }
-    return { stil: "text-emerald-600 bg-emerald-500/5 border-emerald-500/10", metin: "AI Analizi: Malzeme tüketim hızı stabil seyrediyor. Algoritma olağandışı bir sapma tespit etmedi." };
-  }, [donemAnaliz, hareketler, urun]);
-
-  const grafikData = useMemo(() => {
-    if (!urun || hareketler.length === 0) return [];
-    const sirali = [...hareketler].sort((a, b) => a.tarih.localeCompare(b.tarih));
-    const tarihMap = new Map<string, number>();
-    let stok = 0;
-    
-    sirali.forEach(h => {
-      if (h.tip === "sayim") {
-        stok = h.miktar;
-      } else if (h.tip === "giris") {
-        stok += h.miktar;
-      } else if (h.tip === "cikis") {
-        stok -= h.miktar;
-      } else if (h.tip === "duzeltme") {
-        stok = h.miktar;
-      }
-      tarihMap.set(h.tarih, stok);
-    });
-    
-    return Array.from(tarihMap.entries()).map(([tarih, miktar]) => ({ tarih, miktar }));
-  }, [urun, hareketler]);
-
-  useEffect(() => {
-    if (grafikData.length === 0 || !chartRef.current) return;
-    if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null; }
-
-    const load = async () => {
-      // @ts-ignore
-      if (!window.Chart) {
-        await new Promise<void>(resolve => {
-          const s = document.createElement("script");
-          s.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
-          s.onload = () => resolve(); document.head.appendChild(s);
-        });
-      }
-      if (!chartRef.current) return;
-
-      const labels = grafikData.map(d => fmtTarih(d.tarih).substring(0, 5));
-      const data = grafikData.map(d => d.miktar);
-      const minStok = urun?.min_stok || 0;
-
-      // @ts-ignore
-      chartInstance.current = new window.Chart(chartRef.current, {
-        type: "line",
-        data: {
-          labels,
-          datasets: [{
-            label: "Stok Seviyesi",
-            data,
-            borderColor: "#10B981",
-            backgroundColor: "rgba(16, 185, 129, 0.1)",
-            borderWidth: 2,
-            fill: true,
-            tension: 0.3,
-            pointRadius: 4,
-            pointBackgroundColor: "#10B981",
-            pointBorderColor: "#0c0f1a",
-            pointBorderWidth: 2,
-          }, ...(minStok > 0 ? [{
-            label: "Min. Stok",
-            data: Array(labels.length).fill(minStok),
-            borderColor: "#F59E0B",
-            borderWidth: 1,
-            borderDash: [5, 5],
-            pointRadius: 0,
-            fill: false,
-          }] : [])]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: "#0f1623", borderColor: "#1e2a3a", borderWidth: 1, titleColor: "#94a3b8", bodyColor: "#e2e8f0",
-              callbacks: { label: (ctx: any) => `${ctx.dataset.label}: ${fmt(ctx.parsed.y)} ${urun?.birim || ""}` }
-            }
-          },
-          scales: {
-            x: { ticks: { color: "#4b5563", font: { size: 10 } }, grid: { color: "rgba(255,255,255,0.03)" } },
-            y: { ticks: { color: "#4b5563", font: { size: 10 } }, grid: { color: "rgba(255,255,255,0.04)" }, beginAtZero: true }
-          }
-        }
-      });
-    };
-    load();
-    return () => { if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null; } };
-  }, [grafikData, urun?.birim, urun?.min_stok]);
-
-  const sayimKaydet = async () => {
-    if (!urun) return;
-    const m = parseFloat(sayimMiktar);
-    if (isNaN(m) || m < 0) { alert("Geçerli miktar"); return; }
+  const kaydet = async () => {
+    if (!urun || !modal) return;
+    const m = miktarOku(miktar);
+    if (isNaN(m) || m < 0 || (modal !== "sayim" && m === 0)) { alert("Geçerli bir miktar girin"); return; }
+    if (tarih > bugun()) { alert("İleri tarihli hareket girilemez."); return; }
+    if (modal === "cikis" && m > durum.tahminiMevcut * 1.5 + 0.001
+      && !confirm(`Çıkış (${fmt(m)} ${urun.birim}) tahmini stoktan (${fmt(durum.tahminiMevcut)}) fazla. Yine de kaydedilsin mi?`)) return;
     setSaving(true);
-    const ekleyen = userEmail.split("@")[0] || "Bilinmiyor";
-    const { error } = await supabase.from("stok_hareketler").insert([{
-      urun_id: urun.id, tarih: sayimTarih, tip: "sayim", miktar: m, kaynak: "manuel", kullanici: ekleyen, aciklama: `${urun.urun_adi} sayımı`,
-    }]);
-    if (error) { alert("Hata: " + error.message); setSaving(false); return; }
-    setSayimAcik(false); setSayimMiktar(""); setSayimTarih(bugun()); setSaving(false);
-    veriCek();
-  };
-
-  const girisKaydet = async () => {
-    if (!urun) return;
-    const m = parseFloat(girisMiktar);
-    if (isNaN(m) || m <= 0) { alert("Geçerli miktar"); return; }
-    setSaving(true);
-    const ekleyen = userEmail.split("@")[0] || "Bilinmiyor";
-    const { error } = await supabase.from("stok_hareketler").insert([{
-      urun_id: urun.id, tarih: girisTarih, tip: "giris", miktar: m, kaynak: "manuel", kullanici: ekleyen, aciklama: `${urun.urun_adi} mal girişi`,
-    }]);
-    if (error) { alert("Hata: " + error.message); setSaving(false); return; }
-    setGirisAcik(false); setGirisMiktar(""); setGirisTarih(bugun()); setSaving(false);
+    const f = miktarOku(fiyat);
+    const kayit: Record<string, unknown> = {
+      urun_id: urun.id, tarih, tip: modal, miktar: m, kaynak: "manuel", kullanici: ekleyen,
+      aciklama: not.trim() || (modal === "sayim" ? "Sayım" : modal === "giris" ? "Mal girişi" : nedenEtiketi(neden)),
+    };
+    if (modal === "giris" && !isNaN(f) && f > 0) kayit.birim_fiyat = f;
+    if (modal === "cikis") { kayit.neden = neden; kayit.birim_fiyat = urun.son_fiyat; }
+    if (modal === "sayim") kayit.vakit = vakit;
+    const { error } = await supabase.from("stok_hareketler").insert([kayit]);
+    if (!error && modal === "giris" && !isNaN(f) && f > 0) {
+      await supabase.from("stok_urunler").update({ son_fiyat: f }).eq("id", urun.id);
+    }
+    setSaving(false);
+    if (error) { alert("Hata: " + error.message); return; }
+    setModal(null);
     veriCek();
   };
 
@@ -266,9 +158,9 @@ export default function StokDetayPage() {
     </div>
   );
 
-  const kritik = urun.mevcut_stok <= urun.min_stok && urun.min_stok > 0;
-  const tukenmis = urun.mevcut_stok <= 0;
-  const tahminiBitis = donemAnaliz && donemAnaliz.gunlukOrt > 0 ? Math.floor(urun.mevcut_stok / donemAnaliz.gunlukOrt) : null;
+  const kritik = urun.min_stok > 0 && durum.tahminiMevcut <= urun.min_stok;
+  const tukenmis = durum.sonSayimTarih !== null && durum.tahminiMevcut <= 0;
+  const sonTutarsiz = analiz.tutarsizAraliklar[analiz.tutarsizAraliklar.length - 1];
 
   return (
     <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased">
@@ -282,15 +174,18 @@ export default function StokDetayPage() {
             <div>
               <h1 className="text-sm font-black tracking-tight text-[#1a1f2e] leading-none">{urun.urun_adi}</h1>
               <p className="text-[10px] text-gray-600 leading-none mt-0.5">
-                {urun.kategori || "Kategorisiz"} · {urun.birim} · <span className="capitalize text-blue-600">{urun.sayim_periyodu || "gunluk"} Sayım</span>
+                {urun.kategori || "Kategorisiz"} · {urun.birim} · <span className="text-blue-600">{urun.sayim_periyodu === "haftalik" ? "Haftalık" : urun.sayim_periyodu === "aylik" ? "Aylık" : "Günlük"} sayım</span>
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setGirisAcik(true)} className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-amber-600 border border-[#e2e5eb] px-3 py-2 rounded-xl">
+            <button onClick={() => modalAc("giris")} className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 border border-amber-500/30 bg-amber-500/5 px-3 py-2 rounded-xl">
               <Truck size={13}/> Mal Geldi
             </button>
-            <button onClick={() => setSayimAcik(true)} className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl shadow-lg shadow-blue-900/30">
+            <button onClick={() => modalAc("cikis")} className="flex items-center gap-1.5 text-[11px] font-semibold text-red-700 border border-red-500/30 bg-red-500/5 px-3 py-2 rounded-xl">
+              <PackageMinus size={13}/> Çıkış / Fire
+            </button>
+            <button onClick={() => modalAc("sayim")} className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl shadow-lg shadow-blue-900/30">
               <ClipboardCheck size={14}/> Sayım Gir
             </button>
           </div>
@@ -298,42 +193,46 @@ export default function StokDetayPage() {
       </div>
 
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
-        
-        {/* AI ŞERİT */}
-        {aiTrendMesaji && (
-          <div className={`rounded-xl border p-3 text-xs flex items-center gap-2 font-medium ${aiTrendMesaji.stil}`}>
-            <BrainCircuit className="h-4 w-4 shrink-0" />
-            <p>{aiTrendMesaji.metin}</p>
+
+        {sonTutarsiz && (
+          <div className="rounded-xl border border-purple-500/25 bg-purple-500/5 p-3 text-xs flex items-center gap-2 text-purple-700">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <p>{fmtTarih(sonTutarsiz.bas)} → {fmtTarih(sonTutarsiz.bit)} arası stok {fmt(sonTutarsiz.fark)} {urun.birim} arttı ama mal girişi yok. Giriş unutulmuş ya da sayım hatalı olabilir; bu aralık ortalamaya katılmadı.</p>
           </div>
         )}
 
         {/* KPI ÖZET */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className={`bg-[#ffffff] border rounded-2xl p-4 ${tukenmis ? "border-red-500/30" : kritik ? "border-amber-500/30" : "border-emerald-500/20"}`}>
-            <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Mevcut Stok</p>
+            <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Tahmini Stok (şu an)</p>
             <p className={`text-2xl font-black ${tukenmis ? "text-red-600" : kritik ? "text-amber-600" : "text-emerald-600"}`}>
-              {fmt(urun.mevcut_stok, 1)} <span className="text-sm text-gray-500">{urun.birim}</span>
+              ~{fmt(durum.tahminiMevcut)} <span className="text-sm text-gray-500">{urun.birim}</span>
             </p>
-            {urun.min_stok > 0 && <p className="text-[10px] text-gray-600 mt-1">Min: {fmt(urun.min_stok, 1)} {urun.birim}</p>}
+            <p className="text-[10px] text-gray-600 mt-1">
+              {durum.sonSayimTarih
+                ? <>Son sayım {fmt(durum.sonSayimMiktar || 0)} {urun.birim} · {fmtTarih(durum.sonSayimTarih)}{durum.sonrakiGiris ? ` · +${fmt(durum.sonrakiGiris)} gelen` : ""}{durum.sonrakiCikis ? ` · −${fmt(durum.sonrakiCikis)} çıkış` : ""}</>
+                : "Henüz sayım yok"}
+              {urun.min_stok > 0 && <> · Min {fmt(urun.min_stok)}</>}
+            </p>
           </div>
           <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
-            <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Günlük Ort. Tüketim</p>
+            <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Günlük Kullanım (son 7 gün)</p>
             <p className="text-2xl font-black text-purple-600">
-              {donemAnaliz ? fmt(donemAnaliz.gunlukOrt, 2) : "—"} <span className="text-sm text-gray-500">{urun.birim}/gün</span>
+              {durum.ort7.ortalama > 0 ? fmt(durum.ort7.ortalama, 2) : "—"} <span className="text-sm text-gray-500">{urun.birim}/gün</span>
             </p>
-            <p className="text-[10px] text-gray-600 mt-1">Son 30 günlük veriye göre</p>
+            <p className="text-[10px] text-gray-600 mt-1">{durum.ort7.veriGunu ? `${durum.ort7.veriGunu} günlük veri${durum.ort7.pencere > 7 ? " (son 7 günde veri yok, son 30 gün)" : ""}` : "En az iki sayım gerekli"}</p>
           </div>
           <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
-            <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Tahmini Bitiş Süresi</p>
+            <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Stok Ne Kadar Yeter</p>
             <p className="text-2xl font-black text-blue-600">
-              {tahminiBitis !== null ? `${tahminiBitis}` : "—"} <span className="text-sm text-gray-500">gün</span>
+              {durum.kalanGun !== null ? durum.kalanGun : "—"} <span className="text-sm text-gray-500">gün</span>
             </p>
-            <p className="text-[10px] text-gray-600 mt-1">{tahminiBitis !== null ? `~${new Date(Date.now() + tahminiBitis * 86400000).toLocaleDateString("tr-TR")}` : "Veri yetersiz"}</p>
+            <p className="text-[10px] text-gray-600 mt-1">{durum.kalanGun !== null ? `~${fmtTarih(gunEkle(bugun(), durum.kalanGun))} tarihine kadar` : "Veri yetersiz"}</p>
           </div>
           <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
             <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Son Alış Fiyatı</p>
             <p className="text-2xl font-black text-amber-600">{urun.son_fiyat ? `₺${fmt(urun.son_fiyat, 2)}` : "—"}</p>
-            <p className="text-[10px] text-gray-600 mt-1">Birim başına maliyet</p>
+            <p className="text-[10px] text-gray-600 mt-1">Birim başına · fire değeri bununla hesaplanır</p>
           </div>
         </div>
 
@@ -346,7 +245,7 @@ export default function StokDetayPage() {
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-gray-800">Dönem Analizi</h3>
-                <p className="text-[10px] text-gray-600">İki tarih arasındaki tüketim hesabı</p>
+                <p className="text-[10px] text-gray-600">Kullanım sayımlardan hesaplanır; sayılmayan günler aradaki günlere eşit bölünür</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -355,85 +254,152 @@ export default function StokDetayPage() {
               <input type="date" value={donemBitis} onChange={e => setDonemBitis(e.target.value)} className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-8 px-2 rounded-lg outline-none"/>
             </div>
           </div>
-          {donemAnaliz && donemAnaliz.gunSayisi > 0 ? (
-            <div className="p-5 grid grid-cols-2 lg:grid-cols-5 gap-3">
-              <div className="bg-[#f7f8fa] rounded-xl p-3 border border-[#e2e5eb]">
-                <p className="text-[9px] text-gray-600 uppercase tracking-widest">Başlangıç Stoğu</p>
-                <p className="text-sm font-black text-blue-600 mt-1">{fmt(donemAnaliz.baslangicStok, 1)} {urun.birim}</p>
-              </div>
-              <div className="bg-[#f7f8fa] rounded-xl p-3 border border-[#e2e5eb]">
-                <p className="text-[9px] text-gray-600 uppercase tracking-widest">Arada Gelen Mal</p>
-                <p className="text-sm font-black text-amber-600 mt-1">+ {fmt(donemAnaliz.aradaGelen, 1)} {urun.birim}</p>
-              </div>
-              <div className="bg-[#f7f8fa] rounded-xl p-3 border border-[#e2e5eb]">
-                <p className="text-[9px] text-gray-600 uppercase tracking-widest">Bitiş Stoğu</p>
-                <p className="text-sm font-black text-emerald-600 mt-1">{fmt(donemAnaliz.bitisStok, 1)} {urun.birim}</p>
-              </div>
-              <div className="bg-[#f7f8fa] rounded-xl p-3 border border-red-500/20">
-                <p className="text-[9px] text-red-600 uppercase tracking-widest font-bold">Toplam Kullanım</p>
-                <p className="text-sm font-black text-red-600 mt-1">- {fmt(donemAnaliz.kullanim, 1)} {urun.birim}</p>
-              </div>
-              <div className="bg-[#f7f8fa] rounded-xl p-3 border border-purple-500/20">
-                <p className="text-[9px] text-purple-600 uppercase tracking-widest font-bold">Günlük Ortalama</p>
-                <p className="text-sm font-black text-purple-600 mt-1">{fmt(donemAnaliz.gunlukOrt, 2)} {urun.birim}/gün</p>
-                <p className="text-[9px] text-gray-700 mt-0.5">{donemAnaliz.gunSayisi} gün</p>
-              </div>
+          <div className="p-5 grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="bg-[#f7f8fa] rounded-xl p-3 border border-purple-500/20">
+              <p className="text-[9px] text-purple-600 uppercase tracking-widest font-bold">Toplam Kullanım</p>
+              <p className="text-sm font-black text-purple-600 mt-1">{fmt(donem.toplam)} {urun.birim}</p>
+              <p className="text-[9px] text-gray-600 mt-0.5">{donem.gun} gün{donem.tahminiGun ? ` (${donem.tahminiGun}'i tahmini)` : ""}</p>
             </div>
-          ) : (
-            <div className="p-8 text-center text-xs text-gray-600">Bu dönemde sayım verisi yetersiz. En az iki sayım gerekli.</div>
+            <div className="bg-[#f7f8fa] rounded-xl p-3 border border-[#e2e5eb]">
+              <p className="text-[9px] text-gray-600 uppercase tracking-widest">Günlük Ortalama</p>
+              <p className="text-sm font-black text-gray-800 mt-1">{fmt(donem.ortalama, 2)} {urun.birim}/gün</p>
+            </div>
+            <div className="bg-[#f7f8fa] rounded-xl p-3 border border-[#e2e5eb]">
+              <p className="text-[9px] text-gray-600 uppercase tracking-widest">Gelen Mal</p>
+              <p className="text-sm font-black text-amber-600 mt-1">+{fmt(donem.gelen)} {urun.birim}</p>
+            </div>
+            <div className="bg-[#f7f8fa] rounded-xl p-3 border border-red-500/20">
+              <p className="text-[9px] text-red-600 uppercase tracking-widest font-bold">Fire (SKT/bozuk/diğer)</p>
+              <p className="text-sm font-black text-red-600 mt-1">{fmt(donem.cikis.fire)} {urun.birim}</p>
+              <p className="text-[9px] text-gray-600 mt-0.5">
+                {donem.cikis.fireTutar ? `~₺${fmt(donem.cikis.fireTutar, 0)}` : ""}
+                {donem.toplam > 0 && donem.cikis.fire > 0 ? ` · kullanımın %${fmt(donem.cikis.fire / donem.toplam * 100, 1)}'i` : ""}
+              </p>
+            </div>
+            <div className="bg-[#f7f8fa] rounded-xl p-3 border border-[#e2e5eb]">
+              <p className="text-[9px] text-gray-600 uppercase tracking-widest">Tedarikçiye İade</p>
+              <p className="text-sm font-black text-gray-800 mt-1">{fmt(donem.cikis.iade)} {urun.birim}</p>
+            </div>
+          </div>
+          {Object.keys(donem.cikis.nedenler).length > 0 && (
+            <div className="px-5 pb-4 flex flex-wrap gap-2 text-[11px]">
+              {Object.entries(donem.cikis.nedenler).map(([n, m]) => (
+                <span key={n} className="bg-red-500/5 border border-red-500/15 text-red-700 px-2 py-1 rounded-lg">{nedenEtiketi(n)}: {fmt(m)} {urun.birim}</span>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* GRAFİK */}
-        {grafikData.length > 0 && (
-          <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] p-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                <BarChart3 className="h-3.5 w-3.5 text-emerald-600"/>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-800">Stok Seviyesi Trendi</h3>
-            </div>
-            <div className="relative" style={{ height: "240px" }}>
-              <canvas ref={chartRef}/>
-            </div>
+        {/* HAFTANIN GÜNLERİNE GÖRE KULLANIM */}
+        <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-800">Haftanın Günlerine Göre Kullanım <span className="text-[10px] text-gray-500 font-normal">(son 4 hafta)</span></h3>
+            <span className="text-[11px] text-gray-600">Son 7 gün ort.: <strong className="text-purple-700">{fmt(durum.ort7.ortalama, 1)} {urun.birim}</strong></span>
           </div>
-        )}
+          <div className="grid grid-cols-7 gap-1.5">
+            {[1, 2, 3, 4, 5, 6, 0].map(i => {
+              const v = durum.tahmin.haftaGunleri[i];
+              const enBuyuk = Math.max(...durum.tahmin.haftaGunleri.map(x => x || 0), 1);
+              return (
+                <div key={i} className="text-center">
+                  <div className="h-16 flex items-end justify-center bg-[#f7f8fa] rounded-lg overflow-hidden">
+                    <div className="w-full bg-purple-500/70" style={{ height: `${v ? (v / enBuyuk) * 100 : 0}%` }}/>
+                  </div>
+                  <p className="text-[10px] text-gray-600 mt-1">{GUN_ADLARI[i].slice(0, 3)}</p>
+                  <p className="text-[11px] font-bold text-gray-800">{v !== null ? fmt(v, 1) : "—"}</p>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-gray-500 mt-2">Sipariş önerisi &quot;haftanın günlerine göre&quot; seçiliyse bu değerler, veri olmayan günlerde son 7 günün ortalaması kullanılır.</p>
+        </div>
+
+        {/* GRAFİKLER */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-purple-600"/> Günlük Kullanım</h3>
+              <div className="flex items-center gap-3 text-[10px] text-gray-600">
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-purple-500 inline-block"/>Sayımlı gün</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-purple-300 inline-block"/>Tahmini (sayılmadı)</span>
+              </div>
+            </div>
+            {kullanimGrafik.length === 0 ? (
+              <p className="text-xs text-gray-600 py-16 text-center">Bu dönemde en az iki sayım yok.</p>
+            ) : (
+              <div style={{ height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={kullanimGrafik}>
+                    <CartesianGrid stroke="rgba(0,0,0,0.05)" vertical={false} />
+                    <XAxis dataKey="gun" tick={{ fontSize: 10, fill: "#6b7280" }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#6b7280" }} tickLine={false} axisLine={false} width={36} />
+                    <Tooltip formatter={(v, _n, p) => [`${fmt(Number(v), 2)} ${urun.birim}${(p?.payload as { tahmini?: boolean })?.tahmini ? " (tahmini)" : ""}`, "Kullanım"]} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                    {durum.ort7.ortalama > 0 && <ReferenceLine y={durum.ort7.ortalama} stroke="#7c3aed" strokeDasharray="4 4" label={{ value: "7g ort.", fontSize: 10, fill: "#6d28d9", position: "insideTopRight" }} />}
+                    <Bar dataKey="kullanim" radius={[4, 4, 0, 0]}>
+                      {kullanimGrafik.map((g, i) => <Cell key={i} fill={g.tahmini ? "#c4b5fd" : "#8b5cf6"} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+          <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] p-5">
+            <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2 mb-4"><BarChart3 className="h-4 w-4 text-emerald-600"/> Sayılan Stok</h3>
+            {sayimGrafik.length === 0 ? (
+              <p className="text-xs text-gray-600 py-16 text-center">Bu dönemde sayım yok.</p>
+            ) : (
+              <div style={{ height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={sayimGrafik}>
+                    <CartesianGrid stroke="rgba(0,0,0,0.05)" vertical={false} />
+                    <XAxis dataKey="gun" tick={{ fontSize: 10, fill: "#6b7280" }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: "#6b7280" }} tickLine={false} axisLine={false} width={36} />
+                    <Tooltip formatter={(v) => [`${fmt(Number(v))} ${urun.birim}`, "Sayım"]} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                    {urun.min_stok > 0 && <ReferenceLine y={urun.min_stok} stroke="#F59E0B" strokeDasharray="5 5" label={{ value: "Min", fontSize: 10, fill: "#b45309" }} />}
+                    <Area dataKey="miktar" type="monotone" stroke="#10B981" strokeWidth={2} fill="rgba(16,185,129,0.12)" dot={{ r: 3 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* HAREKETLER */}
         <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden">
           <div className="px-5 py-4 border-b border-[#e2e5eb]">
-            <h3 className="text-sm font-semibold text-gray-800">Tüm Hareketler ({hareketler.length})</h3>
+            <h3 className="text-sm font-semibold text-gray-800">Hareketler ({hareketler.length})</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-[#e2e5eb] bg-[#f7f8fa]">
-                  {["Tarih", "Tip", "Miktar", "Açıklama", "Kullanıcı", ""].map((h, i) => (
+                  {["Tarih", "Tür", "Miktar", "Fiyat", "Açıklama", "Kullanıcı", ""].map((h, i) => (
                     <th key={i} className="px-4 py-3 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-widest">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#0f1624]">
+              <tbody className="divide-y divide-[#e2e5eb]">
                 {hareketler.map(h => {
-                  const konfig = TIP_KONFIG[h.tip];
+                  const konfig = TIP_KONFIG[h.tip] || TIP_KONFIG.duzeltme;
                   const Icon = konfig.icon;
                   return (
                     <tr key={h.id} className="hover:bg-black/[0.03] group">
                       <td className="px-4 py-3 text-gray-700 font-semibold">{fmtTarih(h.tarih)}</td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-${konfig.color}-500/10 text-${konfig.color}-400`}>
-                          <Icon size={9}/> {konfig.label}
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full ${konfig.rozet}`}>
+                          <Icon size={9}/> {h.tip === "cikis" ? nedenEtiketi(h.neden) : konfig.label}
                         </span>
                       </td>
-                      <td className={`px-4 py-3 font-black text-${konfig.color}-400`}>
-                        {h.tip === "giris" ? "+" : h.tip === "cikis" ? "-" : ""}{fmt(h.miktar, 1)} {urun.birim}
+                      <td className={`px-4 py-3 font-black ${konfig.yazi}`}>
+                        {h.tip === "giris" ? "+" : h.tip === "cikis" ? "−" : ""}{fmt(h.miktar)} {urun.birim}
                       </td>
+                      <td className="px-4 py-3 text-gray-500">{h.birim_fiyat ? `₺${fmt(h.birim_fiyat, 2)}` : "—"}</td>
                       <td className="px-4 py-3 text-gray-500">{h.aciklama || "—"}</td>
                       <td className="px-4 py-3 text-gray-600 text-[10px]">{h.kullanici || "—"}</td>
                       <td className="px-4 py-3">
                         {isAdmin && (
-                          <button onClick={() => hareketSil(h)} className="p-1 text-gray-700 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Trash2 size={11}/>
+                          <button onClick={() => hareketSil(h)} title="Sil" className="p-1 text-gray-400 hover:text-red-600">
+                            <Trash2 size={12}/>
                           </button>
                         )}
                       </td>
@@ -446,61 +412,68 @@ export default function StokDetayPage() {
         </div>
       </div>
 
-      {/* SAYIM MODAL */}
-      {sayimAcik && (
+      {/* SAYIM / GİRİŞ / ÇIKIŞ MODAL */}
+      {modal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#ffffff] border border-blue-500/20 rounded-2xl w-full max-w-sm">
+          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl w-full max-w-sm">
             <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
               <h3 className="text-sm font-bold text-[#1a1f2e] flex items-center gap-2">
-                <ClipboardCheck size={14} className="text-blue-600"/> Sayım Gir
+                {modal === "sayim" ? <><ClipboardCheck size={14} className="text-blue-600"/> Sayım Gir</>
+                  : modal === "giris" ? <><Truck size={14} className="text-amber-600"/> Mal Girişi</>
+                  : <><PackageMinus size={14} className="text-red-600"/> Stok Çıkışı / Fire</>}
               </h3>
-              <button onClick={() => setSayimAcik(false)} className="text-gray-600"><X size={16}/></button>
+              <button onClick={() => setModal(null)} className="text-gray-600"><X size={16}/></button>
             </div>
             <div className="p-5 space-y-3">
-              <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl px-3 py-2 text-xs">
-                Sistem stoğu: <strong className="text-[#1a1f2e]">{fmt(urun.mevcut_stok, 1)} {urun.birim}</strong>
+              {modal === "sayim" && (
+                <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl px-3 py-2 text-xs">
+                  Tahmini olması gereken: <strong className="text-[#1a1f2e]">~{fmt(durum.tahminiMevcut)} {urun.birim}</strong>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Akşam sayımı ile ertesi sabahın sayımı aynı an kabul edilir; arada kullanım hesaplanmaz.</p>
+                </div>
+              )}
+              {modal === "sayim" && <VakitSecici value={vakit} onChange={setVakit}/>}
+              {modal === "cikis" && (
+                <div>
+                  <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Neden</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {CIKIS_NEDENLERI.map(n => (
+                      <button key={n.v} type="button" onClick={() => setNeden(n.v)}
+                        className={`text-xs font-semibold py-2 rounded-lg border ${neden === n.v ? "bg-red-600 text-white border-red-600" : "bg-[#f7f8fa] border-[#e2e5eb] text-gray-600"}`}>
+                        {n.l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Tarih</label>
+                  <input type="date" value={tarih} max={bugun()} onChange={e => setTarih(e.target.value)} className={inputCls}/>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">
+                    {modal === "sayim" ? "Stokta olan" : modal === "giris" ? "Gelen miktar" : "Çıkan miktar"} ({urun.birim})
+                  </label>
+                  <input type="text" inputMode="decimal" value={miktar} onChange={e => setMiktar(e.target.value)} autoFocus className={`${inputCls} font-bold`}/>
+                </div>
               </div>
+              {modal === "giris" && (
+                <div>
+                  <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Birim alış fiyatı (₺, opsiyonel)</label>
+                  <input type="text" inputMode="decimal" value={fiyat} onChange={e => setFiyat(e.target.value)} className={inputCls}/>
+                </div>
+              )}
               <div>
-                <label className="block text-[10px] text-gray-600 uppercase tracking-wide font-medium mb-1">Sayım Tarihi</label>
-                <input type="date" value={sayimTarih} onChange={e => setSayimTarih(e.target.value)} className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none"/>
+                <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Açıklama</label>
+                <input type="text" value={not} onChange={e => setNot(e.target.value)} placeholder="Opsiyonel" className={`${inputCls} text-xs`}/>
               </div>
-              <div>
-                <label className="block text-[10px] text-gray-600 uppercase tracking-wide font-medium mb-1">Şu Anda Stokta Olan ({urun.birim})</label>
-                <input type="number" step="0.01" value={sayimMiktar} onChange={e => setSayimMiktar(e.target.value)} autoFocus className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-lg font-bold h-12 px-3 rounded-xl outline-none"/>
-              </div>
+              {modal === "cikis" && urun.son_fiyat && miktarOku(miktar) > 0 && (
+                <p className="text-[11px] text-red-700">Yaklaşık değer: ₺{fmt(miktarOku(miktar) * urun.son_fiyat, 0)}</p>
+              )}
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setSayimAcik(false)} className="text-xs font-semibold text-gray-500 border border-[#e2e5eb] px-4 py-2 rounded-xl">İptal</button>
-                <button onClick={sayimKaydet} disabled={saving || !sayimMiktar} className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-xl flex items-center gap-2">
-                  {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>} Kaydet
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MAL GİRİŞ MODAL */}
-      {girisAcik && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#ffffff] border border-amber-500/20 rounded-2xl w-full max-w-sm">
-            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[#1a1f2e] flex items-center gap-2">
-                <Truck size={14} className="text-amber-600"/> Mal Girişi
-              </h3>
-              <button onClick={() => setGirisAcik(false)} className="text-gray-600"><X size={16}/></button>
-            </div>
-            <div className="p-5 space-y-3">
-              <div>
-                <label className="block text-[10px] text-gray-600 uppercase tracking-wide font-medium mb-1">Geliş Tarihi</label>
-                <input type="date" value={girisTarih} onChange={e => setGirisTarih(e.target.value)} className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none"/>
-              </div>
-              <div>
-                <label className="block text-[10px] text-gray-600 uppercase tracking-wide font-medium mb-1">Gelen Miktar ({urun.birim})</label>
-                <input type="number" step="0.01" value={girisMiktar} onChange={e => setGirisMiktar(e.target.value)} autoFocus className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-lg font-bold h-12 px-3 rounded-xl outline-none"/>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setGirisAcik(false)} className="text-xs font-semibold text-gray-500 border border-[#e2e5eb] px-4 py-2 rounded-xl">İptal</button>
-                <button onClick={girisKaydet} disabled={saving || !girisMiktar} className="text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 px-6 py-2 rounded-xl flex items-center gap-2">
+                <button onClick={() => setModal(null)} className="text-xs font-semibold text-gray-500 border border-[#e2e5eb] px-4 py-2 rounded-xl">İptal</button>
+                <button onClick={kaydet} disabled={saving || !miktar}
+                  className={`text-xs font-bold text-white px-6 py-2 rounded-xl flex items-center gap-2 disabled:opacity-40 ${modal === "sayim" ? "bg-blue-600 hover:bg-blue-700" : modal === "giris" ? "bg-amber-600 hover:bg-amber-700" : "bg-red-600 hover:bg-red-700"}`}>
                   {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>} Kaydet
                 </button>
               </div>

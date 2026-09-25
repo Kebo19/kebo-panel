@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { oturumKontrol } from "@/lib/supabase/server";
 
 // MagicPay (kebo-admin-ui.magicpay.ai) entegrasyonu — 02.09.2026
 //
@@ -77,13 +78,18 @@ function paymentBreakdownTopla(pb: Record<string, unknown> | undefined | null) {
   return { nakit, digerToplam };
 }
 
+const TARIH_DESENI = /^\d{4}-\d{2}-\d{2}$/;
+
 export async function GET(req: Request) {
+  // Ciro verisi: sadece Tam Yetkili kullanıcılar.
+  const oturum = await oturumKontrol({ sadeceTamYetkili: true });
+  if (!oturum.ok) return oturum.yanit;
   try {
     const { searchParams } = new URL(req.url);
-    const start = searchParams.get("start");
-    const end = searchParams.get("end");
-    if (!start || !end) {
-      return NextResponse.json({ error: "start ve end tarih parametreleri gerekli (YYYY-AA-GG)." }, { status: 400 });
+    const start = searchParams.get("start") || "";
+    const end = searchParams.get("end") || "";
+    if (!TARIH_DESENI.test(start) || !TARIH_DESENI.test(end) || start > end) {
+      return NextResponse.json({ error: "start ve end tarih parametreleri YYYY-AA-GG biçiminde olmalı." }, { status: 400 });
     }
 
     const turnover = await magicpayGet(`/reports/turnover/daily?start=${start}&end=${end}&branch_ids=${MAGICPAY_BRANCH_ID}`);

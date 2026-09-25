@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { bugun } from "@/lib/tarih";
 import { ArrowLeft, Save, Loader2, User, Phone, Briefcase, Calendar, Shield, CreditCard } from "lucide-react";
 import Link from "next/link";
 
@@ -22,7 +23,7 @@ export default function YeniPersonelPage() {
     iban: "TR",
     departman: "Mutfak",
     maas: "",
-    ise_giris_tarihi: new Date().toISOString().split("T")[0],
+    ise_giris_tarihi: bugun(),
   });
 
   useEffect(() => {

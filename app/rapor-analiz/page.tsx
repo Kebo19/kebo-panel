@@ -9,16 +9,24 @@ import {
   ChevronRight, MessageSquare, Zap, Truck, Percent, CheckCircle2
 } from "lucide-react";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, YAxis } from "recharts";
+import { fmt } from "@/lib/para";
+import { bugun, ayBasi, gunEkle, gunFarki, fmtTarih } from "@/lib/tarih";
+import {
+  raporOzeti, donemOzeti, platformKirilimi, indirimToplam, PLATFORMLAR, PLATFORM_RENK, type RaporVerisi, type PlatformAdi,
+  RR_PAKET_UCRETI, RR_UZAK_KATSAYI, RR_KM9_KATSAYI, RR_POS_KOMISYON_ORANI, KURYE_GARANTI_PAKET as RR_KURYE_GARANTI,
+  roadrunnerKuryesiMi, roadrunnerKuryeUcreti, type KuryeSatiri,
+} from "@/lib/hesap";
+import { useYetki } from "@/lib/useYetki";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
-interface GunlukRapor {
+interface GunlukRapor extends RaporVerisi {
   id: string; tarih: string;
   os_yemeksepeti: number; os_getir: number; os_trendyol: number; os_migros: number;
   ko_yemeksepeti: number; ko_getir: number; ko_trendyol: number; ko_migros: number; ko_alo_paket: number;
   kasa_nakit: number; kasa_pos: number; kasa_edenred: number; kasa_metropol?: number;
   gunluk_gider: number; iade_tutar: number; toplam_ciro: number;
-  kurye_raporlari?: any[];
+  kurye_raporlari?: KuryeSatiri[];
   // 02.09.2026: MagicPay karşılaştırması için — platform indirim alanları (select("*")
   // zaten hepsini getiriyor, burada sadece TypeScript'e tanıtıyoruz).
   os_kebo_ys_indirim?: number; os_cnf_ys_indirim?: number;
@@ -44,38 +52,19 @@ interface AIAnaliz {
 const RAPOR_TURLERI = [
   { key: "genel", label: "Genel Özet", desc: "Brüt/net ciro, gider, paket toplamları" },
   { key: "platform", label: "Platform Detayı", desc: "Her platformun online + kapıda satışları" },
-  { key: "kasa", label: "Kasa Dağılımı", desc: "Nakit, POS, Edenred ödeme yöntemleri" },
+  { key: "kasa", label: "Kasa Dağılımı", desc: "Nakit, POS, Edenred, Metropol ödeme yöntemleri" },
   { key: "gunluk", label: "Gün Gün Liste", desc: "Seçilen tarih aralığında her günün detayı" },
   { key: "karsilastirma", label: "Platform Karşılaştırma", desc: "Platformları yan yana karşılaştır" },
   { key: "roadrunner", label: "Roadrunner Mutabakatı", desc: "Seçilen dönem için kurye paket ücreti, POS komisyonu ve tahsilat mutabakatı (haftalık hesap için tarih aralığını o haftaya ayarlayın)" },
   { key: "magicpay", label: "MagicPay Karşılaştırma", desc: "MagicPay (kebo-admin-ui) POS/online sipariş sisteminden çekilen rakamlarla, buraya elle girilen raporun karşılaştırması" },
 ];
 
-// 02.09.2026: Roadrunner kurye mutabakatı — rapor girişindeki günlük kurye verilerinden
-// (paket sayısı, uzak/9km üzeri paket, nakit/pos tahsilat) seçilen tarih aralığı için
-// otomatik hesaplanır. Sabit kuryede (Roadrunner) günlük en az 30 paket garantisi var;
-// altında kalınırsa 30 üzerinden ücretlendirilir. Rakamlar (₺100/paket, %5 POS komisyonu,
-// 1.5x/2x mesafe katsayıları) canın 02.09.2026 tarihli talimatına göre girildi — Roadrunner
-// ile yapılan gerçek sözleşme farklıysa bu sabitleri güncellemek yeterli.
-const RR_PAKET_UCRETI = 100; // ₺ / normal (1x) paket
-const RR_UZAK_KATSAYI = 1.5; // uzak paketler
-const RR_KM9_KATSAYI = 2; // 9km üzeri paketler
-const RR_POS_KOMISYON_ORANI = 0.05; // kapıda ödeme POS tahsilatından kesilen komisyon
-const RR_KURYE_GARANTI = 30; // sabit kurye günlük min. paket garantisi
+// Roadrunner kurye mutabakatı — rapor girişindeki günlük kurye verilerinden (paket, uzak/9km
+// üzeri paket, nakit/pos tahsilat) seçilen aralık için hesaplanır. Ücret sabitleri lib/hesap.ts'de.
+// Sadece 13.08.2026 ve sonrasındaki sabit/havuz (Roadrunner) kuryeler dahil; kendi personel
+// kuryelerimiz ücretlendirilmez.
 
-const PLATFORM_COLORS: Record<string, string> = {
-  Yemeksepeti: "#FF6B35", Getir: "#8B5CF6", Trendyol: "#F97316", Migros: "#10B981", "Alo Paket": "#3B82F6",
-};
-
-const PATRONLAR = ["murat@kebo.com", "bulent@kebo.com"];
-
-const PLATFORM_KOLON = {
-  Yemeksepeti: { online: "os_yemeksepeti", kapida: "ko_yemeksepeti" },
-  Getir: { online: "os_getir", kapida: "ko_getir" },
-  Trendyol: { online: "os_trendyol", kapida: "ko_trendyol" },
-  Migros: { online: "os_migros", kapida: "ko_migros" },
-  "Alo Paket": { online: null, kapida: "ko_alo_paket" },
-};
+type PlatformSecimi = PlatformAdi;
 
 const HAZIR_SORULAR = [
   "Bu dönemin genel performansını değerlendir, güçlü ve zayıf yönlerimi söyle",
@@ -88,8 +77,6 @@ const HAZIR_SORULAR = [
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
-const fmt = (v: number) => new Intl.NumberFormat("tr-TR").format(Math.round(v));
-const fmtTarih = (t: string) => { if (!t) return ""; const [y, m, d] = t.split("-"); return `${d}.${m}.${y}`; };
 
 function TrendBadge({ value, prev }: { value: number; prev: number }) {
   if (!prev) return null;
@@ -106,16 +93,14 @@ function TrendBadge({ value, prev }: { value: number; prev: number }) {
 
 export default function RaporAnalizPage() {
   const supabase = createClient();
-  const [yetkili, setYetkili] = useState(false);
-  const [yetkiYukleniyor, setYetkiYukleniyor] = useState(true);
+  const yetki = useYetki();
+  const yetkili = yetki.tamYetkili;
+  const yetkiYukleniyor = yetki.yukleniyor;
 
-  const [baslangic, setBaslangic] = useState(() => {
-    const d = new Date(); d.setDate(1);
-    return d.toISOString().split("T")[0];
-  });
-  const [bitis, setBitis] = useState(() => new Date().toISOString().split("T")[0]);
+  const [baslangic, setBaslangic] = useState(() => ayBasi(bugun()));
+  const [bitis, setBitis] = useState(() => bugun());
   const [raporTuru, setRaporTuru] = useState("genel");
-  const [seciliPlatformlar, setSeciliPlatformlar] = useState<string[]>(["Yemeksepeti", "Getir", "Trendyol", "Migros", "Alo Paket"]);
+  const [seciliPlatformlar, setSeciliPlatformlar] = useState<PlatformSecimi[]>([...PLATFORMLAR]);
   const [odemeFiltre, setOdemeFiltre] = useState<"hepsi" | "online" | "kapida">("hepsi");
 
   const [raporlar, setRaporlar] = useState<GunlukRapor[]>([]);
@@ -137,21 +122,11 @@ export default function RaporAnalizPage() {
   const [mpYukleniyor, setMpYukleniyor] = useState(false);
   const [mpHata, setMpHata] = useState("");
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.email && PATRONLAR.includes(user.email.toLowerCase())) setYetkili(true);
-      setYetkiYukleniyor(false);
-    });
-  }, []);
-
+  // Karşılaştırma için aynı uzunlukta bir önceki dönem
   const oncekiAralik = useMemo(() => {
-    if (!baslangic || !bitis) return null;
-    const bas = new Date(baslangic), bit = new Date(bitis);
-    const gun = Math.round((bit.getTime() - bas.getTime()) / 86400000);
-    const ob = new Date(bas); ob.setDate(bas.getDate() - gun - 1);
-    const obit = new Date(bas); obit.setDate(bas.getDate() - 1);
-    const f = (d: Date) => d.toISOString().split("T")[0];
-    return { bas: f(ob), bit: f(obit) };
+    if (!baslangic || !bitis || bitis < baslangic) return null;
+    const gun = gunFarki(baslangic, bitis);
+    return { bas: gunEkle(baslangic, -gun - 1), bit: gunEkle(baslangic, -1) };
   }, [baslangic, bitis]);
 
   const veriCek = useCallback(async () => {
@@ -173,59 +148,47 @@ export default function RaporAnalizPage() {
   useEffect(() => { chatSonRef.current?.scrollIntoView({ behavior: "smooth" }); }, [mesajlar]);
 
   const stats = useMemo(() => {
-    const sum = (arr: GunlukRapor[], key: keyof GunlukRapor) =>
-      arr.reduce((s, r) => s + ((r[key] as number) || 0), 0);
+    const platformToplam = (arr: GunlukRapor[], platform: PlatformAdi, tur: "hepsi" | "online" | "kapida") =>
+      arr.reduce((s, r) => {
+        const k = platformKirilimi(r);
+        return s + (tur !== "kapida" ? k.online[platform] : 0) + (tur !== "online" ? k.kapida[platform] : 0);
+      }, 0);
 
-    const platformToplam = (arr: GunlukRapor[], platform: string, tur: "hepsi" | "online" | "kapida") => {
-      const kol = PLATFORM_KOLON[platform as keyof typeof PLATFORM_KOLON];
-      if (!kol) return 0;
-      let toplam = 0;
-      if ((tur === "hepsi" || tur === "online") && kol.online)
-        toplam += arr.reduce((s, r) => s + ((r[kol.online as keyof GunlukRapor] as number) || 0), 0);
-      if ((tur === "hepsi" || tur === "kapida") && kol.kapida)
-        toplam += arr.reduce((s, r) => s + ((r[kol.kapida as keyof GunlukRapor] as number) || 0), 0);
-      return toplam;
-    };
+    const d = donemOzeti(raporlar);
+    const o = donemOzeti(oncekiRaporlar);
+    const toplamGider = d.gider + d.iade;
 
-    const brutCiro = sum(raporlar, "toplam_ciro");
-    const toplamGider = sum(raporlar, "gunluk_gider") + sum(raporlar, "iade_tutar");
-    const netCiro = brutCiro - toplamGider;
-    const paket = raporlar.reduce((s, r) => s + (r.kurye_raporlari?.reduce((ks: number, k: any) => ks + (parseInt(k.paketSayisi) || 0), 0) || 0), 0);
-    const oncBrut = sum(oncekiRaporlar, "toplam_ciro");
-    const oncNet = oncBrut - sum(oncekiRaporlar, "gunluk_gider") - sum(oncekiRaporlar, "iade_tutar");
-    const oncGider = sum(oncekiRaporlar, "gunluk_gider") + sum(oncekiRaporlar, "iade_tutar");
-
-    const platformlar = Object.fromEntries(
-      Object.keys(PLATFORM_KOLON).map(p => [p, platformToplam(raporlar, p, odemeFiltre)])
-    );
+    const platformlar = Object.fromEntries(PLATFORMLAR.map(p => [p, platformToplam(raporlar, p, odemeFiltre)])) as Record<PlatformAdi, number>;
     const toplamPlatform = Object.values(platformlar).reduce((s, v) => s + v, 0);
+    let markaKebo = 0, markaCnf = 0;
+    raporlar.forEach(r => { const m = platformKirilimi(r).marka; markaKebo += m.kebo; markaCnf += m.cnf; });
 
     const gunlukDetay = raporlar.map(r => {
-      const secilenPlatformToplam = seciliPlatformlar.reduce((s, p) => s + platformToplam([r], p, odemeFiltre), 0);
-      const paket = r.kurye_raporlari?.reduce((s: number, k: any) => s + (parseInt(k.paketSayisi) || 0), 0) || 0;
+      const oz = raporOzeti(r);
       return {
         tarih: r.tarih,
-        brutCiro: r.toplam_ciro || 0,
-        net: (r.toplam_ciro || 0) - (r.gunluk_gider || 0) - (r.iade_tutar || 0),
-        gider: (r.gunluk_gider || 0) + (r.iade_tutar || 0),
-        secilenPlatform: secilenPlatformToplam,
-        paket,
-        platformDetay: Object.fromEntries(Object.keys(PLATFORM_KOLON).map(p => [p, platformToplam([r], p, odemeFiltre)])),
+        brutCiro: oz.brut,
+        net: oz.net,
+        gider: oz.gider + oz.iade,
+        secilenPlatform: seciliPlatformlar.reduce((s, p) => s + platformToplam([r], p, odemeFiltre), 0),
+        paket: oz.paket,
+        platformDetay: Object.fromEntries(PLATFORMLAR.map(p => [p, platformToplam([r], p, odemeFiltre)])) as Record<PlatformAdi, number>,
       };
     });
+    const sirali = [...gunlukDetay].sort((a, b) => b.brutCiro - a.brutCiro);
+    const sum = (key: "kasa_nakit" | "kasa_pos" | "kasa_edenred" | "kasa_metropol") => raporlar.reduce((s, r) => s + (Number(r[key]) || 0), 0);
 
     return {
-      brutCiro, netCiro, toplamGider, paket, oncBrut, oncNet, oncGider,
-      kasaNakit: sum(raporlar, "kasa_nakit"),
-      kasaPos: sum(raporlar, "kasa_pos"),
-      kasaEdenred: sum(raporlar, "kasa_edenred"),
-      platformlar, toplamPlatform,
+      brutCiro: d.brut, netCiro: d.net, toplamGider, indirim: d.indirim, paket: d.paket,
+      oncBrut: o.brut, oncNet: o.net, oncGider: o.gider + o.iade,
+      kasaNakit: sum("kasa_nakit"), kasaPos: sum("kasa_pos"), kasaEdenred: sum("kasa_edenred"), kasaMetropol: sum("kasa_metropol"),
+      platformlar, toplamPlatform, markaKebo, markaCnf,
       gunlukDetay,
       gunSayisi: raporlar.length,
-      gunlukOrt: raporlar.length > 0 ? brutCiro / raporlar.length : 0,
-      enIyi: [...raporlar].sort((a, b) => (b.toplam_ciro || 0) - (a.toplam_ciro || 0))[0],
-      enKotu: [...raporlar].sort((a, b) => (a.toplam_ciro || 0) - (b.toplam_ciro || 0))[0],
-      giderOrani: brutCiro > 0 ? (toplamGider / brutCiro) * 100 : 0,
+      gunlukOrt: raporlar.length > 0 ? d.brut / raporlar.length : 0,
+      enIyi: sirali[0] ? { tarih: sirali[0].tarih, brut: sirali[0].brutCiro } : null,
+      enKotu: sirali.length ? { tarih: sirali[sirali.length - 1].tarih, brut: sirali[sirali.length - 1].brutCiro } : null,
+      giderOrani: d.brut > 0 ? (toplamGider / d.brut) * 100 : 0,
     };
   }, [raporlar, oncekiRaporlar, seciliPlatformlar, odemeFiltre]);
 
@@ -239,20 +202,10 @@ export default function RaporAnalizPage() {
     }> = {};
 
     raporlar.forEach(r => {
-      (r.kurye_raporlari || []).forEach((k: any) => {
-        const sabit = k?.tip === "sabit";
-        const normal = parseInt(k?.paketSayisi) || 0;
-        const uzak = parseInt(k?.uzakPaket) || 0;
-        const km9 = parseInt(k?.paket9km) || 0;
-        const gercek = normal + uzak + km9;
-        const uygulanan = sabit ? Math.max(gercek, RR_KURYE_GARANTI) : gercek;
-        const garantiFarki = uygulanan - gercek; // sadece sabit kuryede ve 30'un altında kalındığında >0
-        const ucret = normal * RR_PAKET_UCRETI
-          + uzak * RR_PAKET_UCRETI * RR_UZAK_KATSAYI
-          + km9 * RR_PAKET_UCRETI * RR_KM9_KATSAYI
-          + garantiFarki * RR_PAKET_UCRETI; // garanti farkı normal (1x) ücretten tamamlanır
-        const nakit = Number(k?.nakit) || 0;
-        const pos = Number(k?.pos) || 0;
+      (r.kurye_raporlari || []).forEach((k) => {
+        // Kendi personel kuryelerimiz (13.08.2026 öncesi / "kendi" tipi) Roadrunner'a ücretlendirilmez.
+        if (!roadrunnerKuryesiMi(r.tarih, k)) return;
+        const { sabit, normal, uzak, km9, gercek, uygulanan, garantiFarki, ucret, nakit, pos } = roadrunnerKuryeUcreti(k);
 
         const isim = (k?.isim || "").trim() || (sabit ? "Sabit Kurye" : "Havuz Kurye");
         const key = `${isim}__${sabit ? "sabit" : "havuz"}`;
@@ -300,8 +253,8 @@ export default function RaporAnalizPage() {
       .map(g => `${fmtTarih(g.tarih)}: ₺${fmt(g.brutCiro)} ciro, ₺${fmt(g.gider)} gider`)
       .join(" | ");
 
-    const enIyiGun = stats.enIyi ? `${fmtTarih(stats.enIyi.tarih)} (₺${fmt(stats.enIyi.toplam_ciro)})` : "-";
-    const enKotuGun = stats.enKotu ? `${fmtTarih(stats.enKotu.tarih)} (₺${fmt(stats.enKotu.toplam_ciro)})` : "-";
+    const enIyiGun = stats.enIyi ? `${fmtTarih(stats.enIyi.tarih)} (₺${fmt(stats.enIyi.brut)})` : "-";
+    const enKotuGun = stats.enKotu ? `${fmtTarih(stats.enKotu.tarih)} (₺${fmt(stats.enKotu.brut)})` : "-";
 
     const ciroTrend = stats.oncBrut > 0
       ? `Önceki dönem brüt: ₺${fmt(stats.oncBrut)}, değişim: ${(((stats.brutCiro - stats.oncBrut) / stats.oncBrut) * 100).toFixed(1)}%`
@@ -312,8 +265,9 @@ KEBO ERP İŞLETME RAPORU
 Dönem: ${fmtTarih(baslangic)} - ${fmtTarih(bitis)} (${stats.gunSayisi} gün)
 
 FİNANSAL ÖZET:
-- Brüt Ciro: ₺${fmt(stats.brutCiro)}
-- Net Ciro: ₺${fmt(stats.netCiro)}
+- Brüt Ciro: ₺${fmt(stats.brutCiro)} (platform tutarları indirim öncesi)
+- Net Ciro: ₺${fmt(stats.netCiro)} (brüt − gider − iade − ₺${fmt(stats.indirim)} platform indirimi)
+- Marka: Kebo ₺${fmt(stats.markaKebo)}, Chick'N Fride ₺${fmt(stats.markaCnf)}
 - Toplam Gider: ₺${fmt(stats.toplamGider)} (gider oranı: %${stats.giderOrani.toFixed(1)})
 - Günlük Ortalama: ₺${fmt(stats.gunlukOrt)}
 - ${ciroTrend}
@@ -322,9 +276,10 @@ PLATFORM DAĞILIMI (${odemeFiltre === "hepsi" ? "Online + Kapıda" : odemeFiltre
 ${platformDetaylar}
 
 KASA DAĞILIMI:
-- Nakit: ₺${fmt(stats.kasaNakit)} (%${(stats.kasaNakit + stats.kasaPos + stats.kasaEdenred) > 0 ? (stats.kasaNakit / (stats.kasaNakit + stats.kasaPos + stats.kasaEdenred) * 100).toFixed(1) : 0})
+- Nakit: ₺${fmt(stats.kasaNakit)}
 - POS/Kart: ₺${fmt(stats.kasaPos)}
 - Edenred: ₺${fmt(stats.kasaEdenred)}
+- Metropol: ₺${fmt(stats.kasaMetropol)}
 
 GÜNLÜK PERFORMANS:
 - En İyi Gün: ${enIyiGun}
@@ -359,7 +314,6 @@ GÜNLÜK PERFORMANS:
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-6",
           max_tokens: 2000,
           system: `Sen KEBO ERP'nin kıdemli iş analistisisin. Restoran/yemek işletmesi verilerini analiz ediyorsun.
 Görevin: İşletme sahibine rakamların arkasındaki gerçek anlamı açıklamak, somut ve uygulanabilir öneriler vermek.
@@ -387,7 +341,7 @@ SADECE şu JSON formatında yanıt ver, hiçbir ek metin yazma:
         ozet: "Analiz yapılırken bir hata oluştu. API bağlantınızı kontrol edin.",
         basarilar: [],
         riskler: ["API bağlantısı kurulamadı"],
-        oneriler: ["Vercel ortam değişkenlerinde NEXT_PUBLIC_ANTHROPIC_API_KEY ayarını kontrol edin"],
+        oneriler: ["Vercel ortam değişkenlerinde GEMINI_API_KEY tanımlı mı kontrol edin, sonra tekrar deneyin"],
         oncelik: "kritik",
         chartData: [],
         hedef: "Teknik sorunu çöz ve yeniden dene.",
@@ -410,7 +364,6 @@ SADECE şu JSON formatında yanıt ver, hiçbir ek metin yazma:
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-6",
           max_tokens: 1500,
           system: `Sen KEBO ERP'nin kıdemli iş danışmanısın. Restoran/yemek işletmesi konusunda uzmansın.
 Türkçe, net ve pratik cevaplar ver. Rakamları referans al. Gerektiğinde madde madde listele.
@@ -501,10 +454,10 @@ ${isletmeOzeti}`,
             <div>
               <p className="text-[10px] text-gray-600 mb-2 uppercase tracking-widest">Platformlar</p>
               <div className="flex flex-wrap gap-2 mb-3">
-                {Object.keys(PLATFORM_KOLON).map(p => (
+                {PLATFORMLAR.map(p => (
                   <button key={p} onClick={() => setSeciliPlatformlar(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])}
                     className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-colors border ${seciliPlatformlar.includes(p) ? "text-[#1a1f2e] border-transparent" : "bg-black/[0.04] text-gray-500 border-[#e2e5eb]"}`}
-                    style={seciliPlatformlar.includes(p) ? { backgroundColor: PLATFORM_COLORS[p] } : {}}>
+                    style={seciliPlatformlar.includes(p) ? { backgroundColor: PLATFORM_RENK[p] } : {}}>
                     {p}
                   </button>
                 ))}
@@ -560,14 +513,14 @@ ${isletmeOzeti}`,
                     <div className="bg-[#ffffff] border border-emerald-500/20 rounded-2xl p-4">
                       <p className="text-[10px] text-emerald-600 uppercase tracking-widest mb-1">En İyi Gün</p>
                       <p className="text-sm font-bold text-[#1a1f2e]">{fmtTarih(stats.enIyi.tarih)}</p>
-                      <p className="text-lg font-black text-emerald-600">₺{fmt(stats.enIyi.toplam_ciro)}</p>
+                      <p className="text-lg font-black text-emerald-600">₺{fmt(stats.enIyi.brut)}</p>
                     </div>
                   )}
                   {stats.enKotu && (
                     <div className="bg-[#ffffff] border border-red-500/20 rounded-2xl p-4">
                       <p className="text-[10px] text-red-600 uppercase tracking-widest mb-1">En Düşük Gün</p>
                       <p className="text-sm font-bold text-[#1a1f2e]">{fmtTarih(stats.enKotu.tarih)}</p>
-                      <p className="text-lg font-black text-red-600">₺{fmt(stats.enKotu.toplam_ciro)}</p>
+                      <p className="text-lg font-black text-red-600">₺{fmt(stats.enKotu.brut)}</p>
                     </div>
                   )}
                 </div>
@@ -599,19 +552,18 @@ ${isletmeOzeti}`,
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-4 flex items-center gap-1.5"><PieChart size={12} /> Platform Gelir Dağılımı</p>
                   <div className="space-y-4">
                     {seciliPlatformlar.map(p => {
-                      const kol = PLATFORM_KOLON[p as keyof typeof PLATFORM_KOLON];
-                      const online = kol?.online ? raporlar.reduce((s, r) => s + ((r[kol.online as keyof GunlukRapor] as number) || 0), 0) : 0;
-                      const kapida = kol?.kapida ? raporlar.reduce((s, r) => s + ((r[kol.kapida as keyof GunlukRapor] as number) || 0), 0) : 0;
+                      const online = raporlar.reduce((s, r) => s + platformKirilimi(r).online[p], 0);
+                      const kapida = raporlar.reduce((s, r) => s + platformKirilimi(r).kapida[p], 0);
                       const toplam = (odemeFiltre === "online" ? online : odemeFiltre === "kapida" ? kapida : online + kapida);
                       const pct = stats.toplamPlatform > 0 ? (toplam / stats.toplamPlatform) * 100 : 0;
                       return (
                         <div key={p} className="bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p] }} />
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PLATFORM_RENK[p] }} />
                               <span className="text-sm font-bold text-[#1a1f2e]">{p}</span>
                             </div>
-                            <span className="text-lg font-black" style={{ color: PLATFORM_COLORS[p] }}>₺{fmt(toplam)}</span>
+                            <span className="text-lg font-black" style={{ color: PLATFORM_RENK[p] }}>₺{fmt(toplam)}</span>
                           </div>
                           <div className="grid grid-cols-3 gap-3 mb-3">
                             <div className="text-center"><p className="text-[10px] text-gray-600 uppercase tracking-widest">Online</p><p className="text-sm font-bold text-blue-600">₺{fmt(online)}</p></div>
@@ -619,7 +571,7 @@ ${isletmeOzeti}`,
                             <div className="text-center"><p className="text-[10px] text-gray-600 uppercase tracking-widest">Pay</p><p className="text-sm font-bold text-gray-700">{Math.round(pct)}%</p></div>
                           </div>
                           <div className="h-2 bg-black/[0.04] rounded-full overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: PLATFORM_COLORS[p] }} />
+                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: PLATFORM_RENK[p] }} />
                           </div>
                         </div>
                       );
@@ -641,8 +593,9 @@ ${isletmeOzeti}`,
                   { label: "Nakit", value: stats.kasaNakit, color: "#34D399" },
                   { label: "POS / Kredi Kartı", value: stats.kasaPos, color: "#60A5FA" },
                   { label: "Edenred", value: stats.kasaEdenred, color: "#FBBF24" },
+                  { label: "Metropol", value: stats.kasaMetropol, color: "#A78BFA" },
                 ].map(item => {
-                  const toplam = stats.kasaNakit + stats.kasaPos + stats.kasaEdenred;
+                  const toplam = stats.kasaNakit + stats.kasaPos + stats.kasaEdenred + stats.kasaMetropol;
                   const pct = toplam > 0 ? (item.value / toplam) * 100 : 0;
                   return (
                     <div key={item.label} className="bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
@@ -661,7 +614,7 @@ ${isletmeOzeti}`,
                 })}
                 <div className="pt-3 border-t border-[#e2e5eb] flex justify-between">
                   <span className="text-xs text-gray-600">Kasa Toplamı</span>
-                  <span className="text-sm font-black text-[#1a1f2e]">₺{fmt(stats.kasaNakit + stats.kasaPos + stats.kasaEdenred)}</span>
+                  <span className="text-sm font-black text-[#1a1f2e]">₺{fmt(stats.kasaNakit + stats.kasaPos + stats.kasaEdenred + stats.kasaMetropol)}</span>
                 </div>
               </div>
             )}
@@ -691,7 +644,7 @@ ${isletmeOzeti}`,
                           <td className={`px-4 py-3 font-bold ${g.net >= 0 ? "text-emerald-600" : "text-red-600"}`}>₺{fmt(g.net)}</td>
                           <td className="px-4 py-3 text-red-600">₺{fmt(g.gider)}</td>
                           {seciliPlatformlar.map(p => (
-                            <td key={p} className="px-4 py-3 font-bold whitespace-nowrap" style={{ color: PLATFORM_COLORS[p] }}>
+                            <td key={p} className="px-4 py-3 font-bold whitespace-nowrap" style={{ color: PLATFORM_RENK[p] }}>
                               ₺{fmt(g.platformDetay[p] || 0)}
                             </td>
                           ))}
@@ -706,7 +659,7 @@ ${isletmeOzeti}`,
                         <td className="px-4 py-3 text-emerald-600 font-black">₺{fmt(stats.netCiro)}</td>
                         <td className="px-4 py-3 text-red-600 font-black">₺{fmt(stats.toplamGider)}</td>
                         {seciliPlatformlar.map(p => (
-                          <td key={p} className="px-4 py-3 font-black whitespace-nowrap" style={{ color: PLATFORM_COLORS[p] }}>
+                          <td key={p} className="px-4 py-3 font-black whitespace-nowrap" style={{ color: PLATFORM_RENK[p] }}>
                             ₺{fmt(stats.platformlar[p] || 0)}
                           </td>
                         ))}
@@ -735,17 +688,16 @@ ${isletmeOzeti}`,
                     </thead>
                     <tbody className="divide-y divide-[#0f1624]">
                       {seciliPlatformlar.map(p => {
-                        const kol = PLATFORM_KOLON[p as keyof typeof PLATFORM_KOLON];
-                        const online = kol?.online ? raporlar.reduce((s, r) => s + ((r[kol.online as keyof GunlukRapor] as number) || 0), 0) : 0;
-                        const kapida = kol?.kapida ? raporlar.reduce((s, r) => s + ((r[kol.kapida as keyof GunlukRapor] as number) || 0), 0) : 0;
+                        const online = raporlar.reduce((s, r) => s + platformKirilimi(r).online[p], 0);
+                        const kapida = raporlar.reduce((s, r) => s + platformKirilimi(r).kapida[p], 0);
                         const toplam = online + kapida;
                         const pct = stats.toplamPlatform > 0 ? ((toplam / stats.toplamPlatform) * 100).toFixed(1) : "0";
                         return (
                           <tr key={p} className="hover:bg-black/[0.03] transition-colors">
-                            <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_COLORS[p] }} /><span className="font-bold text-[#1a1f2e]">{p}</span></div></td>
+                            <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_RENK[p] }} /><span className="font-bold text-[#1a1f2e]">{p}</span></div></td>
                             <td className="px-4 py-3 text-blue-600 font-bold">₺{fmt(online)}</td>
                             <td className="px-4 py-3 text-orange-600 font-bold">₺{fmt(kapida)}</td>
-                            <td className="px-4 py-3 font-black" style={{ color: PLATFORM_COLORS[p] }}>₺{fmt(toplam)}</td>
+                            <td className="px-4 py-3 font-black" style={{ color: PLATFORM_RENK[p] }}>₺{fmt(toplam)}</td>
                             <td className="px-4 py-3 text-gray-400">{pct}%</td>
                           </tr>
                         );
@@ -920,12 +872,10 @@ ${isletmeOzeti}`,
                         <tbody className="divide-y divide-[#0f1624]">
                           {mpVeri.gunler.map(g => {
                             const kr = raporlar.find(r => r.tarih === g.tarih);
-                            const keboIndirim = kr ? (Number(kr.os_kebo_ys_indirim) || 0) + (Number(kr.os_cnf_ys_indirim) || 0)
-                              + (Number(kr.os_kebo_trendyol_indirim) || 0) + (Number(kr.os_cnf_trendyol_indirim) || 0)
-                              + (Number(kr.ko_kebo_ys_indirim) || 0) + (Number(kr.ko_cnf_ys_indirim) || 0)
-                              + (Number(kr.ko_kebo_trendyol_indirim) || 0) + (Number(kr.ko_cnf_trendyol_indirim) || 0) : null;
-                            const keboBrut = kr ? (kr.toplam_ciro || 0) : null;
-                            const keboNet = kr ? (kr.toplam_ciro || 0) - (kr.gunluk_gider || 0) - (kr.iade_tutar || 0) : null;
+                            const keboIndirim = kr ? indirimToplam(kr) : null;
+                            const krOzet = kr ? raporOzeti(kr) : null;
+                            const keboBrut = krOzet ? krOzet.brut : null;
+                            const keboNet = krOzet ? krOzet.net : null;
                             const keboIade = kr ? (kr.iade_tutar || 0) : null;
                             const keboNakit = kr ? (kr.kasa_nakit || 0) : null;
                             const farkli = (a: number | null, b: number, tol = 1) => a !== null && Math.abs(a - b) > tol;
@@ -1109,7 +1059,7 @@ ${isletmeOzeti}`,
                       <div>
                         <p className="text-sm font-bold text-[#1a1f2e] mb-1">AI İş Analistiniz Hazır</p>
                         <p className="text-xs text-gray-500 max-w-xs">
-                          Verilerinizi analiz edeyim. Ciro trendleri, platform performansı, gider optimizasyonu ve büyüme önerileri için "Analiz Et"e tıklayın.
+                          Verilerinizi analiz edeyim. Ciro trendleri, platform performansı, gider optimizasyonu ve büyüme önerileri için &quot;Analiz Et&quot;e tıklayın.
                         </p>
                       </div>
                       <button onClick={analizYap}
@@ -1197,4 +1147,4 @@ ${isletmeOzeti}`,
       </div>
     </div>
   );
-}
+}

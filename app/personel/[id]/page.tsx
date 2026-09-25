@@ -4,6 +4,10 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useYetki } from "@/lib/useYetki";
+import { tv, paraGirdisi, fmtEsnek } from "@/lib/para";
+import { bugun, fmtTarih as fmtTarihOrtak } from "@/lib/tarih";
+import { ODEME_HESAPLARI, HESAP_ETIKET } from "@/lib/cari";
 import {
   ArrowLeft, Phone, CreditCard, Landmark, Users, CalendarDays,
   FileText, Wallet, Save, Loader2, AlertTriangle, CheckCircle2,
@@ -18,16 +22,18 @@ interface Personel {
   durum: "aktif" | "ayrildi"; notlar?: string; ekleyen_kullanici?: string; created_at?: string;
 }
 
-interface Avans { id: string; personel_isim: string; tutar: number; tarih: string; odeme_yontemi: string; kasa_kaynagi: string; aciklama: string; created_at: string; }
+interface Avans { id: string; personel_id?: string | null; rapor_id?: string | null; personel_isim: string; tutar: number; tarih: string; odeme_yontemi: string; kasa_kaynagi: string; aciklama: string; created_at: string; }
 interface Prim { id: string; personel_isim: string; tutar: number; tarih: string; aciklama: string; odendi: boolean; odeme_tarihi?: string; created_at: string; }
-interface Kesinti { id: string; personel_isim: string; tutar: number; tarih: string; aciklama: string; created_at: string; }
+interface Kesinti { id: string; personel_id?: string | null; rapor_id?: string | null; personel_isim: string; tutar: number; tarih: string; aciklama: string; created_at: string; }
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
 const DEPARTMANLAR = ["Mutfak", "Banko", "Kurye", "Temizlik", "Yönetim", "Diğer"];
-const KASALAR = ["Nakit Kasa", "POS", "Banka Havalesi", "Diğer"];
-const fmt = (v: number) => new Intl.NumberFormat("tr-TR").format(v);
-const fmtTarih = (t?: string) => { if (!t) return "—"; const [y, m, d] = t.split("-"); return `${d}.${m}.${y}`; };
+// Avans hangi hesaptan verildi? İlk dördü Kasa & Finans hesaplarıdır; seçilirse avans
+// o hesabın bakiyesinden otomatik düşülür. "Diğer" kasaya yansımaz.
+const KASALAR = [...ODEME_HESAPLARI, "Diğer"] as const;
+const fmt = fmtEsnek;
+const fmtTarih = (t?: string) => fmtTarihOrtak(t) || "—";
 const inputCls = "w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/15 text-[#1a1f2e] text-sm h-10 px-3 rounded-xl outline-none transition-all placeholder:text-gray-700 disabled:opacity-40";
 
 // ─── FIELD CARD ───────────────────────────────────────────────────────────────
@@ -72,7 +78,7 @@ export default function PersonelDetayPage() {
   const [orijinal, setOrijinal] = useState<Personel | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const isAdmin = useYetki().tamYetkili;
   const [toast, setToast] = useState<{ tip: "basari" | "hata"; mesaj: string } | null>(null);
   const [cikisOnayAcik, setCikisOnayAcik] = useState(false);
   const [silmeOnayAcik, setSilmeOnayAcik] = useState(false);
@@ -89,9 +95,9 @@ export default function PersonelDetayPage() {
   const [kesintiModal, setKesintiModal] = useState(false);
 
   // Form state
-  const [yeniAvans, setYeniAvans] = useState({ tutar: "", tarih: new Date().toISOString().split("T")[0], odeme_yontemi: "Nakit Kasa", kasa_kaynagi: "Nakit Kasa", aciklama: "" });
-  const [yeniPrim, setYeniPrim] = useState({ tutar: "", tarih: new Date().toISOString().split("T")[0], aciklama: "" });
-  const [yeniKesinti, setYeniKesinti] = useState({ tutar: "", tarih: new Date().toISOString().split("T")[0], aciklama: "" });
+  const [yeniAvans, setYeniAvans] = useState({ tutar: "", tarih: bugun(), kasa_kaynagi: "Nakit", aciklama: "" });
+  const [yeniPrim, setYeniPrim] = useState({ tutar: "", tarih: bugun(), aciklama: "" });
+  const [yeniKesinti, setYeniKesinti] = useState({ tutar: "", tarih: bugun(), aciklama: "" });
   const [formSaving, setFormSaving] = useState(false);
 
   const showToast = (tip: "basari" | "hata", mesaj: string) => {
@@ -100,26 +106,28 @@ export default function PersonelDetayPage() {
   };
 
   // ── Veri çek ──
-  const finansalVeriCek = useCallback(async (isim: string) => {
-    const [{ data: a }, { data: p }, { data: k }] = await Promise.all([
-      supabase.from("avanslar").select("*").eq("personel_isim", isim).order("tarih", { ascending: false }),
-      supabase.from("primler").select("*").eq("personel_isim", isim).order("tarih", { ascending: false }),
-      supabase.from("kesintiler").select("*").eq("personel_isim", isim).order("tarih", { ascending: false }),
-    ]);
-    if (a) setAvanslar(a as Avans[]);
-    if (p) setPrimler(p as Prim[]);
-    if (k) setKesintiler(k as Kesinti[]);
-  }, []);
+  // Kayıtlar personel id'siyle bağlı; id'si olmayan eski kayıtlar isimle eşleştirilir.
+  const finansalVeriCek = useCallback(async (p: { id: string; isim: string }) => {
+    const getir = async (tablo: "avanslar" | "primler" | "kesintiler") => {
+      const [idli, isimli] = await Promise.all([
+        supabase.from(tablo).select("*").eq("personel_id", String(p.id)),
+        supabase.from(tablo).select("*").is("personel_id", null).eq("personel_isim", p.isim),
+      ]);
+      return [...(idli.data || []), ...(isimli.data || [])].sort((x, y) => String(y.tarih).localeCompare(String(x.tarih)));
+    };
+    const [a, pr, k] = await Promise.all([getir("avanslar"), getir("primler"), getir("kesintiler")]);
+    setAvanslar(a as Avans[]);
+    setPrimler(pr as Prim[]);
+    setKesintiler(k as Kesinti[]);
+  }, [supabase]);
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setIsAdmin(user?.email === "murat@kebo.com" || user?.email === "bulent@kebo.com");
       const { data, error } = await supabase.from("personeller").select("*").eq("id", params.id).single();
       if (error || !data) { showToast("hata", "Personel bulunamadı."); setLoading(false); return; }
       setPersonel(data as Personel);
       setOrijinal(data as Personel);
-      await finansalVeriCek(data.isim);
+      await finansalVeriCek(data);
       setLoading(false);
     };
     init();
@@ -143,6 +151,13 @@ export default function PersonelDetayPage() {
         isten_cikis_tarihi: veri.isten_cikis_tarihi || null, durum: veri.durum, notlar: veri.notlar,
       }).eq("id", veri.id);
       if (error) { showToast("hata", "Kayıt hatası: " + error.message); return; }
+      // İsim değiştiyse bağlı kayıtlardaki isim de güncellensin (eski, id'siz kayıtlar id'ye bağlanır).
+      if (orijinal && orijinal.isim !== veri.isim) {
+        for (const tablo of ["avanslar", "primler", "kesintiler"] as const) {
+          await supabase.from(tablo).update({ personel_isim: veri.isim }).eq("personel_id", String(veri.id));
+          await supabase.from(tablo).update({ personel_isim: veri.isim, personel_id: String(veri.id) }).is("personel_id", null).eq("personel_isim", orijinal.isim);
+        }
+      }
       setOrijinal(veri);
       showToast("basari", "Değişiklikler kaydedildi.");
     } finally { setSaving(false); }
@@ -174,20 +189,24 @@ export default function PersonelDetayPage() {
   const avansKaydet = async () => {
     if (!personel || !yeniAvans.tutar) return;
     setFormSaving(true);
+    const tutar = tv(yeniAvans.tutar);
+    if (tutar <= 0) { setFormSaving(false); showToast("hata", "Geçerli bir tutar girin."); return; }
+    const kasadan = (ODEME_HESAPLARI as readonly string[]).includes(yeniAvans.kasa_kaynagi);
     const { error } = await supabase.from("avanslar").insert({
+      personel_id: String(personel.id),
       personel_isim: personel.isim,
-      tutar: parseFloat(yeniAvans.tutar.replace(/\./g, "").replace(",", ".")),
+      tutar,
       tarih: yeniAvans.tarih,
-      odeme_yontemi: yeniAvans.odeme_yontemi,
+      odeme_yontemi: kasadan ? HESAP_ETIKET[yeniAvans.kasa_kaynagi] : "Diğer",
       kasa_kaynagi: yeniAvans.kasa_kaynagi,
       aciklama: yeniAvans.aciklama,
     });
     setFormSaving(false);
-    if (error) { showToast("hata", "Kayıt hatası."); return; }
-    showToast("basari", "Avans kaydedildi.");
+    if (error) { showToast("hata", "Kayıt hatası: " + error.message); return; }
+    showToast("basari", kasadan ? `Avans kaydedildi ve ${HESAP_ETIKET[yeniAvans.kasa_kaynagi]} bakiyesinden düşüldü.` : "Avans kaydedildi.");
     setAvansModal(false);
-    setYeniAvans({ tutar: "", tarih: new Date().toISOString().split("T")[0], odeme_yontemi: "Nakit Kasa", kasa_kaynagi: "Nakit Kasa", aciklama: "" });
-    finansalVeriCek(personel.isim);
+    setYeniAvans({ tutar: "", tarih: bugun(), kasa_kaynagi: "Nakit", aciklama: "" });
+    finansalVeriCek(personel);
   };
 
   // ── Prim kaydet ──
@@ -195,24 +214,25 @@ export default function PersonelDetayPage() {
     if (!personel || !yeniPrim.tutar) return;
     setFormSaving(true);
     const { error } = await supabase.from("primler").insert({
+      personel_id: String(personel.id),
       personel_isim: personel.isim,
-      tutar: parseFloat(yeniPrim.tutar.replace(/\./g, "").replace(",", ".")),
+      tutar: tv(yeniPrim.tutar),
       tarih: yeniPrim.tarih,
       aciklama: yeniPrim.aciklama,
       odendi: false,
     });
     setFormSaving(false);
-    if (error) { showToast("hata", "Kayıt hatası."); return; }
+    if (error) { showToast("hata", "Kayıt hatası: " + error.message); return; }
     showToast("basari", "Prim kaydedildi.");
     setPrimModal(false);
-    setYeniPrim({ tutar: "", tarih: new Date().toISOString().split("T")[0], aciklama: "" });
-    finansalVeriCek(personel.isim);
+    setYeniPrim({ tutar: "", tarih: bugun(), aciklama: "" });
+    finansalVeriCek(personel);
   };
 
   // ── Prim ödendi işaretle ──
   const primOdendi = async (id: string) => {
-    await supabase.from("primler").update({ odendi: true, odeme_tarihi: new Date().toISOString().split("T")[0] }).eq("id", id);
-    if (personel) finansalVeriCek(personel.isim);
+    await supabase.from("primler").update({ odendi: true, odeme_tarihi: bugun() }).eq("id", id);
+    if (personel) finansalVeriCek(personel);
     showToast("basari", "Prim ödendi olarak işaretlendi.");
   };
 
@@ -221,34 +241,39 @@ export default function PersonelDetayPage() {
     if (!personel || !yeniKesinti.tutar) return;
     setFormSaving(true);
     const { error } = await supabase.from("kesintiler").insert({
+      personel_id: String(personel.id),
       personel_isim: personel.isim,
-      tutar: parseFloat(yeniKesinti.tutar.replace(/\./g, "").replace(",", ".")),
+      tutar: tv(yeniKesinti.tutar),
       tarih: yeniKesinti.tarih,
       aciklama: yeniKesinti.aciklama,
     });
     setFormSaving(false);
-    if (error) { showToast("hata", "Kayıt hatası."); return; }
+    if (error) { showToast("hata", "Kayıt hatası: " + error.message); return; }
     showToast("basari", "Kesinti kaydedildi.");
     setKesintiModal(false);
-    setYeniKesinti({ tutar: "", tarih: new Date().toISOString().split("T")[0], aciklama: "" });
-    finansalVeriCek(personel.isim);
+    setYeniKesinti({ tutar: "", tarih: bugun(), aciklama: "" });
+    finansalVeriCek(personel);
   };
 
   // ── Sil işlemleri ──
   const avansKaldir = async (id: string) => {
-    if (!confirm("Bu avans kaydını silmek istiyor musunuz?")) return;
+    const a = avanslar.find(x => x.id === id);
+    if (a?.rapor_id) { showToast("hata", "Bu avans günlük rapordan geliyor; raporu düzenleyerek değiştirin."); return; }
+    if (!confirm("Bu avans kaydını silmek istiyor musunuz? (Kasa'daki karşılığı da silinir.)")) return;
     await supabase.from("avanslar").delete().eq("id", id);
-    if (personel) finansalVeriCek(personel.isim);
+    if (personel) finansalVeriCek(personel);
   };
   const primKaldir = async (id: string) => {
     if (!confirm("Bu prim kaydını silmek istiyor musunuz?")) return;
     await supabase.from("primler").delete().eq("id", id);
-    if (personel) finansalVeriCek(personel.isim);
+    if (personel) finansalVeriCek(personel);
   };
   const kesintiKaldir = async (id: string) => {
+    const k = kesintiler.find(x => x.id === id);
+    if (k?.rapor_id) { showToast("hata", "Bu kesinti günlük rapordan geliyor; raporu düzenleyerek değiştirin."); return; }
     if (!confirm("Bu kesinti kaydını silmek istiyor musunuz?")) return;
     await supabase.from("kesintiler").delete().eq("id", id);
-    if (personel) finansalVeriCek(personel.isim);
+    if (personel) finansalVeriCek(personel);
   };
 
   // ── Özet hesapla ──
@@ -547,7 +572,7 @@ export default function PersonelDetayPage() {
         <div className="space-y-3">
           <div>
             <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Tutar (₺)</p>
-            <input type="number" value={yeniAvans.tutar} onChange={e => setYeniAvans({ ...yeniAvans, tutar: e.target.value })}
+            <input type="text" inputMode="decimal" value={yeniAvans.tutar} onChange={e => setYeniAvans({ ...yeniAvans, tutar: paraGirdisi(e.target.value) })}
               placeholder="0" className={inputCls} />
           </div>
           <div>
@@ -557,7 +582,7 @@ export default function PersonelDetayPage() {
           <div>
             <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Kasa Kaynağı</p>
             <select value={yeniAvans.kasa_kaynagi} onChange={e => setYeniAvans({ ...yeniAvans, kasa_kaynagi: e.target.value })} className={inputCls}>
-              {KASALAR.map(k => <option key={k} value={k} className="bg-[#ffffff]">{k}</option>)}
+              {KASALAR.map(k => <option key={k} value={k} className="bg-[#ffffff]">{HESAP_ETIKET[k] || "Diğer (kasaya yansımaz)"}</option>)}
             </select>
           </div>
           <div>
@@ -580,7 +605,7 @@ export default function PersonelDetayPage() {
         <div className="space-y-3">
           <div>
             <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Tutar (₺)</p>
-            <input type="number" value={yeniPrim.tutar} onChange={e => setYeniPrim({ ...yeniPrim, tutar: e.target.value })}
+            <input type="text" inputMode="decimal" value={yeniPrim.tutar} onChange={e => setYeniPrim({ ...yeniPrim, tutar: paraGirdisi(e.target.value) })}
               placeholder="0" className={inputCls} />
           </div>
           <div>
@@ -607,7 +632,7 @@ export default function PersonelDetayPage() {
         <div className="space-y-3">
           <div>
             <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Tutar (₺)</p>
-            <input type="number" value={yeniKesinti.tutar} onChange={e => setYeniKesinti({ ...yeniKesinti, tutar: e.target.value })}
+            <input type="text" inputMode="decimal" value={yeniKesinti.tutar} onChange={e => setYeniKesinti({ ...yeniKesinti, tutar: paraGirdisi(e.target.value) })}
               placeholder="0" className={inputCls} />
           </div>
           <div>

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useYetki, yetkiOnbelleginiTemizle } from "@/lib/useYetki";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard, Wallet, ClipboardList, Users, Settings, LogOut,
-  Utensils, BarChart3, TrendingUp, Menu, X, Building2, FileText, ChevronDown,
+  Utensils, BarChart3, Menu, X, Building2, FileText, ChevronDown,
   Package
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -15,21 +16,13 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // Rol profiles.role alanından okunur (e-posta listesi yok). Sayfa erişimi ayrıca
+  // sunucu tarafında (proxy.ts) ve veritabanında (RLS) korunur.
+  const yetki = useYetki();
+  const isAdmin = yetki.tamYetkili;
+  const loading = yetki.yukleniyor;
   const [drawerAcik, setDrawerAcik] = useState(false);
   const [kasaAcik, setKasaAcik] = useState(false);
-
-  useEffect(() => {
-    const yetkiKontrol = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email === "murat@kebo.com" || user?.email === "bulent@kebo.com") {
-        setIsAdmin(true);
-      }
-      setLoading(false);
-    };
-    yetkiKontrol();
-  }, []);
 
   useEffect(() => { setDrawerAcik(false); }, [pathname]);
 
@@ -40,6 +33,7 @@ export default function Sidebar() {
   }, [pathname]);
 
   const handleSignOut = async () => {
+    yetkiOnbelleginiTemizle();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
@@ -56,7 +50,6 @@ export default function Sidebar() {
 
   const kasaAltMenuler = [
     { name: "Kasa", icon: Wallet, href: "/kasa" },
-    { name: "Platform", icon: TrendingUp, href: "/platform-takip" },
     { name: "Cariler", icon: Building2, href: "/cariler" },
     { name: "Faturalar", icon: FileText, href: "/faturalar" },
   ];
@@ -152,7 +145,7 @@ export default function Sidebar() {
 
         <div className="p-3 border-t border-[#e2e5eb]">
           <p className="px-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold border-b border-[#e2e5eb] pb-3 mb-2">
-            {isAdmin ? "Yönetici" : "Şube Müdürü"}
+            {isAdmin ? "Yönetici" : "Şube Müdürü"}{yetki.kullaniciAdi ? ` · ${yetki.kullaniciAdi}` : ""}
           </p>
           <button onClick={handleSignOut}
             className="flex items-center gap-3 px-3 py-2.5 w-full text-gray-500 hover:bg-red-500/10 hover:text-red-600 rounded-xl transition-colors text-sm">

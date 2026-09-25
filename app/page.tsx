@@ -4,18 +4,26 @@ import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import {
-  Users, Wallet, TrendingUp, ArrowUpRight,
+  Users, Wallet, TrendingUp,
   ChevronRight, AlertTriangle, CheckCircle2,
   FileText, Bike, ChefHat, Store, Clock,
-  BarChart3, Calendar
+  BarChart3, Calendar, Building2
 } from "lucide-react";
+import { fmt, fmtK } from "@/lib/para";
+import { bugun, ayBasi, aySonu, fmtTarih } from "@/lib/tarih";
+import { donemOzeti, raporOzeti, type RaporVerisi } from "@/lib/hesap";
+import { buAyinOdemeDonemi } from "@/lib/cari";
 
-const fmt = (v: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(v);
-const fmtK = (v: number) => {
-  if (v >= 1000000) return `₺${(v / 1000000).toFixed(1)}M`;
-  if (v >= 1000) return `₺${(v / 1000).toFixed(0)}K`;
-  return `₺${fmt(v)}`;
-};
+// Tailwind sınıfları derleme anında taranır; `bg-${renk}-500` gibi dinamik sınıflar
+// üretilmez. Bu yüzden her renk için sınıflar burada açıkça yazılı.
+const RENK = {
+  blue:    { yazi: "text-blue-600",    zemin: "bg-blue-500/10",    zeminHover: "group-hover:bg-blue-500/20",    kenar: "hover:border-blue-500/30",    parilti: "bg-blue-500/5" },
+  emerald: { yazi: "text-emerald-600", zemin: "bg-emerald-500/10", zeminHover: "group-hover:bg-emerald-500/20", kenar: "hover:border-emerald-500/30", parilti: "bg-emerald-500/5" },
+  purple:  { yazi: "text-purple-600",  zemin: "bg-purple-500/10",  zeminHover: "group-hover:bg-purple-500/20",  kenar: "hover:border-purple-500/30",  parilti: "bg-purple-500/5" },
+  amber:   { yazi: "text-amber-600",   zemin: "bg-amber-500/10",   zeminHover: "group-hover:bg-amber-500/20",   kenar: "hover:border-amber-500/30",   parilti: "bg-amber-500/5" },
+  red:     { yazi: "text-red-600",     zemin: "bg-red-500/10",     zeminHover: "group-hover:bg-red-500/20",     kenar: "hover:border-red-500/30",     parilti: "bg-red-500/5" },
+} as const;
+type Renk = keyof typeof RENK;
 
 function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) {
   const [display, setDisplay] = useState(0);
@@ -34,24 +42,32 @@ function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; pr
 }
 
 export default function Anasayfa() {
-  const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [kullanici, setKullanici] = useState("");
   const [d, setD] = useState({
     aktifPersonel: 0, kurye: 0, mutfak: 0, banko: 0, eksikBelge: 0,
-    bugunRapor: false, bugunCiro: 0, bugunNet: 0, bugunPaket: 0,
-    aylikCiro: 0, aylikNet: 0, aylikGider: 0, donemRapor: 0,
+    bugunRapor: false, bugunCiro: 0, bugunNet: 0, bugunPaket: 0, bugunTarih: "",
+    aylikCiro: 0, aylikNet: 0, aylikIade: 0, aylikGider: 0, donemRapor: 0,
     enYuksek: 0, gunOrt: 0,
-    bekleyenTutar: 0, bekleyenAdet: 0, gecikmisTutar: 0,
+    cariOdenecek: 0, cariGeciken: 0, cariVade: "",
   });
 
   useEffect(() => {
+    const supabase = createClient();
     const run = async () => {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.email) setKullanici(user.email.split("@")[0]);
 
-      const { data: personeller } = await supabase.from("personeller").select("departman,durum,tc_kimlik,iban");
+      const bugunStr = bugun();
+      const donem = buAyinOdemeDonemi();
+      const [{ data: personeller }, { data: bugunData }, { data: aylik }, { data: odenecek }] = await Promise.all([
+        supabase.from("personeller").select("departman,durum,tc_kimlik,iban"),
+        supabase.from("gunluk_raporlar").select("*").eq("tarih", bugunStr).maybeSingle(),
+        supabase.from("gunluk_raporlar").select("*").gte("tarih", ayBasi(bugunStr)).lte("tarih", aySonu(bugunStr.slice(0, 4), bugunStr.slice(5, 7))),
+        supabase.from("faturalar").select("toplam_tutar,fatura_tarihi,durum").neq("durum", "odendi").lte("fatura_tarihi", donem.donemBit),
+      ]);
+
       let aktifPersonel = 0, kurye = 0, mutfak = 0, banko = 0, eksikBelge = 0;
       if (personeller) {
         const aktif = personeller.filter(p => p.durum === "aktif");
@@ -62,52 +78,37 @@ export default function Anasayfa() {
         eksikBelge = aktif.filter(p => !p.tc_kimlik || !p.iban).length;
       }
 
-      const today = new Date().toISOString().split("T")[0];
-      const { data: bugunData } = await supabase.from("gunluk_raporlar")
-        .select("toplam_ciro,gunluk_gider,iade_tutar,kurye_raporlari").eq("tarih", today).single();
+      // Bugünün raporu genelde gün sonunda girilir; yoksa en son girilen raporu gösteririz.
+      let gunRapor = bugunData as RaporVerisi | null;
+      if (!gunRapor) {
+        const { data: son } = await supabase.from("gunluk_raporlar").select("*").order("tarih", { ascending: false }).limit(1).maybeSingle();
+        gunRapor = son as RaporVerisi | null;
+      }
+      const g = gunRapor ? raporOzeti(gunRapor) : null;
+      const ay = donemOzeti((aylik || []) as RaporVerisi[]);
 
-      // BRÜT CİRO = toplam_ciro + gunluk_gider (gider kasadan çıktığı için brüte dahil)
-      const bugunCiro = (bugunData?.toplam_ciro || 0) + (bugunData?.gunluk_gider || 0);
-      const bugunNet = (bugunData?.toplam_ciro || 0) - (bugunData?.iade_tutar || 0);
-      const bugunPaket = bugunData?.kurye_raporlari?.reduce((s: number, k: any) => s + (parseInt(k.paketSayisi) || 0), 0) || 0;
-
-      const ay = String(new Date().getMonth() + 1).padStart(2, "0");
-      const yil = String(new Date().getFullYear());
-      const sonGun = new Date(parseInt(yil), parseInt(ay), 0).getDate();
-      const { data: aylik } = await supabase.from("gunluk_raporlar").select("toplam_ciro,gunluk_gider,iade_tutar")
-        .gte("tarih", `${yil}-${ay}-01`).lte("tarih", `${yil}-${ay}-${String(sonGun).padStart(2, "0")}`);
-
-      let aylikCiro = 0, aylikGider = 0, enYuksek = 0;
-      aylik?.forEach(r => {
-        // BRÜT CİRO = toplam_ciro + gunluk_gider
-        const brut = (r.toplam_ciro || 0) + (r.gunluk_gider || 0);
-        aylikCiro += brut;
-        aylikGider += (r.iade_tutar || 0);
-        if (brut > enYuksek) enYuksek = brut;
-      });
-      const donemRapor = aylik?.length || 0;
-      // Net = toplam_ciro - iade (gider zaten brütte, çıkartmıyoruz net hesabında)
-      const aylikNet = (aylik?.reduce((s, r) => s + (r.toplam_ciro || 0) - (r.iade_tutar || 0), 0) || 0);
-      const gunOrt = donemRapor > 0 ? Math.round(aylikCiro / donemRapor) : 0;
-
-      const { data: tahsilatlar } = await supabase.from("platform_tahsilatlar").select("satis_tutari,beklenen_odeme_tarihi,durum");
-      let bekleyenTutar = 0, bekleyenAdet = 0, gecikmisTutar = 0;
-      const bugun = new Date();
-      tahsilatlar?.forEach(t => {
-        if (t.durum !== "tamamlandi") {
-          bekleyenAdet++; bekleyenTutar += t.satis_tutari || 0;
-          if (new Date(t.beklenen_odeme_tarihi) < bugun) gecikmisTutar += t.satis_tutari || 0;
-        }
+      // Cari: bu ödeme dönemine kadar kesilmiş, ödenmemiş faturalar
+      let cariOdenecek = 0, cariGeciken = 0;
+      (odenecek || []).forEach(f => {
+        cariOdenecek += Number(f.toplam_tutar) || 0;
+        if (f.fatura_tarihi < donem.donemBas) cariGeciken += Number(f.toplam_tutar) || 0;
       });
 
-      setD({ aktifPersonel, kurye, mutfak, banko, eksikBelge, bugunRapor: !!bugunData, bugunCiro, bugunNet, bugunPaket, aylikCiro, aylikNet, aylikGider, donemRapor, enYuksek, gunOrt, bekleyenTutar, bekleyenAdet, gecikmisTutar });
+      setD({
+        aktifPersonel, kurye, mutfak, banko, eksikBelge,
+        bugunRapor: !!bugunData, bugunTarih: gunRapor?.tarih || "",
+        bugunCiro: g?.brut || 0, bugunNet: g?.net || 0, bugunPaket: g?.paket || 0,
+        aylikCiro: ay.brut, aylikNet: ay.net, aylikIade: ay.iade, aylikGider: ay.gider, donemRapor: ay.gunSayisi,
+        enYuksek: ay.enYuksekBrut, gunOrt: ay.gunSayisi > 0 ? Math.round(ay.brut / ay.gunSayisi) : 0,
+        cariOdenecek, cariGeciken, cariVade: donem.vadeStr,
+      });
       setLoading(false);
     };
     run();
   }, []);
 
-  const tarih = new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
-  const gun = new Date().toLocaleDateString("tr-TR", { weekday: "long" });
+  const tarih = new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Istanbul" });
+  const gun = new Date().toLocaleDateString("tr-TR", { weekday: "long", timeZone: "Europe/Istanbul" });
 
   if (loading) return (
     <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center">
@@ -148,8 +149,8 @@ export default function Anasayfa() {
                     <p className="text-[10px] text-gray-500">₺{fmt(d.bugunCiro)} brüt ciro</p></div></>
               ) : (
                 <><AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 animate-pulse" />
-                  <div><p className="text-xs font-bold text-amber-600">Rapor Bekleniyor</p>
-                    <p className="text-[10px] text-gray-500">Kasa henüz kapatılmadı</p></div></>
+                  <div><p className="text-xs font-bold text-amber-600">Bugünün Raporu Bekleniyor</p>
+                    <p className="text-[10px] text-gray-500">{d.bugunTarih ? `Son rapor: ${fmtTarih(d.bugunTarih)}` : "Henüz rapor yok"}</p></div></>
               )}
             </div>
           </div>
@@ -160,20 +161,20 @@ export default function Anasayfa() {
 
         {/* ── 4 KPI KART ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[
+          {([
             { label: "Aylık Brüt", value: d.aylikCiro, color: "blue", icon: <BarChart3 size={13} />, sub: `${d.donemRapor} rapor` },
-            { label: "Aylık Net", value: d.aylikNet, color: "emerald", icon: <TrendingUp size={13} />, sub: `Ort. ${fmtK(d.gunOrt)}/gün` },
+            { label: "Aylık Net", value: d.aylikNet, color: "emerald", icon: <TrendingUp size={13} />, sub: `Ort. ${fmtK(d.gunOrt)}/gün brüt` },
             { label: "Aktif Kadro", value: d.aktifPersonel, color: "purple", icon: <Users size={13} />, sub: `${d.kurye} kurye · ${d.mutfak} mutfak`, noTL: true },
-            { label: "Bekleyen Tahsilat", value: d.bekleyenTutar, color: d.gecikmisTutar > 0 ? "red" : "amber", icon: <Wallet size={13} />, sub: d.gecikmisTutar > 0 ? `⚠ ${fmtK(d.gecikmisTutar)} gecikmiş` : `${d.bekleyenAdet} işlem` },
-          ].map(c => (
-            <div key={c.label} className={`bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4 relative overflow-hidden group hover:border-${c.color}-500/20 transition-all`}>
-              <div className={`absolute top-0 right-0 w-20 h-20 bg-${c.color}-500/5 blur-xl rounded-full group-hover:bg-${c.color}-500/10 transition-all`} />
+            { label: "Cari Ödenecek", value: d.cariOdenecek, color: d.cariGeciken > 0 ? "red" : "amber", icon: <Building2 size={13} />, sub: d.cariGeciken > 0 ? `⚠ ${fmtK(d.cariGeciken)} gecikmiş` : `Vade: ${d.cariVade}` },
+          ] as { label: string; value: number; color: Renk; icon: React.ReactNode; sub: string; noTL?: boolean }[]).map(c => (
+            <div key={c.label} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4 relative overflow-hidden group transition-all">
+              <div className={`absolute top-0 right-0 w-20 h-20 ${RENK[c.color].parilti} blur-xl rounded-full transition-all`} />
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">{c.label}</span>
-                  <div className={`w-7 h-7 rounded-xl bg-${c.color}-500/10 flex items-center justify-center text-${c.color}-400`}>{c.icon}</div>
+                  <div className={`w-7 h-7 rounded-xl ${RENK[c.color].zemin} flex items-center justify-center ${RENK[c.color].yazi}`}>{c.icon}</div>
                 </div>
-                <p className={`text-2xl font-black text-${c.color}-400`}>
+                <p className={`text-2xl font-black ${RENK[c.color].yazi}`}>
                   <AnimatedNumber value={c.value} prefix={c.noTL ? "" : "₺"} suffix={c.noTL ? " kişi" : ""} />
                 </p>
                 <p className={`text-[10px] mt-1 ${c.color === "red" ? "text-red-600" : "text-gray-600"}`}>{c.sub}</p>
@@ -189,9 +190,10 @@ export default function Anasayfa() {
           <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center"><Clock size={12} className="text-blue-600" /></div>
-              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Bugün</h3>
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">{d.bugunRapor ? "Bugün" : "Son Rapor"}</h3>
+              {!d.bugunRapor && d.bugunTarih && <span className="text-[10px] text-gray-500">{fmtTarih(d.bugunTarih)}</span>}
             </div>
-            {d.bugunRapor ? (
+            {d.bugunTarih ? (
               <div className="space-y-3">
                 {[
                   { l: "Brüt Ciro", v: `₺${fmt(d.bugunCiro)}`, c: "text-blue-600" },
@@ -224,8 +226,9 @@ export default function Anasayfa() {
             <div className="space-y-3">
               {[
                 { l: "Brüt Ciro", v: d.aylikCiro, c: "#3B82F6" },
-                { l: "Net Kâr", v: d.aylikNet, c: "#10B981" },
-                { l: "İade", v: d.aylikGider, c: "#EF4444" },
+                { l: "Net Ciro", v: d.aylikNet, c: "#10B981" },
+                { l: "Gider", v: d.aylikGider, c: "#F97316" },
+                { l: "İade", v: d.aylikIade, c: "#EF4444" },
               ].map(i => {
                 const pct = d.aylikCiro > 0 ? Math.min((i.v / d.aylikCiro) * 100, 100) : 0;
                 return (
@@ -297,16 +300,16 @@ export default function Anasayfa() {
         <div>
           <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-3">Hızlı Erişim</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
+            {([
               { href: "/raporlar", icon: FileText, label: "Kasa Raporu", sub: "Gün sonu girişi", color: "blue" },
               { href: "/kasa", icon: Wallet, label: "Kasa", sub: "Bakiye & işlemler", color: "emerald" },
-              { href: "/platform-takip", icon: TrendingUp, label: "Platform Takip", sub: "Tahsilat durumu", color: "purple" },
+              { href: "/rapor-analiz", icon: BarChart3, label: "Rapor Analizi", sub: "Dönem & Roadrunner", color: "purple" },
               { href: "/personel", icon: Users, label: "Personeller", sub: `${d.aktifPersonel} kişi`, color: "amber" },
-            ].map(item => (
+            ] as { href: string; icon: typeof FileText; label: string; sub: string; color: Renk }[]).map(item => (
               <Link key={item.href} href={item.href}
-                className={`group bg-[#ffffff] border border-[#e2e5eb] hover:border-${item.color}-500/30 rounded-2xl p-4 transition-all`}>
-                <div className={`w-9 h-9 rounded-xl bg-${item.color}-500/10 flex items-center justify-center mb-3 group-hover:bg-${item.color}-500/20 transition-all`}>
-                  <item.icon size={16} className={`text-${item.color}-400`} />
+                className={`group bg-[#ffffff] border border-[#e2e5eb] ${RENK[item.color].kenar} rounded-2xl p-4 transition-all`}>
+                <div className={`w-9 h-9 rounded-xl ${RENK[item.color].zemin} flex items-center justify-center mb-3 ${RENK[item.color].zeminHover} transition-all`}>
+                  <item.icon size={16} className={RENK[item.color].yazi} />
                 </div>
                 <p className="text-sm font-bold text-[#1a1f2e]">{item.label}</p>
                 <p className="text-[10px] text-gray-600 mt-0.5">{item.sub}</p>
@@ -319,10 +322,10 @@ export default function Anasayfa() {
         <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-xs text-gray-500">KEBO ERP — Tüm sistemler çalışıyor</span>
+            <span className="text-xs text-gray-500">KEBO ERP</span>
           </div>
           <div className="flex items-center gap-4 text-[10px] text-gray-700">
-            <span>Supabase ✓</span><span>Vercel ✓</span><span>v2.7</span>
+            <span>v3.0</span>
           </div>
         </div>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { bugun, ayBasi, gunEkle } from "@/lib/tarih";
 import {
   Plus, Search, FileText, Trash2, X, Loader2, CheckCircle2,
   AlertTriangle, Building2, Upload, RefreshCw, Calendar,
@@ -32,8 +33,8 @@ export default function FaturalarPage() {
   const [durumFiltre, setDurumFiltre] = useState<"hepsi" | "bekliyor" | "odendi" | "gecikti">("hepsi");
   const [cariFiltre, setCariFiltre] = useState("hepsi");
   const [gorunumModu, setGorunumModu] = useState<"aylik" | "tarih" | "cari">("aylik");
-  const [baslangic, setBaslangic] = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().split("T")[0]; });
-  const [bitis, setBitis] = useState(() => new Date().toISOString().split("T")[0]);
+  const [baslangic, setBaslangic] = useState(() => ayBasi());
+  const [bitis, setBitis] = useState(() => bugun());
   const [acikAylar, setAcikAylar] = useState<Set<string>>(new Set());
   const [modalAcik, setModalAcik] = useState(false);
   const [xlsYukleniyor, setXlsYukleniyor] = useState(false);
@@ -46,7 +47,7 @@ export default function FaturalarPage() {
 
   const [form, setForm] = useState({
     cari_id: "", fatura_no: "",
-    fatura_tarihi: new Date().toISOString().split("T")[0],
+    fatura_tarihi: bugun(),
     vade_tarihi: "", tutar: "", kdv: "20", toplam_tutar: "",
     aciklama: "", durum: "bekliyor",
   });
@@ -207,7 +208,7 @@ export default function FaturalarPage() {
     if (error) { showToast("hata", "Kayıt hatası: " + error.message); return; }
     showToast("basari", "Fatura kaydedildi.");
     setModalAcik(false);
-    setForm({ cari_id: "", fatura_no: "", fatura_tarihi: new Date().toISOString().split("T")[0], vade_tarihi: "", tutar: "", kdv: "20", toplam_tutar: "", aciklama: "", durum: "bekliyor" });
+    setForm({ cari_id: "", fatura_no: "", fatura_tarihi: bugun(), vade_tarihi: "", tutar: "", kdv: "20", toplam_tutar: "", aciklama: "", durum: "bekliyor" });
     veriCek();
   };
 
@@ -289,7 +290,7 @@ export default function FaturalarPage() {
   }, [seciliFaturalar, faturalar]);
 
   // Fatura tablosu — "Ödendi" butonu kaldırıldı, ödeme Cariler'den yapılır
-  const FaturaTablosu = ({ liste }: { liste: Fatura[] }) => {
+  const faturaTablosu = (liste: Fatura[]) => {
     const hepsiSecili = liste.length > 0 && liste.every(f => seciliFaturalar.has(f.id));
     return (
       <table className="w-full text-xs">
@@ -434,9 +435,9 @@ export default function FaturalarPage() {
               <input type="date" value={bitis} onChange={e => setBitis(e.target.value)} className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none focus:border-blue-500/40" />
               <div className="flex gap-1.5 flex-wrap">
                 {[
-                  { label: "Bu ay", fn: () => { const d = new Date(); d.setDate(1); setBaslangic(d.toISOString().split("T")[0]); setBitis(new Date().toISOString().split("T")[0]); } },
-                  { label: "Son 30 gün", fn: () => { const d = new Date(); d.setDate(d.getDate() - 30); setBaslangic(d.toISOString().split("T")[0]); setBitis(new Date().toISOString().split("T")[0]); } },
-                  { label: "Son 3 ay", fn: () => { const d = new Date(); d.setMonth(d.getMonth() - 3); setBaslangic(d.toISOString().split("T")[0]); setBitis(new Date().toISOString().split("T")[0]); } },
+                  { label: "Bu ay", fn: () => { setBaslangic(ayBasi()); setBitis(bugun()); } },
+                  { label: "Son 30 gün", fn: () => { setBaslangic(gunEkle(bugun(), -30)); setBitis(bugun()); } },
+                  { label: "Son 3 ay", fn: () => { setBaslangic(gunEkle(bugun(), -91)); setBitis(bugun()); } },
                 ].map(b => (
                   <button key={b.label} onClick={b.fn} className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-black/[0.04] text-gray-400 hover:bg-blue-600 hover:text-white transition-colors">{b.label}</button>
                 ))}
@@ -478,7 +479,7 @@ export default function FaturalarPage() {
                         {acikAylar.has(key) ? <ChevronUp size={14} className="text-gray-600" /> : <ChevronDown size={14} className="text-gray-600" />}
                       </div>
                     </button>
-                    {acikAylar.has(key) && <div className="border-t border-[#e2e5eb] overflow-x-auto"><FaturaTablosu liste={liste} /></div>}
+                    {acikAylar.has(key) && <div className="border-t border-[#e2e5eb] overflow-x-auto">{faturaTablosu(liste)}</div>}
                   </div>
                 ))}
               </div>
@@ -487,7 +488,7 @@ export default function FaturalarPage() {
             {/* TARİH ARALIKLI */}
             {gorunumModu === "tarih" && (
               <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden overflow-x-auto">
-                <FaturaTablosu liste={filtreliFaturalar} />
+                {faturaTablosu(filtreliFaturalar)}
               </div>
             )}
 
@@ -520,7 +521,7 @@ export default function FaturalarPage() {
                         {cariFiltre === g.unvan ? <ChevronUp size={14} className="text-gray-600" /> : <ChevronDown size={14} className="text-gray-600" />}
                       </div>
                     </button>
-                    {cariFiltre === g.unvan && <div className="border-t border-[#e2e5eb] overflow-x-auto"><FaturaTablosu liste={g.faturalar} /></div>}
+                    {cariFiltre === g.unvan && <div className="border-t border-[#e2e5eb] overflow-x-auto">{faturaTablosu(g.faturalar)}</div>}
                   </div>
                 ))}
               </div>

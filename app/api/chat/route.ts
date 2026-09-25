@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { oturumKontrol } from "@/lib/supabase/server";
 
 // AI Analiz (raporlar sayfasındaki "AI Analiz" paneli) buradan geçer.
 // Anahtar sadece burada, sunucu tarafında kullanılır — tarayıcıya asla
@@ -23,11 +24,15 @@ const MAX_DENEME = 3;
 const bekle = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function POST(req: Request) {
+  // Sadece giriş yapmış panel kullanıcıları AI'yi kullanabilir (Gemini kotası korunur).
+  const oturum = await oturumKontrol();
+  if (!oturum.ok) return oturum.yanit;
   try {
     const body = await req.json();
     const { system, messages, max_tokens } = body || {};
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+    // NEXT_PUBLIC_ önekli değişkenler tarayıcıya gömülür; anahtar sadece sunucu değişkeninden okunur.
+    const apiKey = process.env.GEMINI_API_KEY || "";
 
     if (!apiKey) {
       console.error("[chat] GEMINI_API_KEY tanımlı değil");

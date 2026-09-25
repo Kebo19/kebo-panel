@@ -46,4 +46,5 @@ next-env.d.ts
 # repomix çıktıları (AI'ye kod göndermek için üretiliyor, repoya girmemeli —
 # her seferinde büyüyüp gereksiz yer kaplıyordu)
 repomix-output.*
-repomix.config.json
+repomix.config.json
+_kebo_test/

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { yetkiOnbelleginiTemizle } from "@/lib/useYetki";
 import { useRouter } from "next/navigation";
 import { LogOut, User, Shield } from "lucide-react";
 
@@ -19,6 +20,7 @@ export default function AyarlarPage() {
   }, []);
 
   const handleSignOut = async () => {
+    yetkiOnbelleginiTemizle();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();

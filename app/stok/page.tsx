@@ -2,12 +2,30 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { bugun, gunEkle } from "@/lib/tarih";
+import { useYetki } from "@/lib/useYetki";
+import { fmtTarih } from "@/lib/tarih";
+import {
+  stokDurumu, siparisPlani, sayimGecikti, kullanimAnalizi, cikisOzeti, miktarOku, varsayilanVakit,
+  CIKIS_NEDENLERI, GUN_ADLARI, VARSAYILAN_SIPARIS,
+  type StokDurumu, type CikisNedeni, type SiparisAyari, type SiparisPlani, type TahminYontemi, type SayimVakti,
+} from "@/lib/stok";
+import VakitSecici from "@/components/VakitSecici";
+import IrsaliyePaneli, { type IrsaliyeKalemi } from "@/components/IrsaliyePaneli";
+
+// Ekran tercihleri bu tarayıcıda hatırlanır (tarayıcı izin vermezse varsayılanlar kullanılır).
+function tercihOku<T>(anahtar: string, varsayilan: T): T {
+  try { const v = localStorage.getItem(anahtar); return v ? JSON.parse(v) as T : varsayilan; } catch { return varsayilan; }
+}
+function tercihYaz(anahtar: string, deger: unknown) {
+  try { localStorage.setItem(anahtar, JSON.stringify(deger)); } catch { /* yok say */ }
+}
 import Link from "next/link";
 import {
   Package, PlusCircle, Search, AlertTriangle, TrendingDown,
   Truck, ClipboardCheck, Loader2, X, Save, Edit3, Trash2,
   RefreshCw, Layers, Box, Clock, BrainCircuit, CheckSquare, Square,
-  Check, ListOrdered, Send, Bot, MessageSquare, Calendar, ArrowUp, ArrowDown
+  ListOrdered, Calendar, ArrowUp, ArrowDown, PackageMinus, ShoppingCart
 } from "lucide-react";
 
 interface Urun {
@@ -31,21 +49,19 @@ interface Hareket {
   tarih: string;
   tip: "sayim" | "giris" | "cikis" | "duzeltme";
   miktar: number;
+  neden?: string | null;
+  birim_fiyat?: number | null;
   kaynak: string | null;
   aciklama: string | null;
   kullanici: string | null;
   created_at: string;
 }
 
-interface ChatMesaj {
-  sender: "user" | "ai";
-  text: string;
-  time: string;
-}
+// Hesap mantığı lib/stok.ts'de: kullanım iki sayım arasında hesaplanır, sayılmayan
+// günlere eşit bölünür; sipariş için son 7 günün ortalama günlük kullanımı esas alınır.
 
 const fmt = (v: number, decimals = 1): string =>
   new Intl.NumberFormat("tr-TR", { maximumFractionDigits: decimals, minimumFractionDigits: 0 }).format(v);
-const bugun = () => new Date().toISOString().split("T")[0];
 
 const PERIYOTLAR = [
   { v: "gunluk", l: "Günlük Sayım" },
@@ -58,10 +74,12 @@ export default function StokPage() {
   const supabase = createClient();
 
   const [loading, setLoading] = useState(true);
-  const [userEmail, setUserEmail] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const yetki = useYetki();
+  const userEmail = yetki.email;
+  const isAdmin = yetki.tamYetkili;
   const [urunler, setUrunler] = useState<Urun[]>([]);
   const [hareketler, setHareketler] = useState<Hareket[]>([]);
+  const [bekleyenIrsaliye, setBekleyenIrsaliye] = useState<IrsaliyeKalemi[]>([]);
 
   const [arama, setArama] = useState("");
   const [filtreKategori, setFiltreKategori] = useState("");
@@ -73,6 +91,22 @@ export default function StokPage() {
   const [duzenleUrun, setDuzenleUrun] = useState<Urun | null>(null);
   const [sayimUrun, setSayimUrun] = useState<Urun | null>(null);
   const [malGirisUrun, setMalGirisUrun] = useState<Urun | null>(null);
+  const [cikisUrun, setCikisUrun] = useState<Urun | null>(null);
+  const [cikisMiktar, setCikisMiktar] = useState("");
+  const [cikisNeden, setCikisNeden] = useState<CikisNedeni>("skt");
+  const [cikisTarih, setCikisTarih] = useState(bugun());
+  const [cikisNot, setCikisNot] = useState("");
+  // Sipariş takvimi (varsayılan: Salı sipariş, 7 gün sonra teslim) ve tahmin yöntemi
+  const [siparisAyar, setSiparisAyarState] = useState<SiparisAyari>(VARSAYILAN_SIPARIS);
+  const [yontem, setYontemState] = useState<TahminYontemi>("gun");
+  useEffect(() => {
+    setSiparisAyarState(tercihOku("kebo-stok-siparis", VARSAYILAN_SIPARIS));
+    setYontemState(tercihOku<TahminYontemi>("kebo-stok-yontem", "gun"));
+  }, []);
+  const setSiparisAyar = (a: SiparisAyari) => { setSiparisAyarState(a); tercihYaz("kebo-stok-siparis", a); };
+  const setYontem = (y: TahminYontemi) => { setYontemState(y); tercihYaz("kebo-stok-yontem", y); };
+  const [sayimVakti, setSayimVakti] = useState<SayimVakti>("sabah");
+  const [topluVakit, setTopluVakit] = useState<SayimVakti>("sabah");
   const [topluSayimAcik, setTopluSayimAcik] = useState(false);
 
   // Form Verileri
@@ -108,24 +142,16 @@ export default function StokPage() {
   const [girisTarih, setGirisTarih] = useState(bugun());
   const [girisFiyat, setGirisFiyat] = useState("");
 
-  // AI Chatbot State'leri
-  const [chatAcik, setChatAcik] = useState(false);
-  const [chatGirdisi, setChatGirdisi] = useState("");
-  const [chatGecmisi, setChatGecmisi] = useState<ChatMesaj[]>([
-    { sender: "ai", text: "Selam Şef! Kebo Stok Asistanı hazır. Hangi malzemenin durumunu veya tüketim tahminini analiz etmemi istersin?", time: "Şimdi" }
-  ]);
 
   const veriCek = useCallback(async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const mail = user?.email || "";
-    setUserEmail(mail);
-    setIsAdmin(mail === "murat@kebo.com" || mail === "bulent@kebo.com");
-
-    const [urunRes, hareketRes] = await Promise.all([
+    const [urunRes, hareketRes, irsaliyeRes] = await Promise.all([
       supabase.from("stok_urunler").select("*").eq("durum", "aktif"),
-      supabase.from("stok_hareketler").select("*").order("tarih", { ascending: false }).limit(600),
+      // Son 120 günün hareketleri (eskiden sabit 600 kayıt sınırı vardı; ürün sayısı arttıkça ortalamalar bozuluyordu)
+      supabase.from("stok_hareketler").select("*").gte("tarih", gunEkle(bugun(), -120)).order("tarih", { ascending: false }),
+      supabase.from("stok_fatura_kalemleri").select("*").eq("durum", "bekliyor").order("beklenen_tarih"),
     ]);
+    if (irsaliyeRes.data) setBekleyenIrsaliye(irsaliyeRes.data as IrsaliyeKalemi[]);
 
     if (urunRes.data) {
       const sirali = (urunRes.data as Urun[]).sort((a, b) => {
@@ -154,129 +180,91 @@ export default function StokPage() {
     return Array.from(set).sort();
   }, [urunler]);
 
-  const gunlukOrtalama = useCallback((urunId: string): number => {
-    // Son 7 günün tarih sınırını hesapla
-    const bugunDate = new Date();
-    bugunDate.setHours(0, 0, 0, 0);
-    const yediGunOnce = new Date(bugunDate);
-    yediGunOnce.setDate(yediGunOnce.getDate() - 7);
-    const yediGunOnceStr = yediGunOnce.toISOString().split("T")[0];
-
-    // Bu ürünün son 7 güne ait sayımlarını tarihe göre sırala
-    const sonYediGunSayimlar = hareketler
-      .filter(h => h.urun_id === urunId && h.tip === "sayim" && h.tarih >= yediGunOnceStr)
-      .sort((a, b) => a.tarih.localeCompare(b.tarih));
-
-    if (sonYediGunSayimlar.length < 2) return 0;
-
-    let toplamKullanim = 0;
-    let toplamGun = 0;
-
-    for (let i = 1; i < sonYediGunSayimlar.length; i++) {
-      const onceki = sonYediGunSayimlar[i - 1];
-      const sonraki = sonYediGunSayimlar[i];
-      const aradaGelen = hareketler
-        .filter(h =>
-          h.urun_id === urunId &&
-          h.tip === "giris" &&
-          h.tarih > onceki.tarih &&
-          h.tarih <= sonraki.tarih
-        )
-        .reduce((s, h) => s + h.miktar, 0);
-      const gunFarki = Math.max(
-        (new Date(sonraki.tarih).getTime() - new Date(onceki.tarih).getTime()) / (1000 * 60 * 60 * 24),
-        1
-      );
-      const kullanim = (onceki.miktar + aradaGelen) - sonraki.miktar;
-      if (kullanim > 0) {
-        toplamKullanim += kullanim;
-        toplamGun += gunFarki;
-      }
-    }
-
-    return toplamGun > 0 ? toplamKullanim / toplamGun : 0;
-  }, [hareketler]);
-
-  const tahminiBitisGunu = useCallback((urun: Urun): number | null => {
-    const ort = gunlukOrtalama(urun.id);
-    if (ort <= 0 || urun.mevcut_stok <= 0) return null;
-    return Math.floor(urun.mevcut_stok / ort);
-  }, [gunlukOrtalama]);
+  // Her ürünün güncel durumu: son sayım, tahmini stok, 7 günlük ortalama, kalan gün.
+  const durumlar = useMemo(() => {
+    const m = new Map<string, StokDurumu>();
+    const bugunStr = bugun();
+    urunler.forEach(u => m.set(u.id, stokDurumu(hareketler, u.id, bugunStr, yontem)));
+    return m;
+  }, [urunler, hareketler, yontem]);
+  const planlar = useMemo(() => {
+    const m = new Map<string, SiparisPlani>();
+    urunler.forEach(u => {
+      const d = durumlar.get(u.id); if (!d) return;
+      const yolda = bekleyenIrsaliye.filter(k => k.urun_id === u.id).map(k => ({ miktar: Number(k.miktar), beklenen_tarih: k.beklenen_tarih }));
+      m.set(u.id, siparisPlani(d, siparisAyar, u.min_stok, bugun(), yolda));
+    });
+    return m;
+  }, [urunler, durumlar, siparisAyar, bekleyenIrsaliye]);
+  const ornekPlan = planlar.values().next().value as SiparisPlani | undefined;
+  const durum = useCallback((id: string) => durumlar.get(id)!, [durumlar]);
+  const kritikMi = useCallback((u: Urun) => {
+    const d = durumlar.get(u.id);
+    return !!d && u.min_stok > 0 && d.tahminiMevcut <= u.min_stok;
+  }, [durumlar]);
 
   const tarihteSayimVarMi = useCallback((urunId: string, tarih: string) => {
     return hareketler.some(h => h.urun_id === urunId && h.tarih === tarih && h.tip === "sayim");
   }, [hareketler]);
 
-  const elemanYeriDegistir = async (index: number, yon: "yukari" | "asagi") => {
-    const yeniUrunlerListesi = [...urunler];
-    const hedefIndex = yon === "yukari" ? index - 1 : index + 1;
-    
-    if (hedefIndex < 0 || hedefIndex >= yeniUrunlerListesi.length) return;
-
-    const gecici = yeniUrunlerListesi[index];
-    yeniUrunlerListesi[index] = yeniUrunlerListesi[hedefIndex];
-    yeniUrunlerListesi[hedefIndex] = gecici;
-
-    const guncellenmisUrunler = yeniUrunlerListesi.map((u, i) => ({ ...u, sira_no: i + 1 }));
-    setUrunler(guncellenmisUrunler);
-
-    await Promise.all([
-      supabase.from("stok_urunler").update({ sira_no: index + 1 }).eq("id", guncellenmisUrunler[index].id),
-      supabase.from("stok_urunler").update({ sira_no: hedefIndex + 1 }).eq("id", guncellenmisUrunler[hedefIndex].id)
-    ]);
+  // Sıralama ekranda gösterilen grup içinde yapılır; tüm liste yeniden numaralanıp
+  // sırası değişen her ürün kaydedilir (eskiden sadece yer değiştiren iki ürün yazılıyordu).
+  const elemanYeriDegistir = async (urun: Urun, grup: Urun[], yon: "yukari" | "asagi") => {
+    const grupIdx = grup.findIndex(u => u.id === urun.id);
+    const komsu = grup[yon === "yukari" ? grupIdx - 1 : grupIdx + 1];
+    if (!komsu) return;
+    const liste = [...urunler];
+    const i = liste.findIndex(u => u.id === urun.id), j = liste.findIndex(u => u.id === komsu.id);
+    [liste[i], liste[j]] = [liste[j], liste[i]];
+    const yeni = liste.map((u, k) => ({ ...u, sira_no: k + 1 }));
+    const degisenler = yeni.filter(u => urunler.find(x => x.id === u.id)?.sira_no !== u.sira_no);
+    setUrunler(yeni);
+    const sonuclar = await Promise.all(degisenler.map(u => supabase.from("stok_urunler").update({ sira_no: u.sira_no }).eq("id", u.id)));
+    if (sonuclar.some(s => s.error)) { alert("Sıralama kaydedilemedi, sayfa yenileniyor."); veriCek(); }
   };
 
-  const aiAnalizleri = useMemo(() => {
-    if (urunler.length === 0 || hareketler.length < 5) return [];
-    const uyarilar: { urun_adi: string; tip: "kritik" | "hizli" | "stabil" | "atik"; mesaj: string }[] = [];
-
+  // Uyarılar: gerçek verilerden basit kurallar (sahte "AI" metni yok).
+  const uyarilar = useMemo(() => {
+    const liste: { urun: Urun; tip: "bitiyor" | "sayim" | "tutarsiz" | "fire"; mesaj: string }[] = [];
+    const bugunStr = bugun();
     urunler.forEach(u => {
-      const urunHareketleri = hareketler.filter(h => h.urun_id === u.id).sort((a, b) => b.tarih.localeCompare(a.tarih));
-      const ort = gunlukOrtalama(u.id);
-
-      if (ort > 0) {
-        const sayimlar = urunHareketleri.filter(h => h.tip === "sayim");
-        if (sayimlar.length >= 2) {
-          const sonKullanimHizi = Math.max(sayimlar[1].miktar - sayimlar[0].miktar, 0);
-          
-          if (sonKullanimHizi > ort * 1.4) {
-            uyarilar.push({
-              urun_adi: u.urun_adi,
-              tip: "hizli",
-              mesaj: `Son günlerde normal tüketiminin %40 üzerine çıktı! Hızlı tükeniyor, tedarik planlamasını öne alın.`
-            });
-          } else if (sonKullanimHizi < ort * 0.4 && u.mevcut_stok > u.min_stok * 3) {
-            uyarilar.push({
-              urun_adi: u.urun_adi,
-              tip: "atik",
-              mesaj: `Kullanım hızı ciddi oranda düştü. Stok fazlası/atıl malzeme riski oluşabilir, siparişleri bekletin.`
-            });
-          }
-        }
-
-        const kalanGun = tahminiBitisGunu(u);
-        if (kalanGun !== null && kalanGun <= 3 && u.mevcut_stok > 0) {
-          uyarilar.push({
-            urun_adi: u.urun_adi,
-            tip: "kritik",
-            mesaj: `Mevcut tüketim hızıyla stoğun yaklaşık ${kalanGun} gün içinde sıfırlanacak! Acil sipariş geçilmeli.`
-          });
-        }
+      const d = durumlar.get(u.id); if (!d) return;
+      const p = planlar.get(u.id);
+      if (p && d.kalanGun !== null && !p.varisaKadarYeter) {
+        liste.push({ urun: u, tip: "bitiyor", mesaj: `Tahmini ${fmt(d.tahminiMevcut)} ${u.birim} kaldı, ~${d.kalanGun} gün yeter; bir sonraki sipariş ${fmtTarih(p.varisTarihi)}'de geliyor. Ara alım gerekebilir.` });
+      }
+      if (sayimGecikti(u.sayim_periyodu, d.sonSayimdanBeriGun)) {
+        liste.push({ urun: u, tip: "sayim", mesaj: d.sonSayimTarih ? `Son sayım ${fmtTarih(d.sonSayimTarih)} (${d.sonSayimdanBeriGun} gün önce). Tahminler eskiyor.` : "Hiç sayım girilmemiş." });
+      }
+      const a = kullanimAnalizi(hareketler, u.id);
+      const sonTutarsiz = a.tutarsizAraliklar.filter(t => t.bit >= gunEkle(bugunStr, -14)).pop();
+      if (sonTutarsiz) {
+        liste.push({ urun: u, tip: "tutarsiz", mesaj: `${fmtTarih(sonTutarsiz.bas)} → ${fmtTarih(sonTutarsiz.bit)} arası stok ${fmt(sonTutarsiz.fark)} ${u.birim} arttı ama mal girişi yok. Giriş unutulmuş ya da sayım hatalı olabilir.` });
+      }
+      const c = cikisOzeti(hareketler, u.id, gunEkle(bugunStr, -7), bugunStr, u.son_fiyat);
+      const kullanim7 = d.ort7.ortalama * 7;
+      if (c.fire > 0 && kullanim7 > 0 && c.fire / kullanim7 > 0.1) {
+        liste.push({ urun: u, tip: "fire", mesaj: `Son 7 günde ${fmt(c.fire)} ${u.birim} fire (kullanımın %${Math.round(c.fire / kullanim7 * 100)}'i)${c.fireTutar ? `, ~₺${fmt(c.fireTutar, 0)}` : ""}.` });
       }
     });
-
-    return uyarilar.slice(0, 3);
-  }, [urunler, hareketler, gunlukOrtalama, tahminiBitisGunu]);
+    const oncelik = { bitiyor: 0, tutarsiz: 1, fire: 2, sayim: 3 };
+    return liste.sort((x, y) => oncelik[x.tip] - oncelik[y.tip]);
+  }, [urunler, hareketler, durumlar, planlar]);
+  const [tumUyarilar, setTumUyarilar] = useState(false);
 
   const filtreliUrunler = useMemo(() => {
     return urunler.filter(u => {
       if (arama && !u.urun_adi.toLowerCase().includes(arama.toLowerCase()) && !(u.kategori || "").toLowerCase().includes(arama.toLowerCase())) return false;
       if (filtreKategori && !(u.kategori || "").startsWith(filtreKategori)) return false;
       if (filtrePeriyot && (u.sayim_periyodu || "gunluk") !== filtrePeriyot) return false;
-      if (sadeceKritik && u.mevcut_stok > u.min_stok) return false;
+      if (sadeceKritik) {
+        const d = durumlar.get(u.id);
+        const bitiyor = d?.kalanGun !== null && planlar.get(u.id)?.varisaKadarYeter === false;
+        if (!kritikMi(u) && !bitiyor) return false;
+      }
       return true;
     });
-  }, [urunler, arama, filtreKategori, filtrePeriyot, sadeceKritik]);
+  }, [urunler, arama, filtreKategori, filtrePeriyot, sadeceKritik, durumlar, kritikMi, planlar]);
 
   const topluSayimSekmeFiltreliUrunler = useMemo(() => {
     return urunler.filter(u => {
@@ -303,11 +291,21 @@ export default function StokPage() {
   }, [filtreliUrunler]);
 
   const stats = useMemo(() => {
-    const kritik = urunler.filter(u => u.mevcut_stok <= u.min_stok && u.min_stok > 0).length;
-    const tukenmis = urunler.filter(u => u.mevcut_stok <= 0).length;
-    const toplam = urunler.length;
-    return { kritik, tukenmis, toplam };
-  }, [urunler]);
+    const kritik = urunler.filter(kritikMi).length;
+    const sayilacak = urunler.filter(u => (u.sayim_periyodu || "gunluk") === "gunluk" && durumlar.get(u.id)?.sonSayimTarih !== bugun()).length;
+    return { kritik, sayilacak, toplam: urunler.length };
+  }, [urunler, kritikMi, durumlar]);
+
+  // Sipariş listesi: önerisi olan ürünler (panoya kopyalanabilir metin)
+  const siparisListesi = useMemo(() => urunler
+    .map(u => ({ u, miktar: planlar.get(u.id)?.oneri || 0 }))
+    .filter(x => x.miktar > 0), [urunler, planlar]);
+  const siparisKopyala = async () => {
+    const baslik = ornekPlan ? `Sipariş ${fmtTarih(ornekPlan.siparisTarihi)} (teslim ${fmtTarih(ornekPlan.varisTarihi)})\n` : "";
+    const metin = baslik + siparisListesi.map(x => `${x.u.urun_adi}: ${fmt(Math.ceil(x.miktar * 10) / 10)} ${x.u.birim}`).join("\n");
+    try { await navigator.clipboard.writeText(metin); alert(`${siparisListesi.length} kalem kopyalandı.`); }
+    catch { alert(metin); }
+  };
 
   const secimDegis = (id: string) => {
     const yeniSecim = new Set(seciliUrunIds);
@@ -332,7 +330,7 @@ export default function StokPage() {
       const idsArray = Array.from(seciliUrunIds);
 
       if (cokluStokMiktar.trim() !== "") {
-        const miktarNum = parseFloat(cokluStokMiktar);
+        const miktarNum = miktarOku(cokluStokMiktar);
         if (!isNaN(miktarNum) && miktarNum >= 0) {
           const kayitlar = idsArray.map(id => ({
             urun_id: id, tarih: bugun(), tip: "sayim" as const, miktar: miktarNum,
@@ -362,11 +360,11 @@ export default function StokPage() {
     const ekleyen = userEmail.split("@")[0] || "Bilinmiyor";
     
     const kayitlar = Object.entries(topluMiktarlar)
-      .filter(([_, v]) => v.trim() !== "" && !isNaN(parseFloat(v)))
+      .filter(([, v]) => v.trim() !== "" && miktarOku(v) >= 0)
       .map(([id, miktarStr]) => {
         const ozelNot = topluNotlar[id]?.trim() || "";
         return {
-          urun_id: id, tarih: topluSayimTarih, tip: "sayim" as const, miktar: parseFloat(miktarStr),
+          urun_id: id, tarih: topluSayimTarih, tip: "sayim" as const, vakit: topluVakit, miktar: miktarOku(miktarStr),
           kaynak: "manuel", kullanici: ekleyen, aciklama: ozelNot ? `Toplu Sayım (${ozelNot})` : `Toplu Sayım Girildi`
         };
       });
@@ -394,8 +392,8 @@ export default function StokPage() {
     setSaving(true);
     try {
       const ekleyen = userEmail.split("@")[0] || "Bilinmiyor";
-      const minStokNum = parseFloat(yMinStok) || 0;
-      const ilkStokNum = parseFloat(yIlkStok) || 0;
+      const minStokNum = miktarOku(yMinStok) || 0;
+      const ilkStokNum = miktarOku(yIlkStok) || 0;
 
       if (duzenleUrun) {
         const { error } = await supabase.from("stok_urunler").update({
@@ -440,13 +438,13 @@ export default function StokPage() {
 
   const sayimKaydet = async () => {
     if (!sayimUrun) return;
-    const miktar = parseFloat(sayimMiktar);
+    const miktar = miktarOku(sayimMiktar);
     if (isNaN(miktar) || miktar < 0) { alert("Geçerli bir miktar girin"); return; }
     setSaving(true);
     try {
       const ekleyen = userEmail.split("@")[0] || "Bilinmiyor";
       const { error } = await supabase.from("stok_hareketler").insert([{
-        urun_id: sayimUrun.id, tarih: sayimTarih, tip: "sayim",
+        urun_id: sayimUrun.id, tarih: sayimTarih, tip: "sayim", vakit: sayimVakti,
         miktar, kaynak: "manuel", kullanici: ekleyen,
         aciklama: sayimNot.trim() || `${sayimUrun.urun_adi} sayımı`,
       }]);
@@ -458,16 +456,17 @@ export default function StokPage() {
 
   const malGirisKaydet = async () => {
     if (!malGirisUrun) return;
-    const miktar = parseFloat(girisMiktar);
+    const miktar = miktarOku(girisMiktar);
     if (isNaN(miktar) || miktar <= 0) { alert("Geçerli bir miktar girin"); return; }
     setSaving(true);
     try {
       const ekleyen = userEmail.split("@")[0] || "Bilinmiyor";
-      const fiyat = parseFloat(girisFiyat);
+      const fiyat = miktarOku(girisFiyat);
       const { error } = await supabase.from("stok_hareketler").insert([{
         urun_id: malGirisUrun.id, tarih: girisTarih, tip: "giris",
         miktar, kaynak: "manuel", kullanici: ekleyen,
-        aciklama: "Mal Girişi Tanımlandı",
+        birim_fiyat: !isNaN(fiyat) && fiyat > 0 ? fiyat : null,
+        aciklama: "Mal girişi",
       }]);
       if (error) { alert("Hata: " + error.message); return; }
       if (!isNaN(fiyat) && fiyat > 0) {
@@ -478,20 +477,24 @@ export default function StokPage() {
     } finally { setSaving(false); }
   };
 
-  const chatGonder = () => {
-    if (!chatGirdisi.trim()) return;
-    const yeniKullaniciMesaj: ChatMesaj = { sender: "user", text: chatGirdisi.trim(), time: "Şimdi" };
-    setChatGecmisi(prev => [...prev, yeniKullaniciMesaj]);
-    const arananSöz = chatGirdisi.toLowerCase();
-    setChatGirdisi("");
-
-    setTimeout(() => {
-      let aiYanit = "Malzeme hareketlerini ve periyodik mutfak tüketimlerini arka planda inceliyorum şef.";
-      if (arananSöz.includes("stok") || arananSöz.includes("kritik")) {
-        aiYanit = `Güncel duruma göre panoda ${stats.kritik} adet kritik seviyede, ${stats.tukenmis} adet tamamen tükenmiş malzeme bulunuyor şef.`;
-      }
-      setChatGecmisi(prev => [...prev, { sender: "ai", text: aiYanit, time: "Şimdi" }]);
-    }, 600);
+  const cikisKaydet = async () => {
+    if (!cikisUrun) return;
+    const miktar = miktarOku(cikisMiktar);
+    if (isNaN(miktar) || miktar <= 0) { alert("Geçerli bir miktar girin"); return; }
+    const d = durumlar.get(cikisUrun.id);
+    if (d && miktar > d.tahminiMevcut * 1.5 + 0.001 && !confirm(`Çıkış (${fmt(miktar)} ${cikisUrun.birim}) tahmini stoktan (${fmt(d.tahminiMevcut)}) fazla. Yine de kaydedilsin mi?`)) return;
+    setSaving(true);
+    try {
+      const ekleyen = userEmail.split("@")[0] || "Bilinmiyor";
+      const { error } = await supabase.from("stok_hareketler").insert([{
+        urun_id: cikisUrun.id, tarih: cikisTarih, tip: "cikis", miktar, neden: cikisNeden,
+        birim_fiyat: cikisUrun.son_fiyat, kaynak: "manuel", kullanici: ekleyen,
+        aciklama: cikisNot.trim() || CIKIS_NEDENLERI.find(n => n.v === cikisNeden)?.l || "Çıkış",
+      }]);
+      if (error) { alert("Hata: " + error.message); return; }
+      setCikisUrun(null); setCikisMiktar(""); setCikisNot(""); setCikisNeden("skt"); setCikisTarih(bugun());
+      veriCek();
+    } finally { setSaving(false); }
   };
 
   useEffect(() => {
@@ -524,13 +527,38 @@ export default function StokPage() {
             </div>
             <div>
               <h1 className="text-sm font-black tracking-tight text-[#1a1f2e] leading-none">Stok Yönetimi</h1>
-              <p className="text-[10px] text-gray-600 leading-none mt-0.5">{stats.toplam} malzeme · {stats.kritik} kritik</p>
+              <p className="text-[10px] text-gray-600 leading-none mt-0.5">{stats.toplam} malzeme · {stats.kritik} kritik · bugün sayılacak {stats.sayilacak}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => { setTopluSayimSekme("gunluk"); setTopluSayimAcik(true); }}
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <label className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-600 bg-[#ffffff] border border-[#e2e5eb] px-2.5 py-1.5 rounded-xl"
+              title="Haftanın günlerine göre: her gün için son 4 haftanın aynı günleri. Son 7 gün: tüm günler için son 7 günün ortalaması.">
+              Tahmin
+              <select value={yontem} onChange={e => setYontem(e.target.value as TahminYontemi)} className="bg-transparent font-bold text-[#1a1f2e] outline-none">
+                <option value="gun">Haftanın günlerine göre</option>
+                <option value="ort7">Son 7 gün ortalaması</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-600 bg-[#ffffff] border border-[#e2e5eb] px-2.5 py-1.5 rounded-xl"
+              title="Bu gün verilen sipariş, teslim süresi sonra gelir ve bir sonraki haftanın siparişi gelene kadar yetmelidir.">
+              <ShoppingCart size={12} className="text-emerald-600"/> Sipariş
+              <select value={siparisAyar.siparisGunu} onChange={e => setSiparisAyar({ ...siparisAyar, siparisGunu: Number(e.target.value) })} className="bg-transparent font-bold text-[#1a1f2e] outline-none">
+                {GUN_ADLARI.map((g, i) => <option key={i} value={i}>{g}</option>)}
+              </select>
+              · teslim
+              <select value={siparisAyar.teslimGun} onChange={e => setSiparisAyar({ ...siparisAyar, teslimGun: Number(e.target.value) })} className="bg-transparent font-bold text-[#1a1f2e] outline-none">
+                {[1, 2, 3, 4, 5, 6, 7, 10, 14].map(g => <option key={g} value={g}>{g} gün</option>)}
+              </select>
+            </label>
+            {siparisListesi.length > 0 && (
+              <button onClick={siparisKopyala}
+                className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 rounded-xl hover:bg-emerald-500/15">
+                <ShoppingCart size={13}/> Sipariş listesi ({siparisListesi.length})
+              </button>
+            )}
+            <button onClick={() => { setTopluVakit(varsayilanVakit()); setTopluSayimSekme("gunluk"); setTopluSayimAcik(true); }}
               className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-blue-600/90 hover:bg-blue-600 border border-blue-500/30 px-3 py-2 rounded-xl transition-all shadow-lg shadow-blue-900/20">
-              <ClipboardCheck size={13}/> Gelişmiş Toplu Sayım
+              <ClipboardCheck size={13}/> Toplu Sayım
             </button>
             <button 
               onClick={() => setSiraDuzenleModu(!siraDuzenleModu)}
@@ -538,7 +566,7 @@ export default function StokPage() {
                 siraDuzenleModu ? "bg-purple-500/20 border-purple-500/40 text-purple-600" : "text-gray-500 hover:text-purple-600 border-[#e2e5eb]"
               }`}
             >
-              <ListOrdered size={13}/> {siraDuzenleModu ? "Sıralamayı Kapat" : "Sıralama / Düzen Değiştir"}
+              <ListOrdered size={13}/> {siraDuzenleModu ? "Sıralamayı Kapat" : "Sırala"}
             </button>
             <button onClick={veriCek} className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-xl">
               <RefreshCw size={14}/>
@@ -553,29 +581,46 @@ export default function StokPage() {
 
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
-        {/* AI PANEL */}
-        <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-r from-blue-100/60 via-[#0c0f1a] to-[#0c0f1a] p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <BrainCircuit className="h-4 w-4 text-blue-600 animate-pulse" />
-            <h2 className="text-xs font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">Kebo AI Akıllı Analiz Motoru</h2>
+        {/* UYARILAR — gerçek verilerden: bitecek ürünler, tutarsız sayımlar, yüksek fire, geciken sayımlar */}
+        <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-black text-gray-700 uppercase tracking-widest flex items-center gap-2"><AlertTriangle size={13} className="text-amber-600"/> Stok Uyarıları</h2>
+            {uyarilar.length > 6 && (
+              <button onClick={() => setTumUyarilar(!tumUyarilar)} className="text-[11px] font-semibold text-blue-600">{tumUyarilar ? "Daha az" : `Tümü (${uyarilar.length})`}</button>
+            )}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {aiAnalizleri.length === 0 ? (
-              <div className="col-span-3 text-xs text-gray-600 py-1">Sistem malzeme hareket döngülerini inceliyor.</div>
-            ) : aiAnalizleri.map((ai, index) => (
-              <div key={index} className={`rounded-xl p-3 border text-xs flex flex-col justify-between ${
-                ai.tip === "kritik" ? "bg-red-500/5 border-red-500/20 text-red-200" :
-                ai.tip === "hizli" ? "bg-amber-500/5 border-amber-500/20 text-amber-200" : "bg-purple-500/5 border-purple-500/20 text-purple-200"
-              }`}>
-                <div className="font-bold mb-1 flex items-center gap-1">
-                  <span className={`w-1.5 h-1.5 rounded-full ${ai.tip === "kritik" ? "bg-red-500" : "bg-amber-500"}`} />
-                  {ai.urun_adi}
+          {uyarilar.length === 0 ? (
+            <p className="text-xs text-gray-600">Her şey yolunda: bitmek üzere ürün, tutarsız sayım ya da yüksek fire yok.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+              {(tumUyarilar ? uyarilar : uyarilar.slice(0, 6)).map((u, i) => (
+                <div key={i} className={`rounded-xl p-3 border text-xs ${
+                  u.tip === "bitiyor" ? "bg-red-500/5 border-red-500/20" :
+                  u.tip === "tutarsiz" ? "bg-purple-500/5 border-purple-500/20" :
+                  u.tip === "fire" ? "bg-orange-500/5 border-orange-500/20" : "bg-amber-500/5 border-amber-500/20"}`}>
+                  <div className="font-bold mb-1 flex items-center justify-between gap-2">
+                    <Link href={`/stok/${u.urun.id}`} className="text-[#1a1f2e] hover:text-blue-600">{u.urun.urun_adi}</Link>
+                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                      u.tip === "bitiyor" ? "bg-red-500/10 text-red-600" : u.tip === "tutarsiz" ? "bg-purple-500/10 text-purple-600" :
+                      u.tip === "fire" ? "bg-orange-500/10 text-orange-600" : "bg-amber-500/10 text-amber-700"}`}>
+                      {u.tip === "bitiyor" ? "Bitiyor" : u.tip === "tutarsiz" ? "Kontrol et" : u.tip === "fire" ? "Fire" : "Sayım"}
+                    </span>
+                  </div>
+                  <p className="text-gray-600 text-[11px] leading-relaxed">{u.mesaj}</p>
                 </div>
-                <p className="text-gray-400 text-[11px] leading-relaxed">{ai.mesaj}</p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* İRSALİYE / YOLDAKİ MAL */}
+        <IrsaliyePaneli
+          urunler={urunler.map(u => ({ id: u.id, urun_adi: u.urun_adi, birim: u.birim, son_fiyat: u.son_fiyat }))}
+          bekleyenler={bekleyenIrsaliye}
+          varsayilanTarih={ornekPlan?.varisTarihi || bugun()}
+          kullanici={yetki.kullaniciAdi}
+          onDegisti={veriCek}
+        />
 
         {/* BULK SEÇİM BAR */}
         {seciliUrunIds.size > 0 && (
@@ -585,7 +630,7 @@ export default function StokPage() {
               <span className="text-xs font-bold">{seciliUrunIds.size} malzeme topluca seçildi</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <input type="number" placeholder="Çoklu Stok..." value={cokluStokMiktar} onChange={e => setCokluStokMiktar(e.target.value)}
+              <input type="text" inputMode="decimal" placeholder="Hepsine sayım..." value={cokluStokMiktar} onChange={e => setCokluStokMiktar(e.target.value)}
                 className="bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none w-28" />
               <input type="text" placeholder="Toplu Başlık..." value={cokluKategori} onChange={e => setCokluKategori(e.target.value)}
                 className="bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none w-36" />
@@ -618,7 +663,7 @@ export default function StokPage() {
             className={`text-xs font-semibold px-4 py-2 rounded-xl border transition-colors flex items-center gap-1.5 ${
               sadeceKritik ? "bg-amber-500/15 border-amber-500/40 text-amber-600" : "bg-[#f7f8fa] border-[#e2e5eb] text-gray-500"
             }`}>
-            <AlertTriangle size={12}/> Sadece Kritik
+            <AlertTriangle size={12}/> Sadece kritik / bitecek
           </button>
         </div>
 
@@ -652,22 +697,29 @@ export default function StokPage() {
                               <button onClick={tumunuSecVeyaBirak} className="text-gray-600"><Square size={13} /></button>
                             </th>
                             {siraDuzenleModu && <th className="px-4 py-2 text-left w-24">Sıralama</th>}
-                            <th className="px-4 py-2 text-left">Malzeme Adı</th>
-                            <th className="px-4 py-2 text-left">Döngü</th>
-                            <th className="px-4 py-2 text-left">Mevcut Stok</th>
-                            <th className="px-4 py-2 text-left">Min. Stok</th>
-                            <th className="px-4 py-2 text-left">Günlük Tüketim</th>
-                            <th className="px-4 py-2 text-left">Kalan Gün</th>
+                            <th className="px-4 py-2 text-left">Malzeme</th>
+                            <th className="px-4 py-2 text-left" title="En son girilen sayım ve tarihi">Son Sayım</th>
+                            <th className="px-4 py-2 text-left" title="Son sayım + sonraki girişler − çıkışlar − (günlük ortalama × geçen gün)">Tahmini Stok</th>
+                            <th className="px-4 py-2 text-left">Min.</th>
+                            <th className="px-4 py-2 text-left" title="Son 7 günün ortalama günlük kullanımı ve bugün için tahmin (sayılmayan günler aradaki sayımlardan bölünerek hesaplanır)">Günlük Kullanım</th>
+                            <th className="px-4 py-2 text-left">Yeter</th>
+                            <th className="px-4 py-2 text-left" title="Bir sonraki haftanın siparişi gelene kadarki tahmini kullanım + minimum stok − tahmini stok">
+                              Sipariş{ornekPlan ? ` (${fmtTarih(ornekPlan.siparisTarihi).slice(0, 5)})` : ""}
+                            </th>
                             <th className="px-4 py-2 text-right">İşlemler</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#0f1624]">
                           {liste.map(urun => {
-                            const globalIndex = urunler.findIndex(u => u.id === urun.id);
-                            const ort = gunlukOrtalama(urun.id);
-                            const kalanGun = tahminiBitisGunu(urun);
-                            const kritik = urun.mevcut_stok <= urun.min_stok && urun.min_stok > 0;
-                            const tukenmis = urun.mevcut_stok <= 0;
+                            const grupIdx = liste.findIndex(u => u.id === urun.id);
+                            const d = durum(urun.id);
+                            const ort = d.ort7.ortalama;
+                            const plan = planlar.get(urun.id);
+                            const kalanGun = d.kalanGun;
+                            const kritik = kritikMi(urun);
+                            const tukenmis = d.sonSayimTarih !== null && d.tahminiMevcut <= 0;
+                            const oneri = plan?.oneri || 0;
+                            const gecikti = sayimGecikti(urun.sayim_periyodu, d.sonSayimdanBeriGun);
                             const secili = seciliUrunIds.has(urun.id);
 
                             return (
@@ -681,11 +733,11 @@ export default function StokPage() {
                                 {siraDuzenleModu && (
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-1 text-gray-500">
-                                      <button type="button" onClick={() => elemanYeriDegistir(globalIndex, "yukari")} disabled={globalIndex === 0}
+                                      <button type="button" onClick={() => elemanYeriDegistir(urun, liste, "yukari")} disabled={grupIdx === 0}
                                         className="p-1 hover:text-purple-600 bg-black/[0.04] rounded disabled:opacity-20" title="Yukarı Taşı">
                                         <ArrowUp size={11} />
                                       </button>
-                                      <button type="button" onClick={() => elemanYeriDegistir(globalIndex, "asagi")} disabled={globalIndex === urunler.length - 1}
+                                      <button type="button" onClick={() => elemanYeriDegistir(urun, liste, "asagi")} disabled={grupIdx === liste.length - 1}
                                         className="p-1 hover:text-purple-600 bg-black/[0.04] rounded disabled:opacity-20" title="Aşağı Taşı">
                                         <ArrowDown size={11} />
                                       </button>
@@ -696,20 +748,46 @@ export default function StokPage() {
                                 <td className="px-4 py-3 font-semibold text-gray-800">
                                   <Link href={`/stok/${urun.id}`} className="hover:text-blue-600 transition-colors">{urun.urun_adi}</Link>
                                 </td>
-                                <td className="px-4 py-3 text-gray-400 capitalize">{urun.sayim_periyodu || "gunluk"}</td>
+                                <td className="px-4 py-3">
+                                  {d.sonSayimTarih ? (
+                                    <div>
+                                      <span className="font-semibold text-gray-800">{fmt(d.sonSayimMiktar || 0)} {urun.birim}</span>
+                                      <p className={`text-[10px] ${gecikti ? "text-amber-700 font-semibold" : "text-gray-500"}`}>
+                                        {d.sonSayimdanBeriGun === 0 ? "bugün" : `${fmtTarih(d.sonSayimTarih).slice(0, 5)} · ${d.sonSayimdanBeriGun} gün önce`}
+                                      </p>
+                                    </div>
+                                  ) : <span className="text-[10px] text-amber-700 font-semibold">sayım yok</span>}
+                                </td>
                                 <td className={`px-4 py-3 font-black ${tukenmis ? "text-red-600" : kritik ? "text-amber-600" : "text-[#1a1f2e]"}`}>
-                                  {fmt(urun.mevcut_stok)} <span className="text-[10px] text-gray-600 font-normal">{urun.birim}</span>
+                                  {d.sonSayimTarih || d.tahminiMevcut > 0 ? <>~{fmt(d.tahminiMevcut)} <span className="text-[10px] text-gray-600 font-normal">{urun.birim}</span></> : "—"}
+                                  {plan && plan.yolda > 0 && <p className="text-[10px] font-semibold text-amber-700">+{fmt(plan.yolda)} yolda</p>}
                                 </td>
                                 <td className="px-4 py-3 text-gray-500">{urun.min_stok > 0 ? `${fmt(urun.min_stok)} ${urun.birim}` : "—"}</td>
-                                <td className="px-4 py-3 text-purple-600 font-semibold">{ort > 0 ? `${fmt(ort, 2)} ${urun.birim}` : "—"}</td>
                                 <td className="px-4 py-3">
-                                  {kalanGun !== null ? <span className={`font-semibold ${kalanGun <= 3 ? "text-red-600" : "text-emerald-600"}`}>~{kalanGun} gün</span> : <span className="text-gray-700">—</span>}
+                                  {ort > 0 ? (
+                                    <div>
+                                      <span className="text-purple-600 font-semibold">7g ort. {fmt(ort, 1)} {urun.birim}</span>
+                                      <p className="text-[10px] text-gray-500">
+                                        {yontem === "gun" && Math.abs(d.bugunkuTahmin - ort) > 0.05 ? `bugün tahmini ${fmt(d.bugunkuTahmin, 1)} · ` : ""}
+                                        {d.ort7.veriGunu} günlük veri{d.ort7.pencere > 7 ? " (son 30 gün)" : ""}
+                                      </p>
+                                    </div>
+                                  ) : <span className="text-gray-500 text-[10px]">en az 2 sayım gerekli</span>}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {kalanGun !== null
+                                    ? <span title={plan ? `Bir sonraki teslim: ${fmtTarih(plan.varisTarihi)}` : undefined} className={`font-semibold ${plan && !plan.varisaKadarYeter ? "text-red-600" : "text-emerald-600"}`}>{kalanGun >= 120 ? "120+" : `~${kalanGun}`} gün</span>
+                                    : <span className="text-gray-700">—</span>}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {oneri > 0 ? <span className="font-black text-emerald-700 bg-emerald-500/10 px-2 py-1 rounded-lg">{fmt(Math.ceil(oneri * 10) / 10)} {urun.birim}</span> : <span className="text-gray-400">—</span>}
                                 </td>
                                 <td className="px-4 py-3 text-right">
-                                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => setSayimUrun(urun)} className="p-1.5 text-blue-600 hover:bg-blue-500/10 rounded-lg"><ClipboardCheck size={12}/></button>
-                                    <button onClick={() => setMalGirisUrun(urun)} className="p-1.5 text-amber-600 hover:bg-amber-500/10 rounded-lg"><Truck size={12}/></button>
-                                    <button onClick={() => setDuzenleUrun(urun)} className="p-1.5 text-gray-400 hover:bg-black/[0.04] rounded-lg"><Edit3 size={12}/></button>
+                                  <div className="flex items-center justify-end gap-1">
+                                    <button onClick={() => { setSayimVakti(varsayilanVakit()); setSayimUrun(urun); }} title="Sayım gir" className="p-1.5 text-blue-600 hover:bg-blue-500/10 rounded-lg"><ClipboardCheck size={13}/></button>
+                                    <button onClick={() => setMalGirisUrun(urun)} title="Mal girişi" className="p-1.5 text-amber-600 hover:bg-amber-500/10 rounded-lg"><Truck size={13}/></button>
+                                    <button onClick={() => setCikisUrun(urun)} title="Stok çıkışı / fire" className="p-1.5 text-red-600 hover:bg-red-500/10 rounded-lg"><PackageMinus size={13}/></button>
+                                    <button onClick={() => setDuzenleUrun(urun)} title="Düzenle" className="p-1.5 text-gray-400 hover:bg-black/[0.04] rounded-lg"><Edit3 size={13}/></button>
                                     {isAdmin && <button onClick={() => urunSil(urun)} className="p-1.5 text-red-600 hover:bg-red-500/10 rounded-lg"><Trash2 size={12}/></button>}
                                   </div>
                                 </td>
@@ -742,8 +820,15 @@ export default function StokPage() {
             <div className="p-4 bg-[#f7f8fa] border-b border-[#e2e5eb] space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <span className="text-xs text-gray-400 flex items-center gap-1"><Calendar size={13}/> Giriş Yapılacak Sayım Günü Tarihi:</span>
-                <input type="date" value={topluSayimTarih} onChange={e => setTopluSayimTarih(e.target.value)}
-                  className="bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs font-bold h-9 px-3 rounded-xl outline-none" />
+                <div className="flex items-center gap-2">
+                  <input type="date" value={topluSayimTarih} max={bugun()} onChange={e => setTopluSayimTarih(e.target.value)}
+                    className="bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs font-bold h-9 px-3 rounded-xl outline-none" />
+                  <select value={topluVakit} onChange={e => setTopluVakit(e.target.value as SayimVakti)}
+                    className="bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs font-bold h-9 px-3 rounded-xl outline-none">
+                    <option value="sabah">Sabah (açılış)</option>
+                    <option value="aksam">Akşam (kapanış)</option>
+                  </select>
+                </div>
               </div>
               
               <div className="grid grid-cols-4 gap-1 bg-[#f4f5f7] p-1 rounded-xl border border-[#e2e5eb]">
@@ -773,7 +858,7 @@ export default function StokPage() {
                         <p className="text-xs font-bold text-[#1a1f2e]">{urun.urun_adi}</p>
                         <span className="text-[9px] text-gray-600 font-mono italic">({urun.kategori || "Kategorisiz"})</span>
                       </div>
-                      <p className="text-[10px] text-gray-600 mt-0.5">Sistem Stoğu: <span className="text-gray-400 font-bold">{fmt(urun.mevcut_stok)} {urun.birim}</span></p>
+                      <p className="text-[10px] text-gray-600 mt-0.5">Tahmini şu an: <span className="text-gray-700 font-bold">~{fmt(durum(urun.id).tahminiMevcut)} {urun.birim}</span></p>
                     </div>
 
                     {mukerrer && (
@@ -789,7 +874,7 @@ export default function StokPage() {
                           setTopluNotlar(prev => ({ ...prev, [urun.id]: val }));
                         }}
                         className="bg-[#ffffff] border border-[#e2e5eb] text-gray-700 text-[11px] h-8 px-2 w-36 rounded-lg outline-none" />
-                      <input type="number" step="0.01" value={topluMiktarlar[urun.id] || ""}
+                      <input type="text" inputMode="decimal" value={topluMiktarlar[urun.id] || ""}
                         onChange={e => {
                           const val = e.target.value;
                           setTopluMiktarlar(prev => ({ ...prev, [urun.id]: val }));
@@ -852,14 +937,14 @@ export default function StokPage() {
                 </div>
                 <div>
                   <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Min. Stok</label>
-                  <input type="number" step="0.01" value={yMinStok} onChange={e => setYMinStok(e.target.value)}
+                  <input type="text" inputMode="decimal" value={yMinStok} onChange={e => setYMinStok(e.target.value)}
                     className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none"/>
                 </div>
               </div>
               {!duzenleUrun && (
                 <div>
                   <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Başlangıç Eldeki Stok</label>
-                  <input type="number" step="0.01" value={yIlkStok} onChange={e => setYIlkStok(e.target.value)}
+                  <input type="text" inputMode="decimal" value={yIlkStok} onChange={e => setYIlkStok(e.target.value)}
                     className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none"/>
                 </div>
               )}
@@ -879,18 +964,19 @@ export default function StokPage() {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#ffffff] border border-blue-500/20 rounded-2xl w-full max-w-sm shadow-2xl">
             <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[#1a1f2e]">Münferit Sayım Gir</h3>
+              <h3 className="text-sm font-bold text-[#1a1f2e]">Sayım Gir · {sayimUrun.urun_adi}</h3>
               <button onClick={() => setSayimUrun(null)} className="p-1 text-gray-600 hover:text-[#1a1f2e]"><X size={16}/></button>
             </div>
             <div className="p-5 space-y-3">
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Sayım Günü Tarihi</label>
-                <input type="date" value={sayimTarih} onChange={e => setSayimTarih(e.target.value)}
+                <input type="date" value={sayimTarih} max={bugun()} onChange={e => setSayimTarih(e.target.value)}
                   className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none"/>
               </div>
+              <VakitSecici value={sayimVakti} onChange={setSayimVakti}/>
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Miktar ({sayimUrun.birim})</label>
-                <input type="number" step="0.01" value={sayimMiktar} onChange={e => setSayimMiktar(e.target.value)} autoFocus
+                <input type="text" inputMode="decimal" value={sayimMiktar} onChange={e => setSayimMiktar(e.target.value)} autoFocus
                   className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-base h-10 px-3 rounded-xl outline-none"/>
               </div>
               <div>
@@ -907,12 +993,62 @@ export default function StokPage() {
         </div>
       )}
 
+      {/* STOK ÇIKIŞI / FİRE MODAL */}
+      {cikisUrun && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#ffffff] border border-red-500/20 rounded-2xl w-full max-w-sm shadow-2xl">
+            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[#1a1f2e]">Stok Çıkışı · {cikisUrun.urun_adi}</h3>
+              <button onClick={() => setCikisUrun(null)} className="p-1 text-gray-600 hover:text-[#1a1f2e]"><X size={16}/></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-[11px] text-gray-500">Mutfakta kullanım için değil; atılan, bozulan ya da iade edilen mal için. Kullanım hesabından ayrı tutulur ve fire raporunda görünür.</p>
+              <div>
+                <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Neden</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {CIKIS_NEDENLERI.map(n => (
+                    <button key={n.v} type="button" onClick={() => setCikisNeden(n.v)}
+                      className={`text-xs font-semibold py-2 rounded-lg border transition-colors ${cikisNeden === n.v ? "bg-red-600 text-white border-red-600" : "bg-[#f7f8fa] border-[#e2e5eb] text-gray-600"}`}>
+                      {n.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Tarih</label>
+                  <input type="date" value={cikisTarih} max={bugun()} onChange={e => setCikisTarih(e.target.value)}
+                    className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none"/>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Miktar ({cikisUrun.birim})</label>
+                  <input type="text" inputMode="decimal" value={cikisMiktar} onChange={e => setCikisMiktar(e.target.value)} autoFocus
+                    className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-base h-9 px-3 rounded-xl outline-none"/>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Açıklama</label>
+                <input type="text" value={cikisNot} onChange={e => setCikisNot(e.target.value)} placeholder="Opsiyonel (örn. parti no, tedarikçi)"
+                  className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-8 px-3 rounded-xl outline-none"/>
+              </div>
+              {cikisUrun.son_fiyat && miktarOku(cikisMiktar) > 0 && (
+                <p className="text-[11px] text-red-700">Yaklaşık değer: ₺{fmt(miktarOku(cikisMiktar) * cikisUrun.son_fiyat, 0)} (son alış fiyatıyla)</p>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <button onClick={() => setCikisUrun(null)} className="text-xs font-semibold text-gray-500 border border-[#e2e5eb] px-4 py-2 rounded-xl">Vazgeç</button>
+                <button onClick={cikisKaydet} disabled={saving || !cikisMiktar} className="text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 px-6 py-2 rounded-xl">Çıkışı Kaydet</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MAL GİRİŞ MODAL */}
       {malGirisUrun && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#ffffff] border border-amber-500/20 rounded-2xl w-full max-w-sm shadow-2xl">
             <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[#1a1f2e]">Mal Kabul Girişi</h3>
+              <h3 className="text-sm font-bold text-[#1a1f2e]">Mal Girişi · {malGirisUrun.urun_adi}</h3>
               <button onClick={() => setMalGirisUrun(null)} className="p-1 text-gray-600 hover:text-[#1a1f2e]"><X size={16}/></button>
             </div>
             <div className="p-5 space-y-3">
@@ -923,12 +1059,12 @@ export default function StokPage() {
               </div>
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Gelen Fatura Miktarı ({malGirisUrun.birim})</label>
-                <input type="number" step="0.01" value={girisMiktar} onChange={e => setGirisMiktar(e.target.value)} autoFocus
+                <input type="text" inputMode="decimal" value={girisMiktar} onChange={e => setGirisMiktar(e.target.value)} autoFocus
                   className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-base h-10 px-3 rounded-xl outline-none"/>
               </div>
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase font-medium mb-1">Birim Alış Fiyatı (₺)</label>
-                <input type="number" step="0.01" value={girisFiyat} onChange={e => setGirisFiyat(e.target.value)}
+                <input type="text" inputMode="decimal" value={girisFiyat} onChange={e => setGirisFiyat(e.target.value)}
                   className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-base h-10 px-3 rounded-xl outline-none"/>
               </div>
               <div className="flex justify-end gap-2 pt-2">
@@ -939,45 +1075,6 @@ export default function StokPage() {
           </div>
         </div>
       )}
-
-      {/* CHATBOT ASİSTANI */}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
-        {chatAcik && (
-          <div className="w-80 sm:w-96 h-[400px] border border-blue-500/30 bg-[#ffffff]/95 backdrop-blur-xl rounded-2xl shadow-2xl flex flex-col mb-3">
-            <div className="px-4 py-3 bg-[#f7f8fa] border-b border-[#e2e5eb] rounded-t-2xl flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Bot size={16} className="text-blue-600 animate-pulse" />
-                <span className="text-xs font-black text-[#1a1f2e]">KEBO AI STOK ASİSTANI</span>
-              </div>
-              <button onClick={() => setChatAcik(false)} className="text-gray-500 hover:text-[#1a1f2e]"><X size={14} /></button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
-              {chatGecmisi.map((m, idx) => (
-                <div key={idx} className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[80%] rounded-xl px-3 py-2 leading-relaxed ${m.sender === "user" ? "bg-blue-600 text-white rounded-br-none" : "bg-[#f1f2f5] text-gray-800 rounded-bl-none"}`}>
-                    {m.text}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="p-2 border-t border-[#e2e5eb] bg-[#f7f8fa] rounded-b-2xl flex items-center gap-2">
-              <input type="text" placeholder="AI'a danış (örn: kritik durumlar)..." value={chatGirdisi}
-                onChange={e => setChatGirdisi(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && chatGonder()}
-                className="flex-1 bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-8 px-3 rounded-lg outline-none" />
-              <button onClick={chatGonder} className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
-                <Send size={12} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        <button onClick={() => setChatAcik(!chatAcik)} className="w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-xl transition-transform active:scale-95">
-          {chatAcik ? <X size={20} /> : <MessageSquare size={20} />}
-        </button>
-      </div>
 
     </div>
   );
