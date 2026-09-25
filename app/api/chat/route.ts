@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   if (!oturum.ok) return oturum.yanit;
   try {
     const body = await req.json();
-    const { system, messages, max_tokens } = body || {};
+    const { system, messages, max_tokens, json } = body || {};
 
     // NEXT_PUBLIC_ önekli değişkenler tarayıcıya gömülür; anahtar sadece sunucu değişkeninden okunur.
     const apiKey = process.env.GEMINI_API_KEY || "";
@@ -68,7 +68,9 @@ export async function POST(req: Request) {
               ...(system ? { system_instruction: { parts: [{ text: system }] } } : {}),
               contents,
               generationConfig: {
-                maxOutputTokens: typeof max_tokens === "number" ? max_tokens : 1024,
+                // Model "düşünme" için de aynı bütçeyi kullanır; düşük limit cevabı yarıda keser.
+                maxOutputTokens: Math.max(8192, typeof max_tokens === "number" ? max_tokens : 0),
+                ...(json ? { responseMimeType: "application/json" } : {}),
                 thinkingConfig: { thinkingLevel: "minimal" },
               },
             }),
@@ -103,7 +105,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `API Hatası: ${detay}`, details: data }, { status: response!.status });
     }
 
-    const metin = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text || "").join("") || "";
+    const aday = data.candidates?.[0];
+    const metin = aday?.content?.parts?.map((p: any) => p.text || "").join("") || "";
+    if (!metin.trim()) {
+      const neden = aday?.finishReason || data?.promptFeedback?.blockReason || "bilinmiyor";
+      console.error("[chat] Boş cevap, neden:", neden);
+      return NextResponse.json({ error: `Model boş cevap döndürdü (${neden}), tekrar deneyin.` }, { status: 502 });
+    }
 
     // Frontend Anthropic'in "content: [{type,text}]" şeklini bekliyor —
     // Gemini'nin cevabını aynı şekle sarıp döndürüyoruz.

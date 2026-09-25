@@ -1,5 +1,6 @@
 "use client";
 
+import { jsonCevap } from "@/lib/gorsel";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -329,19 +330,28 @@ SADECE şu JSON formatında yanıt ver, hiçbir ek metin yazma:
   "hedef": "Bir sonraki dönem için tek cümlelik motivasyonel hedef"
 }`,
           messages: [{ role: "user", content: `Analiz et:\n${isletmeOzeti}` }],
+          json: true,
         }),
       });
-      if (!res.ok) throw new Error("API Hatası");
-      const d = await res.json();
-      const text = d.content?.[0]?.text || "";
-      const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      setOtomatikAnaliz(JSON.parse(cleaned));
-    } catch (err) {
+      const { veri: d, hata } = await jsonCevap(res);
+      if (hata) throw new Error(hata);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const text: string = (d as any).content?.[0]?.text || "";
+      const bas = text.indexOf("{"), son = text.lastIndexOf("}");
+      if (bas < 0 || son <= bas) throw new Error("AI cevabı okunamadı, tekrar deneyin.");
+      const analiz = JSON.parse(text.slice(bas, son + 1));
       setOtomatikAnaliz({
-        ozet: "Analiz yapılırken bir hata oluştu. API bağlantınızı kontrol edin.",
+        ozet: analiz.ozet || "", basarilar: analiz.basarilar || [], riskler: analiz.riskler || [],
+        oneriler: analiz.oneriler || [], oncelik: analiz.oncelik || "orta",
+        chartData: Array.isArray(analiz.chartData) ? analiz.chartData : [], hedef: analiz.hedef || "",
+      });
+    } catch (err) {
+      const mesaj = err instanceof Error && err.message !== "Failed to fetch" ? err.message : "Sunucuya ulaşılamadı.";
+      setOtomatikAnaliz({
+        ozet: "Analiz yapılamadı: " + mesaj,
         basarilar: [],
-        riskler: ["API bağlantısı kurulamadı"],
-        oneriler: ["Vercel ortam değişkenlerinde GEMINI_API_KEY tanımlı mı kontrol edin, sonra tekrar deneyin"],
+        riskler: [mesaj],
+        oneriler: ["Birkaç saniye sonra Yenile'ye basın. Hata 'GEMINI_API_KEY' diyorsa Vercel ortam değişkenlerine ekleyin."],
         oncelik: "kritik",
         chartData: [],
         hedef: "Teknik sorunu çöz ve yeniden dene.",
@@ -373,12 +383,14 @@ ${isletmeOzeti}`,
           messages: liste.map(m => ({ role: m.rol, content: m.icerik })),
         }),
       });
-      if (!res.ok) throw new Error("API Hatası");
-      const d = await res.json();
-      const text = d.content?.map((c: any) => c.text || "").join("") || "Cevap alınamadı.";
+      const { veri: d, hata } = await jsonCevap(res);
+      if (hata) throw new Error(hata);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const text = (d as any).content?.map((c: any) => c.text || "").join("") || "Cevap alınamadı.";
       setMesajlar(prev => [...prev, { rol: "assistant", icerik: text, zaman: new Date() }]);
-    } catch {
-      setMesajlar(prev => [...prev, { rol: "assistant", icerik: "Bağlantı hatası oluştu. Lütfen tekrar deneyin.", zaman: new Date() }]);
+    } catch (err) {
+      const mesaj = err instanceof Error && err.message !== "Failed to fetch" ? err.message : "Bağlantı hatası oluştu.";
+      setMesajlar(prev => [...prev, { rol: "assistant", icerik: mesaj + " Lütfen tekrar deneyin.", zaman: new Date() }]);
     }
     setAiYukleniyor(false);
   };
