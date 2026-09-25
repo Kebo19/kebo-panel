@@ -13,11 +13,11 @@ import {
 } from "lucide-react";
 import { BarChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ComposedChart } from "recharts";
 import { tv, fmt, paraGirdisi, paraYaz } from "@/lib/para";
-import { bugun, buAyYil, aySonu, gunEkle, fmtTarih } from "@/lib/tarih";
+import { bugun, buAyYil, aySonu, gunEkle, gunFarki, fmtTarih } from "@/lib/tarih";
 import {
   brutCiro as brutHesapla, netCiro as netHesapla, raporOzeti, donemOzeti, platformKirilimi, paketToplam,
   kapidaKasadaMi, kuryeGercekPaket, yeniYapiMi, PLATFORM_RENK, PLATFORMLAR,
-  ROADRUNNER_GECIS_GUNU, KURYE_GARANTI_PAKET,
+  ROADRUNNER_GECIS_GUNU, KENDI_POS_GECIS_GUNU, KURYE_GARANTI_PAKET,
 } from "@/lib/hesap";
 import { useYetki } from "@/lib/useYetki";
 import { alanEtiketi } from "@/lib/tarama";
@@ -414,7 +414,7 @@ function PrintModal({rapor, onClose}: {rapor:GunlukRapor, onClose:()=>void}) {
             ))}
             <div className="row bold"><span>Kapıda Toplam</span><span>₺{fmt(tK)}</span></div>
             <div className="row"><span style={{color:"#888",fontSize:"10px"}}>{kapidaKasada
-              ? "↳ Kendi kuryelerimiz topladı; tutar kasa sayımının içinde (brüte ayrıca eklenmez)"
+              ? (rapor.tarih >= KENDI_POS_GECIS_GUNU ? "↳ Kendi POS'umuzla tahsil edildi; tutar kasa sayımının içinde (brüte ayrıca eklenmez)" : "↳ Kendi kuryelerimiz topladı; tutar kasa sayımının içinde (brüte ayrıca eklenmez)")
               : "↳ Roadrunner'da kalır, haftalık mutabakatla mahsup edilir (brüte ayrıca eklenir)"}</span><span></span></div>
             <hr className="divider"/>
             <div className="section-title">Fiziki Kasa</div>
@@ -576,6 +576,20 @@ function kuryeYapisiHesapla(tarihStr: string): KuryeRaporu[] {
     {id:1,isim:"Kurye 1",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"sabit"},
     {id:2,isim:"Kurye 2",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"sabit"},
     {id:3,isim:"Havuz Kurye",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",tip:"havuz"},
+  ];
+}
+/** Tarih değişince kurye yapısını yeni döneme uyarlar ama girilmiş/taranmış verileri korur. */
+function kuryeleriUyarla(mevcut: KuryeRaporu[], tarihStr: string): KuryeRaporu[] {
+  const dolu = mevcut.filter(k => k.nakit || k.pos || k.paketSayisi || k.uzakPaket || k.paket9km ||
+    (k.isim && !/^(Kurye \d|Havuz Kurye)$/.test(k.isim)));
+  if (!dolu.length) return kuryeYapisiHesapla(tarihStr);
+  if (!tarihStr || tarihStr < ROADRUNNER_GECIS_GUNU) return dolu.map(k => ({ ...k, tip: "kendi" }));
+  if (tarihStr === ROADRUNNER_GECIS_GUNU) return dolu.map(k => ({ ...k, tip: k.tip === "havuz" ? "havuz" : "kendi" }));
+  if (dolu.every(k => k.tip === "sabit" || k.tip === "havuz")) return mevcut;
+  const iskelet = kuryeYapisiHesapla(tarihStr);
+  return [
+    ...iskelet.filter(k => k.tip === "sabit").map((k, i) => dolu[i] ? { ...dolu[i], tip: "sabit" as const } : k),
+    ...(dolu.length > 2 ? dolu.slice(2).map(k => ({ ...k, tip: "havuz" as const })) : iskelet.filter(k => k.tip === "havuz")),
   ];
 }
 // ─── PLATFORM SATIRI (tutar + paket sayısı + opsiyonel indirim) ───────────────
@@ -764,6 +778,8 @@ export default function RaporlarPage() {
   const [taramaIleDoldu, setTaramaIleDoldu] = useState(false);
   const [taramaTarihNotu, setTaramaTarihNotu] = useState("");
   const [kontrolOnay, setKontrolOnay] = useState(false);
+  // Yeni raporda önce tarih seçilip onaylanır, sonra form (ve tarama) açılır.
+  const [tarihOnaylandi, setTarihOnaylandi] = useState(false);
   const formAlaniRef = useRef<HTMLDivElement>(null);
   const dosyaInputRef = useRef<HTMLInputElement>(null);
 
@@ -820,7 +836,7 @@ export default function RaporlarPage() {
   const handleTarihChange = (val: string) => {
     setTarih(val); setAdminOnayliGecis(false); setDuplikaTarihHata(false);
     // Yeni rapor eklerken (düzenleme değil) seçilen tarihe göre doğru kurye yapısını (kendi/geçiş/Roadrunner) otomatik kur.
-    if (!selectedRapor) setKuryeler(kuryeYapisiHesapla(val));
+    if (!selectedRapor) setKuryeler(onceki => kuryeleriUyarla(onceki, val));
     if (!val||selectedRapor) { setTarihHataVarMi(false); return; }
     if (mevcutTarihler.has(val)) { setDuplikaTarihHata(true); setTarihHataVarMi(false); return; }
     if (val > bugun()) { setTarihHataVarMi(true); return; }
@@ -843,7 +859,14 @@ export default function RaporlarPage() {
     setKuryeler(kuryeYapisiHesapla(bugun()));
     setNotlar("");setSelectedRapor(null);setIsEditMode(false);
     setTaramaHata(""); setTaramaBelirsizAlanlar([]);
-    setTaramaIleDoldu(false); setTaramaTarihNotu(""); setKontrolOnay(false);
+    setTaramaIleDoldu(false); setTaramaTarihNotu(""); setKontrolOnay(false); setTarihOnaylandi(false);
+  };
+
+  /** Yeni rapor: formu temizler, tarih adımını sıradaki günle hazır açar. */
+  const yeniRaporAc = () => {
+    formuTemizle(); setFormAcik(true);
+    const t = siradakiTarih();
+    if (t && t <= bugun()) handleTarihChange(t);
   };
 
   // ── Rapor Sil ── (rapora bağlı avans/kesinti/firma ödemeleri veritabanında otomatik silinir)
@@ -1079,14 +1102,10 @@ export default function RaporlarPage() {
       // Tarih (sadece yeni rapor eklerken, düzenleme modunda tarihi ezme)
       // Tarih: formdan okunduysa o; okunamadıysa ve seçili değilse sıradaki rapor günü.
       // Böylece form hemen açılır; kullanıcı gerekirse tarihi değiştirir.
-      let hedefTarih: string = tarih;
-      if (!selectedRapor) {
-        if (veri.tarih) hedefTarih = veri.tarih;
-        else if (!tarih) {
-          hedefTarih = siradakiTarih() || bugun();
-          setTaramaTarihNotu(`Formda tarih okunamadı; sıradaki rapor günü ${fmtTarih(hedefTarih)} seçildi. Doğru değilse değiştirin.`);
-        }
-        if (hedefTarih !== tarih) handleTarihChange(hedefTarih);
+      // Tarih elle seçilir; kağıttaki tarih okunur ve farklıysa sadece uyarılır.
+      const hedefTarih: string = tarih;
+      if (veri.tarih && veri.tarih !== tarih) {
+        setTaramaTarihNotu(`Kağıtta ${fmtTarih(veri.tarih)} yazıyor, rapor tarihi ${fmtTarih(tarih)}. Doğru kağıdı taradığınızdan emin olun.`);
       }
       const pg = (o:{tutar?:number;paket?:number}|undefined): PlatformGiris => ({ tutar: nToStr(o?.tutar), paket: o?.paket ? String(o.paket) : "" });
       const ok = veri.online?.kebo || {}; const oc = veri.online?.cnf || {};
@@ -1313,7 +1332,13 @@ Soru: ${soruFinal}`
 
   // ── Derived ──
   const beklenenTarih = siradakiTarih();
-  const formKilitli = !tarih || (tarihHataVarMi && !adminOnayliGecis) || duplikaTarihHata;
+  // Form her zaman açıktır; bu değer sadece kaydetmeyi engeller ve nedenini söyler.
+  const kayitEngeli: string =
+    !tarih ? "Rapor tarihini seçin"
+    : duplikaTarihHata ? "Bu tarihe ait rapor zaten var"
+    : tarihHataVarMi && !adminOnayliGecis ? (isAdmin ? "Tarih uyarısını onaylayın" : "Tarihi düzeltin")
+    : taramaIleDoldu && !kontrolOnay ? "Kağıtla karşılaştırıp onay kutusunu işaretleyin"
+    : "";
   const isReadOnly = !!(selectedRapor && !isEditMode);
 
   const platformOzetSatirlar = [
@@ -1356,9 +1381,97 @@ Soru: ${soruFinal}`
         </div>
       )}
 
+      {!selectedRapor && !tarihOnaylandi ? (
+        <div className="rounded-xl border border-[#e2e5eb] bg-[#fafbfc] p-5 space-y-3">
+          <div>
+            <p className="text-sm font-bold text-[#1a1f2e] flex items-center gap-2"><Calendar size={14} className="text-amber-700"/> 1. Rapor tarihini seçin</p>
+            <p className="text-[12px] text-gray-500 mt-0.5">Tarih onaylanınca rapor formu ve fişten doldurma açılır.</p>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+            <div className="sm:w-56">
+              <input type="date" value={tarih} onChange={e=>handleTarihChange(e.target.value)}
+                max={bugun()} style={{colorScheme:"light"}}
+                className={`bg-white text-[#1a1f2e] font-bold text-center h-12 text-[16px] rounded-xl px-3 w-full outline-none transition-all border-2 ${
+                  duplikaTarihHata ? "border-orange-500 text-orange-600"
+                  : tarihHataVarMi&&!adminOnayliGecis ? "border-red-500 text-red-600"
+                  : "border-[#e2e5eb] focus:border-amber-500/60"}`}/>
+            </div>
+            <button type="button"
+              disabled={!tarih || duplikaTarihHata || tarih > bugun() || (tarihHataVarMi && !adminOnayliGecis)}
+              onClick={()=>{ setTarihOnaylandi(true); setTimeout(()=>formAlaniRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),100); }}
+              className="h-12 px-6 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-xl flex items-center justify-center gap-2 transition-colors">
+              Devam <ArrowUpRight size={14}/>
+            </button>
+          </div>
+          <div className="text-[12px] text-gray-500 space-y-0.5">
+            {enSonRaporTarihi && <p>Son rapor: <strong className="text-gray-700">{fmtTarih(enSonRaporTarihi)}</strong>{beklenenTarih && <> · Sıradaki gün: <strong className="text-gray-700">{fmtTarih(beklenenTarih)}</strong></>}</p>}
+          </div>
+          {duplikaTarihHata && <p className="text-xs font-semibold text-orange-600 flex items-center gap-1.5"><AlertTriangle size={12}/> {fmtTarih(tarih)} tarihli rapor zaten var. Değiştirmek için listeden açın.</p>}
+      {!isReadOnly && tarih && tarihHataVarMi && !adminOnayliGecis && (
+        <div className="rounded-xl border border-red-500/25 bg-[#fef2f2] px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <p className="text-xs text-red-700 flex items-center gap-2">
+            <ShieldAlert size={13} className="shrink-0"/>
+            {tarih > bugun()
+              ? <span><strong>İleri tarihli rapor girilemez.</strong> Tarihi düzeltin.</span>
+              : beklenenTarih && tarih > beklenenTarih
+                ? <span><strong>{gunFarki(beklenenTarih, tarih)} gün atlanıyor</strong> ({fmtTarih(beklenenTarih)}{gunFarki(beklenenTarih, tarih) > 1 ? ` – ${fmtTarih(gunEkle(tarih, -1))}` : ""} raporu yok). {isAdmin ? "Bilerek atlıyorsanız onaylayın." : "Önce sıradaki günün raporunu girin."}</span>
+                : <span>Sıradaki rapor günü <strong>{beklenenTarih ? fmtTarih(beklenenTarih) : ""}</strong>. {isAdmin ? "Bu tarihle devam etmek için onaylayın." : "Tarihi düzeltin."}</span>}
+          </p>
+          <div className="flex gap-2 shrink-0">
+            {isAdmin && tarih <= bugun() && (
+              <button type="button" onClick={()=>setAdminOnayliGecis(true)} className="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg flex items-center gap-1"><Check size={11}/> Onayla</button>
+            )}
+            {beklenenTarih && beklenenTarih <= bugun() && (
+              <button type="button" onClick={()=>handleTarihChange(beklenenTarih)} className="text-xs font-bold text-red-700 bg-white border border-red-300 hover:bg-red-50 px-3 py-1.5 rounded-lg">{fmtTarih(beklenenTarih)} yap</button>
+            )}
+          </div>
+        </div>
+      )}
+
+        </div>
+      ) : (<>
+      {/* TARİH + CANLI METRİKLER */}
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 items-center">
+        <div className="sm:col-span-1">
+          <label className="block text-[12px] text-amber-700 font-bold tracking-wide mb-1.5">Rapor Tarihi</label>
+          {!selectedRapor ? (
+            <div className="flex flex-col gap-1">
+              <div className="bg-[#f7f8fa] border-2 border-[#e2e5eb] text-[#1a1f2e] font-bold text-center h-11 text-[15px] rounded-xl px-3 flex items-center justify-center">{fmtTarih(tarih)}</div>
+              <button type="button" onClick={()=>setTarihOnaylandi(false)} className="text-[11px] font-semibold text-blue-600 hover:underline self-start">Tarihi değiştir</button>
+            </div>
+          ) : (
+          <div className="flex flex-col gap-1">
+            <input type="date" value={tarih} disabled={isReadOnly}
+              onChange={e=>handleTarihChange(e.target.value)}
+              min={!isAdmin&&!selectedRapor&&beklenenTarih?beklenenTarih:undefined}
+              max={!isAdmin&&!selectedRapor&&beklenenTarih?beklenenTarih:undefined}
+              style={{colorScheme:"light"}}
+              className={`bg-[#f7f8fa] text-[#1a1f2e] font-bold text-center h-11 text-[15px] rounded-xl px-3 w-full outline-none focus:ring-2 focus:ring-amber-500/20 transition-all border-2 ${
+                duplikaTarihHata ? "border-orange-500 text-orange-600"
+                : tarihHataVarMi&&!adminOnayliGecis ? "border-red-500 text-red-600"
+                : "border-[#e2e5eb] focus:border-amber-500/60"
+              }`} required/>
+            {duplikaTarihHata && <p className="text-[11px] font-semibold text-orange-600 flex items-center gap-1"><AlertTriangle size={11}/> Bu tarih mevcut</p>}
+            {enSonRaporTarihi && <p className="text-[11px] text-gray-500 font-medium">Son rapor: <span className="text-gray-700 font-bold">{fmtTarih(enSonRaporTarihi)}</span></p>}
+          </div>
+          )}
+        </div>
+        {[
+          {label:"Brüt Ciro", value:`₺${fmt(ch.brutCiro)}`, color:"text-blue-600", border:"border-blue-500/10 bg-blue-500/5"},
+          {label:"Net Ciro",  value:`₺${fmt(ch.netCiro)}`,  color:"text-emerald-600", border:"border-emerald-500/10 bg-emerald-500/5"},
+          {label:"Paket",     value:`${fmt(ch.tKuryeGercekPaket)}`, color:"text-amber-600", border:"border-amber-500/10 bg-amber-500/5"},
+          {label:"Ort. Sepet",value:`₺${fmt(ch.paketOrt)}`, color:"text-purple-600", border:"border-purple-500/10 bg-purple-500/5"},
+        ].map(c=>(
+          <div key={c.label} className={`rounded-xl border ${c.border} px-4 py-3 transition-transform hover:-translate-y-0.5 hover:shadow-sm`}>
+            <p className="text-[12px] text-gray-500 font-semibold">{c.label}</p>
+            <p className={`text-xl font-black tracking-tight ${c.color}`}>{c.value}</p>
+          </div>
+        ))}
+      </div>
+
       {/* FİŞTEN DOLDUR (AI Tarama) */}
       {!isReadOnly && (
-        <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="rounded-xl border-2 border-indigo-500/30 bg-indigo-500/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center shrink-0">
               {taramaYukleniyor ? <Loader2 size={14} className="text-indigo-600 animate-spin"/> : <Camera size={14} className="text-indigo-600"/>}
@@ -1400,73 +1513,9 @@ Soru: ${soruFinal}`
           )}
         </div>
       )}
-      {/* TARİH + CANLI METRİKLER */}
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 items-center">
-        <div className="sm:col-span-1">
-          <label className="block text-[12px] text-amber-700 font-bold tracking-wide mb-1.5">Rapor Tarihi</label>
-          <div className="flex flex-col gap-1">
-            <input type="date" value={tarih} disabled={isReadOnly}
-              onChange={e=>handleTarihChange(e.target.value)}
-              min={!isAdmin&&!selectedRapor&&beklenenTarih?beklenenTarih:undefined}
-              max={!isAdmin&&!selectedRapor&&beklenenTarih?beklenenTarih:undefined}
-              style={{colorScheme:"light"}}
-              className={`bg-[#f7f8fa] text-[#1a1f2e] font-bold text-center h-11 text-[15px] rounded-xl px-3 w-full outline-none focus:ring-2 focus:ring-amber-500/20 transition-all border-2 ${
-                duplikaTarihHata ? "border-orange-500 text-orange-600"
-                : tarihHataVarMi&&!adminOnayliGecis ? "border-red-500 text-red-600"
-                : "border-[#e2e5eb] focus:border-amber-500/60"
-              }`} required/>
-            {duplikaTarihHata && <p className="text-[11px] font-semibold text-orange-600 flex items-center gap-1"><AlertTriangle size={11}/> Bu tarih mevcut</p>}
-            {enSonRaporTarihi && <p className="text-[11px] text-gray-500 font-medium">Son rapor: <span className="text-gray-700 font-bold">{fmtTarih(enSonRaporTarihi)}</span></p>}
-          </div>
-        </div>
-        {[
-          {label:"Brüt Ciro", value:`₺${fmt(ch.brutCiro)}`, color:"text-blue-600", border:"border-blue-500/10 bg-blue-500/5"},
-          {label:"Net Ciro",  value:`₺${fmt(ch.netCiro)}`,  color:"text-emerald-600", border:"border-emerald-500/10 bg-emerald-500/5"},
-          {label:"Paket",     value:`${fmt(ch.tKuryeGercekPaket)}`, color:"text-amber-600", border:"border-amber-500/10 bg-amber-500/5"},
-          {label:"Ort. Sepet",value:`₺${fmt(ch.paketOrt)}`, color:"text-purple-600", border:"border-purple-500/10 bg-purple-500/5"},
-        ].map(c=>(
-          <div key={c.label} className={`rounded-xl border ${c.border} px-4 py-3 transition-transform hover:-translate-y-0.5 hover:shadow-sm`}>
-            <p className="text-[12px] text-gray-500 font-semibold">{c.label}</p>
-            <p className={`text-xl font-black tracking-tight ${c.color}`}>{c.value}</p>
-          </div>
-        ))}
-      </div>
+      <div ref={formAlaniRef} className="scroll-mt-4">
 
-      {/* Admin skip onayı */}
-      {tarihHataVarMi && isAdmin && !adminOnayliGecis && !isReadOnly && (
-        <div className="rounded-xl border border-amber-500/20 bg-amber-100/60 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <p className="text-xs text-amber-600 flex items-center gap-2">
-            <AlertTriangle size={12}/>
-            <strong className="text-[#1a1f2e]">{beklenenTarih?fmtTarih(beklenenTarih):""}</strong> eklenmeden devam edilsin mi?
-          </p>
-          <div className="flex gap-2">
-            <button type="button" onClick={()=>setAdminOnayliGecis(true)} className="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg flex items-center gap-1"><Check size={11}/> Evet</button>
-            <button type="button" onClick={()=>{setTarih("");setTarihHataVarMi(false);}} className="text-xs font-bold text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg flex items-center gap-1"><X size={11}/> Hayır</button>
-          </div>
-        </div>
-      )}
-
-      {/* Non-admin blocker */}
-      {tarihHataVarMi && !isAdmin && !isReadOnly && (
-        <div className="rounded-xl border border-red-500/20 bg-[#fef2f2] p-6 text-center">
-          <ShieldAlert className="h-10 w-10 text-red-700 mx-auto mb-3 animate-bounce"/>
-          <p className="text-sm font-black text-[#1a1f2e] mb-1 uppercase">Gün Atlayamazsınız</p>
-          <p className="text-gray-500 text-xs mb-4">
-            Sıradaki gün: <strong className="text-red-600">{beklenenTarih?fmtTarih(beklenenTarih):""}</strong>
-          </p>
-          <button type="button" onClick={()=>setTarih("")} className="text-xs font-bold text-white bg-red-600 hover:bg-red-700 px-6 py-2 rounded-xl transition-colors">Tarihi Düzelt</button>
-        </div>
-      )}
-
-      <div ref={formAlaniRef} className={`transition-all duration-200 scroll-mt-4 ${formKilitli&&!isReadOnly?"opacity-20 pointer-events-none blur-sm select-none":""}`}>
-
-        {!tarih && !isReadOnly && (
-          <div className="flex items-center justify-center gap-2 py-8 text-gray-600 text-xs border border-dashed border-[#e2e5eb] rounded-xl">
-            <Lock size={12} className="text-amber-700"/> Tarih seçilince form aktif olur
-          </div>
-        )}
-
-        {(tarih || isReadOnly) && (
+        {(
           <div className="space-y-3">
 
             {/* CİRO GİRİŞLERİ: Online / Kapıda Ödeme (Kebo + Chick'N Fride) + Kasa */}
@@ -1501,7 +1550,7 @@ Soru: ${soruFinal}`
                 <div className="px-4 py-3 border-b border-purple-500/15 flex items-center justify-between bg-purple-500/[0.03]">
                   <span className="text-[13px] font-bold text-purple-700 flex items-center gap-2"><Home size={14}/>Kapıda Ödeme</span>
                   <div className="flex items-center gap-2">
-                    <span title={ch.kapidaKasada ? "13.08.2026 öncesi: kendi kuryelerimizin topladığı para kasa sayımının içinde" : "Roadrunner'da kalır, haftalık mutabakatla mahsup edilir"}
+                    <span title={ch.kapidaKasada ? (tarih >= KENDI_POS_GECIS_GUNU ? "28.09.2026'dan itibaren kendi POS'umuz: kapıda nakit ve kart kasa sayımının içinde" : "13.08.2026 öncesi: kendi kuryelerimizin topladığı para kasa sayımının içinde") : "Roadrunner'da kalır, haftalık mutabakatla mahsup edilir"}
                       className="text-[10px] font-semibold text-purple-700 bg-purple-500/15 border border-purple-500/25 px-2 py-0.5 rounded-full">
                       {ch.kapidaKasada ? "Kasa sayımında" : "Brüte ayrıca eklenir"}
                     </span>
@@ -1992,9 +2041,12 @@ Soru: ${soruFinal}`
                     Kağıt formla karşılaştırdım, değerler doğru
                   </label>
                 )}
-                {!isReadOnly && (!tarihHataVarMi || adminOnayliGecis) && !duplikaTarihHata && (
-                  <button type="submit" disabled={!tarih||saving||(taramaIleDoldu&&!kontrolOnay)}
-                    title={taramaIleDoldu&&!kontrolOnay?"Önce değerleri kağıtla karşılaştırıp onay kutusunu işaretleyin":undefined}
+                {!isReadOnly && kayitEngeli && (
+                  <span className="text-[11px] font-semibold text-amber-700">{kayitEngeli}</span>
+                )}
+                {!isReadOnly && (
+                  <button type="submit" disabled={saving||!!kayitEngeli}
+                    title={kayitEngeli||undefined}
                     className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 px-6 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-blue-900/30">
                     {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>}
                     {selectedRapor ? "Kaydet" : "Raporu Kaydet"}
@@ -2006,6 +2058,7 @@ Soru: ${soruFinal}`
           </div>
         )}
       </div>
+      </>)}
     </form>
   );
 
@@ -2067,7 +2120,7 @@ Soru: ${soruFinal}`
                 )}
               </button>
             )}
-            <button onClick={()=>{formuTemizle();setFormAcik(true);}}
+            <button onClick={yeniRaporAc}
               className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-colors shadow-lg shadow-blue-900/30">
               <PlusCircle size={14}/> Yeni Rapor
             </button>
@@ -2138,7 +2191,7 @@ Soru: ${soruFinal}`
           </div>
         )}
 
-        {!formAcik && <EksikRaporBanner enSonRaporTarihi={enSonRaporTarihi} onEkle={()=>{formuTemizle();setFormAcik(true);}}/>}
+        {!formAcik && <EksikRaporBanner enSonRaporTarihi={enSonRaporTarihi} onEkle={yeniRaporAc}/>}
 
         {formAcik && (
           <div className="kebo-anim-in rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden shadow-2xl">

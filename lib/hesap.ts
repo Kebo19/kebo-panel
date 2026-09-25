@@ -18,6 +18,8 @@
 //   os_chicknfride/ko_chicknfride ayrıca TOPLANMAZ (eskiden çift sayılıyordu).
 
 export const ROADRUNNER_GECIS_GUNU = "2026-08-13";
+/** Bu günden itibaren kapıda ödemeler kendi POS'umuz/kasamız üzerinden tahsil edilir (kasa sayımına girer). */
+export const KENDI_POS_GECIS_GUNU = "2026-09-28";
 export const ROADRUNNER_TAM_BASLANGIC = "2026-08-14";
 export const KURYE_GARANTI_PAKET = 30;
 
@@ -68,8 +70,14 @@ export function yeniYapiMi(r: RaporVerisi): boolean {
   ].some(v => n(v) !== 0);
 }
 
-/** Kapıda ödeme o gün kasa sayımının içinde mi? (13.08.2026 öncesi: evet) */
-export const kapidaKasadaMi = (tarih: string): boolean => !!tarih && tarih < ROADRUNNER_GECIS_GUNU;
+/**
+ * Kapıda ödeme o gün kasa sayımının içinde mi?
+ *   13.08.2026 öncesi: evet (kendi kuryelerimiz topluyordu)
+ *   13.08–27.09.2026: hayır (Roadrunner'da kalıyordu, brüte ayrıca eklenir)
+ *   28.09.2026 ve sonrası: evet (kendi POS'umuz; nakit ve kart kasaya girer)
+ */
+export const kapidaKasadaMi = (tarih: string): boolean =>
+  !!tarih && (tarih < ROADRUNNER_GECIS_GUNU || tarih >= KENDI_POS_GECIS_GUNU);
 
 export interface PlatformKirilimi {
   // platform → tutar
