@@ -17,7 +17,7 @@ const base64Oku = (blob: Blob) => new Promise<string>((resolve, reject) => {
   r.readAsDataURL(blob);
 });
 
-export async function yuklemeIcinHazirla(file: File): Promise<HazirDosya> {
+export async function yuklemeIcinHazirla(file: File, maksKenar = MAKS_KENAR): Promise<HazirDosya> {
   if (file.type === "application/pdf") {
     if (file.size > MAKS_PDF_BAYT) throw new Error("PDF en fazla 3 MB olabilir. Sayfanın fotoğrafını yüklemeyi deneyin.");
     return { base64: await base64Oku(file), mediaType: "application/pdf" };
@@ -32,7 +32,7 @@ export async function yuklemeIcinHazirla(file: File): Promise<HazirDosya> {
     if (file.size <= MAKS_PDF_BAYT) return { base64: await base64Oku(file), mediaType: file.type || "image/jpeg" };
     throw new Error("Bu fotoğraf biçimi açılamadı. Kamerayı JPEG olarak ayarlayın ya da ekran görüntüsü yükleyin.");
   }
-  const oran = Math.min(1, MAKS_KENAR / Math.max(bitmap.width, bitmap.height));
+  const oran = Math.min(1, maksKenar / Math.max(bitmap.width, bitmap.height));
   const w = Math.round(bitmap.width * oran), h = Math.round(bitmap.height * oran);
   const canvas = document.createElement("canvas");
   canvas.width = w; canvas.height = h;

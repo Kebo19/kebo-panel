@@ -78,3 +78,22 @@ describe("Roadrunner", () => {
     expect(u.ucret).toBe(20 * 100 + 2 * 150 + 1 * 200 + 7 * 100);
   });
 });
+
+import { kasaToplam, yemekKartiToplam } from "@/lib/hesap";
+describe("yemek kartları", () => {
+  it("tüm kartlar kasaya ve brüte girer", () => {
+    const r: RaporVerisi = { tarih: "2026-09-28", kasa_nakit: 100, kasa_pos: 200, kasa_edenred: 10, kasa_metropol: 20, kasa_setcard: 30, kasa_pluxee: 40, kasa_paye: 50 };
+    expect(yemekKartiToplam(r)).toBe(150);
+    expect(kasaToplam(r)).toBe(450);
+    expect(brutCiro(r)).toBe(450);
+  });
+});
+
+describe("Migros ve Alo indirimi", () => {
+  it("Migros/Alo indirimi netten düşer, Alo online brüte girer", () => {
+    const r: RaporVerisi = { tarih: "2026-09-28", os_kebo_migros: 400, os_kebo_migros_indirim: 40, os_cnf_migros_yemek_indirim: 10,
+      os_kebo_alo: 200, os_kebo_alo_indirim: 5, kasa_nakit: 100 };
+    expect(brutCiro(r)).toBe(700);
+    expect(netCiro(r)).toBe(645);
+  });
+});

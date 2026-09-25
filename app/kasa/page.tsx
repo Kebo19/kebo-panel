@@ -3,8 +3,8 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { tv, paraGirdisi } from "@/lib/para";
-import { bugun, buAyYil } from "@/lib/tarih";
-import { donemOzeti as raporDonemOzeti, type RaporVerisi } from "@/lib/hesap";
+import { bugun, buAyYil, gunEkle, fmtTarih as tarihYaz } from "@/lib/tarih";
+import { donemOzeti as raporDonemOzeti, yemekKartiToplam, type RaporVerisi } from "@/lib/hesap";
 import {
   PlusCircle, Building2, Coins,
   Loader2, Trash2, FileDown, RefreshCw, Calendar,
@@ -84,7 +84,7 @@ function exportCSV(raporlar: GunlukRapor[], manuel: ManuelIslem[], ay: string, y
     ...raporlar.flatMap(r => [
       satir([fmtTarih(r.tarih),"Rapor","Nakit","Nakit Ciro",r.kasa_nakit||0,""]),
       ...(r.kasa_pos ? [satir([fmtTarih(r.tarih),"Rapor","POS","POS Ciro",r.kasa_pos,""])] : []),
-      ...((r.kasa_edenred||0)+(r.kasa_metropol||0) ? [satir([fmtTarih(r.tarih),"Rapor","Yemek Kartı","Edenred + Metropol",(r.kasa_edenred||0)+(r.kasa_metropol||0),""])] : []),
+      ...(yemekKartiToplam(r) ? [satir([fmtTarih(r.tarih),"Rapor","Yemek Kartı","Yemek kartları",yemekKartiToplam(r),""])] : []),
     ]),
     ...aylikManuel.map(i => satir([fmtTarih(i.islem_tarihi),i.tip,i.hesap,i.kategori,Number(i.tutar),i.aciklama||""])),
   ].join("\n");
@@ -141,6 +141,12 @@ export default function KasaPage() {
   const [iTutar, setITutar] = useState("");
   const [iAciklama, setIAciklama] = useState("");
   const [iTarih, setITarih] = useState(() => bugun());
+
+  // Nakit kasa sayımı (yönetici istediği zaman kasayı sayar; fark "Kasa sayım farkı" olarak kaydedilir)
+  const [sayimAcik, setSayimAcik] = useState(false);
+  const [sTarih, setSTarih] = useState(() => bugun());
+  const [sTutar, setSTutar] = useState("");
+  const [sSonuc, setSSonuc] = useState<{ beklenen: number; fark: number; ilk: boolean } | null>(null);
 
   // ── Veri çek ──
   const veriCek = useCallback(async () => {
@@ -202,12 +208,15 @@ export default function KasaPage() {
   // ── Seçilen ayın finansal sonucu ──
   // Satış tarafı günlük raporlardan (lib/hesap), gider tarafı rapor giderleri + manuel giderler.
   // Ortak sermaye / kredi gibi girişler satış değildir; ayrıca gösterilir.
+  // "Nakit kasa açılış": ilk gün sonu sayımında geçmiş bakiyenin düzeltilmesidir; gerçek gelir/gider
+  // değildir, bakiyeyi düzeltir ama kâr/zarar ve gider dağılımına girmez.
+  const karHaric = (i: { kategori?: string }) => i.kategori === "Nakit kasa açılış";
   const aylikSonuc = useMemo(() => {
     const o = raporDonemOzeti(filtreliRaporlar);
     const aylikManuel = manuelIslemler.filter(i => i.islem_tarihi?.slice(0,7) === `${secilenYil}-${secilenAy}`);
-    const manuelGider = aylikManuel.filter(i => i.tip==="gider").reduce((s,i)=>s+(Number(i.tutar)||0),0);
-    const digerGiris = aylikManuel.filter(i => i.tip==="gelir" && i.kategori!=="POS / Kart Tahsilatı").reduce((s,i)=>s+(Number(i.tutar)||0),0);
-    const posAlacak = o.gunSayisi ? filtreliRaporlar.reduce((s,r)=>s+(Number(r.kasa_pos)||0)+(Number(r.kasa_edenred)||0)+(Number(r.kasa_metropol)||0),0) : 0;
+    const manuelGider = aylikManuel.filter(i => i.tip==="gider" && !karHaric(i)).reduce((s,i)=>s+(Number(i.tutar)||0),0);
+    const digerGiris = aylikManuel.filter(i => i.tip==="gelir" && i.kategori!=="POS / Kart Tahsilatı" && !karHaric(i)).reduce((s,i)=>s+(Number(i.tutar)||0),0);
+    const posAlacak = o.gunSayisi ? filtreliRaporlar.reduce((s,r)=>s+(Number(r.kasa_pos)||0)+yemekKartiToplam(r),0) : 0;
     return { brut: o.brut, net: o.net, raporGider: o.gider + o.iade + o.indirim, manuelGider, digerGiris, posAlacak,
       sonuc: o.net - manuelGider };
   }, [filtreliRaporlar, manuelIslemler, secilenAy, secilenYil]);
@@ -217,12 +226,12 @@ export default function KasaPage() {
     let nakitToplam=0, posToplam=0, edenredToplam=0, giderToplam=0;
     const gunlukNakit: Record<number,number> = {};
     filtreliRaporlar.forEach(r => {
-      nakitToplam+=r.kasa_nakit||0; posToplam+=r.kasa_pos||0; edenredToplam+=(r.kasa_edenred||0)+(r.kasa_metropol||0);
+      nakitToplam+=r.kasa_nakit||0; posToplam+=r.kasa_pos||0; edenredToplam+=yemekKartiToplam(r);
       giderToplam+=(r.gunluk_gider||0)+(r.iade_tutar||0);
       const g=parseInt(r.tarih.split("-")[2]);
       gunlukNakit[g]=(gunlukNakit[g]||0)+(r.kasa_nakit||0);
     });
-    const manuelGider=filtreliGiderler.reduce((s,i)=>s+i.tutar,0);
+    const manuelGider=filtreliGiderler.filter(i=>!karHaric(i)).reduce((s,i)=>s+i.tutar,0);
     const sparkData=Array.from({length:new Date(Number(secilenYil), Number(secilenAy), 0).getDate()},(_,i)=>gunlukNakit[i+1]||0);
     return {nakitToplam,posToplam,edenredToplam,giderToplam,manuelGider,sparkData};
   }, [filtreliRaporlar,filtreliGiderler,secilenAy,secilenYil]);
@@ -238,7 +247,7 @@ export default function KasaPage() {
         if(kat&&t>0) map[kat]=(map[kat]||0)+t;
       });
     });
-    filtreliGiderler.forEach(i=>{map[i.kategori]=(map[i.kategori]||0)+i.tutar;});
+    filtreliGiderler.filter(i=>!karHaric(i)).forEach(i=>{map[i.kategori]=(map[i.kategori]||0)+i.tutar;});
     return Object.entries(map).sort((a,b)=>b[1]-a[1]);
   }, [filtreliRaporlar,filtreliGiderler]);
 
@@ -267,6 +276,42 @@ export default function KasaPage() {
       if (error) { alert("Hata: "+error.message); return; }
       setGiderFormAcik(false);
       setGTutar(""); setGAciklama(""); setGPersonel("");
+      veriCek();
+    } finally { setSaving(false); }
+  };
+
+  // ── Nakit kasa sayımı ──
+  const sayimHesapla = async () => {
+    const sayilan = tv(sTutar);
+    if (!sTutar.trim()) { alert("Sayılan tutarı girin."); return; }
+    setSaving(true);
+    try {
+      const [{ data: bakiye, error }, { data: oncekiKasa }, { data: oncekiRapor }] = await Promise.all([
+        supabase.rpc("nakit_kasa_bakiyesi", { p_tarih: gunEkle(sTarih, 1) }),
+        supabase.from("kasa_manuel_islemler").select("id").in("kategori", ["Kasa sayım farkı", "Nakit kasa açılış"]).lte("islem_tarihi", sTarih).limit(1),
+        supabase.from("gunluk_raporlar").select("id").not("nakit_kasa_sayim", "is", null).lte("tarih", sTarih).limit(1),
+      ]);
+      if (error) { alert("Hata: " + error.message); return; }
+      const beklenen = Number(bakiye) || 0;
+      setSSonuc({ beklenen, fark: Math.round((sayilan - beklenen) * 100) / 100, ilk: !oncekiKasa?.length && !oncekiRapor?.length });
+    } finally { setSaving(false); }
+  };
+  const sayimKaydet = async () => {
+    if (!sSonuc) return;
+    if (Math.abs(sSonuc.fark) < 1) { setSayimAcik(false); setSSonuc(null); setSTutar(""); return; }
+    setSaving(true);
+    try {
+      const {data:{user}} = await supabase.auth.getUser();
+      const ekleyen = user?.email?.split("@")[0]||"Bilinmiyor";
+      const { error } = await supabase.from("kasa_manuel_islemler").insert([{
+        tip: sSonuc.fark > 0 ? "gelir" : "gider", hesap: "Nakit",
+        kategori: sSonuc.ilk ? "Nakit kasa açılış" : "Kasa sayım farkı",
+        tutar: Math.abs(sSonuc.fark),
+        aciklama: `${sSonuc.ilk ? "İlk sayımla nakit kasa bakiyesi düzeltildi" : sSonuc.fark > 0 ? "Kasa fazlası" : "Kasa açığı"} (sayım ${tv(sTutar)}, beklenen ${sSonuc.beklenen})`,
+        islem_tarihi: sTarih, ekleyen_kullanici: ekleyen,
+      }]);
+      if (error) { alert("Hata: " + error.message); return; }
+      setSayimAcik(false); setSSonuc(null); setSTutar("");
       veriCek();
     } finally { setSaving(false); }
   };
@@ -357,6 +402,10 @@ export default function KasaPage() {
               className="flex items-center gap-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 px-3 py-2 rounded-xl transition-colors shadow-lg shadow-red-900/20">
               <TrendingDown size={13}/> Gider Ekle
             </button>
+            <button onClick={()=>{ setSayimAcik(true); setSSonuc(null); }}
+              className="flex items-center gap-2 text-xs font-bold text-[#1a1f2e] bg-white border border-[#d8dde5] hover:bg-gray-50 px-3 py-2 rounded-xl transition-colors">
+              <Coins size={13}/> Kasa Sayımı
+            </button>
             <button onClick={()=>setIslemFormAcik(true)}
               className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-2 rounded-xl transition-colors shadow-lg shadow-emerald-900/20">
               <PlusCircle size={13}/> İşlem
@@ -386,7 +435,7 @@ export default function KasaPage() {
                   <div className="flex items-end justify-between gap-2">
                     <div>
                       <p className="text-lg font-black tracking-tight" style={{color}}>₺{fmt2(bakiye)}</p>
-                      <p className="text-[9px] text-gray-600 mt-0.5">{h==="Nakit"?"rapor nakdi + hareketler":"hesap hareketleri"}</p>
+                      <p className="text-[9px] text-gray-600 mt-0.5">{h==="Nakit"?"kasada olması gereken":"hesap hareketleri"}</p>
                     </div>
                     <Sparkline values={sparkVals.filter(v=>v>0)} color={color}/>
                   </div>
@@ -468,7 +517,7 @@ export default function KasaPage() {
                   {[
                     {l:"Nakit",v:donemOzeti.nakitToplam,c:"text-blue-600",bg:"bg-blue-500/5 border-blue-500/10"},
                     {l:"POS",v:donemOzeti.posToplam,c:"text-purple-600",bg:"bg-purple-500/5 border-purple-500/10"},
-                    {l:"Edenred + Metropol",v:donemOzeti.edenredToplam,c:"text-amber-600",bg:"bg-amber-500/5 border-amber-500/10"},
+                    {l:"Yemek Kartları",v:donemOzeti.edenredToplam,c:"text-amber-600",bg:"bg-amber-500/5 border-amber-500/10"},
                     {l:"Gider+İade",v:donemGiderToplam,c:"text-red-600",bg:"bg-red-500/5 border-red-500/10"},
                   ].map(c=>(
                     <div key={c.l} className={`rounded-xl border ${c.bg} px-3 py-2.5`}>
@@ -520,7 +569,7 @@ export default function KasaPage() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-[#f7f8fa] border-b border-[#e2e5eb]">
-                      {["Tarih","Nakit","POS","Edenred","Gider","İade","Net","Giren"].map((h,i)=>(
+                      {["Tarih","Nakit","POS","Yemek K.","Gider","İade","Net","Giren"].map((h,i)=>(
                         <th key={i} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-600">{h}</th>
                       ))}
                     </tr>
@@ -529,13 +578,13 @@ export default function KasaPage() {
                     {filtreliRaporlar.length===0 ? (
                       <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-600 text-xs uppercase tracking-widest">Bu dönemde rapor yok</td></tr>
                     ) : filtreliRaporlar.map(r=>{
-                      const net=(r.kasa_nakit||0)+(r.kasa_pos||0)+(r.kasa_edenred||0)-(r.gunluk_gider||0)-(r.iade_tutar||0);
+                      const net=(r.kasa_nakit||0)+(r.kasa_pos||0)+yemekKartiToplam(r)-(r.gunluk_gider||0)-(r.iade_tutar||0);
                       return (
                         <tr key={r.id} className="hover:bg-white/[0.015] transition-colors">
                           <td className="px-4 py-3 font-semibold text-gray-700">{fmtTarih(r.tarih)}</td>
                           <td className="px-4 py-3 text-blue-600 font-bold">₺{fmt2(r.kasa_nakit||0)}</td>
                           <td className="px-4 py-3 text-purple-600 font-bold">₺{fmt2(r.kasa_pos||0)}</td>
-                          <td className="px-4 py-3 text-amber-600">₺{fmt2(r.kasa_edenred||0)}</td>
+                          <td className="px-4 py-3 text-amber-600">₺{fmt2(yemekKartiToplam(r))}</td>
                           <td className="px-4 py-3 text-red-600">{(r.gunluk_gider||0)>0?`-₺${fmt2(r.gunluk_gider)}`:"—"}</td>
                           <td className="px-4 py-3 text-orange-600">{(r.iade_tutar||0)>0?`-₺${fmt2(r.iade_tutar)}`:"—"}</td>
                           <td className={`px-4 py-3 font-black ${net>=0?"text-emerald-600":"text-red-600"}`}>₺{fmt2(net)}</td>
@@ -705,6 +754,43 @@ export default function KasaPage() {
             <div className="flex gap-2">
               <button onClick={()=>setDeleteTarget(null)} className="flex-1 text-xs font-semibold text-gray-500 border border-[#e2e5eb] py-2.5 rounded-xl hover:text-[#1a1f2e] transition-colors">İptal</button>
               <button onClick={handleSil} className="flex-1 text-xs font-bold text-white bg-red-600 hover:bg-red-700 py-2.5 rounded-xl transition-colors">Sil</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── NAKİT KASA SAYIMI ── */}
+      {sayimAcik && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white border border-[#e2e5eb] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 space-y-4">
+            <div>
+              <p className="text-sm font-bold text-[#1a1f2e]">Nakit kasa sayımı</p>
+              <p className="text-[12px] text-gray-500 mt-0.5">Kasadaki paranın tamamını sayıp girin. Sistem olması gerekenle karşılaştırır, farkı kaydeder.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-[12px] font-semibold text-gray-700">Sayım tarihi (gün sonu)
+                <input type="date" value={sTarih} max={bugun()} onChange={e=>{setSTarih(e.target.value); setSSonuc(null);}} style={{colorScheme:"light"}}
+                  className="mt-1 w-full border border-[#dde1e8] rounded-lg h-10 px-2 text-[14px] font-bold"/>
+              </label>
+              <label className="block text-[12px] font-semibold text-gray-700">Sayılan nakit ₺
+                <input type="text" inputMode="decimal" value={sTutar} onChange={e=>{setSTutar(paraGirdisi(e.target.value)); setSSonuc(null);}} placeholder="0"
+                  className="mt-1 w-full border-2 border-[#1a1f2e] rounded-lg h-10 px-2 text-[16px] font-black text-right"/>
+              </label>
+            </div>
+            {sSonuc && (
+              <div className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] p-3 text-[13px] space-y-1">
+                <p>{tarihYaz(sTarih)} gün sonunda kasada olması gereken: <b>₺{fmt2(sSonuc.beklenen)}</b></p>
+                <p>Sayılan: <b>₺{fmt2(tv(sTutar))}</b></p>
+                {Math.abs(sSonuc.fark) < 1 ? <p className="font-bold text-emerald-700">✓ Kasa tuttu, kayıt gerekmez.</p>
+                  : sSonuc.ilk ? <p className="text-blue-800">İlk sayım: bakiye bu sayıma eşitlenir (₺{fmt2(Math.abs(sSonuc.fark))} &quot;Nakit kasa açılış&quot;, kâr/zarara girmez).</p>
+                  : <p className={`font-bold ${sSonuc.fark < 0 ? "text-red-700" : "text-amber-700"}`}>{sSonuc.fark < 0 ? `Kasa açığı: ₺${fmt2(Math.abs(sSonuc.fark))}` : `Kasa fazlası: ₺${fmt2(sSonuc.fark)}`}</p>}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={()=>{setSayimAcik(false); setSSonuc(null);}} className="flex-1 text-xs font-semibold text-gray-500 border border-[#e2e5eb] py-2.5 rounded-xl">Vazgeç</button>
+              {!sSonuc
+                ? <button onClick={sayimHesapla} disabled={saving} className="flex-1 text-xs font-bold text-white bg-[#1a1f2e] py-2.5 rounded-xl disabled:opacity-50">Hesapla</button>
+                : <button onClick={sayimKaydet} disabled={saving} className="flex-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 py-2.5 rounded-xl disabled:opacity-50">{Math.abs(sSonuc.fark) < 1 ? "Tamam" : "Farkı kaydet"}</button>}
             </div>
           </div>
         </div>

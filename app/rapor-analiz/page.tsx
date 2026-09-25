@@ -15,7 +15,7 @@ import { bugun, ayBasi, gunEkle, gunFarki, fmtTarih } from "@/lib/tarih";
 import {
   raporOzeti, donemOzeti, platformKirilimi, indirimToplam, PLATFORMLAR, PLATFORM_RENK, type RaporVerisi, type PlatformAdi,
   RR_PAKET_UCRETI, RR_UZAK_KATSAYI, RR_KM9_KATSAYI, RR_POS_KOMISYON_ORANI, KURYE_GARANTI_PAKET as RR_KURYE_GARANTI,
-  roadrunnerKuryesiMi, roadrunnerKuryeUcreti, type KuryeSatiri,
+  roadrunnerKuryesiMi, roadrunnerKuryeUcreti, type KuryeSatiri, YEMEK_KARTLARI,
 } from "@/lib/hesap";
 import { useYetki } from "@/lib/useYetki";
 
@@ -177,12 +177,13 @@ export default function RaporAnalizPage() {
       };
     });
     const sirali = [...gunlukDetay].sort((a, b) => b.brutCiro - a.brutCiro);
-    const sum = (key: "kasa_nakit" | "kasa_pos" | "kasa_edenred" | "kasa_metropol") => raporlar.reduce((s, r) => s + (Number(r[key]) || 0), 0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sum = (key: string) => raporlar.reduce((s, r) => s + (Number((r as any)[key]) || 0), 0);
 
     return {
       brutCiro: d.brut, netCiro: d.net, toplamGider, indirim: d.indirim, paket: d.paket,
       oncBrut: o.brut, oncNet: o.net, oncGider: o.gider + o.iade,
-      kasaNakit: sum("kasa_nakit"), kasaPos: sum("kasa_pos"), kasaEdenred: sum("kasa_edenred"), kasaMetropol: sum("kasa_metropol"),
+      kasaNakit: sum("kasa_nakit"), kasaPos: sum("kasa_pos"), kasaKartlar: YEMEK_KARTLARI.map(k => ({ ad: k.ad, deger: sum(k.alan) })),
       platformlar, toplamPlatform, markaKebo, markaCnf,
       gunlukDetay,
       gunSayisi: raporlar.length,
@@ -279,8 +280,7 @@ ${platformDetaylar}
 KASA DAĞILIMI:
 - Nakit: ₺${fmt(stats.kasaNakit)}
 - POS/Kart: ₺${fmt(stats.kasaPos)}
-- Edenred: ₺${fmt(stats.kasaEdenred)}
-- Metropol: ₺${fmt(stats.kasaMetropol)}
+${stats.kasaKartlar.filter(k => k.deger > 0).map(k => `- ${k.ad}: ₺${fmt(k.deger)}`).join("\n")}
 
 GÜNLÜK PERFORMANS:
 - En İyi Gün: ${enIyiGun}
@@ -604,10 +604,9 @@ ${isletmeOzeti}`,
                 {[
                   { label: "Nakit", value: stats.kasaNakit, color: "#34D399" },
                   { label: "POS / Kredi Kartı", value: stats.kasaPos, color: "#60A5FA" },
-                  { label: "Edenred", value: stats.kasaEdenred, color: "#FBBF24" },
-                  { label: "Metropol", value: stats.kasaMetropol, color: "#A78BFA" },
+                  ...stats.kasaKartlar.filter(k => k.deger > 0).map((k, i) => ({ label: k.ad, value: k.deger, color: ["#FBBF24", "#A78BFA", "#F472B6", "#2DD4BF", "#FB923C"][i % 5] })),
                 ].map(item => {
-                  const toplam = stats.kasaNakit + stats.kasaPos + stats.kasaEdenred + stats.kasaMetropol;
+                  const toplam = stats.kasaNakit + stats.kasaPos + stats.kasaKartlar.reduce((t, k) => t + k.deger, 0);
                   const pct = toplam > 0 ? (item.value / toplam) * 100 : 0;
                   return (
                     <div key={item.label} className="bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
@@ -626,7 +625,7 @@ ${isletmeOzeti}`,
                 })}
                 <div className="pt-3 border-t border-[#e2e5eb] flex justify-between">
                   <span className="text-xs text-gray-600">Kasa Toplamı</span>
-                  <span className="text-sm font-black text-[#1a1f2e]">₺{fmt(stats.kasaNakit + stats.kasaPos + stats.kasaEdenred + stats.kasaMetropol)}</span>
+                  <span className="text-sm font-black text-[#1a1f2e]">₺{fmt(stats.kasaNakit + stats.kasaPos + stats.kasaKartlar.reduce((t, k) => t + k.deger, 0))}</span>
                 </div>
               </div>
             )}

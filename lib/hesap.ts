@@ -44,10 +44,13 @@ export interface RaporVerisi {
   // İndirimler
   os_kebo_ys_indirim?: number | null; os_kebo_trendyol_indirim?: number | null;
   os_cnf_ys_indirim?: number | null; os_cnf_trendyol_indirim?: number | null;
+  os_kebo_migros_indirim?: number | null; os_cnf_migros_yemek_indirim?: number | null; os_kebo_alo_indirim?: number | null;
+  os_kebo_alo?: number | null; os_kebo_alo_paket?: number | null;
   ko_kebo_ys_indirim?: number | null; ko_kebo_trendyol_indirim?: number | null;
   ko_cnf_ys_indirim?: number | null; ko_cnf_trendyol_indirim?: number | null;
   // Kasa, gider, iade
   kasa_nakit?: number | null; kasa_pos?: number | null; kasa_edenred?: number | null; kasa_metropol?: number | null;
+  kasa_setcard?: number | null; kasa_pluxee?: number | null; kasa_paye?: number | null;
   gunluk_gider?: number | null; iade_tutar?: number | null;
   kurye_raporlari?: KuryeSatiri[] | null;
 }
@@ -64,7 +67,7 @@ const tamSayi = (v: unknown): number => {
 /** Rapor marka bazlı yeni yapıyla mı girilmiş? */
 export function yeniYapiMi(r: RaporVerisi): boolean {
   return [
-    r.os_kebo_ys, r.os_kebo_trendyol, r.os_kebo_migros, r.os_cnf_ys, r.os_cnf_trendyol, r.os_cnf_migros_yemek,
+    r.os_kebo_ys, r.os_kebo_trendyol, r.os_kebo_migros, r.os_kebo_alo, r.os_cnf_ys, r.os_cnf_trendyol, r.os_cnf_migros_yemek,
     r.ko_kebo_ys, r.ko_kebo_trendyol, r.ko_kebo_migros_yemek, r.ko_kebo_alo,
     r.ko_cnf_ys, r.ko_cnf_trendyol, r.ko_cnf_migros_yemek, r.ko_cnf_alo,
   ].some(v => n(v) !== 0);
@@ -110,7 +113,8 @@ export function platformKirilimi(r: RaporVerisi): PlatformKirilimi {
     kapida.Trendyol = n(r.ko_kebo_trendyol) + n(r.ko_cnf_trendyol);
     kapida.Migros = n(r.ko_kebo_migros_yemek) + n(r.ko_cnf_migros_yemek);
     kapida["Alo Paket"] = n(r.ko_kebo_alo) + n(r.ko_cnf_alo);
-    marka.kebo = n(r.os_kebo_ys) + n(r.os_kebo_trendyol) + n(r.os_kebo_migros)
+    online["Alo Paket"] = n(r.os_kebo_alo);
+    marka.kebo = n(r.os_kebo_ys) + n(r.os_kebo_trendyol) + n(r.os_kebo_migros) + n(r.os_kebo_alo)
       + n(r.ko_kebo_ys) + n(r.ko_kebo_trendyol) + n(r.ko_kebo_migros_yemek) + n(r.ko_kebo_alo);
     marka.cnf = n(r.os_cnf_ys) + n(r.os_cnf_trendyol) + n(r.os_cnf_migros_yemek)
       + n(r.ko_cnf_ys) + n(r.ko_cnf_trendyol) + n(r.ko_cnf_migros_yemek) + n(r.ko_cnf_alo);
@@ -131,12 +135,25 @@ const topla = (o: Record<string, number>) => Object.values(o).reduce((a, b) => a
 
 export const onlineToplam = (r: RaporVerisi): number => topla(platformKirilimi(r).online);
 export const kapidaToplam = (r: RaporVerisi): number => topla(platformKirilimi(r).kapida);
+/** Kasaya giren yemek kartları (veritabanı kolonu → görünen ad). Yeni kart eklemek için buraya + kolona ekleyin. */
+export const YEMEK_KARTLARI = [
+  { alan: "kasa_edenred", ad: "Edenred" },
+  { alan: "kasa_metropol", ad: "Metropol" },
+  { alan: "kasa_setcard", ad: "Setcard" },
+  { alan: "kasa_pluxee", ad: "Pluxee" },
+  { alan: "kasa_paye", ad: "Paye" },
+] as const;
+export type YemekKartiAlani = typeof YEMEK_KARTLARI[number]["alan"];
+
+export const yemekKartiToplam = (r: Partial<Record<YemekKartiAlani, unknown>>): number =>
+  YEMEK_KARTLARI.reduce((t, k) => t + n(r[k.alan]), 0);
 export const kasaToplam = (r: RaporVerisi): number =>
-  n(r.kasa_nakit) + n(r.kasa_pos) + n(r.kasa_edenred) + n(r.kasa_metropol);
+  n(r.kasa_nakit) + n(r.kasa_pos) + yemekKartiToplam(r);
 export const giderToplam = (r: RaporVerisi): number => n(r.gunluk_gider);
 export const iadeToplam = (r: RaporVerisi): number => n(r.iade_tutar);
 export const indirimToplam = (r: RaporVerisi): number =>
   n(r.os_kebo_ys_indirim) + n(r.os_kebo_trendyol_indirim) + n(r.os_cnf_ys_indirim) + n(r.os_cnf_trendyol_indirim)
+  + n(r.os_kebo_migros_indirim) + n(r.os_cnf_migros_yemek_indirim) + n(r.os_kebo_alo_indirim)
   + n(r.ko_kebo_ys_indirim) + n(r.ko_kebo_trendyol_indirim) + n(r.ko_cnf_ys_indirim) + n(r.ko_cnf_trendyol_indirim);
 
 /**

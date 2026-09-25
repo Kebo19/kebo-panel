@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   FileText, PlusCircle, Loader2, TrendingUp, Wallet, CheckCircle2, Bike,
   XCircle, Trash2, Monitor, Home, Edit3, Eye, AlertTriangle, BarChart3,
-  Calendar, Lock, User, Clock, ShieldAlert, Check, X, ArrowUpRight,
+  Calendar, Lock, Plus, User, Clock, ShieldAlert, Check, X, ArrowUpRight,
   Layers, Bell, Printer, ChevronDown, ChevronUp, PieChart, Activity,
   RefreshCw, Download, FileDown, StickyNote, DollarSign, Package,
   RotateCcw, Save, Slash, TrendingDown, Hash, Building2, Search, Sparkles,
@@ -17,7 +17,7 @@ import { bugun, buAyYil, aySonu, gunEkle, gunFarki, fmtTarih } from "@/lib/tarih
 import {
   brutCiro as brutHesapla, netCiro as netHesapla, raporOzeti, donemOzeti, platformKirilimi, paketToplam,
   kapidaKasadaMi, kuryeGercekPaket, yeniYapiMi, PLATFORM_RENK, PLATFORMLAR,
-  ROADRUNNER_GECIS_GUNU, KENDI_POS_GECIS_GUNU, KURYE_GARANTI_PAKET,
+  ROADRUNNER_GECIS_GUNU, KENDI_POS_GECIS_GUNU, KURYE_GARANTI_PAKET, YEMEK_KARTLARI, type YemekKartiAlani,
 } from "@/lib/hesap";
 import { useYetki } from "@/lib/useYetki";
 import { alanEtiketi } from "@/lib/tarama";
@@ -100,11 +100,12 @@ interface GunlukRapor {
   // Online — Kebo
   os_kebo_ys: number; os_kebo_ys_paket: number; os_kebo_ys_indirim: number;
   os_kebo_trendyol: number; os_kebo_trendyol_paket: number; os_kebo_trendyol_indirim: number;
-  os_kebo_migros: number; os_kebo_migros_paket: number;
+  os_kebo_migros: number; os_kebo_migros_paket: number; os_kebo_migros_indirim?: number;
+  os_kebo_alo?: number; os_kebo_alo_paket?: number; os_kebo_alo_indirim?: number;
   // Online — Chick'N Fride
   os_cnf_ys: number; os_cnf_ys_paket: number; os_cnf_ys_indirim: number;
   os_cnf_trendyol: number; os_cnf_trendyol_paket: number; os_cnf_trendyol_indirim: number;
-  os_cnf_migros_yemek: number; os_cnf_migros_yemek_paket: number;
+  os_cnf_migros_yemek: number; os_cnf_migros_yemek_paket: number; os_cnf_migros_yemek_indirim?: number;
   // Kapıda Ödeme — Kebo
   ko_kebo_ys: number; ko_kebo_ys_paket: number; ko_kebo_ys_indirim: number;
   ko_kebo_trendyol: number; ko_kebo_trendyol_paket: number; ko_kebo_trendyol_indirim: number;
@@ -116,6 +117,8 @@ interface GunlukRapor {
   ko_cnf_migros_yemek: number; ko_cnf_migros_yemek_paket: number;
   ko_cnf_alo: number; ko_cnf_alo_paket: number;
   kasa_nakit: number; kasa_pos: number; kasa_edenred: number; kasa_metropol: number;
+  kasa_setcard?: number; kasa_pluxee?: number; kasa_paye?: number;
+  nakit_kasa_sayim?: number | null; nakit_devreden_kagit?: number | null;
   gunluk_gider: number; gider_aciklama?: string;
   iade_tutar: number; iade_aciklama?: string;
   kurye_raporlari?: KuryeRaporu[];
@@ -420,8 +423,9 @@ function PrintModal({rapor, onClose}: {rapor:GunlukRapor, onClose:()=>void}) {
             <div className="section-title">Fiziki Kasa</div>
             {rapor.kasa_nakit>0&&<div className="row"><span>Nakit</span><span>₺{fmt(rapor.kasa_nakit)}</span></div>}
             {rapor.kasa_pos>0&&<div className="row"><span>POS / K.Kartı</span><span>₺{fmt(rapor.kasa_pos)}</span></div>}
-            {rapor.kasa_edenred>0&&<div className="row"><span>Edenred / Sodexo</span><span>₺{fmt(rapor.kasa_edenred)}</span></div>}
-            {rapor.kasa_metropol>0&&<div className="row"><span>Metropol</span><span>₺{fmt(rapor.kasa_metropol)}</span></div>}
+            {YEMEK_KARTLARI.filter(k=>Number(rapor[k.alan])>0).map(k=>(
+              <div key={k.alan} className="row"><span>{k.ad}</span><span>₺{fmt(Number(rapor[k.alan]))}</span></div>
+            ))}
             <div className="row bold"><span>Kasa Toplam</span><span>₺{fmt(tKasa)}</span></div>
             {yeniYapiVarMi && (
               <>
@@ -431,7 +435,7 @@ function PrintModal({rapor, onClose}: {rapor:GunlukRapor, onClose:()=>void}) {
                 {(rapor.os_kebo_ys||rapor.ko_kebo_ys)>0&&<div className="row"><span>· Yemeksepeti ({(rapor.os_kebo_ys_paket||0)+(rapor.ko_kebo_ys_paket||0)} pkt)</span><span>₺{fmt((rapor.os_kebo_ys||0)+(rapor.ko_kebo_ys||0))}</span></div>}
                 {(rapor.os_kebo_trendyol||rapor.ko_kebo_trendyol)>0&&<div className="row"><span>· Trendyol ({(rapor.os_kebo_trendyol_paket||0)+(rapor.ko_kebo_trendyol_paket||0)} pkt)</span><span>₺{fmt((rapor.os_kebo_trendyol||0)+(rapor.ko_kebo_trendyol||0))}</span></div>}
                 {(rapor.os_kebo_migros||rapor.ko_kebo_migros_yemek)>0&&<div className="row"><span>· Migros ({(rapor.os_kebo_migros_paket||0)+(rapor.ko_kebo_migros_yemek_paket||0)} pkt)</span><span>₺{fmt((rapor.os_kebo_migros||0)+(rapor.ko_kebo_migros_yemek||0))}</span></div>}
-                {rapor.ko_kebo_alo>0&&<div className="row"><span>· Alo Paket ({rapor.ko_kebo_alo_paket||0} pkt)</span><span>₺{fmt(rapor.ko_kebo_alo)}</span></div>}
+                {((rapor.ko_kebo_alo||0)+(rapor.os_kebo_alo||0))>0&&<div className="row"><span>· Alo Paket ({(rapor.ko_kebo_alo_paket||0)+(rapor.os_kebo_alo_paket||0)} pkt)</span><span>₺{fmt((rapor.ko_kebo_alo||0)+(rapor.os_kebo_alo||0))}</span></div>}
                 <div className="row"><span style={{fontWeight:700,marginTop:"4px"}}>Chick&apos;N Fride</span><span></span></div>
                 {(rapor.os_cnf_ys||rapor.ko_cnf_ys)>0&&<div className="row"><span>· Yemeksepeti ({(rapor.os_cnf_ys_paket||0)+(rapor.ko_cnf_ys_paket||0)} pkt)</span><span>₺{fmt((rapor.os_cnf_ys||0)+(rapor.ko_cnf_ys||0))}</span></div>}
                 {(rapor.os_cnf_trendyol||rapor.ko_cnf_trendyol)>0&&<div className="row"><span>· Trendyol ({(rapor.os_cnf_trendyol_paket||0)+(rapor.ko_cnf_trendyol_paket||0)} pkt)</span><span>₺{fmt((rapor.os_cnf_trendyol||0)+(rapor.ko_cnf_trendyol||0))}</span></div>}
@@ -554,6 +558,72 @@ function CurrencyInput({label, value, onChange, disabled=false}:
           placeholder="0"
         />
       </div>
+    </div>
+  );
+}
+
+// ─── NAKİT KASA HAREKETİ (önceki günlerden kalan nakitten) ─────────────────────
+type NakitHareket = { id: number; aciklama: string; banka: "" | "TEB" | "VakıfBank" | "Enpara"; tutar: string };
+const NAKIT_BANKALAR = ["TEB", "VakıfBank", "Enpara"] as const;
+function bankaBul(v?: string): NakitHareket["banka"] {
+  const t = (v || "").toLocaleLowerCase("tr");
+  if (!t) return "";
+  if (t.includes("teb")) return "TEB";
+  if (t.includes("vak")) return "VakıfBank";
+  if (t.includes("enpara") || t.includes("qnb")) return "Enpara";
+  return "";
+}
+
+// ─── SATIŞ TABLOSU (kağıt formla aynı düzen) ──────────────────────────────────
+// Sütunlar: Online Tutar | Online Paket | İndirim | Kapıda Tutar | Kapıda Paket
+// Karşılığı olmayan hücre (ör. Chick'n Fride kapıda, Alo Paket online) gösterilmez.
+const SATIS_IZGARA = "md:grid md:grid-cols-[120px_1.3fr_0.7fr_1fr_1.3fr_0.7fr_70px] md:gap-2 md:items-center";
+
+function HucreGirdi({value, onChange, tip, disabled, etiket, renk, soluk}:
+  {value:string, onChange:(v:string)=>void, tip:"para"|"adet", disabled?:boolean, etiket:string, renk?:string, soluk?:boolean}) {
+  return (
+    <label className="block">
+      <span className="md:hidden block text-[10px] font-semibold text-gray-500 mb-0.5">{etiket}</span>
+      <input type="text" inputMode={tip === "para" ? "decimal" : "numeric"} value={value} disabled={disabled}
+        onChange={e => onChange(tip === "para" ? paraGirdisi(e.target.value) : e.target.value.replace(/\D/g, ""))}
+        placeholder="0" aria-label={etiket}
+        className={`w-full ${soluk && !value ? "bg-[#eef0f3] border-dashed" : "bg-[#f7f8fa]"} border border-[#dde1e8] hover:border-[#b9c2d1] focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 text-[15px] font-bold h-10 px-3 rounded-lg outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-gray-400 ${tip === "adet" ? "text-center" : "text-right"} ${renk || "text-[#1a1f2e]"}`}/>
+    </label>
+  );
+}
+const BosHucre = () => <div className="hidden md:block h-10"/>;
+const sayi = (v?: string) => parseInt(v || "", 10) || 0;
+/** Satır/marka toplam paketi: salt okunur rozet */
+const PaketRozet = ({ adet, vurgu }: { adet: number; vurgu?: boolean }) => (
+  <div className={`h-10 rounded-lg flex items-center justify-center text-[15px] font-black text-[#1a1f2e] border ${vurgu ? "border-2 border-[#1a1f2e]" : "border-[#e2e5eb] bg-[#fafbfc]"}`}>{adet}</div>
+);
+
+function SatisSatiri({ad, online, onOnline, indirim, onIndirim, kapida, onKapida, disabled, soluk = []}: {
+  ad: string; disabled?: boolean;
+  /** Formda gri olan (genelde kullanılmayan) hücreler: soluk görünür ama girilebilir */
+  soluk?: ("online" | "indirim" | "kapida")[];
+  online?: PlatformGiris; onOnline?: (v: PlatformGiris) => void;
+  indirim?: string; onIndirim?: (v: string) => void;
+  kapida?: PlatformGiris; onKapida?: (v: PlatformGiris) => void;
+}) {
+  return (
+    <div className={`${SATIS_IZGARA} rounded-lg md:rounded-none border md:border-0 border-[#e2e5eb] p-2.5 md:p-0`}>
+      <p className="text-[13px] font-semibold text-gray-800 mb-1.5 md:mb-0 flex items-center justify-between">{ad}
+        <span className="md:hidden text-[11px] font-bold text-gray-700 border border-[#e2e5eb] rounded px-1.5">{sayi(online?.paket) + sayi(kapida?.paket)} pkt</span></p>
+      <div className="grid grid-cols-3 gap-2 md:contents">
+        {online && onOnline ? <>
+          <HucreGirdi etiket="Online ₺" tip="para" value={online.tutar} onChange={v => onOnline({ ...online, tutar: v })} disabled={disabled} soluk={soluk.includes("online")}/>
+          <HucreGirdi etiket="Paket" tip="adet" value={online.paket} onChange={v => onOnline({ ...online, paket: v })} disabled={disabled} renk="text-amber-700" soluk={soluk.includes("online")}/>
+        </> : <><BosHucre/><BosHucre/></>}
+        {onIndirim ? <HucreGirdi etiket="İndirim ₺" tip="para" value={indirim || ""} onChange={onIndirim} disabled={disabled} renk="text-red-600" soluk={soluk.includes("indirim")}/> : <BosHucre/>}
+      </div>
+      <div className={`grid grid-cols-3 gap-2 md:contents ${kapida ? "mt-2 md:mt-0" : ""}`}>
+        {kapida && onKapida ? <>
+          <HucreGirdi etiket="Kapıda ₺" tip="para" value={kapida.tutar} onChange={v => onKapida({ ...kapida, tutar: v })} disabled={disabled} renk="text-purple-700" soluk={soluk.includes("kapida")}/>
+          <HucreGirdi etiket="Paket" tip="adet" value={kapida.paket} onChange={v => onKapida({ ...kapida, paket: v })} disabled={disabled} renk="text-amber-700" soluk={soluk.includes("kapida")}/>
+        </> : <><BosHucre/><BosHucre/></>}
+      </div>
+      <div className="hidden md:block"><PaketRozet adet={sayi(online?.paket) + sayi(kapida?.paket)}/></div>
     </div>
   );
 }
@@ -741,12 +811,17 @@ export default function RaporlarPage() {
   const [osKeboTrendyol, setOsKeboTrendyol] = useState<PlatformGiris>({tutar:"",paket:""});
   const [osKeboTrendyolIndirim, setOsKeboTrendyolIndirim] = useState("");
   const [osKeboMigros, setOsKeboMigros] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [osKeboMigrosIndirim, setOsKeboMigrosIndirim] = useState("");
+  // Alo Paket online (formda gri; yazılırsa işlenir)
+  const [osKeboAlo, setOsKeboAlo] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [osKeboAloIndirim, setOsKeboAloIndirim] = useState("");
   // ── Online — Chick'N Fride ──
   const [osCnfYs, setOsCnfYs] = useState<PlatformGiris>({tutar:"",paket:""});
   const [osCnfYsIndirim, setOsCnfYsIndirim] = useState("");
   const [osCnfTrendyol, setOsCnfTrendyol] = useState<PlatformGiris>({tutar:"",paket:""});
   const [osCnfTrendyolIndirim, setOsCnfTrendyolIndirim] = useState("");
   const [osCnfMigrosYemek, setOsCnfMigrosYemek] = useState<PlatformGiris>({tutar:"",paket:""});
+  const [osCnfMigrosIndirim, setOsCnfMigrosIndirim] = useState("");
   // ── Kapıda Ödeme — Kebo ──
   const [koKeboYs, setKoKeboYs] = useState<PlatformGiris>({tutar:"",paket:""});
   const [koKeboYsIndirim, setKoKeboYsIndirim] = useState("");
@@ -762,7 +837,18 @@ export default function RaporlarPage() {
   const [koCnfMigrosYemek, setKoCnfMigrosYemek] = useState<PlatformGiris>({tutar:"",paket:""});
   const [koCnfAlo, setKoCnfAlo] = useState<PlatformGiris>({tutar:"",paket:""});
   const [kasaNakit, setKasaNakit] = useState(""); const [kasaPos, setKasaPos] = useState("");
-  const [kasaEdenred, setKasaEdenred] = useState(""); const [kasaMetropol, setKasaMetropol] = useState("");
+  // Yemek kartları (Edenred, Metropol, Setcard, Pluxee, Paye) — lib/hesap.ts YEMEK_KARTLARI
+  const bosKartlar = (): Record<YemekKartiAlani, string> => Object.fromEntries(YEMEK_KARTLARI.map(k => [k.alan, ""])) as Record<YemekKartiAlani, string>;
+  const [kartlar, setKartlar] = useState<Record<YemekKartiAlani, string>>(bosKartlar);
+  // ── 7. Nakit kasa: önceki günlerden kalan nakit, ondan yapılan ödemeler/bankaya yatırmalar, gün sonu sayımı ──
+  const [nakitHareketleri, setNakitHareketleri] = useState<NakitHareket[]>([]);
+  const [nakitSayim, setNakitSayim] = useState("");
+  const [nakitDevredenKagit, setNakitDevredenKagit] = useState("");
+  const [nakitDevredenSistem, setNakitDevredenSistem] = useState<number | null>(null);
+  const [oncekiSayimVar, setOncekiSayimVar] = useState<boolean | null>(null);
+  // Müdür mevcut raporu açtığında kasa hareketlerini okuyamaz; o durumda kayıtta bu liste gönderilmez (silinmesin).
+  const [nakitHareketYuklendi, setNakitHareketYuklendi] = useState(true);
+  const kartYaz = (alan: YemekKartiAlani, v: string) => setKartlar(o => ({ ...o, [alan]: v }));
   const [giderler, setGiderler] = useState<SatirRaporu[]>(()=>[{id:1,aciklama:"",tutar:"",tip:"normal"}]);
   const [iadeler, setIadeler] = useState<SatirRaporu[]>(()=>[{id:2,aciklama:"",tutar:""}]); // İptal-İade Fişleri
   const [kuryeler, setKuryeler] = useState<KuryeRaporu[]>(()=>kuryeYapisiHesapla(bugun()));
@@ -778,10 +864,13 @@ export default function RaporlarPage() {
   const [taramaIleDoldu, setTaramaIleDoldu] = useState(false);
   const [taramaTarihNotu, setTaramaTarihNotu] = useState("");
   const [kontrolOnay, setKontrolOnay] = useState(false);
+  // Kağıda elle yazılmış kontrol toplamları (paket toplamları, brüt, net) — panel hesabıyla karşılaştırılır
+  const [taramaKontrol, setTaramaKontrol] = useState<Record<string, number>>({});
   // Yeni raporda önce tarih seçilip onaylanır, sonra form (ve tarama) açılır.
   const [tarihOnaylandi, setTarihOnaylandi] = useState(false);
   const formAlaniRef = useRef<HTMLDivElement>(null);
   const dosyaInputRef = useRef<HTMLInputElement>(null);
+  const ekDosyaInputRef = useRef<HTMLInputElement>(null);
 
   const personelIdBul = useCallback((isim?: string) =>
     avansPersonelListesi.find(p => p.isim === isim)?.id, [avansPersonelListesi]);
@@ -830,6 +919,22 @@ export default function RaporlarPage() {
 
   useEffect(()=>{veriCek();},[veriCek]);
 
+  // Seçilen günün devreden nakdi (o günden önceki Nakit kasa bakiyesi) ve daha önce sayım yapılmış mı
+  useEffect(() => {
+    if (!tarih || !/^\d{4}-\d{2}-\d{2}$/.test(tarih)) { setNakitDevredenSistem(null); setOncekiSayimVar(null); return; }
+    let iptal = false;
+    (async () => {
+      const [{ data: bakiye }, { data: onceki }] = await Promise.all([
+        supabase.rpc("nakit_kasa_bakiyesi", { p_tarih: tarih }),
+        supabase.from("gunluk_raporlar").select("id").not("nakit_kasa_sayim", "is", null).lt("tarih", tarih).limit(1),
+      ]);
+      if (iptal) return;
+      setNakitDevredenSistem(bakiye == null ? null : Number(bakiye));
+      setOncekiSayimVar(!!onceki?.length);
+    })();
+    return () => { iptal = true; };
+  }, [tarih, supabase]);
+
   // ── Helpers ──
   const siradakiTarih = (): string|null => enSonRaporTarihi ? gunEkle(enSonRaporTarihi, 1) : null;
 
@@ -847,11 +952,12 @@ export default function RaporlarPage() {
 
   const formuTemizle = () => {
     const bosPG = ():PlatformGiris=>({tutar:"",paket:""});
-    setOsKeboYs(bosPG());setOsKeboYsIndirim("");setOsKeboTrendyol(bosPG());setOsKeboTrendyolIndirim("");setOsKeboMigros(bosPG());
+    setOsKeboYs(bosPG());setOsKeboYsIndirim("");setOsKeboTrendyol(bosPG());setOsKeboTrendyolIndirim("");setOsKeboMigros(bosPG());setOsKeboMigrosIndirim("");setOsKeboAlo(bosPG());setOsKeboAloIndirim("");setOsCnfMigrosIndirim("");
     setOsCnfYs(bosPG());setOsCnfYsIndirim("");setOsCnfTrendyol(bosPG());setOsCnfTrendyolIndirim("");setOsCnfMigrosYemek(bosPG());
     setKoKeboYs(bosPG());setKoKeboYsIndirim("");setKoKeboTrendyol(bosPG());setKoKeboTrendyolIndirim("");setKoKeboMigrosYemek(bosPG());setKoKeboAlo(bosPG());
     setKoCnfYs(bosPG());setKoCnfYsIndirim("");setKoCnfTrendyol(bosPG());setKoCnfTrendyolIndirim("");setKoCnfMigrosYemek(bosPG());setKoCnfAlo(bosPG());
-    setKasaNakit("");setKasaPos("");setKasaEdenred("");setKasaMetropol("");
+    setKasaNakit("");setKasaPos("");setKartlar(bosKartlar());
+    setNakitHareketleri([]); setNakitSayim(""); setNakitDevredenKagit(""); setNakitHareketYuklendi(true);
     setGiderler([{id:yeniSatirId(),aciklama:"",tutar:"",tip:"normal"}]);
     setIadeler([{id:yeniSatirId(),aciklama:"",tutar:""}]);
     setKesintiSatirlari([]);
@@ -859,7 +965,7 @@ export default function RaporlarPage() {
     setKuryeler(kuryeYapisiHesapla(bugun()));
     setNotlar("");setSelectedRapor(null);setIsEditMode(false);
     setTaramaHata(""); setTaramaBelirsizAlanlar([]);
-    setTaramaIleDoldu(false); setTaramaTarihNotu(""); setKontrolOnay(false); setTarihOnaylandi(false);
+    setTaramaIleDoldu(false); setTaramaTarihNotu(""); setKontrolOnay(false); setTarihOnaylandi(false); setTaramaKontrol({});
   };
 
   /** Yeni rapor: formu temizler, tarih adımını sıradaki günle hazır açar. */
@@ -911,7 +1017,7 @@ export default function RaporlarPage() {
   // İki rapor kaydı arasındaki farklı alanları okunabilir şekilde listeler
   const talepFarklari = (eski: Record<string, unknown> | null, yeni: Record<string, unknown> | null) => {
     const ALAN_ETIKET: Record<string,string> = {
-      os_kebo_ys:"Kebo · Yemeksepeti (Online)", os_kebo_trendyol:"Kebo · Trendyol (Online)", os_kebo_migros:"Kebo · Migros (Online)",
+      os_kebo_ys:"Kebo · Yemeksepeti (Online)", os_kebo_trendyol:"Kebo · Trendyol (Online)", os_kebo_migros:"Kebo · Migros (Online)", os_kebo_migros_indirim:"Kebo · Migros İndirim", os_kebo_alo:"Kebo · Alo Paket (Online)", os_kebo_alo_indirim:"Kebo · Alo İndirim", os_cnf_migros_yemek_indirim:"CNF · Migros İndirim",
       os_cnf_ys:"CNF · Yemeksepeti (Online)", os_cnf_trendyol:"CNF · Trendyol (Online)", os_cnf_migros_yemek:"CNF · Migros Yemek (Online)",
       ko_kebo_ys:"Kebo · Yemeksepeti (Kapıda)", ko_kebo_trendyol:"Kebo · Trendyol (Kapıda)", ko_kebo_migros_yemek:"Kebo · Migros Yemek (Kapıda)", ko_kebo_alo:"Kebo · Alo Paket",
       ko_cnf_ys:"CNF · Yemeksepeti (Kapıda)", ko_cnf_trendyol:"CNF · Trendyol (Kapıda)", ko_cnf_migros_yemek:"CNF · Migros Yemek (Kapıda)", ko_cnf_alo:"CNF · Alo Paket",
@@ -919,7 +1025,7 @@ export default function RaporlarPage() {
       os_migros:"Migros (Online, eski)", os_chicknfride:"Chick'N Fride (Online, eski)",
       ko_yemeksepeti:"Yemeksepeti (Kapıda, eski)", ko_getir:"Getir (Kapıda)", ko_trendyol:"Trendyol (Kapıda, eski)",
       ko_migros:"Migros (Kapıda, eski)", ko_alo_paket:"Alo Paket (eski)", ko_chicknfride:"Chick'N Fride (Kapıda, eski)",
-      kasa_nakit:"Kasa Nakit", kasa_pos:"Kasa POS", kasa_edenred:"Kasa Edenred", kasa_metropol:"Kasa Metropol",
+      kasa_nakit:"Kasa Nakit", kasa_pos:"Kasa POS", kasa_edenred:"Kasa Edenred", kasa_metropol:"Kasa Metropol", kasa_setcard:"Kasa Setcard", kasa_pluxee:"Kasa Pluxee", kasa_paye:"Kasa Paye",
       gunluk_gider:"Günlük Gider", iade_tutar:"İade Tutarı", toplam_ciro:"Brüt Ciro",
       gider_aciklama:"Gider Açıklaması", iade_aciklama:"İade Açıklaması",
     };
@@ -936,14 +1042,26 @@ export default function RaporlarPage() {
 
   const raporuFormaYukle = async (r: GunlukRapor) => {
     setTarih(r.tarih); setTarihHataVarMi(false); setAdminOnayliGecis(false); setDuplikaTarihHata(false);
+    setNakitSayim(r.nakit_kasa_sayim != null ? paraYaz(Number(r.nakit_kasa_sayim)) : "");
+    setNakitDevredenKagit(r.nakit_devreden_kagit != null ? paraYaz(Number(r.nakit_devreden_kagit)) : "");
+    setNakitHareketleri([]); setNakitHareketYuklendi(false);
+    if (isAdmin) {
+      const { data: nh, error: nhHata } = await supabase.from("kasa_manuel_islemler")
+        .select("id,aciklama,hedef_hesap,tutar").eq("rapor_id", r.id).eq("kaynak", "rapor_nakit").order("created_at");
+      if (!nhHata) {
+        setNakitHareketleri((nh || []).map((h, i) => ({ id: Date.now() + i, aciklama: h.aciklama || "", banka: bankaBul(h.hedef_hesap || ""), tutar: paraYaz(Number(h.tutar)) })));
+        setNakitHareketYuklendi(true);
+      }
+    }
     const pg = (tutar: number, paket: number) => ({tutar: paraYaz(tutar), paket: paket ? String(paket) : ""});
     if (yeniYapiMi(r)) {
       setOsKeboYs(pg(r.os_kebo_ys, r.os_kebo_ys_paket)); setOsKeboYsIndirim(paraYaz(r.os_kebo_ys_indirim));
       setOsKeboTrendyol(pg(r.os_kebo_trendyol, r.os_kebo_trendyol_paket)); setOsKeboTrendyolIndirim(paraYaz(r.os_kebo_trendyol_indirim));
-      setOsKeboMigros(pg(r.os_kebo_migros, r.os_kebo_migros_paket));
+      setOsKeboMigros(pg(r.os_kebo_migros, r.os_kebo_migros_paket)); setOsKeboMigrosIndirim(paraYaz(r.os_kebo_migros_indirim||0));
+      setOsKeboAlo(pg(r.os_kebo_alo||0, r.os_kebo_alo_paket||0)); setOsKeboAloIndirim(paraYaz(r.os_kebo_alo_indirim||0));
       setOsCnfYs(pg(r.os_cnf_ys, r.os_cnf_ys_paket)); setOsCnfYsIndirim(paraYaz(r.os_cnf_ys_indirim));
       setOsCnfTrendyol(pg(r.os_cnf_trendyol, r.os_cnf_trendyol_paket)); setOsCnfTrendyolIndirim(paraYaz(r.os_cnf_trendyol_indirim));
-      setOsCnfMigrosYemek(pg(r.os_cnf_migros_yemek, r.os_cnf_migros_yemek_paket));
+      setOsCnfMigrosYemek(pg(r.os_cnf_migros_yemek, r.os_cnf_migros_yemek_paket)); setOsCnfMigrosIndirim(paraYaz(r.os_cnf_migros_yemek_indirim||0));
       setKoKeboYs(pg(r.ko_kebo_ys, r.ko_kebo_ys_paket)); setKoKeboYsIndirim(paraYaz(r.ko_kebo_ys_indirim));
       setKoKeboTrendyol(pg(r.ko_kebo_trendyol, r.ko_kebo_trendyol_paket)); setKoKeboTrendyolIndirim(paraYaz(r.ko_kebo_trendyol_indirim));
       setKoKeboMigrosYemek(pg(r.ko_kebo_migros_yemek, r.ko_kebo_migros_yemek_paket));
@@ -965,7 +1083,7 @@ export default function RaporlarPage() {
       setKoKeboMigrosYemek(pg(r.ko_migros, 0)); setKoKeboAlo(pg(r.ko_alo_paket, 0));
       setKoCnfYs(pg(r.ko_chicknfride, 0)); setKoCnfYsIndirim(""); setKoCnfTrendyol(bosPG()); setKoCnfTrendyolIndirim(""); setKoCnfMigrosYemek(bosPG()); setKoCnfAlo(bosPG());
     }
-    setKasaNakit(paraYaz(r.kasa_nakit)); setKasaPos(paraYaz(r.kasa_pos)); setKasaEdenred(paraYaz(r.kasa_edenred)); setKasaMetropol(paraYaz(r.kasa_metropol));
+    setKasaNakit(paraYaz(r.kasa_nakit)); setKasaPos(paraYaz(r.kasa_pos)); setKartlar(Object.fromEntries(YEMEK_KARTLARI.map(k => [k.alan, paraYaz(Number(r[k.alan]) || 0)])) as Record<YemekKartiAlani, string>);
     setKuryeler(r.kurye_raporlari?.length
       ? r.kurye_raporlari.map((k,i)=>({...k, id:k.id ?? Date.now()+i, isim:k.isim||"",
           nakit:paraYaz(tv(k.nakit)), pos:paraYaz(tv(k.pos)), paketSayisi:String(k.paketSayisi??""),
@@ -1007,10 +1125,10 @@ export default function RaporlarPage() {
   const ch = useMemo(()=>{
     const pk = (p:PlatformGiris)=>parseInt(p.paket)||0;
     // ── Online ──
-    const tOnlineKebo = tv(osKeboYs.tutar)+tv(osKeboTrendyol.tutar)+tv(osKeboMigros.tutar);
+    const tOnlineKebo = tv(osKeboYs.tutar)+tv(osKeboTrendyol.tutar)+tv(osKeboMigros.tutar)+tv(osKeboAlo.tutar);
     const tOnlineCnf  = tv(osCnfYs.tutar)+tv(osCnfTrendyol.tutar)+tv(osCnfMigrosYemek.tutar);
     const tOnline = tOnlineKebo + tOnlineCnf;
-    const tOnlinePaket = pk(osKeboYs)+pk(osKeboTrendyol)+pk(osKeboMigros)+pk(osCnfYs)+pk(osCnfTrendyol)+pk(osCnfMigrosYemek);
+    const tOnlinePaket = pk(osKeboYs)+pk(osKeboTrendyol)+pk(osKeboMigros)+pk(osKeboAlo)+pk(osCnfYs)+pk(osCnfTrendyol)+pk(osCnfMigrosYemek);
     // ── Kapıda Ödeme ──
     const tKapidaKebo = tv(koKeboYs.tutar)+tv(koKeboTrendyol.tutar)+tv(koKeboMigrosYemek.tutar)+tv(koKeboAlo.tutar);
     const tKapidaCnf  = tv(koCnfYs.tutar)+tv(koCnfTrendyol.tutar)+tv(koCnfMigrosYemek.tutar)+tv(koCnfAlo.tutar);
@@ -1020,12 +1138,13 @@ export default function RaporlarPage() {
     // ── İndirim Analizi (Yemeksepeti + Trendyol, Kebo + CNF, online + kapıda) ──
     const tIndirimYS = tv(osKeboYsIndirim)+tv(osCnfYsIndirim)+tv(koKeboYsIndirim)+tv(koCnfYsIndirim);
     const tIndirimTrendyol = tv(osKeboTrendyolIndirim)+tv(osCnfTrendyolIndirim)+tv(koKeboTrendyolIndirim)+tv(koCnfTrendyolIndirim);
-    const tIndirim = tIndirimYS + tIndirimTrendyol;
+    const tIndirimDiger = tv(osKeboMigrosIndirim)+tv(osCnfMigrosIndirim)+tv(osKeboAloIndirim);
+    const tIndirim = tIndirimYS + tIndirimTrendyol + tIndirimDiger;
     const paketCiroToplami = tOnline + tKapida; // platform tutarları indirim öncesi (brüt)
     const indirimOrani = paketCiroToplami>0 ? (tIndirim/paketCiroToplami)*100 : 0;
     const indirimUyari = indirimOrani > 15;
     // ── Kasa ──
-    const tKasa=tv(kasaNakit)+tv(kasaPos)+tv(kasaEdenred)+tv(kasaMetropol);
+    const tKasa=tv(kasaNakit)+tv(kasaPos)+YEMEK_KARTLARI.reduce((t,k)=>t+tv(kartlar[k.alan]),0);
     const tGider=giderler.reduce((a,g)=>a+tv(g.tutar),0);
     const tIade=iadeler.reduce((a,i)=>a+tv(i.tutar),0);
     const brutCiro = tOnline + (kapidaKasada ? 0 : tKapida) + tKasa + tGider;
@@ -1051,11 +1170,11 @@ export default function RaporlarPage() {
       tIndirimYS,tIndirimTrendyol,tIndirim,indirimOrani,indirimUyari,
       tKasa,brutCiro,tGider,tIade,netCiro,kuryelerHesap,tKuryePaket,tKuryeGercekPaket,
       tKuryeUzakPaket,tKuryePaket9km,tKuryeTahsilat,paketOrt,kuryeFark};
-  },[tarih,osKeboYs,osKeboYsIndirim,osKeboTrendyol,osKeboTrendyolIndirim,osKeboMigros,
+  },[tarih,osKeboYs,osKeboYsIndirim,osKeboTrendyol,osKeboTrendyolIndirim,osKeboMigros,osKeboMigrosIndirim,osKeboAlo,osKeboAloIndirim,osCnfMigrosIndirim,
      osCnfYs,osCnfYsIndirim,osCnfTrendyol,osCnfTrendyolIndirim,osCnfMigrosYemek,
      koKeboYs,koKeboYsIndirim,koKeboTrendyol,koKeboTrendyolIndirim,koKeboMigrosYemek,koKeboAlo,
      koCnfYs,koCnfYsIndirim,koCnfTrendyol,koCnfTrendyolIndirim,koCnfMigrosYemek,koCnfAlo,
-     kasaNakit,kasaPos,kasaEdenred,kasaMetropol,giderler,iadeler,kuryeler]);
+     kasaNakit,kasaPos,kartlar,giderler,iadeler,kuryeler]);
 
   // ── Table totals ──
   const tabloToplam = useMemo(()=>{
@@ -1084,47 +1203,57 @@ export default function RaporlarPage() {
   };
   // ── Fişten Doldur: kağıt raporu fotoğraflayıp/yükleyip AI'ye okutma ──
   const nToStr = (n:number|undefined) => (n && n>0) ? paraYaz(n) : "";
-  const handleFisTara = async (file: File) => {
-    if (!file) return;
-    setTaramaYukleniyor(true); setTaramaHata(""); setTaramaBelirsizAlanlar([]);
+  /**
+   * Kağıt formun bir veya birkaç sayfasını (ön/arka) okur.
+   * ekle=false: ilk tarama, formu doldurur. ekle=true: "Sayfa ekle" — önceki
+   * değerler korunur, sadece yeni okunan dolu alanlar yazılır, satırlar eklenir.
+   */
+  const handleFisTara = async (dosyalar: File[], ekle = false) => {
+    if (!dosyalar.length) return;
+    if (dosyalar.length > 3) { setTaramaHata("En fazla 3 sayfa seçebilirsiniz."); return; }
+    setTaramaYukleniyor(true); setTaramaHata("");
     try {
-      // Fotoğraf yüklemeden önce küçültülür (Vercel ~4,5 MB istek sınırı).
-      const dosya = await yuklemeIcinHazirla(file);
+      // Fotoğraflar yüklemeden önce küçültülür (Vercel ~4,5 MB istek sınırı; çok sayfada daha küçük).
+      const gorseller = await Promise.all(dosyalar.map(f => yuklemeIcinHazirla(f, dosyalar.length > 1 ? 1600 : 2000)));
       const response = await fetch("/api/rapor-tara", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: dosya.base64, mediaType: dosya.mediaType }),
+        body: JSON.stringify({ gorseller: gorseller.map(g => ({ base64: g.base64, mediaType: g.mediaType })) }),
       });
       const { veri: hamVeri, hata } = await jsonCevap(response);
       if (hata) { setTaramaHata(hata); return; }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const veri = hamVeri as any;
-      // Tarih (sadece yeni rapor eklerken, düzenleme modunda tarihi ezme)
-      // Tarih: formdan okunduysa o; okunamadıysa ve seçili değilse sıradaki rapor günü.
-      // Böylece form hemen açılır; kullanıcı gerekirse tarihi değiştirir.
       // Tarih elle seçilir; kağıttaki tarih okunur ve farklıysa sadece uyarılır.
       const hedefTarih: string = tarih;
       if (veri.tarih && veri.tarih !== tarih) {
         setTaramaTarihNotu(`Kağıtta ${fmtTarih(veri.tarih)} yazıyor, rapor tarihi ${fmtTarih(tarih)}. Doğru kağıdı taradığınızdan emin olun.`);
       }
+      // ekle modunda boş okunan alanlar mevcut değeri silmez
+      const yaz = <T,>(setter: (v: T) => void, deger: T, dolu: boolean) => { if (!ekle || dolu) setter(deger); };
+      const pgYaz = (setter: (v: PlatformGiris) => void, o: {tutar?:number;paket?:number}|undefined) => {
+        const v = pg(o); yaz(setter, v, !!(v.tutar || v.paket));
+      };
+      const sYaz = (setter: (v: string) => void, n: number|undefined) => { const v = nToStr(n); yaz(setter, v, !!v); };
       const pg = (o:{tutar?:number;paket?:number}|undefined): PlatformGiris => ({ tutar: nToStr(o?.tutar), paket: o?.paket ? String(o.paket) : "" });
       const ok = veri.online?.kebo || {}; const oc = veri.online?.cnf || {};
-      setOsKeboYs(pg(ok.ys)); setOsKeboYsIndirim(nToStr(ok.ys?.indirim));
-      setOsKeboTrendyol(pg(ok.trendyol)); setOsKeboTrendyolIndirim(nToStr(ok.trendyol?.indirim));
-      setOsKeboMigros(pg(ok.migros));
-      setOsCnfYs(pg(oc.ys)); setOsCnfYsIndirim(nToStr(oc.ys?.indirim));
-      setOsCnfTrendyol(pg(oc.trendyol)); setOsCnfTrendyolIndirim(nToStr(oc.trendyol?.indirim));
-      setOsCnfMigrosYemek(pg(oc.migrosYemek));
+      pgYaz(setOsKeboYs, ok.ys); sYaz(setOsKeboYsIndirim, ok.ys?.indirim);
+      pgYaz(setOsKeboTrendyol, ok.trendyol); sYaz(setOsKeboTrendyolIndirim, ok.trendyol?.indirim);
+      pgYaz(setOsKeboMigros, ok.migros); sYaz(setOsKeboMigrosIndirim, ok.migros?.indirim);
+      pgYaz(setOsKeboAlo, ok.alo); sYaz(setOsKeboAloIndirim, ok.alo?.indirim);
+      pgYaz(setOsCnfYs, oc.ys); sYaz(setOsCnfYsIndirim, oc.ys?.indirim);
+      pgYaz(setOsCnfTrendyol, oc.trendyol); sYaz(setOsCnfTrendyolIndirim, oc.trendyol?.indirim);
+      pgYaz(setOsCnfMigrosYemek, oc.migrosYemek); sYaz(setOsCnfMigrosIndirim, oc.migrosYemek?.indirim);
       const kk = veri.kapida?.kebo || {}; const kc = veri.kapida?.cnf || {};
-      setKoKeboYs(pg(kk.ys)); setKoKeboYsIndirim(nToStr(kk.ys?.indirim));
-      setKoKeboTrendyol(pg(kk.trendyol)); setKoKeboTrendyolIndirim(nToStr(kk.trendyol?.indirim));
-      setKoKeboMigrosYemek(pg(kk.migrosYemek)); setKoKeboAlo(pg(kk.alo));
-      setKoCnfYs(pg(kc.ys)); setKoCnfYsIndirim(nToStr(kc.ys?.indirim));
-      setKoCnfTrendyol(pg(kc.trendyol)); setKoCnfTrendyolIndirim(nToStr(kc.trendyol?.indirim));
-      setKoCnfMigrosYemek(pg(kc.migrosYemek)); setKoCnfAlo(pg(kc.alo));
+      pgYaz(setKoKeboYs, kk.ys); sYaz(setKoKeboYsIndirim, kk.ys?.indirim);
+      pgYaz(setKoKeboTrendyol, kk.trendyol); sYaz(setKoKeboTrendyolIndirim, kk.trendyol?.indirim);
+      pgYaz(setKoKeboMigrosYemek, kk.migrosYemek); pgYaz(setKoKeboAlo, kk.alo);
+      pgYaz(setKoCnfYs, kc.ys); sYaz(setKoCnfYsIndirim, kc.ys?.indirim);
+      pgYaz(setKoCnfTrendyol, kc.trendyol); sYaz(setKoCnfTrendyolIndirim, kc.trendyol?.indirim);
+      pgYaz(setKoCnfMigrosYemek, kc.migrosYemek); pgYaz(setKoCnfAlo, kc.alo);
       if (veri.kasa) {
-        setKasaNakit(nToStr(veri.kasa.nakit)); setKasaPos(nToStr(veri.kasa.pos));
-        setKasaEdenred(nToStr(veri.kasa.edenred)); setKasaMetropol(nToStr(veri.kasa.metropol));
+        sYaz(setKasaNakit, veri.kasa.nakit); sYaz(setKasaPos, veri.kasa.pos);
+        YEMEK_KARTLARI.forEach(k => { const anahtar = k.alan.replace("kasa_", ""); sYaz(v => kartYaz(k.alan, v), veri.kasa[anahtar]); });
       }
       type TaramaSatiri = { tutar?: number; aciklama?: string; personel?: string; isim?: string; nakit?: number; pos?: number; paket?: number };
       const yeniGiderler: SatirRaporu[] = [];
@@ -1135,19 +1264,23 @@ export default function RaporlarPage() {
         if (a.tutar || a.personel) yeniGiderler.push({ id: Date.now()+100+i, aciklama: a.aciklama||"", tutar: nToStr(a.tutar), tip: "personel",
           personelIsim: a.personel||"", personelId: personelIdBul(a.personel) });
       });
-      if (yeniGiderler.length) setGiderler(yeniGiderler);
+      const doluSatir = (g: SatirRaporu) => !!(g.aciklama || g.tutar);
+      if (yeniGiderler.length) setGiderler(onceki => ekle ? [...onceki.filter(doluSatir), ...yeniGiderler] : yeniGiderler);
       const yeniKesintiler = (veri.kesintiler||[]).filter((k:TaramaSatiri)=>k.tutar||k.personel)
         .map((k:TaramaSatiri,i:number)=>({ id: Date.now()+200+i, personelId: personelIdBul(k.personel), personelIsim: k.personel||"", tutar: nToStr(k.tutar), aciklama: k.aciklama||"" }));
-      if (yeniKesintiler.length) setKesintiSatirlari(yeniKesintiler);
+      if (yeniKesintiler.length) setKesintiSatirlari(onceki => ekle ? [...onceki.filter(k => k.tutar || k.personelIsim), ...yeniKesintiler] : yeniKesintiler);
       const yeniIadeler = (veri.iadeler||[]).filter((i:TaramaSatiri)=>i.tutar||i.aciklama)
         .map((i:TaramaSatiri,idx:number)=>({ id: Date.now()+300+idx, aciklama: i.aciklama||"", tutar: nToStr(i.tutar) }));
-      if (yeniIadeler.length) setIadeler(yeniIadeler);
+      if (yeniIadeler.length) setIadeler(onceki => ekle ? [...onceki.filter(i => i.aciklama || i.tutar), ...yeniIadeler] : yeniIadeler);
       const sabitler: TaramaSatiri[] = (veri.kuryeSabit||[]);
       const havuzlar: TaramaSatiri[] = (veri.kuryeHavuz||[]).filter((k:TaramaSatiri)=>k.isim||k.paket||k.nakit||k.pos);
       const satir = (k: TaramaSatiri|undefined, id: number, tip: KuryeRaporu["tip"], varsayilanIsim: string): KuryeRaporu => ({
         id, isim: k?.isim || varsayilanIsim, nakit: nToStr(k?.nakit), pos: nToStr(k?.pos),
         paketSayisi: k?.paket ? String(k.paket) : "", uzakPaket:"", paket9km:"", tip });
-      if (hedefTarih && hedefTarih < ROADRUNNER_GECIS_GUNU) {
+      const kuryeOkundu = [...sabitler, ...havuzlar].some(k => k.isim || k.paket || k.nakit || k.pos);
+      if (ekle && !kuryeOkundu) {
+        // Bu sayfada kurye bölümü yok; mevcut kurye satırları korunur.
+      } else if (hedefTarih && hedefTarih < ROADRUNNER_GECIS_GUNU) {
         // Roadrunner öncesi: fişteki tüm kuryeler kendi personel kuryemiz.
         const hepsi = [...sabitler.filter(k=>k.isim||k.paket||k.nakit||k.pos), ...havuzlar];
         setKuryeler(hepsi.length ? hepsi.map((k,i)=>satir(k, Date.now()+400+i, "kendi", "")) : kuryeYapisiHesapla(hedefTarih));
@@ -1158,15 +1291,24 @@ export default function RaporlarPage() {
           ...havuzlar.map((k,i)=>satir(k, Date.now()+400+i, "havuz", "Havuz Kurye")),
         ]);
       }
-      if (veri.notlar) setNotlar(veri.notlar);
-      setTaramaBelirsizAlanlar(veri.belirsiz_alanlar || []);
+      const nk = veri.nakitKasa || {};
+      sYaz(setNakitDevredenKagit, nk.devreden); sYaz(setNakitSayim, nk.sayim);
+      const yeniNakit: NakitHareket[] = (Array.isArray(nk.hareketler) ? nk.hareketler : [])
+        .filter((h: { tutar?: number }) => Number(h?.tutar) > 0)
+        .map((h: { aciklama?: string; banka?: string; tutar?: number }, i: number) => ({ id: Date.now() + 500 + i, aciklama: h.aciklama || "", banka: bankaBul(h.banka), tutar: nToStr(h.tutar) }));
+      if (yeniNakit.length) setNakitHareketleri(onceki => ekle ? [...onceki.filter(h => h.tutar), ...yeniNakit] : yeniNakit);
+      if (veri.notlar) setNotlar(onceki => ekle && onceki ? `${onceki}\n${veri.notlar}` : veri.notlar);
+      setTaramaBelirsizAlanlar(onceki => ekle ? [...new Set([...onceki, ...(veri.belirsiz_alanlar || [])])] : (veri.belirsiz_alanlar || []));
       setTaramaIleDoldu(true); setKontrolOnay(false);
+      const kontrol = Object.fromEntries(Object.entries(veri.kontrol || {}).filter(([, v]) => Number(v) > 0)) as Record<string, number>;
+      setTaramaKontrol(onceki => ekle ? { ...onceki, ...kontrol } : kontrol);
       setTimeout(() => formAlaniRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
     } catch (err) {
       setTaramaHata(err instanceof Error ? err.message : "Bağlantı hatası, tekrar deneyin.");
     } finally {
       setTaramaYukleniyor(false);
       if (dosyaInputRef.current) dosyaInputRef.current.value = "";
+      if (ekDosyaInputRef.current) ekDosyaInputRef.current.value = "";
     }
   };
 
@@ -1267,11 +1409,12 @@ Soru: ${soruFinal}`
         // Online — Kebo
         os_kebo_ys:tv(osKeboYs.tutar), os_kebo_ys_paket:pk(osKeboYs), os_kebo_ys_indirim:tv(osKeboYsIndirim),
         os_kebo_trendyol:tv(osKeboTrendyol.tutar), os_kebo_trendyol_paket:pk(osKeboTrendyol), os_kebo_trendyol_indirim:tv(osKeboTrendyolIndirim),
-        os_kebo_migros:tv(osKeboMigros.tutar), os_kebo_migros_paket:pk(osKeboMigros),
+        os_kebo_migros:tv(osKeboMigros.tutar), os_kebo_migros_paket:pk(osKeboMigros), os_kebo_migros_indirim:tv(osKeboMigrosIndirim),
+        os_kebo_alo:tv(osKeboAlo.tutar), os_kebo_alo_paket:pk(osKeboAlo), os_kebo_alo_indirim:tv(osKeboAloIndirim),
         // Online — Chick'N Fride
         os_cnf_ys:tv(osCnfYs.tutar), os_cnf_ys_paket:pk(osCnfYs), os_cnf_ys_indirim:tv(osCnfYsIndirim),
         os_cnf_trendyol:tv(osCnfTrendyol.tutar), os_cnf_trendyol_paket:pk(osCnfTrendyol), os_cnf_trendyol_indirim:tv(osCnfTrendyolIndirim),
-        os_cnf_migros_yemek:tv(osCnfMigrosYemek.tutar), os_cnf_migros_yemek_paket:pk(osCnfMigrosYemek),
+        os_cnf_migros_yemek:tv(osCnfMigrosYemek.tutar), os_cnf_migros_yemek_paket:pk(osCnfMigrosYemek), os_cnf_migros_yemek_indirim:tv(osCnfMigrosIndirim),
         // Kapıda Ödeme — Kebo
         ko_kebo_ys:tv(koKeboYs.tutar), ko_kebo_ys_paket:pk(koKeboYs), ko_kebo_ys_indirim:tv(koKeboYsIndirim),
         ko_kebo_trendyol:tv(koKeboTrendyol.tutar), ko_kebo_trendyol_paket:pk(koKeboTrendyol), ko_kebo_trendyol_indirim:tv(koKeboTrendyolIndirim),
@@ -1282,7 +1425,9 @@ Soru: ${soruFinal}`
         ko_cnf_trendyol:tv(koCnfTrendyol.tutar), ko_cnf_trendyol_paket:pk(koCnfTrendyol), ko_cnf_trendyol_indirim:tv(koCnfTrendyolIndirim),
         ko_cnf_migros_yemek:tv(koCnfMigrosYemek.tutar), ko_cnf_migros_yemek_paket:pk(koCnfMigrosYemek),
         ko_cnf_alo:tv(koCnfAlo.tutar), ko_cnf_alo_paket:pk(koCnfAlo),
-        kasa_nakit:tv(kasaNakit), kasa_pos:tv(kasaPos), kasa_edenred:tv(kasaEdenred), kasa_metropol:tv(kasaMetropol),
+        kasa_nakit:tv(kasaNakit), kasa_pos:tv(kasaPos), ...Object.fromEntries(YEMEK_KARTLARI.map(k => [k.alan, tv(kartlar[k.alan])])),
+        nakit_kasa_sayim: nakitSayim.trim() ? tv(nakitSayim) : null,
+        nakit_devreden_kagit: nakitDevredenKagit.trim() ? tv(nakitDevredenKagit) : null,
         gunluk_gider:ch.tGider, gider_aciklama:giderAciklamaFinal,
         iade_tutar:ch.tIade, iade_aciklama:birlesikIade,
         kurye_raporlari:temizKuryeler,
@@ -1302,6 +1447,9 @@ Soru: ${soruFinal}`
             cari_id: g.firmaId, cari_unvan: g.firmaUnvan || g.aciklama, tutar: tv(g.tutar),
             aciklama: `Günlük rapor gideri — ${fmtTarih(tarih)}`,
           })),
+          ...(nakitHareketYuklendi ? { nakit_hareketleri: nakitHareketleri.filter(h => tv(h.tutar) > 0).map(h => ({
+            aciklama: h.aciklama, banka: h.banka, tutar: tv(h.tutar),
+          })) } : {}),
         },
       };
       // Müdür mevcut bir raporu düzenliyorsa: rapor doğrudan güncellenmez, Tam Yetkili onayına gider.
@@ -1478,15 +1626,24 @@ Soru: ${soruFinal}`
             </div>
             <div>
               <p className="text-xs font-bold text-indigo-700">Fişten Doldur</p>
-              <p className="text-[10px] text-gray-500">Kağıt raporun fotoğrafını yükle, AI okuyup formu doldursun</p>
+              <p className="text-[10px] text-gray-500">Formun fotoğrafını seçin. Eski önlü arkalı formda iki yüzü birlikte seçin ya da sonra &quot;Sayfa ekle&quot; deyin. <a href="/kebo-gunluk-kasa-formu.pdf" target="_blank" rel="noopener" className="text-indigo-600 font-semibold hover:underline">Boş formu indir (PDF)</a></p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <input ref={dosyaInputRef} type="file" accept="image/*,application/pdf" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFisTara(f); }}/>
+            <input ref={dosyaInputRef} type="file" accept="image/*,application/pdf" multiple className="hidden"
+              onChange={e => { const f = Array.from(e.target.files || []); if (f.length) handleFisTara(f); }}/>
+            <input ref={ekDosyaInputRef} type="file" accept="image/*,application/pdf" multiple className="hidden"
+              onChange={e => { const f = Array.from(e.target.files || []); if (f.length) handleFisTara(f, true); }}/>
+            {taramaIleDoldu && (
+              <button type="button" disabled={taramaYukleniyor} onClick={() => ekDosyaInputRef.current?.click()}
+                title="Diğer yüzü okut; mevcut değerler korunur"
+                className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-white border border-indigo-300 hover:bg-indigo-50 disabled:opacity-40 px-3.5 py-2 rounded-xl transition-colors">
+                <Plus size={13}/> Sayfa ekle
+              </button>
+            )}
             <button type="button" disabled={taramaYukleniyor} onClick={() => dosyaInputRef.current?.click()}
               className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 px-3.5 py-2 rounded-xl transition-colors">
-              {taramaYukleniyor ? "Okunuyor..." : <><Camera size={13}/> Tara</>}
+              {taramaYukleniyor ? "Okunuyor..." : <><Camera size={13}/> {taramaIleDoldu ? "Baştan tara" : "Tara"}</>}
             </button>
           </div>
         </div>
@@ -1501,6 +1658,36 @@ Soru: ${soruFinal}`
         <div className="rounded-xl border border-indigo-500/25 bg-indigo-50 px-4 py-3 space-y-2">
           <p className="text-xs font-bold text-indigo-800 flex items-center gap-1.5"><Check size={13}/> Form fişten dolduruldu. Aşağıdaki değerleri kağıtla karşılaştırıp gerekirse düzeltin, sonra kaydedin.</p>
           {taramaTarihNotu && <p className="text-[12px] text-amber-800 font-semibold flex items-center gap-1.5"><AlertTriangle size={12}/> {taramaTarihNotu}</p>}
+          {Object.keys(taramaKontrol).length > 0 && (() => {
+            const pk = (...l: PlatformGiris[]) => l.reduce((t, x) => t + (parseInt(x.paket || "", 10) || 0), 0);
+            const kebo = pk(osKeboYs, osKeboTrendyol, osKeboMigros, osKeboAlo, koKeboYs, koKeboTrendyol, koKeboMigrosYemek, koKeboAlo);
+            const cnf = pk(osCnfYs, osCnfTrendyol, osCnfMigrosYemek, koCnfYs, koCnfTrendyol, koCnfMigrosYemek, koCnfAlo);
+            const satirlar: [string, string, number, number, boolean][] = [
+              ["paketKebo", "KEBO toplam paket", taramaKontrol.paketKebo, kebo, false],
+              ["paketCnf", "Chick'n Fride toplam paket", taramaKontrol.paketCnf, cnf, false],
+              ["paketToplam", "Dükkân toplam paket", taramaKontrol.paketToplam, kebo + cnf, false],
+              ["gider", "Toplam gider", taramaKontrol.gider, ch.tGider, true],
+              ["brut", "Brüt ciro", taramaKontrol.brut, ch.brutCiro, true],
+              ["net", "Net ciro", taramaKontrol.net, ch.netCiro, true],
+            ];
+            return (
+              <div>
+                <p className="text-[12px] font-bold text-indigo-800 mb-1">Kağıttaki toplamlar ile panelin hesabı:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {satirlar.filter(([k]) => taramaKontrol[k] > 0).map(([k, ad, kagit, panel, para]) => {
+                    const fark = Math.round((panel - kagit) * 100) / 100;
+                    const tamam = Math.abs(fark) < (para ? 1 : 0.5);
+                    const f = (x: number) => para ? `₺${fmt(x)}` : String(x);
+                    return (
+                      <span key={k} className={`text-[11px] font-semibold rounded-lg px-2 py-0.5 border ${tamam ? "text-emerald-800 bg-emerald-50 border-emerald-200" : "text-red-800 bg-red-50 border-red-200"}`}>
+                        {tamam ? "✓" : "⚠"} {ad}: kağıt {f(kagit)}{tamam ? "" : ` · panel ${f(panel)} (fark ${fark > 0 ? "+" : ""}${para ? fmt(fark) : fark})`}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
           {taramaBelirsizAlanlar.length > 0 && (
             <div>
               <p className="text-[12px] font-bold text-amber-800 mb-1">Özellikle şu alanlara bakın (okuma belirsiz):</p>
@@ -1518,137 +1705,93 @@ Soru: ${soruFinal}`
         {(
           <div className="space-y-3">
 
-            {/* CİRO GİRİŞLERİ: Online / Kapıda Ödeme (Kebo + Chick'N Fride) + Kasa */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* ── ONLINE ── */}
-              <div className="rounded-xl border border-blue-500/20 bg-[#ffffff] overflow-hidden">
-                <div className="px-4 py-3 border-b border-blue-500/15 flex items-center justify-between bg-blue-500/[0.03]">
-                  <span className="text-[13px] font-bold text-blue-700 flex items-center gap-2"><Monitor size={14}/>Online Satışlar</span>
-                  <span className="text-sm font-black text-blue-700">₺{fmt(ch.tOnline)} <span className="text-gray-500 font-medium text-[11px]">· {ch.tOnlinePaket} paket</span></span>
-                </div>
-                <div className="p-3 space-y-4">
-                  <div>
-                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full mb-2">🍔 Kebo</span>
-                    <div className="space-y-2">
-                      <PlatformSatir label="Yemeksepeti" value={osKeboYs} onChange={setOsKeboYs} indirim={osKeboYsIndirim} onIndirimChange={setOsKeboYsIndirim} disabled={isReadOnly}/>
-                      <PlatformSatir label="Trendyol" value={osKeboTrendyol} onChange={setOsKeboTrendyol} indirim={osKeboTrendyolIndirim} onIndirimChange={setOsKeboTrendyolIndirim} disabled={isReadOnly}/>
-                      <PlatformSatir label="Migros" value={osKeboMigros} onChange={setOsKeboMigros} disabled={isReadOnly}/>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-red-700 bg-red-500/10 border border-red-500/25 px-2.5 py-1 rounded-full mb-2">🍗 Chick&apos;N Fride</span>
-                    <div className="space-y-2">
-                      <PlatformSatir label="Yemeksepeti" value={osCnfYs} onChange={setOsCnfYs} indirim={osCnfYsIndirim} onIndirimChange={setOsCnfYsIndirim} disabled={isReadOnly}/>
-                      <PlatformSatir label="Trendyol" value={osCnfTrendyol} onChange={setOsCnfTrendyol} indirim={osCnfTrendyolIndirim} onIndirimChange={setOsCnfTrendyolIndirim} disabled={isReadOnly}/>
-                      <PlatformSatir label="Migros Yemek" value={osCnfMigrosYemek} onChange={setOsCnfMigrosYemek} disabled={isReadOnly}/>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {/* ── KAPIDA ÖDEME ── */}
-              <div className="rounded-xl border border-purple-500/20 bg-[#ffffff] overflow-hidden">
-                <div className="px-4 py-3 border-b border-purple-500/15 flex items-center justify-between bg-purple-500/[0.03]">
-                  <span className="text-[13px] font-bold text-purple-700 flex items-center gap-2"><Home size={14}/>Kapıda Ödeme</span>
-                  <div className="flex items-center gap-2">
-                    <span title={ch.kapidaKasada ? (tarih >= KENDI_POS_GECIS_GUNU ? "28.09.2026'dan itibaren kendi POS'umuz: kapıda nakit ve kart kasa sayımının içinde" : "13.08.2026 öncesi: kendi kuryelerimizin topladığı para kasa sayımının içinde") : "Roadrunner'da kalır, haftalık mutabakatla mahsup edilir"}
-                      className="text-[10px] font-semibold text-purple-700 bg-purple-500/15 border border-purple-500/25 px-2 py-0.5 rounded-full">
-                      {ch.kapidaKasada ? "Kasa sayımında" : "Brüte ayrıca eklenir"}
-                    </span>
-                    <span className="text-sm font-black text-purple-700">₺{fmt(ch.tKapida)} <span className="text-gray-500 font-medium text-[11px]">· {ch.tKapidaPaket} paket</span></span>
-                  </div>
-                </div>
-                <div className="p-3 space-y-4">
-                  <div>
-                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full mb-2">🍔 Kebo</span>
-                    <div className="space-y-2">
-                      <PlatformSatir label="Yemeksepeti" value={koKeboYs} onChange={setKoKeboYs} indirim={koKeboYsIndirim} onIndirimChange={setKoKeboYsIndirim} disabled={isReadOnly}/>
-                      <PlatformSatir label="Trendyol" value={koKeboTrendyol} onChange={setKoKeboTrendyol} indirim={koKeboTrendyolIndirim} onIndirimChange={setKoKeboTrendyolIndirim} disabled={isReadOnly}/>
-                      <PlatformSatir label="Migros Yemek" value={koKeboMigrosYemek} onChange={setKoKeboMigrosYemek} disabled={isReadOnly}/>
-                      <PlatformSatir label="Alo Paket" value={koKeboAlo} onChange={setKoKeboAlo} disabled={isReadOnly}/>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-red-700 bg-red-500/10 border border-red-500/25 px-2.5 py-1 rounded-full mb-2">🍗 Chick&apos;N Fride</span>
-                    <div className="space-y-2">
-                      <PlatformSatir label="Yemeksepeti" value={koCnfYs} onChange={setKoCnfYs} indirim={koCnfYsIndirim} onIndirimChange={setKoCnfYsIndirim} disabled={isReadOnly}/>
-                      <PlatformSatir label="Trendyol" value={koCnfTrendyol} onChange={setKoCnfTrendyol} indirim={koCnfTrendyolIndirim} onIndirimChange={setKoCnfTrendyolIndirim} disabled={isReadOnly}/>
-                      <PlatformSatir label="Migros Yemek" value={koCnfMigrosYemek} onChange={setKoCnfMigrosYemek} disabled={isReadOnly}/>
-                      <PlatformSatir label="Alo Paket" value={koCnfAlo} onChange={setKoCnfAlo} disabled={isReadOnly}/>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            {/* ── KASA ── */}
-            <div className="rounded-xl border border-emerald-500/20 bg-[#ffffff] overflow-hidden">
-              <div className="px-4 py-3 border-b border-emerald-500/15 flex items-center justify-between bg-emerald-500/[0.03]">
-                <span className="text-[13px] font-bold text-emerald-700 flex items-center gap-2">💰 Kasa</span>
-                <span className="text-sm font-black text-emerald-700">₺{fmt(ch.tKasa)}</span>
-              </div>
-              <div className="p-3 grid grid-cols-2 md:grid-cols-4 gap-2.5">
-                <CurrencyInput label="Nakit" value={kasaNakit} onChange={setKasaNakit} disabled={isReadOnly}/>
-                <CurrencyInput label="Pos" value={kasaPos} onChange={setKasaPos} disabled={isReadOnly}/>
-                <CurrencyInput label="Edenred" value={kasaEdenred} onChange={setKasaEdenred} disabled={isReadOnly}/>
-                <CurrencyInput label="Metropol" value={kasaMetropol} onChange={setKasaMetropol} disabled={isReadOnly}/>
-              </div>
-              <div className="mx-3 mb-3 rounded-lg border border-red-500/20 bg-red-500/5 px-3.5 py-2.5 flex items-center justify-between">
-                <span className="text-[12px] text-red-700 font-semibold flex items-center gap-1.5"><TrendingDown size={13}/>Gider (salt okunur)</span>
-                <span className="text-[15px] font-black text-red-700">₺{fmt(ch.tGider)}</span>
-              </div>
-              <p className="px-3.5 pb-3 text-[11px] text-gray-500 leading-relaxed">Gider için aşağıdaki <span className="text-gray-700 font-semibold">Giderler</span> bölümünü kullan — buraya doğrudan giriş yapılamaz, orada eklediğin her satır bu toplama otomatik yansır.</p>
-            </div>
-            {/* ── İNDİRİM ANALİZİ ── */}
-            <div className={`rounded-xl border overflow-hidden ${ch.indirimUyari ? "border-red-500/40 bg-red-500/5" : "border-[#dde1e8] bg-[#ffffff]"}`}>
-              <div className={`px-4 py-3 border-b flex items-center justify-between ${ch.indirimUyari ? "border-red-500/25 bg-red-500/[0.04]" : "border-[#dde1e8] bg-black/[0.03]"}`}>
-                <span className={`text-[13px] font-bold flex items-center gap-2 ${ch.indirimUyari?"text-red-700":"text-gray-800"}`}>
-                  <Percent size={14}/>İndirim Analizi
+            {/* ── 1. SATIŞLAR (kağıt formla aynı tablo) ── */}
+            <div className="rounded-xl border border-[#e2e5eb] bg-white overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#e2e5eb] flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[14px] font-bold text-[#1a1f2e]">1. Satışlar</span>
+                <span title={ch.kapidaKasada ? (tarih >= KENDI_POS_GECIS_GUNU ? "28.09.2026'dan itibaren kendi POS'umuz: kapıda nakit ve kart kasa sayımının içinde" : "13.08.2026 öncesi: kendi kuryelerimizin topladığı para kasa sayımının içinde") : "Roadrunner'da kalır, haftalık mutabakatla mahsup edilir"}
+                  className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
+                  Kapıda: {ch.kapidaKasada ? "kasa sayımına dahil" : "Roadrunner'da, brüte ayrıca eklenir"}
                 </span>
-                <span className={`text-sm font-black ${ch.indirimUyari?"text-red-700":"text-[#1a1f2e]"}`}>%{ch.indirimOrani.toFixed(1)}</span>
               </div>
-              <div className="p-3.5 grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <p className="text-[11px] text-gray-400 font-medium">Yemeksepeti</p>
-                  <p className="text-[15px] font-black text-red-700">₺{fmt(ch.tIndirimYS)}</p>
+              <div className="p-3 space-y-2">
+                <div className={`hidden ${SATIS_IZGARA} text-[11px] font-bold text-gray-500 px-0.5`}>
+                  <span/>
+                  <span className="text-right pr-3">Online ₺</span><span className="text-center">Paket</span>
+                  <span className="text-right pr-3 text-red-600">İndirim ₺</span>
+                  <span className="text-right pr-3 text-purple-700">Kapıda ₺</span><span className="text-center">Paket</span>
+                  <span className="text-center">Toplam</span>
                 </div>
-                <div>
-                  <p className="text-[11px] text-gray-400 font-medium">Trendyol</p>
-                  <p className="text-[15px] font-black text-red-700">₺{fmt(ch.tIndirimTrendyol)}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-gray-400 font-medium">Toplam</p>
-                  <p className="text-[15px] font-black text-[#1a1f2e]">₺{fmt(ch.tIndirim)}</p>
-                </div>
+                <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wide pt-1">🍔 Kebo</p>
+                <SatisSatiri ad="Yemeksepeti" online={osKeboYs} onOnline={setOsKeboYs} indirim={osKeboYsIndirim} onIndirim={setOsKeboYsIndirim} kapida={koKeboYs} onKapida={setKoKeboYs} disabled={isReadOnly}/>
+                <SatisSatiri ad="Trendyol" online={osKeboTrendyol} onOnline={setOsKeboTrendyol} indirim={osKeboTrendyolIndirim} onIndirim={setOsKeboTrendyolIndirim} kapida={koKeboTrendyol} onKapida={setKoKeboTrendyol} disabled={isReadOnly}/>
+                <SatisSatiri ad="Migros" online={osKeboMigros} onOnline={setOsKeboMigros} indirim={osKeboMigrosIndirim} onIndirim={setOsKeboMigrosIndirim} kapida={koKeboMigrosYemek} onKapida={setKoKeboMigrosYemek} disabled={isReadOnly}/>
+                <SatisSatiri ad="Alo Paket" online={osKeboAlo} onOnline={setOsKeboAlo} indirim={osKeboAloIndirim} onIndirim={setOsKeboAloIndirim} kapida={koKeboAlo} onKapida={setKoKeboAlo} soluk={["online","indirim"]} disabled={isReadOnly}/>
+                <p className="text-[11px] font-bold text-red-700 uppercase tracking-wide pt-2">🍗 Chick&apos;n Fride</p>
+                <SatisSatiri ad="Yemeksepeti" online={osCnfYs} onOnline={setOsCnfYs} indirim={osCnfYsIndirim} onIndirim={setOsCnfYsIndirim} kapida={koCnfYs} onKapida={setKoCnfYs} soluk={["kapida"]} disabled={isReadOnly}/>
+                <SatisSatiri ad="Trendyol" online={osCnfTrendyol} onOnline={setOsCnfTrendyol} indirim={osCnfTrendyolIndirim} onIndirim={setOsCnfTrendyolIndirim} kapida={koCnfTrendyol} onKapida={setKoCnfTrendyol} soluk={["kapida"]} disabled={isReadOnly}/>
+                <SatisSatiri ad="Migros" online={osCnfMigrosYemek} onOnline={setOsCnfMigrosYemek} indirim={osCnfMigrosIndirim} onIndirim={setOsCnfMigrosIndirim} kapida={koCnfMigrosYemek} onKapida={setKoCnfMigrosYemek} soluk={["kapida"]} disabled={isReadOnly}/>
+                {/* Eski raporlarda girilmiş Chick'n Fride kapıda / kapıda indirim varsa kaybolmasın diye gösterilir */}
+                {(tv(koCnfAlo.tutar)+tv(koKeboYsIndirim)+tv(koKeboTrendyolIndirim)+tv(koCnfYsIndirim)+tv(koCnfTrendyolIndirim)) > 0 && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    Bu raporda eski formdan kalan Chick&apos;n Fride Alo Paket / kapıda indirim tutarı var (₺{fmt(tv(koCnfAlo.tutar))} Alo, ₺{fmt(tv(koKeboYsIndirim)+tv(koKeboTrendyolIndirim)+tv(koCnfYsIndirim)+tv(koCnfTrendyolIndirim))} indirim). Hesaplara dahil.
+                  </p>
+                )}
+                {(() => {
+                  const pk = (...l: PlatformGiris[]) => l.reduce((t, x) => t + sayi(x.paket), 0);
+                  const kebo = pk(osKeboYs, osKeboTrendyol, osKeboMigros, osKeboAlo, koKeboYs, koKeboTrendyol, koKeboMigrosYemek, koKeboAlo);
+                  const cnf = pk(osCnfYs, osCnfTrendyol, osCnfMigrosYemek, koCnfYs, koCnfTrendyol, koCnfMigrosYemek, koCnfAlo);
+                  return (
+                    <div className="border-t border-[#e2e5eb] pt-2.5 mt-1 space-y-2">
+                      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1.5 text-[12px] font-semibold text-gray-600">
+                        <span>KEBO <b className="ml-1 inline-block min-w-14 text-center rounded-md border border-[#cfd5df] text-[#1a1f2e] px-2 py-0.5">{kebo}</b></span>
+                        <span>Chick&apos;n <b className="ml-1 inline-block min-w-14 text-center rounded-md border border-[#cfd5df] text-[#1a1f2e] px-2 py-0.5">{cnf}</b></span>
+                        <span className="text-[#1a1f2e] font-bold">Dükkân <b className="ml-1 inline-block min-w-14 text-center rounded-md border-2 border-[#1a1f2e] text-[#1a1f2e] px-2 py-0.5">{kebo + cnf}</b> <span className="font-medium text-gray-500">paket</span></span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-5 gap-y-1 text-[13px] font-black pt-1.5">
+                        <span className="text-blue-700">Online ₺{fmt(ch.tOnline)}</span>
+                        <span className={ch.indirimUyari ? "text-red-700" : "text-red-600"}>İndirim ₺{fmt(ch.tIndirim)} <span className="font-semibold text-[11px]">(%{ch.indirimOrani.toFixed(1)})</span></span>
+                        <span className="text-purple-700">Kapıda ₺{fmt(ch.tKapida)}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+                {ch.indirimUyari && (
+                  <p className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-2"><AlertTriangle size={13}/> İndirim online cironun %15&apos;ini geçti — rakamları kontrol edin.</p>
+                )}
               </div>
-              {ch.indirimUyari && (
-                <div className="mx-3.5 mb-3.5 flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3.5 py-2.5">
-                  <AlertTriangle size={14} className="text-red-600 shrink-0"/>
-                  <p className="text-[12px] text-red-200">İndirim oranı platform cirosunun <span className="font-black">%15&apos;ini</span> geçti — kontrol et.</p>
-                </div>
-              )}
             </div>
 
-            {/* PLATFORM ÖZET BANTI */}
-            {platformOzetSatirlar.length > 0 && (
-              <div className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] px-4 py-3">
-                <p className="text-[11px] text-gray-400 font-semibold mb-2.5 flex items-center gap-1.5">
-                  <PieChart size={11}/> Platform Bazlı Toplam (Online + Kapıda) — Bilgi Amaçlı
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  {platformOzetSatirlar.map(p => (
-                    <div key={p.label} className="flex items-center gap-2 bg-black/[0.04] border border-white/5 rounded-lg px-2.5 py-1.5">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{backgroundColor:p.color}}/>
-                      <span className="text-[10px] text-gray-400">{p.label}</span>
-                      <span className="text-[11px] font-bold text-[#1a1f2e]">₺{fmt(p.online+p.kapida)}</span>
-                      {p.kapida > 0 && (
-                        <span className="text-[9px] text-gray-600">
-                          ({p.online > 0 ? `On:₺${fmt(p.online)} + ` : ""}Kpd:₺{fmt(p.kapida)})
-                        </span>
-                      )}
-                    </div>
-                  ))}
+            {/* ── 2. KASA ── */}
+            <div className="rounded-xl border border-[#e2e5eb] bg-white overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#e2e5eb] flex items-center justify-between">
+                <span className="text-[14px] font-bold text-[#1a1f2e]">2. Kasa</span>
+                <span className="text-sm font-black text-emerald-700">₺{fmt(ch.tKasa)}</span>
+              </div>
+              <div className="p-3 grid grid-cols-2 gap-2.5">
+                <CurrencyInput label="Nakit" value={kasaNakit} onChange={setKasaNakit} disabled={isReadOnly}/>
+                <CurrencyInput label="POS" value={kasaPos} onChange={setKasaPos} disabled={isReadOnly}/>
+              </div>
+              <p className="px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wide">Yemek kartları</p>
+              <div className="p-3 pt-1.5 grid grid-cols-2 md:grid-cols-5 gap-2.5">
+                {YEMEK_KARTLARI.map(k => (
+                  <CurrencyInput key={k.alan} label={k.ad} value={kartlar[k.alan]} onChange={v => kartYaz(k.alan, v)} disabled={isReadOnly}/>
+                ))}
+              </div>
+              <div className="mx-3 mb-2 flex flex-wrap items-center justify-between gap-2 text-[13px] text-gray-600 border-t border-[#e2e5eb] pt-2.5">
+                <span>Kasa ₺<b className="text-[#1a1f2e]">{fmt(ch.tKasa)}</b> + Giderler ₺<b className="text-red-700">{fmt(ch.tGider)}</b>{ch.kapidaKasada ? "" : <> + Kapıda ₺<b className="text-purple-700">{fmt(ch.tKapida)}</b></>} + Online ₺<b className="text-blue-700">{fmt(ch.tOnline)}</b></span>
+              </div>
+              <div className="mx-3 mb-3 grid grid-cols-2 gap-2.5">
+                <div className="rounded-xl bg-blue-50 border border-blue-200 px-5 py-5">
+                  <p className="text-[13px] font-bold text-blue-700 uppercase tracking-wide">Brüt ciro</p>
+                  <p className="text-3xl md:text-4xl font-black text-blue-700 mt-1">₺{fmt(ch.brutCiro)}</p>
+                </div>
+                <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-5 py-5">
+                  <p className="text-[13px] font-bold text-emerald-700 uppercase tracking-wide">Net ciro</p>
+                  <p className="text-3xl md:text-4xl font-black text-emerald-700 mt-1">₺{fmt(ch.netCiro)}</p>
                 </div>
               </div>
-            )}
+            </div>
 
             {/* ALT KISIM: Gider / İade / Kurye / Notlar */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
@@ -1656,7 +1799,7 @@ Soru: ${soruFinal}`
               {/* Giderler */}
               <div className="rounded-xl border border-red-500/20 bg-[#ffffff] overflow-hidden">
                 <div className="px-4 py-3 border-b border-red-500/15 flex flex-wrap items-center justify-between gap-2 bg-red-500/[0.03]">
-                  <span className="text-[13px] font-bold text-red-700 flex items-center gap-2">💸 Giderler</span>
+                  <span className="text-[13px] font-bold text-red-700 flex items-center gap-2">3. Giderler <span className="font-medium text-[11px] text-gray-500">(avans dahil · iade/iptal buraya değil 5. bölüme)</span></span>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-black text-red-700">₺{fmt(ch.tGider)}</span>
                     {!isReadOnly && (
@@ -1759,12 +1902,10 @@ Soru: ${soruFinal}`
                     </div>
                   ))}
                 </div>
-                {/* 02.09.2026: Platform indirimleri (Yemeksepeti + Trendyol, online + kapıda) burada
-                    da salt okunur olarak özetleniyor — hesaplama İndirim Analizi kartındaki ch.tIndirim
-                    değerinden geliyor, buradan ayrıca giriş yapılmaz. */}
-                <div className="mx-3 mb-3 rounded-lg border border-orange-500/20 bg-orange-500/5 px-3.5 py-2.5 flex items-center justify-between">
-                  <span className="text-[12px] text-orange-700 font-semibold flex items-center gap-1.5"><Percent size={13}/>Toplam Platform İndirimleri (salt okunur)</span>
-                  <span className="text-[15px] font-black text-orange-700">₺{fmt(ch.tIndirim)}</span>
+                {/* Toplam gider — kağıt formdaki "TOPLAM GİDER" satırının karşılığı; satırlardan otomatik hesaplanır */}
+                <div className="mx-3 mb-3 rounded-lg border-2 border-[#1a1f2e] px-3.5 py-2.5 flex items-center justify-between">
+                  <span className="text-[13px] font-bold text-[#1a1f2e]">Toplam gider <span className="font-medium text-[11px] text-gray-500">(avanslar dahil)</span></span>
+                  <span className="text-[17px] font-black text-red-700">₺{fmt(ch.tGider)}</span>
                 </div>
               </div>
 
@@ -1773,7 +1914,7 @@ Soru: ${soruFinal}`
                 {/* Personel Kesintisi — kasayı/gideri etkilemez, sadece ay sonu maaştan düşülür */}
                 <div className="rounded-xl border border-rose-500/15 bg-[#ffffff] overflow-hidden">
                   <div className="px-3 py-2 border-b border-rose-500/15 flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-rose-600 uppercase tracking-wider flex items-center gap-1.5"><Users2 size={11}/>Personel Kesintisi</span>
+                    <span className="text-[10px] font-semibold text-rose-600 uppercase tracking-wider flex items-center gap-1.5"><Users2 size={11}/>4. Personel Kesintisi</span>
                     {!isReadOnly && (
                       <button type="button" onClick={()=>setKesintiSatirlari([...kesintiSatirlari,{id:Date.now(),personelIsim:"",tutar:"",aciklama:""}])}
                         className="text-[10px] text-gray-600 hover:text-rose-600 border border-[#e2e5eb] hover:border-rose-500/30 px-2 py-0.5 rounded transition-colors">+ Kesinti</button>
@@ -1813,7 +1954,7 @@ Soru: ${soruFinal}`
                 {/* İadeler */}
                 <div className="rounded-xl border border-orange-500/15 bg-[#ffffff] overflow-hidden">
                   <div className="px-3 py-2 border-b border-orange-500/15 flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-orange-600 uppercase tracking-wider flex items-center gap-1.5"><RotateCcw size={11}/>İptal-İade Fişleri</span>
+                    <span className="text-[10px] font-semibold text-orange-600 uppercase tracking-wider flex items-center gap-1.5"><RotateCcw size={11}/>5. İptal / İade</span>
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-black text-orange-600">₺{fmt(ch.tIade)}</span>
                       {!isReadOnly && <button type="button" onClick={iadeEkle} className="text-[10px] text-gray-600 hover:text-orange-600 border border-[#e2e5eb] hover:border-orange-500/30 w-5 h-5 rounded flex items-center justify-center transition-colors">+</button>}
@@ -1843,7 +1984,7 @@ Soru: ${soruFinal}`
                 {/* Kuryeler */}
                 <div className="rounded-xl border border-amber-500/15 bg-[#ffffff] overflow-hidden">
                   <div className="px-3 py-2 border-b border-amber-500/15 flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider flex items-center gap-1.5"><Truck size={11}/>Kurye (Roadrunner)</span>
+                    <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider flex items-center gap-1.5"><Truck size={11}/>6. Kurye</span>
                     <div className="flex items-center gap-2">
                       {ch.kuryeFark===0
                         ? <span className="text-[10px] text-emerald-600 flex items-center gap-1"><CheckCircle2 size={10}/>Dengede</span>
@@ -1977,7 +2118,7 @@ Soru: ${soruFinal}`
                 {/* Notlar */}
                 <div className="rounded-xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden">
                   <div className="px-3 py-2 border-b border-[#e2e5eb]">
-                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5"><StickyNote size={11}/>Notlar</span>
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5"><StickyNote size={11}/>8. Notlar</span>
                   </div>
                   <div className="p-3">
                     <textarea value={notlar} disabled={isReadOnly} onChange={e=>setNotlar(e.target.value)}
@@ -1989,6 +2130,81 @@ Soru: ${soruFinal}`
 
               </div>
             </div>
+
+            {/* ── 7. NAKİT KASA (önceki günlerden kalan nakit) — günlük ciroya karışmaz ── */}
+            {(() => {
+              const cikis = nakitHareketleri.reduce((t, h) => t + tv(h.tutar), 0);
+              const devreden = nakitDevredenSistem;
+              const beklenen = devreden == null ? null : devreden + tv(kasaNakit) - cikis;
+              const sayim = nakitSayim.trim() ? tv(nakitSayim) : null;
+              const fark = beklenen != null && sayim != null ? Math.round((sayim - beklenen) * 100) / 100 : null;
+              const kagitDevreden = nakitDevredenKagit.trim() ? tv(nakitDevredenKagit) : null;
+              const hareketDegistir = (id: number, alan: Partial<NakitHareket>) =>
+                setNakitHareketleri(l => l.map(h => h.id === id ? { ...h, ...alan, ...(alan.tutar !== undefined ? { tutar: paraGirdisi(alan.tutar) } : {}) } : h));
+              return (
+                <div className="rounded-xl border border-[#e2e5eb] bg-white overflow-hidden">
+                  <div className="px-4 py-3 border-b border-[#e2e5eb] flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[14px] font-bold text-[#1a1f2e]">7. Nakit Kasa <span className="font-medium text-[11px] text-gray-500">önceki günlerden kalan nakit · günlük ciroya girmez</span></span>
+                    {devreden != null && <span className="text-[12px] text-gray-600">Devreden (sistem): <b className="text-[#1a1f2e]">₺{fmt(devreden)}</b></span>}
+                  </div>
+                  <div className="p-3 space-y-3">
+                    {!nakitHareketYuklendi && (
+                      <p className="text-[11px] text-gray-500">Bu raporun kasa hareketlerini sadece Tam Yetkili kullanıcılar görebilir.</p>
+                    )}
+                    {nakitHareketYuklendi && (
+                      <div className="space-y-2">
+                        <p className="text-[12px] font-semibold text-gray-700">Eski nakitten ödemeler / bankaya yatırılan</p>
+                        {nakitHareketleri.map(h => (
+                          <div key={h.id} className="grid grid-cols-[1fr_110px] md:grid-cols-[1fr_150px_140px_28px] gap-2 items-center">
+                            <input type="text" placeholder="Kime / ne için" disabled={isReadOnly} value={h.aciklama}
+                              onChange={e => hareketDegistir(h.id, { aciklama: e.target.value })}
+                              className="col-span-2 md:col-span-1 w-full bg-[#f7f8fa] border border-[#dde1e8] text-[13px] h-9 px-3 rounded-lg outline-none focus:border-blue-500/50 disabled:opacity-50"/>
+                            <select disabled={isReadOnly} value={h.banka} onChange={e => hareketDegistir(h.id, { banka: e.target.value as NakitHareket["banka"] })}
+                              className="w-full bg-[#f7f8fa] border border-[#dde1e8] text-[13px] h-9 px-2 rounded-lg outline-none disabled:opacity-50">
+                              <option value="">Ödeme (kasadan çıktı)</option>
+                              {NAKIT_BANKALAR.map(b => <option key={b} value={b}>Bankaya yatırıldı: {b}</option>)}
+                            </select>
+                            <input type="text" inputMode="decimal" placeholder="₺ 0" disabled={isReadOnly} value={h.tutar}
+                              onChange={e => hareketDegistir(h.id, { tutar: e.target.value })}
+                              className="w-full bg-[#f7f8fa] border border-[#dde1e8] text-[14px] font-bold text-right h-9 px-3 rounded-lg outline-none focus:border-blue-500/50 disabled:opacity-50"/>
+                            {!isReadOnly && <button type="button" onClick={() => setNakitHareketleri(l => l.filter(x => x.id !== h.id))} className="text-gray-400 hover:text-red-600 justify-self-center"><Trash2 size={14}/></button>}
+                          </div>
+                        ))}
+                        {!isReadOnly && (
+                          <button type="button" onClick={() => setNakitHareketleri(l => [...l, { id: Date.now(), aciklama: "", banka: "", tutar: "" }])}
+                            className="text-[12px] font-semibold text-blue-700 hover:underline">+ Ödeme / bankaya yatırma ekle</button>
+                        )}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-3 items-end border-t border-[#e2e5eb] pt-3">
+                      <div className="text-[13px] text-gray-600 space-y-0.5">
+                        <p>Devreden <b className="text-[#1a1f2e]">{devreden == null ? "—" : `₺${fmt(devreden)}`}</b> + bugünkü nakit satış <b className="text-[#1a1f2e]">₺{fmt(tv(kasaNakit))}</b> − çıkışlar <b className="text-red-700">₺{fmt(cikis)}</b></p>
+                        <p className="text-[14px]">= Kasada olması gereken: <b className="text-[#1a1f2e]">{beklenen == null ? "—" : `₺${fmt(beklenen)}`}</b></p>
+                        {kagitDevreden != null && devreden != null && Math.abs(kagitDevreden - devreden) >= 1 && (
+                          <p className="text-[11px] text-amber-700">Kağıttaki devreden ₺{fmt(kagitDevreden)} · sistemdeki ₺{fmt(devreden)}</p>
+                        )}
+                      </div>
+                      <label className="block">
+                        <span className="block text-[12px] font-bold text-[#1a1f2e] mb-1">Kasa sayıldıysa: toplam nakit <span className="font-medium text-gray-500">(isteğe bağlı)</span></span>
+                        <input type="text" inputMode="decimal" placeholder="₺ 0" disabled={isReadOnly} value={nakitSayim} onChange={e => setNakitSayim(paraGirdisi(e.target.value))}
+                          className="w-full border-2 border-[#1a1f2e] text-[16px] font-black text-right h-11 px-3 rounded-lg outline-none disabled:opacity-50"/>
+                      </label>
+                    </div>
+                    {fark != null && (
+                      oncekiSayimVar === false ? (
+                        <p className="text-[12px] text-blue-800 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">İlk sayım: nakit kasa bakiyesi bu sayıma göre başlatılacak (fark ₺{fmt(fark)} &quot;Nakit kasa açılış&quot; olarak kaydedilir, kâr/zarara girmez).</p>
+                      ) : Math.abs(fark) < 1 ? (
+                        <p className="text-[12px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">✓ Kasa tuttu.</p>
+                      ) : (
+                        <p className={`text-[13px] font-bold rounded-lg px-3 py-2 border ${fark < 0 ? "text-red-800 bg-red-50 border-red-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>
+                          {fark < 0 ? `Kasa açığı: ₺${fmt(Math.abs(fark))}` : `Kasa fazlası: ₺${fmt(fark)}`} — kaydedilince Kasa &amp; Finans&apos;a &quot;Kasa sayım farkı&quot; olarak işlenir.
+                        </p>
+                      )
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ÖZET BANT */}
             <div className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1">
