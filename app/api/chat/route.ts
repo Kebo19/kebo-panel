@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { oturumKontrol } from "@/lib/supabase/server";
+import { geminiIstek } from "@/lib/gemini";
 
 // AI Analiz (raporlar sayfasındaki "AI Analiz" paneli) buradan geçer.
 // Anahtar sadece burada, sunucu tarafında kullanılır — tarayıcıya asla
@@ -19,111 +20,30 @@ import { oturumKontrol } from "@/lib/supabase/server";
 // NOT: Supabase "keepalive" (uyanık tutma) görevi artık burada değil,
 // /api/keepalive altında — vercel.json'daki cron tanımıyla eşleşsin diye.
 
-const GEMINI_TIMEOUT_MS = 45000;
-const MAX_DENEME = 3;
-const bekle = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function POST(req: Request) {
   // Sadece giriş yapmış panel kullanıcıları AI'yi kullanabilir (Gemini kotası korunur).
   const oturum = await oturumKontrol();
   if (!oturum.ok) return oturum.yanit;
   try {
-    const body = await req.json();
-    const { system, messages, max_tokens, json } = body || {};
-
-    // NEXT_PUBLIC_ önekli değişkenler tarayıcıya gömülür; anahtar sadece sunucu değişkeninden okunur.
-    const apiKey = process.env.GEMINI_API_KEY || "";
-
-    if (!apiKey) {
-      console.error("[chat] GEMINI_API_KEY tanımlı değil");
-      return NextResponse.json(
-        { error: "Sunucu yapılandırma hatası: GEMINI_API_KEY tanımlı değil." },
-        { status: 500 }
-      );
-    }
-
-    // Anthropic'in "messages" formatını ({role:"user"|"assistant", content})
-    // Gemini'nin "contents" formatına çeviriyoruz ({role:"user"|"model", parts}).
-    const contents = (Array.isArray(messages) ? messages : []).map((m: any) => ({
-      role: m?.role === "assistant" ? "model" : "user",
+    const { system, messages, max_tokens, json } = (await req.json()) || {};
+    // Anthropic "messages" biçimi → Gemini "contents" biçimi
+    const contents = (Array.isArray(messages) ? messages : []).map((m: { role?: string; content?: unknown }) => ({
+      role: (m?.role === "assistant" ? "model" : "user") as "user" | "model",
       parts: [{ text: typeof m?.content === "string" ? m.content : JSON.stringify(m?.content ?? "") }],
     }));
-
-    let response: Response | undefined;
-    let data: any;
-    for (let deneme = 1; deneme <= MAX_DENEME; deneme++) {
-      const controller = new AbortController();
-      const zamanAsimi = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
-      try {
-        response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": apiKey,
-            },
-            signal: controller.signal,
-            body: JSON.stringify({
-              ...(system ? { system_instruction: { parts: [{ text: system }] } } : {}),
-              contents,
-              generationConfig: {
-                // Model "düşünme" için de aynı bütçeyi kullanır; düşük limit cevabı yarıda keser.
-                maxOutputTokens: Math.max(8192, typeof max_tokens === "number" ? max_tokens : 0),
-                ...(json ? { responseMimeType: "application/json" } : {}),
-                thinkingConfig: { thinkingLevel: "minimal" },
-              },
-            }),
-          }
-        );
-      } finally {
-        clearTimeout(zamanAsimi);
-      }
-
-      try {
-        data = await response.json();
-      } catch {
-        console.error("[chat] Gemini'den geçerli JSON gelmedi, HTTP", response.status);
-        return NextResponse.json(
-          { error: `Gemini API beklenmedik bir cevap döndürdü (HTTP ${response.status}).` },
-          { status: 502 }
-        );
-      }
-
-      const gecici = response.status === 503 || response.status === 429;
-      if (gecici && deneme < MAX_DENEME) {
-        console.warn(`[chat] Geçici Gemini hatası (HTTP ${response.status}), ${deneme}. deneme, tekrar denenecek`);
-        await bekle(1200 * deneme);
-        continue;
-      }
-      break;
-    }
-
-    if (!response!.ok) {
-      console.error("API Hatası (Gemini):", JSON.stringify(data));
-      const detay = data?.error?.message || "Bilinmeyen hata";
-      return NextResponse.json({ error: `API Hatası: ${detay}`, details: data }, { status: response!.status });
-    }
-
-    const aday = data.candidates?.[0];
-    const metin = aday?.content?.parts?.map((p: any) => p.text || "").join("") || "";
-    if (!metin.trim()) {
-      const neden = aday?.finishReason || data?.promptFeedback?.blockReason || "bilinmiyor";
-      console.error("[chat] Boş cevap, neden:", neden);
-      return NextResponse.json({ error: `Model boş cevap döndürdü (${neden}), tekrar deneyin.` }, { status: 502 });
-    }
-
-    // Frontend Anthropic'in "content: [{type,text}]" şeklini bekliyor —
-    // Gemini'nin cevabını aynı şekle sarıp döndürüyoruz.
-    return NextResponse.json({ content: [{ type: "text", text: metin || "Cevap alınamadı." }] });
-  } catch (error: any) {
-    console.error("Sunucu Hatası:", error);
-    if (error?.name === "AbortError") {
-      return NextResponse.json(
-        { error: `Gemini API zaman aşımına uğradı (${GEMINI_TIMEOUT_MS / 1000}sn), lütfen tekrar deneyin.` },
-        { status: 504 }
-      );
-    }
-    return NextResponse.json({ error: "Sunucu Hatası" }, { status: 500 });
+    const sonuc = await geminiIstek({
+      system: typeof system === "string" ? system : undefined,
+      contents,
+      // Model "düşünme" için de aynı bütçeyi kullanır; düşük limit cevabı yarıda keser.
+      maxOutputTokens: Math.max(8192, typeof max_tokens === "number" ? max_tokens : 0),
+      json: !!json,
+    });
+    if (!sonuc.ok) return NextResponse.json({ error: sonuc.hata }, { status: sonuc.status });
+    // Frontend Anthropic'in "content: [{type,text}]" şeklini bekliyor.
+    return NextResponse.json({ content: [{ type: "text", text: sonuc.metin }] });
+  } catch (error) {
+    console.error("[chat] Sunucu hatası:", error);
+    return NextResponse.json({ error: "Sunucu hatası, tekrar deneyin." }, { status: 500 });
   }
 }

@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 import { oturumKontrol } from "@/lib/supabase/server";
+import { geminiIstek } from "@/lib/gemini";
 
 // İrsaliye okuma: tedarikçi irsaliyesinin fotoğrafı/PDF'i yüklenir, Gemini kalemleri
 // okuyup stoktaki ürünlerle eşleştirir. Sonuç sadece formu doldurur; kullanıcı kontrol
 // edip kaydeder (bu route veritabanına hiçbir şey yazmaz).
 
-const GEMINI_TIMEOUT_MS = 45000;
-const MAX_DENEME = 3;
 const MAX_DOSYA_BASE64 = 14_000_000; // ~10 MB dosya
-const bekle = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface UrunOzeti { id: string; ad: string; birim: string }
 
@@ -59,41 +57,17 @@ export async function POST(req: Request) {
       ? urunler.slice(0, 500).map((u: UrunOzeti) => ({ id: String(u.id), ad: String(u.ad).slice(0, 80), birim: String(u.birim).slice(0, 10) }))
       : [];
 
-    const apiKey = process.env.GEMINI_API_KEY || "";
-    if (!apiKey) {
-      return NextResponse.json({ error: "Sunucu yapılandırma hatası: GEMINI_API_KEY tanımlı değil." }, { status: 500 });
-    }
-
-    let response: Response | undefined;
-    let data: { error?: { message?: string }; candidates?: { content?: { parts?: { text?: string }[] } }[] } = {};
-    for (let deneme = 1; deneme <= MAX_DENEME; deneme++) {
-      const controller = new AbortController();
-      const zamanAsimi = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
-      try {
-        response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          signal: controller.signal,
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: sistemPromptu(urunListesi) }] },
-            contents: [{ role: "user", parts: [
-              { inline_data: { mime_type: tip, data: dosyaBase64 } },
-              { text: "Bu irsaliyeyi oku ve yalnızca JSON döndür." },
-            ] }],
-            generationConfig: { responseMimeType: "application/json", maxOutputTokens: 16384, thinkingConfig: { thinkingLevel: "minimal" } },
-          }),
-        });
-      } finally {
-        clearTimeout(zamanAsimi);
-      }
-      data = await response.json().catch(() => ({}));
-      if ((response.status === 503 || response.status === 429) && deneme < MAX_DENEME) { await bekle(1200 * deneme); continue; }
-      break;
-    }
-    if (!response?.ok) {
-      return NextResponse.json({ error: `Gemini API hatası: ${data?.error?.message || "Bilinmeyen hata"}` }, { status: response?.status || 502 });
-    }
-    const metin = data.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "";
+    const sonuc = await geminiIstek({
+      system: sistemPromptu(urunListesi),
+      contents: [{ role: "user", parts: [
+        { inline_data: { mime_type: tip, data: dosyaBase64 } },
+        { text: "Bu irsaliyeyi oku ve yalnızca JSON döndür." },
+      ] }],
+      maxOutputTokens: 16384,
+      json: true,
+    });
+    if (!sonuc.ok) return NextResponse.json({ error: sonuc.hata }, { status: sonuc.status });
+    const metin = sonuc.metin;
     const temiz = metin.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
     try {
       const sonuc = JSON.parse(temiz);
