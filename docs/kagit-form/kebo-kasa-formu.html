@@ -51,6 +51,11 @@
   .alt { margin-top: 6px; font-size: 7.5pt; color: #333; display: flex; justify-content: space-between; }
   .kural { border: 1px dashed #555; padding: 4px 7px; font-size: 8pt; margin-top: 6px; }
   .w-tutar { width: 17%; } .w-paket { width: 9%; } .w-ind { width: 14%; }
+
+  /* Notlar sayfanın sonuna kadar uzar */
+  html, body { height: 100%; }
+  body { display: flex; flex-direction: column; height: 281mm; }
+  .not { flex: 1 1 auto; min-height: 60px; }
 </style>
 </head>
 <body>
@@ -126,7 +131,7 @@
     <tr><th style="width:14%"></th><th>Kurye adı</th><th style="width:11%">Paket</th><th style="width:17%">Nakit ₺</th><th style="width:17%">POS ₺</th></tr>
     <tr><td class="ad">Sabit 1</td><td></td><td></td><td></td><td></td></tr>
     <tr><td class="ad">Sabit 2</td><td></td><td></td><td></td><td></td></tr>
-    <tr><td class="ad">Havuz</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="ad">Havuz</td><td class="yok" style="font-size:8pt;color:#777;text-align:center">isim yazılmaz</td><td></td><td></td><td></td></tr>
   </table>
 
   <h2>7. NAKİT KASA <small>Sadece eski nakitten ödeme / bankaya yatırma olduysa · giderlere yazmayın</small></h2>

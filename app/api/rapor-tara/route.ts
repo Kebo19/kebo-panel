@@ -33,7 +33,9 @@ A) YENİ FORM (tek sayfa, başlık "KEBO Günlük Kasa Formu", bölümler 1–7 
   4. PERSONEL KESİNTİSİ: Personel | Sebep | Tutar → "kesintiler"
   5. İPTAL / İADE: Açıklama | Tutar → "iadeler"
   6. KURYE: satırlar "Sabit 1", "Sabit 2", "Havuz"; sütunlar Kurye adı | Paket | Nakit | POS.
-     Sabit satırlar → "kuryeSabit", Havuz satırları → "kuryeHavuz" (isim = yazılan kurye adı).
+     Sabit satırlar → "kuryeSabit" (sırasıyla; isim = yazılan kurye adı).
+     "Havuz" satırı → "kuryeHavuz". Havuz satırında İSİM YAZILMAZ; isim boş olsa bile paket/nakit/POS
+     doluysa satırı MUTLAKA ekle ve isim olarak "Havuz" yaz. Paket sayısını mutlaka oku.
   7. NAKİT KASA (önceki günlerden kalan nakit): tablo satırları (Kime / ne için | Bankaya yatırıldıysa banka
      adı | Tutar) → nakitKasa.hareketler ({aciklama, banka, tutar}; banka boşsa "" yaz);
      "Kasa sayıldıysa: kasadaki toplam nakit" kutusu → nakitKasa.sayim (boşsa 0). Eski formlarda "Devreden"

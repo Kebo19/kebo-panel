@@ -866,6 +866,8 @@ export default function RaporlarPage() {
   const [kontrolOnay, setKontrolOnay] = useState(false);
   // Kağıda elle yazılmış kontrol toplamları (paket toplamları, brüt, net) — panel hesabıyla karşılaştırılır
   const [taramaKontrol, setTaramaKontrol] = useState<Record<string, number>>({});
+  // Toplamlar uyuşmazsa kayıt durur; sadece Tam Yetkili farkı bilerek onaylayıp kaydedebilir
+  const [farkOnay, setFarkOnay] = useState(false);
   // Yeni raporda önce tarih seçilip onaylanır, sonra form (ve tarama) açılır.
   const [tarihOnaylandi, setTarihOnaylandi] = useState(false);
   const formAlaniRef = useRef<HTMLDivElement>(null);
@@ -965,7 +967,7 @@ export default function RaporlarPage() {
     setKuryeler(kuryeYapisiHesapla(bugun()));
     setNotlar("");setSelectedRapor(null);setIsEditMode(false);
     setTaramaHata(""); setTaramaBelirsizAlanlar([]);
-    setTaramaIleDoldu(false); setTaramaTarihNotu(""); setKontrolOnay(false); setTarihOnaylandi(false); setTaramaKontrol({});
+    setTaramaIleDoldu(false); setTaramaTarihNotu(""); setKontrolOnay(false); setTarihOnaylandi(false); setTaramaKontrol({}); setFarkOnay(false);
   };
 
   /** Yeni rapor: formu temizler, tarih adımını sıradaki günle hazır açar. */
@@ -1135,6 +1137,9 @@ export default function RaporlarPage() {
     const tKapida = tKapidaKebo + tKapidaCnf;
     const tKapidaPaket = pk(koKeboYs)+pk(koKeboTrendyol)+pk(koKeboMigrosYemek)+pk(koKeboAlo)+pk(koCnfYs)+pk(koCnfTrendyol)+pk(koCnfMigrosYemek)+pk(koCnfAlo);
     const kapidaKasada = kapidaKasadaMi(tarih);
+    // Marka bazlı paket (satış tablosundan) — kurye paketleriyle ve kağıttaki toplamlarla karşılaştırılır
+    const pkKebo = pk(osKeboYs)+pk(osKeboTrendyol)+pk(osKeboMigros)+pk(osKeboAlo)+pk(koKeboYs)+pk(koKeboTrendyol)+pk(koKeboMigrosYemek)+pk(koKeboAlo);
+    const pkCnf = pk(osCnfYs)+pk(osCnfTrendyol)+pk(osCnfMigrosYemek)+pk(koCnfYs)+pk(koCnfTrendyol)+pk(koCnfMigrosYemek)+pk(koCnfAlo);
     // ── İndirim Analizi (Yemeksepeti + Trendyol, Kebo + CNF, online + kapıda) ──
     const tIndirimYS = tv(osKeboYsIndirim)+tv(osCnfYsIndirim)+tv(koKeboYsIndirim)+tv(koCnfYsIndirim);
     const tIndirimTrendyol = tv(osKeboTrendyolIndirim)+tv(osCnfTrendyolIndirim)+tv(koKeboTrendyolIndirim)+tv(koCnfTrendyolIndirim);
@@ -1166,7 +1171,7 @@ export default function RaporlarPage() {
     // Sepet ortalaması gerçek teslim edilen pakete göre (garanti farkı ortalamayı düşürmesin)
     const paketOrt = paketCiroToplami>0 && tKuryeGercekPaket>0 ? paketCiroToplami/tKuryeGercekPaket : 0;
     const kuryeFark=Math.round((tKapida-tKuryeTahsilat)*100)/100;
-    return {tOnline,tOnlineKebo,tOnlineCnf,tOnlinePaket,tKapida,tKapidaKebo,tKapidaCnf,tKapidaPaket,kapidaKasada,
+    return {pkKebo,pkCnf,tOnline,tOnlineKebo,tOnlineCnf,tOnlinePaket,tKapida,tKapidaKebo,tKapidaCnf,tKapidaPaket,kapidaKasada,
       tIndirimYS,tIndirimTrendyol,tIndirim,indirimOrani,indirimUyari,
       tKasa,brutCiro,tGider,tIade,netCiro,kuryelerHesap,tKuryePaket,tKuryeGercekPaket,
       tKuryeUzakPaket,tKuryePaket9km,tKuryeTahsilat,paketOrt,kuryeFark};
@@ -1288,7 +1293,8 @@ export default function RaporlarPage() {
         setKuryeler([
           satir(sabitler[0], 1, "sabit", "Kurye 1"),
           satir(sabitler[1], 2, "sabit", "Kurye 2"),
-          ...havuzlar.map((k,i)=>satir(k, Date.now()+400+i, "havuz", "Havuz Kurye")),
+          ...(havuzlar.length ? havuzlar.map((k,i)=>satir(k, Date.now()+400+i, "havuz", "Havuz Kurye"))
+             : [satir(undefined, Date.now()+400, "havuz", "Havuz Kurye")]),
         ]);
       }
       const nk = veri.nakitKasa || {};
@@ -1375,6 +1381,7 @@ Soru: ${soruFinal}`
   const handleRaporKaydet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (duplikaTarihHata) { alert(`${fmtTarih(tarih)} tarihli rapor zaten mevcut!`); return; }
+    if (uyumsuzluklar.length && !farkOnay) { alert("Toplamlar uyuşmuyor:\n• " + uyumsuzluklar.join("\n• ") + "\n\nDüzeltmeden kaydedilemez."); return; }
     if (taramaIleDoldu && !kontrolOnay) { alert("Fişten doldurulan değerleri kağıtla karşılaştırıp onay kutusunu işaretleyin."); return; }
     if (!selectedRapor && tarih > bugun()) { alert("İleri tarihli rapor girilemez."); return; }
     if (!selectedRapor && !adminOnayliGecis && tarihHataVarMi) { alert("Rapor tarihi sırası hatalı."); return; }
@@ -1480,11 +1487,34 @@ Soru: ${soruFinal}`
 
   // ── Derived ──
   const beklenenTarih = siradakiTarih();
+  // ── Toplam uyuşmazlıkları: kağıttaki kontrol toplamları ve kurye paketleri ──
+  const uyumsuzluklar: string[] = (() => {
+    const l: string[] = [];
+    const k = taramaKontrol;
+    const sayiFarki = (ad: string, kagit: number | undefined, panel: number) => {
+      if (kagit && kagit > 0 && Math.abs(kagit - panel) >= 0.5) l.push(`${ad}: kağıtta ${kagit}, panelde ${panel}`);
+    };
+    const paraFarki = (ad: string, kagit: number | undefined, panel: number) => {
+      if (kagit && kagit > 0 && Math.abs(kagit - panel) >= 1) l.push(`${ad}: kağıtta ₺${fmt(kagit)}, panelde ₺${fmt(panel)}`);
+    };
+    sayiFarki("KEBO toplam paket", k.paketKebo, ch.pkKebo);
+    sayiFarki("Chick'n toplam paket", k.paketCnf, ch.pkCnf);
+    sayiFarki("Dükkân toplam paket", k.paketToplam, ch.pkKebo + ch.pkCnf);
+    paraFarki("Toplam gider", k.gider, ch.tGider);
+    paraFarki("Brüt ciro", k.brut, ch.brutCiro);
+    paraFarki("Net ciro", k.net, ch.netCiro);
+    const platformPaket = ch.pkKebo + ch.pkCnf;
+    if (platformPaket > 0 && ch.tKuryeGercekPaket > 0 && platformPaket !== ch.tKuryeGercekPaket)
+      l.push(`Satış tablosundaki paket (${platformPaket}) ile kuryelerin götürdüğü paket (${ch.tKuryeGercekPaket}) tutmuyor`);
+    return l;
+  })();
+
   // Form her zaman açıktır; bu değer sadece kaydetmeyi engeller ve nedenini söyler.
   const kayitEngeli: string =
     !tarih ? "Rapor tarihini seçin"
     : duplikaTarihHata ? "Bu tarihe ait rapor zaten var"
     : tarihHataVarMi && !adminOnayliGecis ? (isAdmin ? "Tarih uyarısını onaylayın" : "Tarihi düzeltin")
+    : uyumsuzluklar.length && !farkOnay ? "Toplamlar uyuşmuyor — düzeltin"
     : taramaIleDoldu && !kontrolOnay ? "Kağıtla karşılaştırıp onay kutusunu işaretleyin"
     : "";
   const isReadOnly = !!(selectedRapor && !isEditMode);
@@ -1994,7 +2024,11 @@ Soru: ${soruFinal}`
                     </div>
                   </div>
                   <div className="p-3 space-y-3">
-                    <p className="text-[10px] text-gray-600">Sabit kuryede (Roadrunner) günlük en az <span className="text-amber-600 font-bold">30 paket</span> garantisi var — altında kalınırsa ödemede 30 esas alınır. Havuz kuryede garanti yok.</p>
+                    {tarih && tarih < ROADRUNNER_GECIS_GUNU ? (
+                      <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">{fmtTarih(tarih)} Roadrunner öncesi: kuryeler kendi personelimiz, 30 paket garantisi uygulanmaz.</p>
+                    ) : (
+                      <p className="text-[10px] text-gray-600">Sabit 1 ve Sabit 2&apos;de günlük en az <span className="text-amber-600 font-bold">30 paket</span> garantisi var — altında kalırsa ödemeye esas 30 alınır. Havuzda garanti ve isim yok.</p>
+                    )}
                     <div className="grid grid-cols-12 gap-1.5">
                       <div className="col-span-3 text-[9px] text-gray-600 uppercase tracking-wider">Kurye</div>
                       <div className="col-span-3 text-[9px] text-gray-600 uppercase tracking-wider text-center">Gerçek / Esas Paket</div>
@@ -2014,7 +2048,7 @@ Soru: ${soruFinal}`
                               ) : (
                                 <div className="relative">
                                   {sabit && <Truck size={9} className="absolute left-2 top-1/2 -translate-y-1/2 text-amber-700"/>}
-                                  <input type="text" placeholder={sabit?"Kurye adı":"Havuz kurye / firma"} disabled={isReadOnly} value={k.isim}
+                                  <input type="text" placeholder={sabit?"Kurye adı":k.tip==="havuz"?"Havuz (isim gerekmez)":"Kurye adı"} disabled={isReadOnly} value={k.isim}
                                     onChange={e=>kuryeDegistir(k.id,"isim",e.target.value)}
                                     className={`w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs rounded-lg ${sabit?"pl-6":"pl-2"} pr-2 outline-none focus:border-amber-500/40 disabled:opacity-40`}/>
                                 </div>
@@ -2205,6 +2239,23 @@ Soru: ${soruFinal}`
                 </div>
               );
             })()}
+
+            {/* ── TOPLAM UYUŞMAZLIKLARI: düzeltilmeden kayıt yapılmaz ── */}
+            {!isReadOnly && uyumsuzluklar.length > 0 && (
+              <div className="rounded-xl border-2 border-red-400 bg-red-50 px-4 py-3 space-y-2">
+                <p className="text-[13px] font-black text-red-800 flex items-center gap-2"><AlertTriangle size={15}/> Toplamlar uyuşmuyor — düzeltilmeden kaydedilemez</p>
+                <ul className="text-[12px] text-red-800 list-disc pl-5 space-y-0.5">
+                  {uyumsuzluklar.map(u => <li key={u}>{u}</li>)}
+                </ul>
+                <p className="text-[11px] text-red-700">Satış tablosundaki paket sayılarını, kurye paketlerini ya da kağıttaki toplamı kontrol edin.</p>
+                {isAdmin && (
+                  <label className="flex items-center gap-2 text-[12px] font-semibold text-red-900 cursor-pointer select-none">
+                    <input type="checkbox" checked={farkOnay} onChange={e => setFarkOnay(e.target.checked)} className="w-4 h-4 accent-red-600"/>
+                    Farkı biliyorum, yine de kaydet (sadece Tam Yetkili)
+                  </label>
+                )}
+              </div>
+            )}
 
             {/* ÖZET BANT */}
             <div className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1">
