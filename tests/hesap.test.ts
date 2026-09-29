@@ -17,12 +17,12 @@ describe("brüt / net ciro", () => {
     expect(brutCiro(eskiRapor)).toBe(51675);
   });
 
-  it("28.09 itibarıyla kendi POS: kapıda ödeme yine kasanın içinde", () => {
+  it("28.09 itibarıyla kendi POS: kapıda ödeme kasa raporunda yok, brüte eklenir", () => {
     expect(kapidaKasadaMi("2026-09-27")).toBe(false);
-    expect(kapidaKasadaMi("2026-09-28")).toBe(true);
+    expect(kapidaKasadaMi("2026-09-28")).toBe(false);
     const r: RaporVerisi = { tarih: "2026-09-28", os_kebo_ys: 1000, ko_kebo_ys: 500, kasa_nakit: 2000, gunluk_gider: 100 };
-    // online 1000 + kasa 2000 + gider 100 (kapıda 500 kasanın içinde, ayrıca eklenmez)
-    expect(brutCiro(r)).toBe(3100);
+    // online 1000 + kapıda 500 + kasa 2000 + gider 100
+    expect(brutCiro(r)).toBe(3600);
   });
 
   it("13.08 – 27.09 arası: kapıda ödeme brüte eklenir", () => {

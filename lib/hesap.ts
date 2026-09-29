@@ -77,10 +77,11 @@ export function yeniYapiMi(r: RaporVerisi): boolean {
  * Kapıda ödeme o gün kasa sayımının içinde mi?
  *   13.08.2026 öncesi: evet (kendi kuryelerimiz topluyordu)
  *   13.08–27.09.2026: hayır (Roadrunner'da kalıyordu, brüte ayrıca eklenir)
- *   28.09.2026 ve sonrası: evet (kendi POS'umuz; nakit ve kart kasaya girer)
+ *   13.08.2026 ve sonrası: hayır — brüte ayrıca eklenir. 28.09'dan itibaren kendi POS'umuzla
+ *   tahsil edilse de adisyon programının kasa raporu kapıda siparişleri içermiyor.
  */
 export const kapidaKasadaMi = (tarih: string): boolean =>
-  !!tarih && (tarih < ROADRUNNER_GECIS_GUNU || tarih >= KENDI_POS_GECIS_GUNU);
+  !!tarih && tarih < ROADRUNNER_GECIS_GUNU;
 
 export interface PlatformKirilimi {
   // platform → tutar

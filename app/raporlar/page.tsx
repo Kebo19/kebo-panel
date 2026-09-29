@@ -428,8 +428,10 @@ function PrintModal({rapor, onClose}: {rapor:GunlukRapor, onClose:()=>void}) {
             ))}
             <div className="row bold"><span>Kapıda Toplam</span><span>₺{fmt(tK)}</span></div>
             <div className="row"><span style={{color:"#888",fontSize:"10px"}}>{kapidaKasada
-              ? (rapor.tarih >= KENDI_POS_GECIS_GUNU ? "↳ Kendi POS'umuzla tahsil edildi; tutar kasa sayımının içinde (brüte ayrıca eklenmez)" : "↳ Kendi kuryelerimiz topladı; tutar kasa sayımının içinde (brüte ayrıca eklenmez)")
-              : "↳ Roadrunner'da kalır, haftalık mutabakatla mahsup edilir (brüte ayrıca eklenir)"}</span><span></span></div>
+              ? "↳ Kendi kuryelerimiz topladı; tutar kasa sayımının içinde (brüte ayrıca eklenmez)"
+              : rapor.tarih >= KENDI_POS_GECIS_GUNU
+                ? "↳ Kendi POS'umuzla tahsil edildi; kasa raporunda yok (brüte ayrıca eklenir)"
+                : "↳ Roadrunner'da kalır, haftalık mutabakatla mahsup edilir (brüte ayrıca eklenir)"}</span><span></span></div>
             <hr className="divider"/>
             <div className="section-title">Fiziki Kasa</div>
             {rapor.kasa_nakit>0&&<div className="row"><span>Nakit</span><span>₺{fmt(rapor.kasa_nakit)}</span></div>}
@@ -1797,9 +1799,9 @@ export default function RaporlarPage() {
             <div className="rounded-xl border border-[#e2e5eb] bg-white overflow-hidden">
               <div className="px-4 py-3 border-b border-[#e2e5eb] flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[14px] font-bold text-[#1a1f2e]">1. Satışlar</span>
-                <span title={ch.kapidaKasada ? (tarih >= KENDI_POS_GECIS_GUNU ? "28.09.2026'dan itibaren kendi POS'umuz: kapıda nakit ve kart kasa sayımının içinde" : "13.08.2026 öncesi: kendi kuryelerimizin topladığı para kasa sayımının içinde") : "Roadrunner'da kalır, haftalık mutabakatla mahsup edilir"}
+                <span title={ch.kapidaKasada ? "13.08.2026 öncesi: kendi kuryelerimizin topladığı para kasa sayımının içinde" : tarih >= KENDI_POS_GECIS_GUNU ? "28.09.2026'dan itibaren kendi POS'umuz: kapıda tutar adisyon kasa raporunda yok, brüte ayrıca eklenir" : "Roadrunner'da kalır, haftalık mutabakatla mahsup edilir"}
                   className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
-                  Kapıda: {ch.kapidaKasada ? "kasa sayımına dahil" : "Roadrunner'da, brüte ayrıca eklenir"}
+                  Kapıda: {ch.kapidaKasada ? "kasa sayımına dahil" : tarih >= KENDI_POS_GECIS_GUNU ? "brüte ayrıca eklenir" : "Roadrunner'da, brüte ayrıca eklenir"}
                 </span>
               </div>
               <div className="p-3 space-y-2">
