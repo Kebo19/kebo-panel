@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { hepsiniCek } from "@/lib/hepsiniCek";
 import { createClient } from "@/lib/supabase/client";
 import {
   Plus, Search, Building2, Trash2, X, Loader2, CheckCircle2,
   AlertTriangle, Wallet, ArrowLeft, Phone, Hash,
-  Calendar, Check, Square, CheckSquare, ChevronDown, ChevronUp, Edit2
+  Calendar, Check, Square, CheckSquare, ChevronDown, ChevronUp, Edit2, ScrollText
 } from "lucide-react";
+import VadeTakvimi from "@/components/VadeTakvimi";
+import CariEkstre from "@/components/CariEkstre";
 
 import { buAyinOdemeDonemi, faturaDurumHesapla, ODEME_HESAPLARI, HESAP_ETIKET } from "@/lib/cari";
 import { tv, fmt2, paraGirdisi } from "@/lib/para";
@@ -19,7 +22,9 @@ const ODEME_SECENEKLERI = [...ODEME_HESAPLARI, "Kredi Kartı", "Çek", "Diğer"]
 interface Cari {
   id: string; cari_kodu: string; unvan: string; vergi_no: string;
   vergi_dairesi: string; telefon: string; adres: string; tip: string; kategori: string;
+  varsayilan_kdv?: number | null;
 }
+const BOS_FORM = { cari_kodu: "", unvan: "", vergi_no: "", vergi_dairesi: "", telefon: "", adres: "", tip: "tedarikci", kategori: "duzenli", varsayilan_kdv: "" };
 interface Fatura {
   id: string; fatura_no: string; fatura_tarihi: string;
   toplam_tutar: number; durum: string; aciklama: string; cari_id?: string; cari_unvan?: string;
@@ -60,7 +65,10 @@ export default function CarilerPage() {
   const [formSaving, setFormSaving] = useState(false);
   const [topluIslemYukleniyor, setTopluIslemYukleniyor] = useState(false);
   const [toast, setToast] = useState<{ tip: "basari" | "hata"; mesaj: string } | null>(null);
-  const [form, setForm] = useState({ cari_kodu: "", unvan: "", vergi_no: "", vergi_dairesi: "", telefon: "", adres: "", tip: "tedarikci", kategori: "duzenli" });
+  const [form, setForm] = useState(BOS_FORM);
+  const [duzenlenenCariId, setDuzenlenenCariId] = useState<string | null>(null);
+  const [ekstreCari, setEkstreCari] = useState<Cari | null>(null);
+  const [takvimYenile, setTakvimYenile] = useState(0);
 
   // Bu Ay Ödenecekler state
   const [buAyFaturalar, setBuAyFaturalar] = useState<BuAyFatura[]>([]);
@@ -83,12 +91,23 @@ export default function CarilerPage() {
   // Map anahtarı cari id'si (ünvan değişse de bağlantı kopmasın).
   const veriCek = useCallback(async () => {
     setYukleniyor(true);
-    const [{ data: c }, { data: f }, { data: o }] = await Promise.all([
-      supabase.from("cariler").select("*").order("unvan"),
-      supabase.from("faturalar").select("cari_id, toplam_tutar, durum, fatura_tarihi"),
-      supabase.from("cari_odemeler").select("cari_id, tutar, fatura_idleri"),
-    ]);
-    if (c) setCariler(c as Cari[]);
+    // Listeler 1000 satırı aşabilir → sayfa sayfa (id ile kararlı sıralama)
+    let c: Cari[] = [], f: { cari_id: string | null; toplam_tutar: number | null; durum: string; fatura_tarihi: string }[] = [],
+      o: { cari_id: string | null; tutar: number | null; fatura_idleri: string[] | null }[] = [];
+    try {
+      [c, f, o] = await Promise.all([
+        hepsiniCek<Cari>((a, b) => supabase.from("cariler").select("*").order("unvan").order("id").range(a, b)),
+        hepsiniCek<{ cari_id: string | null; toplam_tutar: number | null; durum: string; fatura_tarihi: string }>((a, b) =>
+          supabase.from("faturalar").select("cari_id, toplam_tutar, durum, fatura_tarihi").order("id").range(a, b)),
+        hepsiniCek<{ cari_id: string | null; tutar: number | null; fatura_idleri: string[] | null }>((a, b) =>
+          supabase.from("cari_odemeler").select("cari_id, tutar, fatura_idleri").order("id").range(a, b)),
+      ]);
+    } catch (e) {
+      alert("Veri alınamadı: " + (e instanceof Error ? e.message : String(e)));
+      setYukleniyor(false);
+      return;
+    }
+    setCariler(c);
     const map = new Map<string, { buAy: number; toplam: number }>();
     const al = (id: string) => { if (!map.has(id)) map.set(id, { buAy: 0, toplam: 0 }); return map.get(id)!; };
     (f || []).forEach(fatura => {
@@ -107,6 +126,7 @@ export default function CarilerPage() {
       item.buAy = Math.max(item.buAy - (Number(odeme.tutar) || 0), 0);
     });
     setCariTutarMap(map);
+    setTakvimYenile(n => n + 1);
     setYukleniyor(false);
   }, [donem, supabase]);
 
@@ -114,13 +134,13 @@ export default function CarilerPage() {
   // (önceki dönemden kalan gecikmişler dahil).
   const buAyVeriCek = useCallback(async () => {
     setBuAyYukleniyor(true);
-    const { data: f } = await supabase
+    const f = await hepsiniCek<BuAyFatura>((a, b) => supabase
       .from("faturalar")
       .select("*")
       .lte("fatura_tarihi", donem.donemBit)
       .neq("durum", "odendi")
-      .order("fatura_tarihi", { ascending: false });
-    setBuAyFaturalar((f || []) as BuAyFatura[]);
+      .order("fatura_tarihi", { ascending: false }).order("id").range(a, b)).catch(() => [] as BuAyFatura[]);
+    setBuAyFaturalar(f);
     setBuAyYukleniyor(false);
   }, [donem, supabase]);
 
@@ -131,23 +151,39 @@ export default function CarilerPage() {
     setSeciliCari(cari);
     setSeciliFaturalar(new Set());
     setLocalDurumlar(new Map());
-    const [{ data: f }, { data: o }] = await Promise.all([
-      supabase.from("faturalar").select("*").eq("cari_id", cari.id).order("fatura_tarihi", { ascending: false }),
-      supabase.from("cari_odemeler").select("*").eq("cari_id", cari.id).order("tarih", { ascending: false }),
+    const [f, o] = await Promise.all([
+      hepsiniCek<Fatura>((a, b) => supabase.from("faturalar").select("*").eq("cari_id", cari.id).order("fatura_tarihi", { ascending: false }).order("id").range(a, b)).catch(() => [] as Fatura[]),
+      hepsiniCek<Odeme>((a, b) => supabase.from("cari_odemeler").select("*").eq("cari_id", cari.id).order("tarih", { ascending: false }).order("id").range(a, b)).catch(() => [] as Odeme[]),
     ]);
-    setCariFaturalar((f || []) as Fatura[]);
-    setCariOdemeler((o || []) as Odeme[]);
+    setCariFaturalar(f);
+    setCariOdemeler(o);
+  };
+
+  const yeniCariAc = () => { setDuzenlenenCariId(null); setForm(BOS_FORM); setModalAcik(true); };
+  const cariDuzenleAc = (c: Cari) => {
+    setDuzenlenenCariId(c.id);
+    setForm({
+      cari_kodu: c.cari_kodu || "", unvan: c.unvan || "", vergi_no: c.vergi_no || "", vergi_dairesi: c.vergi_dairesi || "",
+      telefon: c.telefon || "", adres: c.adres || "", tip: c.tip || "tedarikci", kategori: c.kategori || "diger",
+      varsayilan_kdv: c.varsayilan_kdv === null || c.varsayilan_kdv === undefined ? "" : String(Number(c.varsayilan_kdv)),
+    });
+    setModalAcik(true);
   };
 
   const kaydet = async () => {
     if (!form.unvan) { showToast("hata", "Ünvan zorunlu."); return; }
     setFormSaving(true);
-    const { error } = await supabase.from("cariler").insert([form]);
+    const kayit = { ...form, varsayilan_kdv: form.varsayilan_kdv === "" ? null : Number(form.varsayilan_kdv) };
+    const { data, error } = duzenlenenCariId
+      ? await supabase.from("cariler").update(kayit).eq("id", duzenlenenCariId).select().single()
+      : await supabase.from("cariler").insert([kayit]).select().single();
     setFormSaving(false);
     if (error) { showToast("hata", "Kayıt hatası: " + error.message); return; }
-    showToast("basari", "Cari kaydedildi.");
+    showToast("basari", duzenlenenCariId ? "Cari güncellendi." : "Cari kaydedildi.");
+    if (duzenlenenCariId && seciliCari?.id === duzenlenenCariId && data) setSeciliCari(data as Cari);
     setModalAcik(false);
-    setForm({ cari_kodu: "", unvan: "", vergi_no: "", vergi_dairesi: "", telefon: "", adres: "", tip: "tedarikci", kategori: "duzenli" });
+    setDuzenlenenCariId(null);
+    setForm(BOS_FORM);
     veriCek();
   };
 
@@ -156,7 +192,7 @@ export default function CarilerPage() {
     if (!seciliKalsin) setSeciliFaturalar(new Set());
     setManuelTutar("");
     setOdemeTarih(bugun());
-    setOdemeYontemi("Nakit");
+    setOdemeYontemi("Enpara"); // ödemelerin çoğu Enpara'dan yapılır
     setOdemeAciklama("");
     setOdemeModalAcik(true);
   };
@@ -168,6 +204,15 @@ export default function CarilerPage() {
     await cariDetayAc(cari);
     odemeAc(true);
     setSeciliFaturalar(new Set([f.id]));
+  };
+
+  /** Vade takviminden: carinin detayına geçip o gruptaki faturalar seçili ödeme penceresini açar. */
+  const takvimdenOde = async (cariId: string, faturaIdleri: string[]) => {
+    const cari = cariler.find(c => c.id === cariId);
+    if (!cari) { showToast("hata", "Cari bulunamadı."); return; }
+    await cariDetayAc(cari);
+    odemeAc(true);
+    setSeciliFaturalar(new Set(faturaIdleri));
   };
 
   const faturaSec = (id: string) => {
@@ -405,6 +450,12 @@ export default function CarilerPage() {
           <div className="flex items-center gap-2">
             {seciliCari ? (
               <>
+                <button onClick={() => setEkstreCari(seciliCari)} className="flex items-center gap-2 text-xs font-bold text-gray-700 border border-[#e2e5eb] hover:bg-black/[0.03] px-3 py-2 rounded-xl transition-colors">
+                  <ScrollText size={14} /> <span className="hidden sm:inline">Ekstre</span>
+                </button>
+                <button onClick={() => cariDuzenleAc(seciliCari)} title="Cariyi düzenle" className="p-2 text-gray-600 hover:text-blue-600 border border-[#e2e5eb] rounded-xl transition-colors">
+                  <Edit2 size={14} />
+                </button>
                 <button onClick={() => odemeAc()} className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl transition-colors">
                   <Wallet size={14} /> Ödeme Ekle
                 </button>
@@ -413,7 +464,7 @@ export default function CarilerPage() {
                 </button>
               </>
             ) : (
-              <button onClick={() => setModalAcik(true)} className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-colors">
+              <button onClick={yeniCariAc} className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-colors">
                 <Plus size={14} /> Cari Ekle
               </button>
             )}
@@ -438,6 +489,8 @@ export default function CarilerPage() {
               <p className="text-[10px] text-gray-600 mt-0.5">{fmtTarih(donem.donemBas)} – {fmtTarih(donem.donemBit)} dönem faturaları</p>
             </div>
           </div>
+
+          <VadeTakvimi yenile={takvimYenile} onOde={takvimdenOde} />
 
           {/* Sekmeler */}
           <div className="flex gap-1 bg-[#ffffff] border border-[#e2e5eb] rounded-xl p-1 w-fit">
@@ -590,6 +643,17 @@ export default function CarilerPage() {
                         <p className="text-sm font-black text-[#1a1f2e] group-hover:text-blue-600 transition-colors leading-tight mb-2">{c.unvan}</p>
                         {c.vergi_no && <p className="text-[11px] text-gray-600 flex items-center gap-1.5 mb-1"><Hash size={9} /> VN: {c.vergi_no}</p>}
                         {c.telefon && <p className="text-[11px] text-gray-600 flex items-center gap-1.5 mb-1"><Phone size={9} /> {c.telefon}</p>}
+                        <div className="flex items-center gap-2 mt-2">
+                          {c.varsayilan_kdv === null || c.varsayilan_kdv === undefined ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700">KDV tanımsız</span>
+                          ) : (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-black/[0.04] text-gray-600">KDV %{Number(c.varsayilan_kdv)}</span>
+                          )}
+                          <button onClick={e => { e.stopPropagation(); setEkstreCari(c); }}
+                            className="ml-auto flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-lg hover:bg-blue-500/20 transition-colors">
+                            <ScrollText size={11} /> Ekstre
+                          </button>
+                        </div>
                         <div className="mt-3 pt-3 border-t border-[#e2e5eb] space-y-1.5">
                           {buAyTutar > 0 && (
                             <div className="flex items-center justify-between">
@@ -780,7 +844,7 @@ export default function CarilerPage() {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-base font-black text-[#1a1f2e]">Yeni Cari</h3>
+              <h3 className="text-base font-black text-[#1a1f2e]">{duzenlenenCariId ? "Cariyi Düzenle" : "Yeni Cari"}</h3>
               <button onClick={() => setModalAcik(false)} className="text-gray-600 hover:text-[#1a1f2e]"><X size={16} /></button>
             </div>
             <div className="space-y-3">
@@ -811,6 +875,14 @@ export default function CarilerPage() {
                   <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Telefon</p>
                   <input value={form.telefon} onChange={e => setForm({ ...form, telefon: e.target.value })} placeholder="05xx..." className={inputCls} />
                 </div>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Varsayılan KDV</p>
+                <select value={form.varsayilan_kdv} onChange={e => setForm({ ...form, varsayilan_kdv: e.target.value })} className={inputCls}>
+                  <option value="" className="bg-[#ffffff]">Tanımsız</option>
+                  {["0", "1", "10", "20"].map(v => <option key={v} value={v} className="bg-[#ffffff]">%{v}</option>)}
+                </select>
+                <p className="text-[10px] text-gray-500 mt-1">İrsaliyeden fatura oluştururken ve KDV özetinde kullanılır. Tanımsızsa KDV özetinde bu carinin KDV&apos;siz girilmiş faturaları tahmin edilmez.</p>
               </div>
               <div className="flex gap-2 pt-2">
                 <button onClick={() => setModalAcik(false)} className="flex-1 text-sm font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] py-3 rounded-xl transition-colors">İptal</button>
@@ -917,6 +989,8 @@ export default function CarilerPage() {
           </div>
         </div>
       )}
+
+      {ekstreCari && <CariEkstre cari={ekstreCari} onKapat={() => setEkstreCari(null)} />}
 
       {/* BU AY FATURA DÜZENLEME MODAL */}
       {duzenleModal.acik && duzenleModal.fatura && (

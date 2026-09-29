@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { bugun, fmtTarih } from "@/lib/tarih";
 import { miktarOku } from "@/lib/stok";
 import { yuklemeIcinHazirla, jsonCevap } from "@/lib/gorsel";
-import { FileText, Camera, Loader2, Plus, Trash2, X, Save, PackageCheck, Truck, AlertTriangle } from "lucide-react";
+import { useYetki } from "@/lib/useYetki";
+import { FileText, Camera, Loader2, Plus, Trash2, X, Save, PackageCheck, Truck, AlertTriangle, Receipt } from "lucide-react";
 
 // İRSALİYE / GELECEK MAL
 // Mal gelmeden önce irsaliye girilir (fotoğraf/PDF okutularak ya da elle). Kalemler "yolda"
@@ -16,9 +17,33 @@ export interface IrsaliyeKalemi {
   id: string; belge_id: string | null; fatura_no: string | null; tedarikci: string | null;
   fatura_tarihi: string | null; beklenen_tarih: string | null;
   urun_adi_ham: string | null; urun_id: string | null; miktar: number; birim: string | null;
-  birim_fiyat: number | null; durum: string; created_at: string;
+  birim_fiyat: number | null; durum: string; created_at: string; cari_id?: string | null;
 }
 interface UrunKisa { id: string; urun_adi: string; birim: string; son_fiyat: number | null; }
+interface CariKisa { id: string; unvan: string; varsayilan_kdv: number | null; }
+
+const trKucuk = (s: string) => s.toLocaleLowerCase("tr-TR");
+
+/** Aranabilir cari seçimi: üstte arama kutusu, altta süzülmüş liste. */
+function CariSecici({ cariler, deger, onSec }: { cariler: CariKisa[]; deger: string; onSec: (c: CariKisa | null) => void }) {
+  const [ara, setAra] = useState("");
+  const liste = useMemo(() => {
+    const q = trKucuk(ara.trim());
+    const s = q ? cariler.filter(c => trKucuk(c.unvan || "").includes(q)) : cariler;
+    // Seçili cari süzgeçte kalmasa da listede görünsün (select değeri kaybolmasın).
+    const secili = cariler.find(c => c.id === deger);
+    return secili && !s.includes(secili) ? [secili, ...s] : s;
+  }, [ara, cariler, deger]);
+  return (
+    <div className="space-y-1">
+      <input value={ara} onChange={e => setAra(e.target.value)} placeholder="Cari ara..." className={inputCls} />
+      <select value={deger} onChange={e => onSec(cariler.find(c => c.id === e.target.value) || null)} className={inputCls}>
+        <option value="">{ara && liste.length === 0 ? "Eşleşen cari yok" : "Cari seçilmedi"}</option>
+        {liste.map(c => <option key={c.id} value={c.id}>{c.unvan}</option>)}
+      </select>
+    </div>
+  );
+}
 interface FormSatiri { anahtar: number; urun_id: string; urun_adi_ham: string; miktar: string; birim: string; fiyat: string; }
 
 const inputCls = "w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none";
@@ -34,10 +59,22 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
   onDegisti: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
+  const { tamYetkili } = useYetki();
   const urunMap = useMemo(() => new Map(urunler.map(u => [u.id, u])), [urunler]);
+
+  // ── Cariler (tedarikçi seçimi + fatura işleme) ──
+  const [cariler, setCariler] = useState<CariKisa[]>([]);
+  useEffect(() => {
+    let iptal = false;
+    supabase.from("cariler").select("id, unvan, varsayilan_kdv").order("unvan")
+      .then(({ data }) => { if (!iptal) setCariler((data || []) as CariKisa[]); });
+    return () => { iptal = true; };
+  }, [supabase]);
+  const cariMap = useMemo(() => new Map(cariler.map(c => [c.id, c])), [cariler]);
 
   // ── Yeni irsaliye formu ──
   const [formAcik, setFormAcik] = useState(false);
+  const [cariId, setCariId] = useState("");
   const [tedarikci, setTedarikci] = useState("");
   const [belgeNo, setBelgeNo] = useState("");
   const [belgeTarihi, setBelgeTarihi] = useState(bugun());
@@ -52,6 +89,14 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
   const [teslimBelge, setTeslimBelge] = useState<string | null>(null);
   const [teslimMiktarlar, setTeslimMiktarlar] = useState<Record<string, string>>({});
   const [teslimTarihi, setTeslimTarihi] = useState(bugun());
+  // Teslimden sonra cariye fatura işleme
+  const [faturaIsle, setFaturaIsle] = useState(false);
+  const [teslimCariId, setTeslimCariId] = useState("");
+  const [faturaNo, setFaturaNo] = useState("");
+  // "" = seçilmedi (carinin KDV oranı tanımsızsa boş gelir, seçilmeden fatura oluşturulmaz)
+  const [kdvOrani, setKdvOrani] = useState("");
+  const [kdvCariyeKaydet, setKdvCariyeKaydet] = useState(true);
+  const [mevcutFatura, setMevcutFatura] = useState<string | null>(null); // aynı belge_id'li faturanın no'su
 
   const belgeler = useMemo(() => {
     const m = new Map<string, IrsaliyeKalemi[]>();
@@ -61,7 +106,7 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
   }, [bekleyenler]);
 
   const formuAc = () => {
-    setTedarikci(""); setBelgeNo(""); setBelgeTarihi(bugun()); setBeklenen(varsayilanTarih);
+    setCariId(""); setTedarikci(""); setBelgeNo(""); setBelgeTarihi(bugun()); setBeklenen(varsayilanTarih);
     setSatirlar([bosSatir()]); setTaramaMesaj(null); setFormAcik(true);
   };
 
@@ -81,7 +126,14 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
       if (hata) { setTaramaMesaj({ tip: "hata", metin: hata }); return; }
       const v = veri as { tedarikci?: string; belge_no?: string; tarih?: string; belirsiz?: string[];
         kalemler?: { urun_adi?: string; urun_id?: string | null; miktar?: number; birim?: string; birim_fiyat?: number | null }[] };
-      if (v.tedarikci) setTedarikci(v.tedarikci);
+      if (v.tedarikci) {
+        setTedarikci(v.tedarikci);
+        // Okunan tedarikçi adı bir cariyle eşleşiyorsa (henüz seçilmediyse) otomatik seç.
+        const q = trKucuk(v.tedarikci.trim());
+        const eslesen = cariler.find(c => trKucuk(c.unvan || "") === q)
+          || cariler.find(c => { const u = trKucuk(c.unvan || ""); return u.length > 3 && q.length > 3 && (u.includes(q) || q.includes(u)); });
+        if (eslesen && !cariId) { setCariId(eslesen.id); setTedarikci(eslesen.unvan); }
+      }
       if (v.belge_no) setBelgeNo(v.belge_no);
       if (v.tarih) setBelgeTarihi(v.tarih);
       const yeni = (v.kalemler || []).filter(k => k.urun_adi || k.miktar).map(k => ({
@@ -116,7 +168,7 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
       const u = urunMap.get(s.urun_id)!;
       return {
         belge_id: belgeId, fatura_no: belgeNo.trim() || null, fatura_tarihi: belgeTarihi || null,
-        tedarikci: tedarikci.trim() || null, beklenen_tarih: beklenen || null,
+        tedarikci: tedarikci.trim() || null, cari_id: cariId || null, beklenen_tarih: beklenen || null,
         urun_adi_ham: s.urun_adi_ham || u.urun_adi, urun_id: s.urun_id, miktar, birim: u.birim,
         birim_fiyat: fiyat > 0 ? fiyat : null, toplam_tutar: fiyat > 0 ? fiyat * miktar : null,
         durum: "bekliyor", eslesme_durumu: "eslesti", yukleyen: kullanici,
@@ -129,19 +181,71 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
     onDegisti();
   };
 
-  const teslimAc = (belgeId: string) => {
+  /** Bu irsaliye (belge_id) için daha önce fatura oluşturulmuş mu? Varsa fatura no'sunu döner. */
+  const belgeFaturasi = async (belgeId: string): Promise<string | null> => {
+    const { data } = await supabase.from("faturalar").select("fatura_no").eq("belge_id", belgeId).limit(1);
+    return data && data.length ? (data[0].fatura_no || "(numarasız)") : null;
+  };
+
+  const teslimAc = async (belgeId: string) => {
     const b = belgeler.find(x => x.id === belgeId); if (!b) return;
     setTeslimMiktarlar(Object.fromEntries(b.kalemler.map(k => [k.id, String(k.miktar).replace(".", ",")])));
+    const cid = b.kalemler.find(k => k.cari_id)?.cari_id || "";
+    const vk = cariMap.get(cid)?.varsayilan_kdv;
+    setTeslimCariId(cid);
+    setFaturaNo(b.ilk.fatura_no || "");
+    setKdvOrani(vk === null || vk === undefined ? "" : String(Number(vk)));
+    setKdvCariyeKaydet(true);
+    setMevcutFatura(null);
+    setFaturaIsle(!!cid && tamYetkili);
     setTeslimTarihi(bugun()); setTeslimBelge(belgeId);
+    if (tamYetkili) {
+      const mevcut = await belgeFaturasi(belgeId);
+      setMevcutFatura(mevcut);
+      if (mevcut) setFaturaIsle(false);
+    }
   };
 
   const teslimAl = async () => {
     const b = belgeler.find(x => x.id === teslimBelge); if (!b) return;
     const kalemler = b.kalemler.map(k => ({ id: k.id, gelen: Math.max(miktarOku(teslimMiktarlar[k.id] || "0") || 0, 0) }));
+    const cari = cariMap.get(teslimCariId);
+    if (faturaIsle && !cari) { alert("Fatura işlemek için cari seçin."); return; }
+    if (faturaIsle && !faturaNo.trim()) { alert("Fatura numarasını girin."); return; }
+    if (faturaIsle && kdvOrani === "") { alert("Bu carinin KDV oranı tanımlı değil. Fatura için KDV oranını seçin."); return; }
+    const kdvTanimsiz = !!cari && (cari.varsayilan_kdv === null || cari.varsayilan_kdv === undefined);
     setKaydediliyor(true);
     const { error } = await supabase.rpc("irsaliye_teslim_al", { p_kalemler: kalemler, p_tarih: teslimTarihi });
+    if (error) { setKaydediliyor(false); alert("Teslim alınamadı: " + error.message); return; }
+
+    // Teslim modalında cari seçildi/değiştirildiyse kalemlere de yaz.
+    if (teslimCariId && b.kalemler.some(k => k.cari_id !== teslimCariId)) {
+      await supabase.from("stok_fatura_kalemleri").update({ cari_id: teslimCariId }).in("id", b.kalemler.map(k => k.id));
+    }
+
+    // Teslimden SONRA: cariye fatura olarak işle (aynı belge_id'li fatura varsa tekrar oluşturma).
+    if (faturaIsle && cari) {
+      const mevcut = await belgeFaturasi(b.id);
+      if (mevcut) {
+        alert(`Stok girişi yapıldı. Bu irsaliye için zaten fatura var (No ${mevcut}); tekrar oluşturulmadı.`);
+      } else {
+        const { error: fErr } = await supabase.from("faturalar").insert([{
+          cari_id: cari.id, cari_unvan: cari.unvan, fatura_no: faturaNo.trim(),
+          fatura_tarihi: teslimTarihi, vade_tarihi: null, // vade: dönem kuralı işler
+          tutar: faturaOnizleme.tutar, kdv: faturaOnizleme.kdv, toplam_tutar: faturaOnizleme.toplam,
+          aciklama: `İrsaliyeden (${b.kalemler.length} kalem)`, durum: "bekliyor", islendi: false,
+          belge_id: b.id,
+        }]);
+        if (fErr) alert("Stok girişi yapıldı ama fatura oluşturulamadı: " + fErr.message + "\nFaturayı Faturalar sayfasından elle girin.");
+        else if (kdvTanimsiz && kdvCariyeKaydet) {
+          const oran = Number(kdvOrani);
+          const { error: cErr } = await supabase.from("cariler").update({ varsayilan_kdv: oran }).eq("id", cari.id);
+          if (cErr) alert("Fatura oluşturuldu ama KDV oranı cariye kaydedilemedi: " + cErr.message);
+          else setCariler(l => l.map(c => c.id === cari.id ? { ...c, varsayilan_kdv: oran } : c));
+        }
+      }
+    }
     setKaydediliyor(false);
-    if (error) { alert("Teslim alınamadı: " + error.message); return; }
     setTeslimBelge(null);
     onDegisti();
   };
@@ -155,6 +259,22 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
   };
 
   const teslimBelgesi = belgeler.find(x => x.id === teslimBelge);
+
+  // Fatura önizlemesi: Σ(gelen miktar × birim fiyat) KDV hariç; fiyatı olmayan kalem 0 TL girer.
+  const faturaOnizleme = (() => {
+    const kalemler = teslimBelgesi?.kalemler || [];
+    let tutar = 0, fiyatsiz = 0;
+    kalemler.forEach(k => {
+      const gelen = Math.max(miktarOku(teslimMiktarlar[k.id] || "0") || 0, 0);
+      const fiyat = Number(k.birim_fiyat) || 0;
+      if (gelen > 0 && fiyat <= 0) fiyatsiz++;
+      tutar += gelen * fiyat;
+    });
+    tutar = Math.round(tutar * 100) / 100;
+    const kdv = kdvOrani === "" ? 0 : Math.round(tutar * (Number(kdvOrani) || 0)) / 100;
+    return { tutar, kdv, toplam: Math.round((tutar + kdv) * 100) / 100, fiyatsiz };
+  })();
+  const para = (v: number) => new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
 
   return (
     <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] p-4">
@@ -221,15 +341,20 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
                   <AlertTriangle size={13} className="shrink-0"/> {taramaMesaj.metin}
                 </div>
               )}
+              <div>
+                <label className="block text-[10px] text-gray-600 uppercase mb-1">Tedarikçi (cari)</label>
+                <CariSecici cariler={cariler} deger={cariId} onSec={c => { setCariId(c?.id || ""); if (c) setTedarikci(c.unvan); }} />
+                <p className="text-[10px] text-gray-500 mt-0.5 px-1">Cari seçilirse teslim alırken irsaliye tek tıkla cariye fatura olarak işlenebilir.</p>
+              </div>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                <div><label className="block text-[10px] text-gray-600 uppercase mb-1">Tedarikçi</label><input value={tedarikci} onChange={e => setTedarikci(e.target.value)} className={inputCls}/></div>
+                <div><label className="block text-[10px] text-gray-600 uppercase mb-1">Tedarikçi adı</label><input value={tedarikci} onChange={e => setTedarikci(e.target.value)} className={inputCls}/></div>
                 <div><label className="block text-[10px] text-gray-600 uppercase mb-1">İrsaliye No</label><input value={belgeNo} onChange={e => setBelgeNo(e.target.value)} className={inputCls}/></div>
                 <div><label className="block text-[10px] text-gray-600 uppercase mb-1">Belge Tarihi</label><input type="date" value={belgeTarihi} onChange={e => setBelgeTarihi(e.target.value)} className={inputCls}/></div>
                 <div><label className="block text-[10px] text-gray-600 uppercase mb-1">Beklenen Teslim</label><input type="date" value={beklenen} onChange={e => setBeklenen(e.target.value)} className={inputCls}/></div>
               </div>
               <div className="space-y-2">
                 <div className="hidden sm:grid grid-cols-12 gap-2 text-[10px] text-gray-600 uppercase px-1">
-                  <span className="col-span-5">Stok ürünü</span><span className="col-span-3">Miktar</span><span className="col-span-3">Birim fiyat (₺)</span><span/>
+                  <span className="col-span-5">Stok ürünü</span><span className="col-span-3">Miktar</span><span className="col-span-3">Birim fiyat (₺, KDV hariç)</span><span/>
                 </div>
                 {satirlar.map(s => {
                   const u = urunMap.get(s.urun_id);
@@ -297,11 +422,73 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
                   </div>
                 );
               })}
+
+              {/* Cariye fatura olarak işle */}
+              {tamYetkili ? (
+                <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 space-y-2.5">
+                  <label className="flex items-center gap-2 text-xs font-bold text-[#1a1f2e] cursor-pointer">
+                    <input type="checkbox" checked={faturaIsle} onChange={e => setFaturaIsle(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+                    <Receipt size={13} className="text-blue-600" /> Cariye fatura olarak işle
+                  </label>
+                  {mevcutFatura && (
+                    <p className="text-[11px] text-amber-800 flex items-center gap-1.5"><AlertTriangle size={12} className="shrink-0" /> Bu irsaliye için zaten fatura var (No {mevcutFatura}); tekrar oluşturulmaz.</p>
+                  )}
+                  {faturaIsle && (
+                    <>
+                      <div>
+                        <label className="block text-[10px] text-gray-600 uppercase mb-1">Cari</label>
+                        <CariSecici cariler={cariler} deger={teslimCariId} onSec={c => {
+                          setTeslimCariId(c?.id || "");
+                          if (c) setKdvOrani(c.varsayilan_kdv === null || c.varsayilan_kdv === undefined ? "" : String(Number(c.varsayilan_kdv)));
+                        }} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] text-gray-600 uppercase mb-1">Fatura no</label>
+                          <input value={faturaNo} onChange={e => setFaturaNo(e.target.value)} className={inputCls} />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-600 uppercase mb-1">KDV oranı</label>
+                          <select value={kdvOrani} onChange={e => setKdvOrani(e.target.value)} className={`${inputCls} ${kdvOrani === "" ? "border-amber-400" : ""}`}>
+                            <option value="" disabled>Tanımsız — seçin</option>
+                            {["0", "1", "10", "20"].map(v => <option key={v} value={v}>%{v}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      {(() => {
+                        const tc = cariMap.get(teslimCariId);
+                        if (!tc || (tc.varsayilan_kdv !== null && tc.varsayilan_kdv !== undefined)) return null;
+                        return (
+                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 text-[11px] text-amber-900 space-y-1.5">
+                            <p className="flex items-start gap-1.5"><AlertTriangle size={12} className="shrink-0 mt-0.5" /> Bu carinin KDV oranı tanımlı değil, seçin; seçtiğiniz oran cariye de kaydedilsin mi?</p>
+                            <label className="flex items-center gap-2 font-semibold cursor-pointer">
+                              <input type="checkbox" checked={kdvCariyeKaydet} onChange={e => setKdvCariyeKaydet(e.target.checked)} className="w-3.5 h-3.5 accent-blue-600" />
+                              Evet, bu oranı carinin KDV oranı olarak kaydet
+                            </label>
+                          </div>
+                        );
+                      })()}
+                      <p className="text-[11px] font-semibold text-blue-800">Birim fiyatlar KDV hariç kabul edilir.</p>
+                      <div className="grid grid-cols-3 gap-2 text-[11px]">
+                        <div className="rounded-lg bg-[#ffffff] border border-[#e2e5eb] px-2 py-1.5"><p className="text-gray-500">KDV hariç</p><p className="font-bold">₺{para(faturaOnizleme.tutar)}</p></div>
+                        <div className="rounded-lg bg-[#ffffff] border border-[#e2e5eb] px-2 py-1.5"><p className="text-gray-500">KDV</p><p className="font-bold">{kdvOrani === "" ? "—" : `₺${para(faturaOnizleme.kdv)}`}</p></div>
+                        <div className="rounded-lg bg-[#ffffff] border border-[#e2e5eb] px-2 py-1.5"><p className="text-gray-500">Toplam</p><p className="font-black text-blue-700">{kdvOrani === "" ? "—" : `₺${para(faturaOnizleme.toplam)}`}</p></div>
+                      </div>
+                      <p className="text-[10px] text-gray-500">Fatura tarihi = teslim tarihi ({fmtTarih(teslimTarihi)}); vade dönem kuralıyla hesaplanır; durum &quot;bekliyor&quot;.</p>
+                      {faturaOnizleme.fiyatsiz > 0 && (
+                        <p className="text-[11px] text-amber-800 flex items-center gap-1.5"><AlertTriangle size={12} className="shrink-0" /> Fiyatı olmayan kalemler faturaya 0 TL girer, faturayı sonra düzeltin ({faturaOnizleme.fiyatsiz} kalem).</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              ) : (
+                <p className="text-[10px] text-gray-500">Cariye fatura işleme Tam Yetkili kullanıcı tarafından yapılır.</p>
+              )}
             </div>
             <div className="px-5 py-4 border-t border-[#e2e5eb] flex justify-end gap-2">
               <button onClick={() => setTeslimBelge(null)} className="text-xs font-semibold text-gray-500 border border-[#e2e5eb] px-4 py-2 rounded-xl">Vazgeç</button>
-              <button onClick={teslimAl} disabled={kaydediliyor} className="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 px-6 py-2 rounded-xl flex items-center gap-2">
-                {kaydediliyor ? <Loader2 size={12} className="animate-spin"/> : <PackageCheck size={12}/>} Teslim Al ve Stoğa Ekle
+              <button onClick={teslimAl} disabled={kaydediliyor || (faturaIsle && kdvOrani === "")} className="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 px-6 py-2 rounded-xl flex items-center gap-2">
+                {kaydediliyor ? <Loader2 size={12} className="animate-spin"/> : <PackageCheck size={12}/>} Teslim Al ve Stoğa Ekle{faturaIsle ? " + Fatura" : ""}
               </button>
             </div>
           </div>

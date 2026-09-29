@@ -25,7 +25,7 @@ import {
   Package, PlusCircle, Search, AlertTriangle, TrendingDown,
   Truck, ClipboardCheck, Loader2, X, Save, Edit3, Trash2,
   RefreshCw, Layers, Box, Clock, BrainCircuit, CheckSquare, Square,
-  ListOrdered, Calendar, ArrowUp, ArrowDown, PackageMinus, ShoppingCart
+  ListOrdered, Calendar, ArrowUp, ArrowDown, PackageMinus, ShoppingCart, ChefHat
 } from "lucide-react";
 
 interface Urun {
@@ -556,6 +556,10 @@ export default function StokPage() {
                 <ShoppingCart size={13}/> Sipariş listesi ({siparisListesi.length})
               </button>
             )}
+            <Link href="/stok/recete"
+              className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-[#ffffff] border border-emerald-500/30 px-3 py-2 rounded-xl hover:bg-emerald-500/10">
+              <ChefHat size={13}/> Reçete & Maliyet
+            </Link>
             <button onClick={() => { setTopluVakit(varsayilanVakit()); setTopluSayimSekme("gunluk"); setTopluSayimAcik(true); }}
               className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-blue-600/90 hover:bg-blue-600 border border-blue-500/30 px-3 py-2 rounded-xl transition-all shadow-lg shadow-blue-900/20">
               <ClipboardCheck size={13}/> Toplu Sayım

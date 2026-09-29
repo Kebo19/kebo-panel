@@ -18,6 +18,7 @@ import {
   roadrunnerKuryesiMi, roadrunnerKuryeUcreti, type KuryeSatiri, YEMEK_KARTLARI,
 } from "@/lib/hesap";
 import { useYetki } from "@/lib/useYetki";
+import PosMutabakat from "@/components/PosMutabakat";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -51,14 +52,13 @@ interface AIAnaliz {
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
 const RAPOR_TURLERI = [
-  { key: "genel", label: "Genel Özet", desc: "Brüt/net ciro, gider, paket toplamları" },
-  { key: "platform", label: "Platform Detayı", desc: "Her platformun online + kapıda satışları" },
-  { key: "kasa", label: "Kasa Dağılımı", desc: "Nakit, POS, Edenred, Metropol ödeme yöntemleri" },
-  { key: "gunluk", label: "Gün Gün Liste", desc: "Seçilen tarih aralığında her günün detayı" },
-  { key: "karsilastirma", label: "Platform Karşılaştırma", desc: "Platformları yan yana karşılaştır" },
-  { key: "roadrunner", label: "Roadrunner Mutabakatı", desc: "Seçilen dönem için kurye paket ücreti, POS komisyonu ve tahsilat mutabakatı (haftalık hesap için tarih aralığını o haftaya ayarlayın)" },
-  { key: "magicpay", label: "MagicPay Karşılaştırma", desc: "MagicPay (kebo-admin-ui) POS/online sipariş sisteminden çekilen rakamlarla, buraya elle girilen raporun karşılaştırması" },
-];
+  { key: "ozet", label: "Özet", desc: "Brüt/net ciro, gider, en iyi/en düşük gün, ciro trendi ve kasa ödeme dağılımı (nakit, POS, yemek kartları)" },
+  { key: "platform", label: "Platformlar", desc: "Platformların online + kapıda satışları, payları ve karşılaştırması" },
+  { key: "gunluk", label: "Gün Gün", desc: "Seçilen tarih aralığında her günün detayı" },
+  { key: "roadrunner", label: "Roadrunner", desc: "Seçilen dönem için kurye paket ücreti, POS komisyonu ve tahsilat mutabakatı (haftalık hesap için tarih aralığını o haftaya ayarlayın)" },
+  { key: "pos", label: "POS & Kart", desc: "POS ve yemek kartı satışlarının bankaya yatan tutarlarla mutabakatı; MagicPay karşılaştırması" },
+] as const;
+type RaporTuru = typeof RAPOR_TURLERI[number]["key"];
 
 // Roadrunner kurye mutabakatı — rapor girişindeki günlük kurye verilerinden (paket, uzak/9km
 // üzeri paket, nakit/pos tahsilat) seçilen aralık için hesaplanır. Ücret sabitleri lib/hesap.ts'de.
@@ -100,7 +100,7 @@ export default function RaporAnalizPage() {
 
   const [baslangic, setBaslangic] = useState(() => ayBasi(bugun()));
   const [bitis, setBitis] = useState(() => bugun());
-  const [raporTuru, setRaporTuru] = useState("genel");
+  const [raporTuru, setRaporTuru] = useState<RaporTuru>("ozet");
   const [seciliPlatformlar, setSeciliPlatformlar] = useState<PlatformSecimi[]>([...PLATFORMLAR]);
   const [odemeFiltre, setOdemeFiltre] = useState<"hepsi" | "online" | "kapida">("hepsi");
 
@@ -160,6 +160,8 @@ export default function RaporAnalizPage() {
     const toplamGider = d.gider + d.iade;
 
     const platformlar = Object.fromEntries(PLATFORMLAR.map(p => [p, platformToplam(raporlar, p, odemeFiltre)])) as Record<PlatformAdi, number>;
+    const platformOnline = Object.fromEntries(PLATFORMLAR.map(p => [p, platformToplam(raporlar, p, "online")])) as Record<PlatformAdi, number>;
+    const platformKapida = Object.fromEntries(PLATFORMLAR.map(p => [p, platformToplam(raporlar, p, "kapida")])) as Record<PlatformAdi, number>;
     const toplamPlatform = Object.values(platformlar).reduce((s, v) => s + v, 0);
     let markaKebo = 0, markaCnf = 0;
     raporlar.forEach(r => { const m = platformKirilimi(r).marka; markaKebo += m.kebo; markaCnf += m.cnf; });
@@ -184,7 +186,7 @@ export default function RaporAnalizPage() {
       brutCiro: d.brut, netCiro: d.net, toplamGider, indirim: d.indirim, paket: d.paket,
       oncBrut: o.brut, oncNet: o.net, oncGider: o.gider + o.iade,
       kasaNakit: sum("kasa_nakit"), kasaPos: sum("kasa_pos"), kasaKartlar: YEMEK_KARTLARI.map(k => ({ ad: k.ad, deger: sum(k.alan) })),
-      platformlar, toplamPlatform, markaKebo, markaCnf,
+      platformlar, platformOnline, platformKapida, toplamPlatform, markaKebo, markaCnf,
       gunlukDetay,
       gunSayisi: raporlar.length,
       gunlukOrt: raporlar.length > 0 ? d.brut / raporlar.length : 0,
@@ -462,7 +464,7 @@ ${isletmeOzeti}`,
             ))}
           </div>
           <p className="text-[11px] text-gray-600">{RAPOR_TURLERI.find(t => t.key === raporTuru)?.desc}</p>
-          {(raporTuru === "platform" || raporTuru === "gunluk" || raporTuru === "karsilastirma") && (
+          {(raporTuru === "platform" || raporTuru === "gunluk") && (
             <div>
               <p className="text-[10px] text-gray-600 mb-2 uppercase tracking-widest">Platformlar</p>
               <div className="flex flex-wrap gap-2 mb-3">
@@ -496,8 +498,8 @@ ${isletmeOzeti}`,
           </div>
         ) : (
           <>
-            {/* ── GENEL ÖZET ── */}
-            {raporTuru === "genel" && (
+            {/* ── ÖZET (genel özet + kasa dağılımı) ── */}
+            {raporTuru === "ozet" && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {[
@@ -554,81 +556,115 @@ ${isletmeOzeti}`,
                     </div>
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* ── PLATFORM DETAYI ── */}
-            {raporTuru === "platform" && (
-              <div className="space-y-4">
-                <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
-                  <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-4 flex items-center gap-1.5"><PieChart size={12} /> Platform Gelir Dağılımı</p>
-                  <div className="space-y-4">
-                    {seciliPlatformlar.map(p => {
-                      const online = raporlar.reduce((s, r) => s + platformKirilimi(r).online[p], 0);
-                      const kapida = raporlar.reduce((s, r) => s + platformKirilimi(r).kapida[p], 0);
-                      const toplam = (odemeFiltre === "online" ? online : odemeFiltre === "kapida" ? kapida : online + kapida);
-                      const pct = stats.toplamPlatform > 0 ? (toplam / stats.toplamPlatform) * 100 : 0;
-                      return (
-                        <div key={p} className="bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PLATFORM_RENK[p] }} />
-                              <span className="text-sm font-bold text-[#1a1f2e]">{p}</span>
-                            </div>
-                            <span className="text-lg font-black" style={{ color: PLATFORM_RENK[p] }}>₺{fmt(toplam)}</span>
-                          </div>
-                          <div className="grid grid-cols-3 gap-3 mb-3">
-                            <div className="text-center"><p className="text-[10px] text-gray-600 uppercase tracking-widest">Online</p><p className="text-sm font-bold text-blue-600">₺{fmt(online)}</p></div>
-                            <div className="text-center"><p className="text-[10px] text-gray-600 uppercase tracking-widest">Kapıda</p><p className="text-sm font-bold text-orange-600">₺{fmt(kapida)}</p></div>
-                            <div className="text-center"><p className="text-[10px] text-gray-600 uppercase tracking-widest">Pay</p><p className="text-sm font-bold text-gray-700">{Math.round(pct)}%</p></div>
-                          </div>
-                          <div className="h-2 bg-black/[0.04] rounded-full overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: PLATFORM_RENK[p] }} />
+                {/* Kasa ödeme dağılımı */}
+                <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5 space-y-4">
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><Wallet size={12} /> Kasa Ödeme Dağılımı</p>
+                  {[
+                    { label: "Nakit", value: stats.kasaNakit, color: "#34D399" },
+                    { label: "POS / Kredi Kartı", value: stats.kasaPos, color: "#60A5FA" },
+                    ...stats.kasaKartlar.filter(k => k.deger > 0).map((k, i) => ({ label: k.ad, value: k.deger, color: ["#FBBF24", "#A78BFA", "#F472B6", "#2DD4BF", "#FB923C"][i % 5] })),
+                  ].map(item => {
+                    const toplam = stats.kasaNakit + stats.kasaPos + stats.kasaKartlar.reduce((t, k) => t + k.deger, 0);
+                    const pct = toplam > 0 ? (item.value / toplam) * 100 : 0;
+                    return (
+                      <div key={item.label} className="bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-bold text-[#1a1f2e]">{item.label}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-gray-500">{Math.round(pct)}%</span>
+                            <span className="text-lg font-black" style={{ color: item.color }}>₺{fmt(item.value)}</span>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-[#e2e5eb] flex justify-between">
-                    <span className="text-xs text-gray-600">Platform Toplamı</span>
-                    <span className="text-sm font-black text-[#1a1f2e]">₺{fmt(stats.toplamPlatform)}</span>
+                        <div className="h-2 bg-black/[0.04] rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: item.color }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="pt-3 border-t border-[#e2e5eb] flex justify-between">
+                    <span className="text-xs text-gray-600">Kasa Toplamı</span>
+                    <span className="text-sm font-black text-[#1a1f2e]">₺{fmt(stats.kasaNakit + stats.kasaPos + stats.kasaKartlar.reduce((t, k) => t + k.deger, 0))}</span>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* ── KASA DAĞILIMI ── */}
-            {raporTuru === "kasa" && (
-              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5 space-y-4">
-                <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><Wallet size={12} /> Kasa Ödeme Dağılımı</p>
-                {[
-                  { label: "Nakit", value: stats.kasaNakit, color: "#34D399" },
-                  { label: "POS / Kredi Kartı", value: stats.kasaPos, color: "#60A5FA" },
-                  ...stats.kasaKartlar.filter(k => k.deger > 0).map((k, i) => ({ label: k.ad, value: k.deger, color: ["#FBBF24", "#A78BFA", "#F472B6", "#2DD4BF", "#FB923C"][i % 5] })),
-                ].map(item => {
-                  const toplam = stats.kasaNakit + stats.kasaPos + stats.kasaKartlar.reduce((t, k) => t + k.deger, 0);
-                  const pct = toplam > 0 ? (item.value / toplam) * 100 : 0;
-                  return (
-                    <div key={item.label} className="bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-bold text-[#1a1f2e]">{item.label}</span>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-gray-500">{Math.round(pct)}%</span>
-                          <span className="text-lg font-black" style={{ color: item.color }}>₺{fmt(item.value)}</span>
-                        </div>
-                      </div>
-                      <div className="h-2 bg-black/[0.04] rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: item.color }} />
+            {/* ── PLATFORMLAR (platform detayı + karşılaştırma) ── */}
+            {raporTuru === "platform" && (() => {
+              const satirlar = seciliPlatformlar.map(p => {
+                const online = stats.platformOnline[p], kapida = stats.platformKapida[p];
+                const toplam = odemeFiltre === "online" ? online : odemeFiltre === "kapida" ? kapida : online + kapida;
+                return { p, online, kapida, toplam, pct: stats.toplamPlatform > 0 ? (toplam / stats.toplamPlatform) * 100 : 0 };
+              });
+              const seciliToplam = satirlar.reduce((t, r) => t + r.toplam, 0);
+              return (
+                <div className="space-y-4">
+                  {satirlar.length > 0 && (
+                    <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
+                      <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-4 flex items-center gap-1.5"><PieChart size={12} /> Platform Gelir Dağılımı</p>
+                      <div className="h-[220px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={satirlar.map(r => ({ name: r.p, online: r.online, kapida: r.kapida }))}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#eef0f3" vertical={false} />
+                            <XAxis dataKey="name" stroke="#6b7280" fontSize={10} tickLine={false} />
+                            <YAxis stroke="#6b7280" fontSize={9} tickLine={false} tickFormatter={v => `₺${v >= 1000 ? (v / 1000).toFixed(0) + "K" : v}`} />
+                            <Tooltip formatter={(v) => `₺${fmt(Number(v))}`} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                            {odemeFiltre !== "kapida" && <Bar dataKey="online" stackId="p" fill="#3b82f6" name="Online" />}
+                            {odemeFiltre !== "online" && <Bar dataKey="kapida" stackId="p" fill="#f97316" name="Kapıda" />}
+                          </BarChart>
+                        </ResponsiveContainer>
                       </div>
                     </div>
-                  );
-                })}
-                <div className="pt-3 border-t border-[#e2e5eb] flex justify-between">
-                  <span className="text-xs text-gray-600">Kasa Toplamı</span>
-                  <span className="text-sm font-black text-[#1a1f2e]">₺{fmt(stats.kasaNakit + stats.kasaPos + stats.kasaKartlar.reduce((t, k) => t + k.deger, 0))}</span>
+                  )}
+                  <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
+                    <div className="px-5 py-3 border-b border-[#e2e5eb]">
+                      <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><BarChart3 size={11} /> Platform Karşılaştırma</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-[#e2e5eb]">
+                            {["Platform", "Online Satış", "Kapıda Ödeme", "Toplam", "Pay"].map(h => (
+                              <th key={h} className="text-left px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold whitespace-nowrap">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#eef0f3]">
+                          {satirlar.map(r => (
+                            <tr key={r.p} className="hover:bg-black/[0.03] transition-colors">
+                              <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_RENK[r.p] }} /><span className="font-bold text-[#1a1f2e] whitespace-nowrap">{r.p}</span></div></td>
+                              <td className={`px-4 py-3 font-bold ${odemeFiltre === "kapida" ? "text-gray-400" : "text-blue-600"}`}>₺{fmt(r.online)}</td>
+                              <td className={`px-4 py-3 font-bold ${odemeFiltre === "online" ? "text-gray-400" : "text-orange-600"}`}>₺{fmt(r.kapida)}</td>
+                              <td className="px-4 py-3 font-black whitespace-nowrap" style={{ color: PLATFORM_RENK[r.p] }}>₺{fmt(r.toplam)}</td>
+                              <td className="px-4 py-3 min-w-[120px]">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 h-1.5 bg-black/[0.04] rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full" style={{ width: `${Math.min(r.pct, 100)}%`, backgroundColor: PLATFORM_RENK[r.p] }} />
+                                  </div>
+                                  <span className="text-gray-500 w-10 text-right">%{r.pct.toFixed(1)}</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t border-[#e2e5eb] bg-[#f7f8fa]">
+                            <td className="px-4 py-3 text-[10px] text-gray-600 uppercase font-bold">Seçili Toplam</td>
+                            <td className="px-4 py-3 text-blue-600 font-black">₺{fmt(satirlar.reduce((t, r) => t + r.online, 0))}</td>
+                            <td className="px-4 py-3 text-orange-600 font-black">₺{fmt(satirlar.reduce((t, r) => t + r.kapida, 0))}</td>
+                            <td className="px-4 py-3 font-black text-[#1a1f2e]">₺{fmt(seciliToplam)}</td>
+                            <td className="px-4 py-3 text-[10px] text-gray-500 whitespace-nowrap">Tüm platformlar: ₺{fmt(stats.toplamPlatform)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                    <p className="px-5 py-2.5 border-t border-[#e2e5eb] text-[10px] text-gray-500">
+                      &quot;Toplam&quot; ve &quot;Pay&quot; üstteki ödeme filtresine ({odemeFiltre === "hepsi" ? "Online + Kapıda" : odemeFiltre === "online" ? "Sadece Online" : "Sadece Kapıda"}) göre hesaplanır; pay, tüm platformların toplamına oranıdır.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* ── GÜN GÜN LİSTE ── */}
             {raporTuru === "gunluk" && (
@@ -677,43 +713,6 @@ ${isletmeOzeti}`,
                         <td className="px-4 py-3 text-purple-600 font-black">{fmt(stats.paket)}</td>
                       </tr>
                     </tfoot>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* ── PLATFORM KARŞILAŞTIRMA ── */}
-            {raporTuru === "karsilastirma" && (
-              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
-                <div className="px-5 py-3 border-b border-[#e2e5eb]">
-                  <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><BarChart3 size={11} /> Platform Karşılaştırma</p>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-[#e2e5eb]">
-                        {["Platform", "Online Satış", "Kapıda Ödeme", "Toplam", "Pay %"].map(h => (
-                          <th key={h} className="text-left px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#0f1624]">
-                      {seciliPlatformlar.map(p => {
-                        const online = raporlar.reduce((s, r) => s + platformKirilimi(r).online[p], 0);
-                        const kapida = raporlar.reduce((s, r) => s + platformKirilimi(r).kapida[p], 0);
-                        const toplam = online + kapida;
-                        const pct = stats.toplamPlatform > 0 ? ((toplam / stats.toplamPlatform) * 100).toFixed(1) : "0";
-                        return (
-                          <tr key={p} className="hover:bg-black/[0.03] transition-colors">
-                            <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_RENK[p] }} /><span className="font-bold text-[#1a1f2e]">{p}</span></div></td>
-                            <td className="px-4 py-3 text-blue-600 font-bold">₺{fmt(online)}</td>
-                            <td className="px-4 py-3 text-orange-600 font-bold">₺{fmt(kapida)}</td>
-                            <td className="px-4 py-3 font-black" style={{ color: PLATFORM_RENK[p] }}>₺{fmt(toplam)}</td>
-                            <td className="px-4 py-3 text-gray-400">{pct}%</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
                   </table>
                 </div>
               </div>
@@ -839,9 +838,15 @@ ${isletmeOzeti}`,
               </div>
             )}
 
-            {/* ── MAGICPAY KARŞILAŞTIRMA ── */}
-            {raporTuru === "magicpay" && (
+            {/* ── POS & KART (banka mutabakatı + MagicPay karşılaştırma) ── */}
+            {raporTuru === "pos" && (
               <div className="space-y-4">
+                <PosMutabakat raporlar={raporlar} baslangic={baslangic} bitis={bitis} />
+
+                {/* MagicPay karşılaştırma — işlevi aynen korunuyor */}
+                <p className="pt-2 text-[11px] font-black text-[#1a1f2e] uppercase tracking-widest flex items-center gap-1.5">
+                  <RefreshCw size={12} className="text-blue-600" /> MagicPay Karşılaştırma
+                </p>
                 <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-4 text-[11px] text-gray-700 leading-relaxed flex items-start gap-2.5">
                   <RefreshCw size={15} className="text-blue-600 shrink-0 mt-0.5" />
                   <div>

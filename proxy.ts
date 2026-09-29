@@ -102,6 +102,6 @@ export const config = {
   matcher: [
     // Statik dosyalar, görseller ve api/ hariç her sayfa. API route'ları kendi
     // oturum kontrolünü yapar (bkz. lib/supabase/server.ts → oturumKontrol).
-    '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|webmanifest)$).*)',
   ],
 }

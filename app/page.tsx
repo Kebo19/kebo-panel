@@ -7,12 +7,15 @@ import {
   Users, Wallet, TrendingUp,
   ChevronRight, AlertTriangle, CheckCircle2,
   FileText, Bike, ChefHat, Store, Clock,
-  BarChart3, Calendar, Building2
+  BarChart3, Calendar, Building2, CalendarClock
 } from "lucide-react";
 import { fmt, fmtK } from "@/lib/para";
 import { bugun, ayBasi, aySonu, fmtTarih } from "@/lib/tarih";
 import { donemOzeti, raporOzeti, type RaporVerisi } from "@/lib/hesap";
 import { buAyinOdemeDonemi } from "@/lib/cari";
+import { sabitGiderDurum, type SabitGiderDurum } from "@/lib/karZarar";
+
+interface BekleyenSabitGider { id: string; ad: string; tutar: number; degisken: boolean; gun: number; durum: SabitGiderDurum }
 
 // Tailwind sınıfları derleme anında taranır; `bg-${renk}-500` gibi dinamik sınıflar
 // üretilmez. Bu yüzden her renk için sınıflar burada açıkça yazılı.
@@ -44,6 +47,7 @@ function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; pr
 export default function Anasayfa() {
   const [loading, setLoading] = useState(true);
   const [kullanici, setKullanici] = useState("");
+  const [sabitGiderler, setSabitGiderler] = useState<{ bekleyen: BekleyenSabitGider[]; aktifSayi: number } | null>(null);
   const [d, setD] = useState({
     aktifPersonel: 0, kurye: 0, mutfak: 0, banko: 0, eksikBelge: 0,
     bugunRapor: false, bugunCiro: 0, bugunNet: 0, bugunPaket: 0, bugunTarih: "",
@@ -61,21 +65,37 @@ export default function Anasayfa() {
 
       const bugunStr = bugun();
       const donem = buAyinOdemeDonemi();
-      const [{ data: personeller }, { data: bugunData }, { data: aylik }, { data: odenecek }] = await Promise.all([
-        supabase.from("personeller").select("departman,durum,tc_kimlik,iban"),
+      const [{ data: personeller }, { data: bugunData }, { data: aylik }, { data: odenecek }, { data: belgeEksik }] = await Promise.all([
+        supabase.from("personeller").select("departman,durum"),
         supabase.from("gunluk_raporlar").select("*").eq("tarih", bugunStr).maybeSingle(),
         supabase.from("gunluk_raporlar").select("*").gte("tarih", ayBasi(bugunStr)).lte("tarih", aySonu(bugunStr.slice(0, 4), bugunStr.slice(5, 7))),
         supabase.from("faturalar").select("toplam_tutar,fatura_tarihi,durum").neq("durum", "odendi").lte("fatura_tarihi", donem.donemBit),
+        // TC/IBAN personel_hassas'ta (sadece Tam Yetkili okur); eksik sayısı herkese rpc ile gelir.
+        supabase.rpc("personel_belge_eksik_sayisi"),
       ]);
 
-      let aktifPersonel = 0, kurye = 0, mutfak = 0, banko = 0, eksikBelge = 0;
+      // Bu ay ödenecek sabit giderler (sadece Tam Yetkili okuyabilir; hata olursa kart gösterilmez)
+      const [{ data: sabitler, error: sabitHata }, { data: sabitOdemeler }] = await Promise.all([
+        supabase.from("sabit_giderler").select("id,ad,tutar,degisken,gun").eq("aktif", true).order("gun"),
+        supabase.from("kasa_manuel_islemler").select("kaynak_id,islem_tarihi").eq("kaynak", "sabit_gider")
+          .gte("islem_tarihi", ayBasi(bugunStr)).lte("islem_tarihi", aySonu(bugunStr.slice(0, 4), bugunStr.slice(5, 7))),
+      ]);
+      if (!sabitHata && sabitler) {
+        const odenen = new Map((sabitOdemeler || []).map(o => [o.kaynak_id as string, o.islem_tarihi as string]));
+        const bekleyen = sabitler
+          .map(x => ({ id: x.id, ad: x.ad, tutar: Number(x.tutar) || 0, degisken: !!x.degisken, gun: x.gun, durum: sabitGiderDurum(x.gun, bugunStr, odenen.get(x.id)) }))
+          .filter(x => x.durum !== "odendi");
+        setSabitGiderler({ bekleyen, aktifSayi: sabitler.length });
+      }
+
+      let aktifPersonel = 0, kurye = 0, mutfak = 0, banko = 0;
+      const eksikBelge = Number(belgeEksik) || 0;
       if (personeller) {
         const aktif = personeller.filter(p => p.durum === "aktif");
         aktifPersonel = aktif.length;
         kurye = aktif.filter(p => p.departman === "Kurye").length;
         mutfak = aktif.filter(p => p.departman === "Mutfak").length;
         banko = aktif.filter(p => p.departman === "Banko").length;
-        eksikBelge = aktif.filter(p => !p.tc_kimlik || !p.iban).length;
       }
 
       // Bugünün raporu genelde gün sonunda girilir; yoksa en son girilen raporu gösteririz.
@@ -182,6 +202,42 @@ export default function Anasayfa() {
             </div>
           ))}
         </div>
+
+        {/* ── BU AY ÖDENECEK SABİT GİDERLER ── */}
+        {sabitGiderler && sabitGiderler.aktifSayi > 0 && (() => {
+          const { bekleyen } = sabitGiderler;
+          const geciken = bekleyen.filter(x => x.durum === "gecikti").length;
+          const toplam = bekleyen.reduce((t, x) => t + (x.degisken ? 0 : x.tutar), 0);
+          const degiskenVar = bekleyen.some(x => x.degisken);
+          return (
+            <Link href="/kasa" className={`block bg-[#ffffff] border rounded-2xl p-4 transition-all hover:border-blue-500/30 ${geciken > 0 ? "border-red-500/30" : "border-[#e2e5eb]"}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${geciken > 0 ? "bg-red-500/10 text-red-600" : "bg-amber-500/10 text-amber-600"}`}><CalendarClock size={13} /></div>
+                  <div>
+                    <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Bu ay ödenecek sabit giderler</p>
+                    <p className="text-[11px] text-gray-500">
+                      {bekleyen.length === 0 ? "Hepsi ödendi ✓" : <>{bekleyen.length} bekliyor{geciken > 0 && <span className="text-red-600 font-semibold"> · {geciken} gecikmiş</span>}</>}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {bekleyen.length > 0 && <p className="text-lg font-black text-[#1a1f2e]">₺{fmt(toplam)}{degiskenVar && <span className="text-[10px] font-medium text-gray-500"> + değişken</span>}</p>}
+                  <ChevronRight size={14} className="text-gray-400" />
+                </div>
+              </div>
+              {bekleyen.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {bekleyen.map(x => (
+                    <span key={x.id} className={`text-[11px] px-2 py-1 rounded-lg ${x.durum === "gecikti" ? "bg-red-500/10 text-red-700" : "bg-black/[0.04] text-gray-700"}`}>
+                      {x.ad} · {x.degisken ? "değişken" : `₺${fmt(x.tutar)}`} · {x.gun}&apos;i{x.durum === "gecikti" ? " (gecikti)" : ""}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </Link>
+          );
+        })()}
 
         {/* ── ORTA: Bugün + Aylık + Kadro ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

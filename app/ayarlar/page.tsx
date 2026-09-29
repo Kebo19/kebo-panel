@@ -2,14 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { yetkiOnbelleginiTemizle } from "@/lib/useYetki";
+import { yetkiOnbelleginiTemizle, useYetki } from "@/lib/useYetki";
 import { useRouter } from "next/navigation";
-import { LogOut, User, Shield } from "lucide-react";
+import Link from "next/link";
+import { LogOut, User, History, MessageSquareWarning, Sparkles, ChevronRight } from "lucide-react";
 
 export default function AyarlarPage() {
   const supabase = createClient();
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const { tamYetkili } = useYetki();
+
+  const kartlar = [
+    ...(tamYetkili ? [
+      { href: "/ayarlar/gecmis", icon: History, baslik: "İşlem geçmişi", aciklama: "Kim, neyi, ne zaman ekledi / değiştirdi / sildi" },
+      { href: "/ayarlar/bildirimler", icon: MessageSquareWarning, baslik: "Sorun bildirimleri ve hata kayıtları", aciklama: "Kullanıcıların bildirdiği sorunlar ve sistem hataları" },
+    ] : []),
+    { href: "/yenilikler", icon: Sparkles, baslik: "Yenilikler", aciklama: "Panele eklenen son özellikler" },
+  ];
 
   useEffect(() => {
     const getUser = async () => {
@@ -49,6 +59,20 @@ export default function AyarlarPage() {
           <LogOut size={16} />
           Çıkış Yap
         </button>
+
+        {kartlar.map(k => (
+          <Link key={k.href} href={k.href}
+            className="flex items-center gap-4 bg-[#ffffff] border border-[#e2e5eb] hover:border-blue-300 rounded-2xl p-5 transition-colors">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+              <k.icon size={17} className="text-blue-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-[#1a1f2e]">{k.baslik}</p>
+              <p className="text-[12px] text-gray-500">{k.aciklama}</p>
+            </div>
+            <ChevronRight size={16} className="text-gray-400 shrink-0" />
+          </Link>
+        ))}
 
       </div>
     </main>

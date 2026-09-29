@@ -6,10 +6,12 @@ import { bugun, ayBasi, gunEkle } from "@/lib/tarih";
 import {
   Plus, Search, FileText, Trash2, X, Loader2, CheckCircle2,
   AlertTriangle, Building2, Upload, RefreshCw, Calendar,
-  ChevronDown, ChevronUp, Check, Square, CheckSquare
+  ChevronDown, ChevronUp, Check, Square, CheckSquare, Percent, FileSpreadsheet
 } from "lucide-react";
+import { kdvOzeti, faturaKdvAyristir, csvMetni, csvIndir } from "@/lib/cariEkstre";
+import { hepsiniCek } from "@/lib/hepsiniCek";
 
-interface Cari { id: string; unvan: string; vergi_no: string; }
+interface Cari { id: string; unvan: string; vergi_no: string; varsayilan_kdv?: number | null; }
 interface Fatura {
   id: string; cari_id: string; cari_unvan: string; fatura_no: string;
   fatura_tarihi: string; vade_tarihi: string; tutar: number; kdv: number;
@@ -21,6 +23,126 @@ const fmt = (v: number) => new Intl.NumberFormat("tr-TR", { minimumFractionDigit
 const fmtTarih = (t: string) => { if (!t) return "—"; try { const p = t.split("-"); return `${p[2]}.${p[1]}.${p[0]}`; } catch { return t; } };
 const parseTutar = (s: string) => parseFloat((s || "0").replace(/\./g, "").replace(",", ".")) || 0;
 const AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+
+/** Seçilen ayın faturalarının KDV özeti (mali müşavir için): oran kırılımı, cari bazında ilk 10, CSV. */
+function KdvOzetiBolumu({ faturalar, cariler }: { faturalar: Fatura[]; cariler: Cari[] }) {
+  const [acik, setAcik] = useState(false);
+  const [ay, setAy] = useState(() => bugun().slice(0, 7));
+  const cariKdv = useMemo(() => new Map(cariler.map(c => [c.id, c.varsayilan_kdv ?? null])), [cariler]);
+  const ayinFaturalari = useMemo(() => faturalar.filter(f => f.fatura_tarihi?.startsWith(ay)), [faturalar, ay]);
+  const ozet = useMemo(() => kdvOzeti(ayinFaturalari, cariKdv), [ayinFaturalari, cariKdv]);
+  const [y, m] = ay.split("-");
+  const ayAdi = `${AYLAR[Number(m) - 1] || ""} ${y}`;
+
+  const csv = () => {
+    csvIndir(`kdv-ozeti-${ay}.csv`, csvMetni([
+      ["KDV Özeti", ayAdi],
+      [],
+      ["Fatura Tarihi", "Fatura No", "Cari", "Vergi No", "KDV Oranı (%)", "KDV Hariç Tutar", "KDV", "Toplam", "Not"],
+      ...ayinFaturalari
+        .slice().sort((a, b) => (a.fatura_tarihi || "").localeCompare(b.fatura_tarihi || ""))
+        .map(f => {
+          const a = faturaKdvAyristir(f, f.cari_id ? cariKdv.get(f.cari_id) : null);
+          const vn = cariler.find(c => c.id === f.cari_id)?.vergi_no || "";
+          return [fmtTarih(f.fatura_tarihi), f.fatura_no, f.cari_unvan, vn, a.oran, a.matrah, a.kdv, a.toplam,
+            a.kaynak === "cari_varsayilan" ? "KDV carinin tanımlı oranından hesaplandı" : a.kaynak === "bilinmiyor" ? "KDV oranı tanımsız" : ""];
+        }),
+      [],
+      ["Oran Kırılımı"],
+      ["KDV Oranı (%)", "Fatura Adedi", "KDV Hariç Tutar", "KDV", "Toplam"],
+      ...ozet.oranlar.map(o => [o.oran, o.adet, o.matrah, o.kdv, o.toplam]),
+      ["Genel Toplam (oranı bilinen)", ozet.adet, ozet.matrah, ozet.kdv, ozet.toplam],
+      ...(ozet.tanimsiz.adet ? [["KDV oranı tanımsız", ozet.tanimsiz.adet, "", "", ozet.tanimsiz.toplam]] : []),
+    ]));
+  };
+
+  return (
+    <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
+      <button onClick={() => setAcik(!acik)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-black/[0.03] transition-colors">
+        <span className="flex items-center gap-2 text-sm font-black text-[#1a1f2e]"><Percent size={14} className="text-indigo-600" /> KDV Özeti <span className="text-[11px] font-normal text-gray-500">mali müşavir için</span></span>
+        {acik ? <ChevronUp size={14} className="text-gray-600" /> : <ChevronDown size={14} className="text-gray-600" />}
+      </button>
+      {acik && (
+        <div className="border-t border-[#e2e5eb] p-4 space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <input type="month" value={ay} onChange={e => e.target.value && setAy(e.target.value)} className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none" />
+            <span className="text-xs text-gray-500">{ozet.adet + ozet.tanimsiz.adet} fatura</span>
+            <button onClick={csv} disabled={ozet.adet + ozet.tanimsiz.adet === 0} className="ml-auto flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 px-3 py-2 rounded-xl">
+              <FileSpreadsheet size={13} /> CSV dışa aktar
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            {[{ l: "KDV hariç", v: ozet.matrah, c: "text-[#1a1f2e]" }, { l: "KDV", v: ozet.kdv, c: "text-indigo-600" }, { l: "Toplam", v: ozet.toplam, c: "text-emerald-600" }].map(k => (
+              <div key={k.l} className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] px-3 py-2.5">
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest">{k.l}</p>
+                <p className={`text-sm sm:text-base font-black ${k.c}`}>₺{fmt(k.v)}</p>
+              </div>
+            ))}
+          </div>
+
+          {ozet.tanimsizCariler.length > 0 && (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] text-red-800 flex gap-2">
+              <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+              <span>
+                <b>{ozet.tanimsizCariler.length} carinin KDV oranı tanımlı değil — Cariler&apos;den girin.</b>{" "}
+                Bu carilerin KDV&apos;si ayrı girilmemiş {ozet.tanimsiz.adet} faturası (₺{fmt(ozet.tanimsiz.toplam)}) tahmin edilmedi; yukarıdaki toplamlara katılmadı, &quot;KDV oranı tanımsız&quot; satırında gösteriliyor.
+                <span className="block text-red-700/80 mt-0.5">{ozet.tanimsizCariler.slice(0, 8).join(", ")}{ozet.tanimsizCariler.length > 8 ? ` ve ${ozet.tanimsizCariler.length - 8} cari daha` : ""}</span>
+              </span>
+            </div>
+          )}
+          {ozet.tahminiAdet > 0 && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 flex gap-2">
+              <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+              <span>{ozet.tahminiAdet} faturada KDV ayrı girilmemiş; carinin tanımlı KDV oranıyla toplamdan hesaplandı.</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="overflow-x-auto">
+              <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-2">Oran kırılımı</p>
+              <table className="w-full text-xs">
+                <thead><tr className="border-b border-[#e2e5eb] text-[10px] text-gray-500 uppercase">
+                  <th className="text-left py-2">Oran</th><th className="text-right py-2">Adet</th><th className="text-right py-2">KDV hariç</th><th className="text-right py-2">KDV</th><th className="text-right py-2">Toplam</th>
+                </tr></thead>
+                <tbody className="divide-y divide-[#eef0f3]">
+                  {ozet.oranlar.length === 0 && !ozet.tanimsiz.adet ? <tr><td colSpan={5} className="py-4 text-center text-gray-500">Bu ay fatura yok</td></tr> : ozet.oranlar.map(o => (
+                    <tr key={o.oran}>
+                      <td className="py-2 font-bold">%{o.oran}</td><td className="py-2 text-right">{o.adet}</td>
+                      <td className="py-2 text-right whitespace-nowrap">₺{fmt(o.matrah)}</td><td className="py-2 text-right text-indigo-600 whitespace-nowrap">₺{fmt(o.kdv)}</td><td className="py-2 text-right font-bold whitespace-nowrap">₺{fmt(o.toplam)}</td>
+                    </tr>
+                  ))}
+                  {ozet.tanimsiz.adet > 0 && (
+                    <tr className="text-red-700">
+                      <td className="py-2 font-bold">KDV oranı tanımsız</td><td className="py-2 text-right">{ozet.tanimsiz.adet}</td>
+                      <td className="py-2 text-right">—</td><td className="py-2 text-right">—</td><td className="py-2 text-right font-bold whitespace-nowrap">₺{fmt(ozet.tanimsiz.toplam)}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="overflow-x-auto">
+              <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-2">Cari bazında (ilk 10)</p>
+              <table className="w-full text-xs">
+                <thead><tr className="border-b border-[#e2e5eb] text-[10px] text-gray-500 uppercase">
+                  <th className="text-left py-2">Cari</th><th className="text-right py-2">Adet</th><th className="text-right py-2">KDV</th><th className="text-right py-2">Toplam</th>
+                </tr></thead>
+                <tbody className="divide-y divide-[#eef0f3]">
+                  {ozet.cariler.slice(0, 10).map(c => (
+                    <tr key={c.cari_id || c.cari_unvan}>
+                      <td className="py-2 max-w-[180px] truncate">{c.cari_unvan}{c.tanimsiz && <span className="ml-1 text-[10px] font-bold text-red-600">KDV tanımsız</span>}</td><td className="py-2 text-right">{c.adet}</td>
+                      <td className="py-2 text-right text-indigo-600 whitespace-nowrap">₺{fmt(c.kdv)}</td><td className="py-2 text-right font-bold whitespace-nowrap">₺{fmt(c.toplam)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function FaturalarPage() {
   const supabase = createClient();
@@ -59,12 +181,16 @@ export default function FaturalarPage() {
 
   const veriCek = useCallback(async () => {
     setYukleniyor(true);
-    const [{ data: f }, { data: c }] = await Promise.all([
-      supabase.from("faturalar").select("*").order("fatura_tarihi", { ascending: false }),
-      supabase.from("cariler").select("id, unvan, vergi_no").order("unvan"),
-    ]);
-    if (f) setFaturalar(f as Fatura[]);
-    if (c) setCariler(c as Cari[]);
+    // Tüm faturalar 1000 satırı aşabilir → sayfa sayfa (id ile kararlı sıralama)
+    try {
+      const [f, c] = await Promise.all([
+        hepsiniCek<Fatura>((a, b) => supabase.from("faturalar").select("*").order("fatura_tarihi", { ascending: false }).order("id").range(a, b)),
+        hepsiniCek<Cari>((a, b) => supabase.from("cariler").select("id, unvan, vergi_no, varsayilan_kdv").order("unvan").order("id").range(a, b)),
+      ]);
+      setFaturalar(f); setCariler(c);
+    } catch (e) {
+      showToast("hata", "Veri alınamadı: " + (e instanceof Error ? e.message : String(e)));
+    }
     setYukleniyor(false);
     setSeciliFaturalar(new Set());
   }, []);
@@ -149,9 +275,9 @@ export default function FaturalarPage() {
         if (vkn && unvan && !cariMap.has(vkn)) { cariMap.set(vkn, unvan); yeniCariler.push({ vergi_no: vkn, unvan }); }
       });
 
-      const { data: mevcutCariler } = await supabase.from("cariler").select("id, vergi_no");
+      const mevcutCariler = await hepsiniCek<{ id: string; vergi_no: string }>((a, b) => supabase.from("cariler").select("id, vergi_no").order("id").range(a, b));
       const mevcutVknMap = new Map<string, string>();
-      (mevcutCariler || []).forEach(c => mevcutVknMap.set(c.vergi_no, c.id));
+      mevcutCariler.forEach(c => mevcutVknMap.set(c.vergi_no, c.id));
 
       let eklenenCari = 0;
       for (const cari of yeniCariler) {
@@ -178,8 +304,8 @@ export default function FaturalarPage() {
         faturaRows.push({ cari_id: cariId, cari_unvan: unvan, fatura_no: gibNo, fatura_tarihi: fatura_tarihi || null, tutar, kdv: 0, toplam_tutar: odenecek || tutar, aciklama: `Mikro e-Fatura: ${gibNo}`, durum: "bekliyor", islendi: false });
       });
 
-      const { data: mevcutFaturalar } = await supabase.from("faturalar").select("fatura_no");
-      const mevcutNoSet = new Set((mevcutFaturalar || []).map(f => f.fatura_no));
+      const mevcutFaturalar = await hepsiniCek<{ fatura_no: string }>((a, b) => supabase.from("faturalar").select("fatura_no").order("id").range(a, b));
+      const mevcutNoSet = new Set(mevcutFaturalar.map(f => f.fatura_no));
       const yeniSatirlar = faturaRows.filter(f => !mevcutNoSet.has(f.fatura_no));
       const atlanenFatura = faturaRows.length - yeniSatirlar.length;
       let eklenenFatura = 0;
@@ -198,10 +324,13 @@ export default function FaturalarPage() {
     if (!form.cari_id || !form.fatura_no || !form.tutar) { showToast("hata", "Cari, fatura no ve tutar zorunlu."); return; }
     setFormSaving(true);
     const cari = cariler.find(c => c.id === form.cari_id);
+    // kdv sütunu TUTAR tutar (oran değil): KDV hariç tutar × oran.
+    const matrah = parseFloat(form.tutar) || 0;
+    const kdvTutari = Math.round(matrah * (parseFloat(form.kdv) || 0)) / 100;
     const { error } = await supabase.from("faturalar").insert([{
       cari_id: form.cari_id, cari_unvan: cari?.unvan || "", fatura_no: form.fatura_no,
       fatura_tarihi: form.fatura_tarihi, vade_tarihi: form.vade_tarihi || null,
-      tutar: parseFloat(form.tutar), kdv: parseFloat(form.kdv), toplam_tutar: parseFloat(form.toplam_tutar),
+      tutar: matrah, kdv: kdvTutari, toplam_tutar: Math.round((matrah + kdvTutari) * 100) / 100,
       aciklama: form.aciklama, durum: form.durum, islendi: false,
     }]);
     setFormSaving(false);
@@ -407,6 +536,9 @@ export default function FaturalarPage() {
           ))}
         </div>
 
+        {/* KDV ÖZETİ */}
+        <KdvOzetiBolumu faturalar={faturalar} cariler={cariler} />
+
         {/* FİLTRELER */}
         <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4 space-y-3">
           <div className="flex flex-wrap gap-2 items-center justify-between">
@@ -565,9 +697,13 @@ export default function FaturalarPage() {
             <div className="space-y-3">
               <div>
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Cari *</p>
-                <select value={form.cari_id} onChange={e => setForm({ ...form, cari_id: e.target.value })} className={inputCls}>
+                <select value={form.cari_id} onChange={e => {
+                  const c = cariler.find(x => x.id === e.target.value);
+                  const vk = c?.varsayilan_kdv;
+                  setForm({ ...form, cari_id: e.target.value, kdv: vk === null || vk === undefined ? form.kdv : String(Number(vk)) });
+                }} className={inputCls}>
                   <option value="" className="bg-[#ffffff]">Cari seçin...</option>
-                  {cariler.map(c => <option key={c.id} value={c.id} className="bg-[#ffffff]">{c.unvan}</option>)}
+                  {cariler.map(c => <option key={c.id} value={c.id} className="bg-[#ffffff]">{c.unvan}{c.varsayilan_kdv === null || c.varsayilan_kdv === undefined ? " (KDV tanımsız)" : ""}</option>)}
                 </select>
               </div>
               <div>
@@ -586,7 +722,7 @@ export default function FaturalarPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Tutar *</p>
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Tutar (KDV hariç) *</p>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-xs">₺</span>
                     <input type="number" value={form.tutar} onChange={e => setForm({ ...form, tutar: e.target.value })} placeholder="0" className={`${inputCls} pl-7`} />
@@ -597,6 +733,8 @@ export default function FaturalarPage() {
                   <select value={form.kdv} onChange={e => setForm({ ...form, kdv: e.target.value })} className={inputCls}>
                     {["0", "1", "10", "20"].map(v => <option key={v} value={v} className="bg-[#ffffff]">%{v}</option>)}
                   </select>
+                  {(() => { const c = cariler.find(x => x.id === form.cari_id); return c && (c.varsayilan_kdv === null || c.varsayilan_kdv === undefined)
+                    ? <p className="text-[10px] text-amber-700 mt-1">Carinin KDV oranı: Tanımsız — oranı kontrol edin.</p> : null; })()}
                 </div>
               </div>
               <div className="bg-[#f7f8fa] border border-[#e2e5eb] rounded-xl px-4 py-3 flex justify-between">

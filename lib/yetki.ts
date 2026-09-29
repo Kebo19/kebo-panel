@@ -12,7 +12,10 @@ export const TAM_YETKILI: Rol = "Tam Yetkili";
 export const MUDUR: Rol = "Müdür";
 
 /** Sadece Tam Yetkili kullanıcıların açabildiği sayfalar. */
-export const YONETICI_SAYFALARI = ["/kasa", "/cariler", "/faturalar", "/rapor-analiz"];
+export const YONETICI_SAYFALARI = [
+  "/kasa", "/cariler", "/faturalar", "/rapor-analiz", "/kar-zarar",
+  "/ayarlar/gecmis", "/ayarlar/bildirimler",
+];
 
 /** Müdürün giriş sonrası açılış sayfası (anasayfa yöneticilere özel). */
 export const MUDUR_ANA_SAYFA = "/raporlar";

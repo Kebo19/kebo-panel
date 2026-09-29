@@ -22,8 +22,11 @@ import {
 import { useYetki } from "@/lib/useYetki";
 import { alanEtiketi } from "@/lib/tarama";
 import { yuklemeIcinHazirla, jsonCevap } from "@/lib/gorsel";
+import { PUANTAJ_DURUMLARI, DURUM_ETIKET, DURUM_KISA, DURUM_RENK, durumGecerliMi, gunlukOzetMetni, puantajListesi, puantajFarklari, type PuantajDurum, type PuantajGirdisi } from "@/lib/puantaj";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
+
+interface PuantajSatiri { durum: PuantajDurum; fazla: string; aciklama: string; }
 
 interface KuryeRaporu {
   id: number; isim: string; nakit: string; pos: string; paketSayisi: string;
@@ -134,12 +137,20 @@ interface Cari {
 // doğrudan düzenler ve talepleri onaylar; "Müdür" yeni rapor girer, mevcut rapordaki
 // değişikliği onaya gönderir.
 interface PersonelKisa { id: string; isim: string; }
+/** Puantaj listesi için personel (ayrılanlar dahil; tarihe göre süzülür). */
+interface PuantajPersoneli extends PersonelKisa { durum: string | null; ise_giris_tarihi: string | null; isten_cikis_tarihi: string | null; }
 interface DegisiklikTalebi {
   id: string; rapor_id: string; rapor_tarihi: string;
   talep_eden: string; talep_tarihi: string;
   eski_veri: Record<string, unknown> | null; yeni_veri: Record<string, unknown> | null;
   durum: "bekliyor" | "onaylandi" | "reddedildi";
   onaylayan?: string | null; onay_tarihi?: string | null; red_sebebi?: string | null;
+}
+
+/** Talepteki yeni puantaj listesi; talep puantaja dokunmuyorsa null. */
+function talepPuantajListesi(t: DegisiklikTalebi): PuantajGirdisi[] | null {
+  const ekler = t.yeni_veri?._ekler as { puantaj?: unknown } | undefined;
+  return Array.isArray(ekler?.puantaj) ? (ekler.puantaj as PuantajGirdisi[]) : null;
 }
 
 const AYLAR = [
@@ -795,12 +806,6 @@ export default function RaporlarPage() {
   const [printRapor, setPrintRapor] = useState<GunlukRapor|null>(null);
   const [duplikaTarihHata, setDuplikaTarihHata] = useState(false);
 
-  // ── AI Soru ──
-  const [aiSoru, setAiSoru] = useState("");
-  const [aiCevap, setAiCevap] = useState("");
-  const [aiYukleniyor, setAiYukleniyor] = useState(false);
-  const [aiAcik, setAiAcik] = useState(false);
-
   // ── Form Fields ──
   const [tarih, setTarih] = useState("");
   const [tarihHataVarMi, setTarihHataVarMi] = useState(false);
@@ -856,6 +861,18 @@ export default function RaporlarPage() {
   // Personel Avans / Yemek Kesintisi için tüm aktif personel (id + isim)
   const [avansPersonelListesi, setAvansPersonelListesi] = useState<PersonelKisa[]>([]);
   const [kesintiSatirlari, setKesintiSatirlari] = useState<{id:number; personelId?:string; personelIsim:string; tutar:string; aciklama:string}[]>([]);
+  // ── Puantaj: o gün çalışanlar (personel id → durum). Kaydı olmayan aktif personel "Çalıştı" sayılır. ──
+  const [puantaj, setPuantaj] = useState<Record<string, PuantajSatiri>>({});
+  // Tüm personel (ayrılanlar dahil); günlük listeye o tarihte çalışır durumda olanlar girer.
+  const [tumPersonel, setTumPersonel] = useState<PuantajPersoneli[]>([]);
+  // Seçilen tarihte veritabanında puantaj kaydı olan personel (bunlar her durumda listede kalır)
+  const [puantajKayitliIdler, setPuantajKayitliIdler] = useState<string[]>([]);
+  // Kullanıcı puantaj kartında bir şey değiştirdi mi? (kaydı olmayan eski raporda sahte puantaj oluşmasın)
+  const [puantajDokunuldu, setPuantajDokunuldu] = useState(false);
+  // Tarih hızlı değişirse eski isteğin cevabı yeni tarihi ezmesin
+  const puantajIstekRef = useRef(0);
+  // Değişiklik taleplerinin karşılaştırılması için mevcut puantaj (rapor tarihi → kayıtlar)
+  const [talepPuantaj, setTalepPuantaj] = useState<Record<string, PuantajGirdisi[]>>({});
   // ── Fişten Doldur (AI tarama) ──
   const [taramaYukleniyor, setTaramaYukleniyor] = useState(false);
   const [taramaHata, setTaramaHata] = useState("");
@@ -885,12 +902,21 @@ export default function RaporlarPage() {
       const { data: talepler } = await supabase.from("rapor_degisiklik_talepleri")
         .select("*").order("talep_tarihi", { ascending: false });
       if (talepler) {
-        setOnayBekleyenler((talepler as DegisiklikTalebi[]).filter(t => t.durum === "bekliyor"));
+        const bekleyen = (talepler as DegisiklikTalebi[]).filter(t => t.durum === "bekliyor");
+        // Puantaj değiştiren taleplerde karşılaştırma için o günlerin mevcut puantajı
+        const pTarihler = [...new Set(bekleyen.filter(t => talepPuantajListesi(t) !== null).map(t => t.rapor_tarihi))];
+        if (pTarihler.length) {
+          const { data: tp } = await supabase.from("puantaj").select("personel_id, tarih, durum, fazla_mesai_saat, rapor_id").in("tarih", pTarihler);
+          const h: Record<string, PuantajGirdisi[]> = {};
+          (tp || []).forEach((k: PuantajGirdisi & { tarih: string }) => { (h[k.tarih] ||= []).push(k); });
+          setTalepPuantaj(h);
+        } else setTalepPuantaj({});
+        setOnayBekleyenler(bekleyen);
         setOnayGecmisi((talepler as DegisiklikTalebi[]).filter(t => t.durum !== "bekliyor"));
       }
     }
 
-    const [sonRaporRes, tumTarihlerRes, personelRes, cariRes, raporRes] = await Promise.all([
+    const [sonRaporRes, tumTarihlerRes, personelRes, cariRes, raporRes, tumPersonelRes] = await Promise.all([
       supabase.from("gunluk_raporlar").select("tarih").order("tarih",{ascending:false}).limit(1),
       supabase.from("gunluk_raporlar").select("tarih").gte("tarih", `${Number(secilenYil)-1}-01-01`),
       supabase.from("personeller").select("id, isim").eq("durum","aktif").order("isim"),
@@ -899,11 +925,15 @@ export default function RaporlarPage() {
         .gte("tarih", `${secilenYil}-${secilenAy}-01`)
         .lte("tarih", aySonu(secilenYil, secilenAy))
         .order("tarih",{ascending:false}),
+      supabase.from("personeller").select("id, isim, durum, ise_giris_tarihi, isten_cikis_tarihi").order("isim"),
     ]);
     setEnSonRaporTarihi(sonRaporRes.data?.[0]?.tarih ?? null);
     setMevcutTarihler(new Set((tumTarihlerRes.data||[]).map((r:{tarih:string})=>r.tarih)));
     setAvansPersonelListesi((personelRes.data||[]).map((p:{id:number|string; isim:string})=>({id:String(p.id), isim:p.isim})));
     if (cariRes.data) setCariListesi(cariRes.data as Cari[]);
+    if (tumPersonelRes.data) setTumPersonel(tumPersonelRes.data.map((p: {id:number|string; isim:string; durum:string|null; ise_giris_tarihi:string|null; isten_cikis_tarihi:string|null}) => ({
+      id: String(p.id), isim: p.isim, durum: p.durum, ise_giris_tarihi: p.ise_giris_tarihi, isten_cikis_tarihi: p.isten_cikis_tarihi,
+    })));
 
     if (!raporRes.error && raporRes.data) {
       const rList = raporRes.data as GunlukRapor[];
@@ -940,8 +970,28 @@ export default function RaporlarPage() {
   // ── Helpers ──
   const siradakiTarih = (): string|null => enSonRaporTarihi ? gunEkle(enSonRaporTarihi, 1) : null;
 
+  /** Seçilen günün mevcut puantajını (ör. /puantaj sayfasında girilmiş) forma yükler; kaydı olmayan "Çalıştı" sayılır. */
+  const puantajYukle = async (t: string) => {
+    const istek = ++puantajIstekRef.current;
+    setPuantaj({}); setPuantajKayitliIdler([]); setPuantajDokunuldu(false);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return;
+    const { data } = await supabase.from("puantaj").select("personel_id, durum, fazla_mesai_saat, aciklama").eq("tarih", t);
+    if (istek !== puantajIstekRef.current) return; // bu arada tarih değişti / form kapandı
+    const yeni: Record<string, PuantajSatiri> = {};
+    (data || []).forEach(k => {
+      yeni[String(k.personel_id)] = {
+        durum: durumGecerliMi(k.durum) ? k.durum : "calisti",
+        fazla: Number(k.fazla_mesai_saat) ? String(k.fazla_mesai_saat).replace(".", ",") : "",
+        aciklama: k.aciklama || "",
+      };
+    });
+    setPuantaj(yeni); setPuantajKayitliIdler(Object.keys(yeni));
+  };
+
   const handleTarihChange = (val: string) => {
     setTarih(val); setAdminOnayliGecis(false); setDuplikaTarihHata(false);
+    // Yeni raporda o günün daha önce girilmiş puantajı gelsin (düzenlemede raporun kendi puantajı korunur).
+    if (!selectedRapor) void puantajYukle(val);
     // Yeni rapor eklerken (düzenleme değil) seçilen tarihe göre doğru kurye yapısını (kendi/geçiş/Roadrunner) otomatik kur.
     if (!selectedRapor) setKuryeler(onceki => kuryeleriUyarla(onceki, val));
     if (!val||selectedRapor) { setTarihHataVarMi(false); return; }
@@ -963,6 +1013,7 @@ export default function RaporlarPage() {
     setGiderler([{id:yeniSatirId(),aciklama:"",tutar:"",tip:"normal"}]);
     setIadeler([{id:yeniSatirId(),aciklama:"",tutar:""}]);
     setKesintiSatirlari([]);
+    puantajIstekRef.current++; setPuantaj({}); setPuantajKayitliIdler([]); setPuantajDokunuldu(false);
     setTarih("");setTarihHataVarMi(false);setAdminOnayliGecis(false);setDuplikaTarihHata(false);
     setKuryeler(kuryeYapisiHesapla(bugun()));
     setNotlar("");setSelectedRapor(null);setIsEditMode(false);
@@ -976,6 +1027,17 @@ export default function RaporlarPage() {
     const t = siradakiTarih();
     if (t && t <= bugun()) handleTarihChange(t);
   };
+
+  // Telefondaki "Rapor gir" kısayolu (/raporlar?yeni=1): veriler yüklenince yeni rapor formunu aç.
+  const yeniKisayolIslendi = useRef(false);
+  useEffect(() => {
+    if (loading || yeniKisayolIslendi.current || typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("yeni") !== "1") return;
+    yeniKisayolIslendi.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    yeniRaporAc();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   // ── Rapor Sil ── (rapora bağlı avans/kesinti/firma ödemeleri veritabanında otomatik silinir)
   const handleRaporSil = async (rapor: GunlukRapor) => {
@@ -994,6 +1056,12 @@ export default function RaporlarPage() {
       // Rapor, avans/kesinti/firma ödemeleri ve talep durumu tek işlemde güncellenir.
       const { error } = await supabase.rpc("talep_onayla", { p_talep_id: talep.id });
       if (error) { alert("Onaylanırken hata: " + error.message); return; }
+      // Talep raporun tarihini değiştirdiyse eski günde rapora bağlı kalan puantaj kayıtları silinir.
+      const yeniTarih = typeof talep.yeni_veri?.tarih === "string" ? talep.yeni_veri.tarih : null;
+      if (yeniTarih && yeniTarih !== talep.rapor_tarihi) {
+        const { error: pSilHata } = await supabase.from("puantaj").delete().eq("rapor_id", talep.rapor_id).eq("tarih", talep.rapor_tarihi);
+        if (pSilHata) alert("Talep onaylandı ancak eski tarihin puantaj kayıtları silinemedi: " + pSilHata.message);
+      }
       veriCek();
     } finally {
       setOnayIslemId(null);
@@ -1039,6 +1107,16 @@ export default function RaporlarPage() {
       const ayni = sayisal ? Number(eskiVal||0) === Number(yeniVal||0) : JSON.stringify(eskiVal) === JSON.stringify(yeniVal);
       if (!ayni) farklar.push({ alan: ALAN_ETIKET[k], eskiDeger: eskiVal, yeniDeger: yeniVal });
     });
+    return farklar;
+  };
+  /** Talep + puantaj farkları ("Puantaj — Ali: Çalıştı → Yıllık izin"). */
+  const talepTumFarklari = (talep: DegisiklikTalebi) => {
+    const farklar: { alan:string; eskiDeger:unknown; yeniDeger:unknown }[] = talepFarklari(talep.eski_veri, talep.yeni_veri);
+    const yeniP = talepPuantajListesi(talep);
+    if (yeniP) {
+      const isimler = Object.fromEntries(tumPersonel.map(p => [p.id, p.isim]));
+      farklar.push(...puantajFarklari(talepPuantaj[talep.rapor_tarihi] || [], yeniP, isimler, talep.rapor_id));
+    }
     return farklar;
   };
 
@@ -1110,6 +1188,8 @@ export default function RaporlarPage() {
     setIadeler(iadeListesi.length
       ? iadeListesi.map((g,i)=>({id:Date.now()+i+1000, aciklama:g.aciklama, tutar:g.tutar}))
       : [{id:Date.now()+1000,aciklama:"",tutar:""}]);
+    // O günün puantajı (yoksa herkes varsayılan "Çalıştı").
+    await puantajYukle(r.tarih);
     // Rapora bağlı kesintiler ayrı tabloda; düzenlemede kaybolmasınlar diye yüklenir.
     setKesintiSatirlari([]);
     const { data: kesintiData } = await supabase.from("kesintiler").select("personel_id, personel_isim, tutar, aciklama").eq("rapor_id", r.id);
@@ -1325,63 +1405,15 @@ export default function RaporlarPage() {
     }
   };
 
-  // ── AI Rapor Analizi (proje içi /api/chat endpoint'i üzerinden) ──
-  const handleAiSoru = async (soru?: string) => {
-    const soruFinal = (soru ?? aiSoru).trim();
-    if (!soruFinal || aiYukleniyor) return;
-    if (soru !== undefined) setAiSoru(soru);
-    setAiYukleniyor(true);
-    setAiCevap("");
-    try {
-      // Raporları özetle (token tasarrufu)
-      const ozet = raporlar.slice(0, 31).map(r => {
-        const o = raporOzeti(r);
-        return `${fmtTarih(r.tarih)}: Brüt=₺${fmt(o.brut)} Net=₺${fmt(o.net)} Online=₺${fmt(o.online)} Kapıda=₺${fmt(o.kapida)} Kasa=₺${fmt(o.kasa)} Gider=₺${fmt(o.gider)} İade=₺${fmt(o.iade)} İndirim=₺${fmt(o.indirim)} Paket=${o.paket}`;
-      }).join("\n");
-      const d = donemOzeti(raporlar);
-
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          max_tokens: 1024,
-          system: `Sen KEBO ERP finansal analiz asistanısın. Restoran/yemek dağıtım işletmesinin günlük kasa raporlarını analiz ediyorsun.
-
-ÖNEMLİ KAVRAMLAR:
-- Platform tutarları indirim öncesidir.
-- Brüt Ciro = Online + Kasa (nakit/POS/yemek kartı) + Gider (gider kasadan ödendiği için geri eklenir)
-  + Kapıda ödeme (sadece 13.08.2026 ve sonrası; öncesinde kapıda parası kasa sayımının içindeydi).
-- Net Ciro = Brüt − Gider − İade − Platform indirimleri.
-
-CEVAP STİLİ: Kısa, net, Türkçe. Sayıları ₺ ile göster. Madde madde yazabilirsin.`,
-          messages: [{
-            role: "user",
-            content: `Dönem: ${AYLAR.find(m=>m.value===secilenAy)?.label} ${secilenYil} (${raporlar.length} gün)
-Toplam Brüt: ₺${fmt(d.brut)}
-Toplam Net: ₺${fmt(d.net)}
-Toplam Gider: ₺${fmt(d.gider)} · İade: ₺${fmt(d.iade)} · İndirim: ₺${fmt(d.indirim)}
-Toplam Paket: ${d.paket}
-
-Günlük Detay:
-${ozet}
-
-Soru: ${soruFinal}`
-          }]
-        })
-      });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setAiCevap(`AI hatası (${response.status}): ${data?.error || "Bilinmeyen hata"}`);
-        return;
-      }
-      const cevap = data.content?.map((c: {text?: string}) => c.text || "").join("") || data.error || "Cevap alınamadı.";
-      setAiCevap(typeof cevap === "string" ? cevap : JSON.stringify(cevap));
-    } catch (err) {
-      setAiCevap(`Bağlantı hatası: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setAiYukleniyor(false);
-    }
+  // ── Puantaj yardımcıları ──
+  // O tarihte çalışır durumdaki personel + o gün kaydı olanlar (işe girişten önce / çıkıştan sonra olanlar girmez)
+  const puantajPersonelleri = useMemo(
+    () => puantajListesi(tumPersonel, tarih || bugun(), puantajKayitliIdler),
+    [tumPersonel, tarih, puantajKayitliIdler]);
+  const puantajSatiri = (id: string): PuantajSatiri => puantaj[id] || { durum: "calisti", fazla: "", aciklama: "" };
+  const puantajDegistir = (id: string, alan: Partial<PuantajSatiri>) => {
+    setPuantajDokunuldu(true);
+    setPuantaj(o => ({ ...o, [id]: { ...(o[id] || { durum: "calisti", fazla: "", aciklama: "" }), ...alan } }));
   };
 
   // ── Save ──
@@ -1461,6 +1493,16 @@ Soru: ${soruFinal}`
             cari_id: g.firmaId, cari_unvan: g.firmaUnvan || g.aciklama, tutar: tv(g.tutar),
             aciklama: `Günlük rapor gideri — ${fmtTarih(tarih)}`,
           })),
+          // Puantaj: listedeki personel (o gün çalışır durumda olanlar + o gün kaydı olanlar).
+          // Puantajı hiç girilmemiş eski rapor düzenlenirken kart değiştirilmediyse anahtar hiç gönderilmez
+          // (rapor_kaydet `_ekler ? 'puantaj'` yoksa puantaja dokunmaz → sahte "Çalıştı" kayıtları oluşmaz).
+          ...(!selectedRapor || puantajKayitliIdler.length > 0 || puantajDokunuldu ? { puantaj: puantajPersonelleri.map(p => {
+            const x = puantajSatiri(p.id);
+            return {
+              personel_id: Number(p.id), durum: x.durum,
+              fazla_mesai_saat: Math.max(0, tv(x.fazla)), aciklama: x.aciklama || null,
+            };
+          }) } : {}),
           ...(nakitHareketYuklendi ? { nakit_hareketleri: nakitHareketleri.filter(h => tv(h.tutar) > 0).map(h => ({
             aciklama: h.aciklama, banka: h.banka, tutar: tv(h.tutar),
           })) } : {}),
@@ -1486,6 +1528,11 @@ Soru: ${soruFinal}`
       if (error) {
         if (error.code === "23505") { alert(`${fmtTarih(tarih)} tarihli rapor zaten mevcut.`); setDuplikaTarihHata(true); return; }
         alert("Kaydedilemedi: "+error.message); return;
+      }
+      // Tarih değiştirildiyse eski günde bu rapora bağlı kalan puantaj kayıtları silinir (puantaj yeni güne taşındı).
+      if (selectedRapor && selectedRapor.tarih !== tarih) {
+        const { error: pSilHata } = await supabase.from("puantaj").delete().eq("rapor_id", selectedRapor.id).eq("tarih", selectedRapor.tarih);
+        if (pSilHata) alert("Rapor kaydedildi ancak eski tarihin puantaj kayıtları silinemedi: " + pSilHata.message);
       }
       formuTemizle(); setFormAcik(false); veriCek();
     } catch(err) { alert("Hata: "+(err instanceof Error ? err.message : String(err))); }
@@ -2168,6 +2215,45 @@ Soru: ${soruFinal}`
               </div>
             </div>
 
+            {/* ── BUGÜN ÇALIŞANLAR (puantaj) ── */}
+            <div className="rounded-xl border border-[#e2e5eb] bg-white overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#e2e5eb] flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[14px] font-bold text-[#1a1f2e] flex items-center gap-1.5"><Users2 size={14} className="text-blue-600"/>Bugün Çalışanlar <span className="font-medium text-[11px] text-gray-500">puantaj · varsayılan herkes çalıştı</span></span>
+                <span className="text-[12px] font-semibold text-gray-700">{gunlukOzetMetni(puantajPersonelleri.map(p => puantajSatiri(p.id).durum))}</span>
+              </div>
+              <div className="p-3 space-y-1.5">
+                {puantajPersonelleri.length === 0 && <p className="text-[11px] text-gray-500">Aktif personel yok.</p>}
+                {puantajPersonelleri.map(p => {
+                  const x = puantajSatiri(p.id);
+                  return (
+                    <div key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-1.5 border-b border-[#f0f1f4] last:border-b-0">
+                      <span className="text-[12px] font-semibold text-[#1a1f2e] w-full sm:w-40 truncate">{p.isim}</span>
+                      <div className="flex flex-wrap gap-1 flex-1">
+                        {PUANTAJ_DURUMLARI.map(d => {
+                          const secili = x.durum === d;
+                          return (
+                            <button key={d} type="button" disabled={isReadOnly} title={DURUM_ETIKET[d]}
+                              onClick={() => puantajDegistir(p.id, { durum: d })}
+                              className={`text-[11px] font-semibold min-w-[30px] h-7 px-2 rounded-md border transition-colors disabled:cursor-not-allowed ${
+                                secili ? DURUM_RENK[d] : "bg-white text-gray-500 border-[#e2e5eb] hover:border-[#c9ced8] disabled:opacity-50"}`}>
+                              <span className="md:hidden">{DURUM_KISA[d]}</span><span className="hidden md:inline">{DURUM_ETIKET[d]}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <label className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                        Fazla mesai
+                        <input type="text" inputMode="decimal" placeholder="0" disabled={isReadOnly} value={x.fazla}
+                          onChange={e => puantajDegistir(p.id, { fazla: e.target.value.replace(/\./g, ",").replace(/[^0-9,]/g, "").slice(0, 5) })}
+                          className="w-14 h-7 bg-[#f7f8fa] border border-[#e2e5eb] focus:border-blue-500/40 text-[#1a1f2e] text-xs px-2 rounded-md outline-none disabled:opacity-40 text-right"/>
+                        saat
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* ── 7. NAKİT KASA (önceki günlerden kalan nakit) — günlük ciroya karışmaz ── */}
             {(() => {
               const cikis = nakitHareketleri.reduce((t, h) => t + tv(h.tutar), 0);
@@ -2369,12 +2455,6 @@ Soru: ${soruFinal}`
                 </button>
               </>
             )}
-            <button onClick={()=>setAiAcik(!aiAcik)}
-              className={`flex items-center gap-1.5 text-[11px] font-semibold border px-3 py-2 rounded-xl transition-colors ${
-                aiAcik ? "text-purple-700 border-purple-500/40 bg-purple-500/10" : "text-gray-500 hover:text-purple-600 border-[#e2e5eb] hover:border-purple-500/30"
-              }`}>
-              <Sparkles size={13}/> AI Analiz
-            </button>
             <button onClick={veriCek}
               className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] rounded-xl transition-colors">
               <RefreshCw size={14}/>
@@ -2399,67 +2479,6 @@ Soru: ${soruFinal}`
       </div>
 
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
-
-        {/* AI ANALİZ PANELI */}
-        {aiAcik && (
-          <div className="rounded-2xl border border-purple-500/20 bg-[#faf9ff] overflow-hidden">
-            <div className="px-5 py-3 border-b border-purple-500/20 flex items-center gap-3">
-              <div className="w-6 h-6 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                <Sparkles className="h-3.5 w-3.5 text-purple-600"/>
-              </div>
-              <span className="text-sm font-semibold text-purple-700">AI Rapor Analizi</span>
-              <span className="text-[10px] text-gray-600 bg-black/[0.04] border border-white/10 px-2 py-0.5 rounded-full">
-                {AYLAR.find(m=>m.value===secilenAy)?.label} {secilenYil} · {raporlar.length} gün
-              </span>
-            </div>
-            <div className="p-5 space-y-3">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={aiSoru}
-                  onChange={e=>setAiSoru(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&handleAiSoru()}
-                  placeholder="Örnek: Bu ay en iyi günlerim hangileri? Giderlerim neden yüksek?"
-                  className="flex-1 bg-[#f7f8fa] border border-purple-500/20 focus:border-purple-500/40 text-[#1a1f2e] text-sm px-4 py-2.5 rounded-xl outline-none transition-all placeholder:text-gray-600"
-                />
-                <button
-                  onClick={()=>handleAiSoru()}
-                  disabled={!aiSoru.trim() || aiYukleniyor || raporlar.length===0}
-                  className="flex items-center gap-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors"
-                >
-                  {aiYukleniyor ? <Loader2 size={13} className="animate-spin"/> : <Sparkles size={13}/>}
-                  {aiYukleniyor ? "Analiz..." : "Sor"}
-                </button>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {[
-                  "Bu ay brüt ve net ciroya genel bakış",
-                  "Hangi günler en düşük ciro?",
-                  "Gider kalemleri analizi",
-                  "Kurye performansı",
-                  "Platform bazlı dağılım yorumu",
-                ].map(s=>(
-                  <button key={s} onClick={()=>handleAiSoru(s)}
-                    disabled={aiYukleniyor || raporlar.length===0}
-                    className="text-[10px] text-gray-500 hover:text-purple-700 border border-[#e2e5eb] hover:border-purple-500/30 disabled:opacity-40 px-2.5 py-1 rounded-lg transition-colors">
-                    {s}
-                  </button>
-                ))}
-              </div>
-
-              {aiCevap && (
-                <div className="bg-[#f7f8fa] border border-purple-500/10 rounded-xl p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                  {aiCevap}
-                </div>
-              )}
-
-              {raporlar.length===0 && (
-                <p className="text-xs text-gray-600 text-center py-2">Bu dönemde rapor yok — önce veri girin.</p>
-              )}
-            </div>
-          </div>
-        )}
 
         {!formAcik && <EksikRaporBanner enSonRaporTarihi={enSonRaporTarihi} onEkle={yeniRaporAc}/>}
 
@@ -2624,7 +2643,7 @@ Soru: ${soruFinal}`
                 onayBekleyenler.length===0 ? (
                   <p className="text-xs text-gray-600 text-center py-8">Onay bekleyen değişiklik talebi yok.</p>
                 ) : onayBekleyenler.map(talep => {
-                  const farklar = talepFarklari(talep.eski_veri, talep.yeni_veri);
+                  const farklar = talepTumFarklari(talep);
                   return (
                     <div key={talep.id} className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
                       <div className="flex items-center justify-between mb-2">

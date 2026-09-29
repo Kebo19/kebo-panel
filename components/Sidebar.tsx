@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard, Wallet, ClipboardList, Users, Settings, LogOut,
   Utensils, BarChart3, Menu, X, Building2, FileText, ChevronDown,
-  Package
+  Package, TrendingUp, ChefHat, CalendarCheck, Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,10 +42,20 @@ export default function Sidebar() {
   const menuItems = [
     ...(isAdmin ? [{ name: "Anasayfa", icon: LayoutDashboard, href: "/" }] : []),
     { name: "Kasa Raporu", icon: ClipboardList, href: "/raporlar" },
-    ...(isAdmin ? [{ name: "Rapor Analizi", icon: BarChart3, href: "/rapor-analiz" }] : []),
+    ...(isAdmin ? [
+      { name: "Rapor Analizi", icon: BarChart3, href: "/rapor-analiz" },
+      { name: "Kâr / Zarar", icon: TrendingUp, href: "/kar-zarar" },
+    ] : []),
     { name: "Stok", icon: Package, href: "/stok" },
+    { name: "Reçete & Maliyet", icon: ChefHat, href: "/stok/recete" },
     { name: "Personel", icon: Users, href: "/personel" },
+    { name: "Puantaj", icon: CalendarCheck, href: "/puantaj" },
+  ];
+
+  // Kasa & Finans grubunun altında, menünün en sonunda.
+  const altMenuItems = [
     { name: "Ayarlar", icon: Settings, href: "/ayarlar" },
+    { name: "Yenilikler", icon: Sparkles, href: "/yenilikler" },
   ];
 
   const kasaAltMenuler = [
@@ -59,11 +69,17 @@ export default function Sidebar() {
     { name: "Kasa Raporu", icon: ClipboardList, href: "/raporlar" },
     { name: "Stok", icon: Package, href: "/stok" },
     { name: "Personel", icon: Users, href: "/personel" },
+    ...(isAdmin ? [] : [{ name: "Puantaj", icon: CalendarCheck, href: "/puantaj" }]),
     { name: "Ayarlar", icon: Settings, href: "/ayarlar" },
   ].slice(0, 5);
 
-  const isActive = (href: string) =>
+  const eslesir = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
+  // En uzun eşleşen menü adresi aktif sayılır (/stok/recete açıkken "Stok" değil
+  // "Reçete & Maliyet" seçili görünsün).
+  const aktifHref = [...menuItems, ...kasaAltMenuler, ...altMenuItems, ...bottomNavItems]
+    .map(m => m.href).filter(eslesir).sort((a, b) => b.length - a.length)[0];
+  const isActive = (href: string) => href === aktifHref;
 
   const kasaGrubuAktif = kasaAltMenuler.some(m => isActive(m.href));
 
@@ -141,6 +157,21 @@ export default function Sidebar() {
               )}
             </div>
           )}
+
+          {altMenuItems.map((item) => (
+            <Link key={item.name} href={item.href}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm group",
+                isActive(item.href)
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
+                  : "text-gray-500 hover:bg-black/[0.04] hover:text-[#1a1f2e]"
+              )}>
+              <item.icon className={cn("h-4 w-4 shrink-0",
+                isActive(item.href) ? "text-white" : "text-gray-600 group-hover:text-blue-600"
+              )} />
+              <span className="font-medium">{item.name}</span>
+            </Link>
+          ))}
         </nav>
 
         <div className="p-3 border-t border-[#e2e5eb]">
@@ -221,6 +252,16 @@ export default function Sidebar() {
                   )}
                 </div>
               )}
+              {altMenuItems.map((item) => (
+                <Link key={item.name} href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all text-sm",
+                    isActive(item.href) ? "bg-blue-600 text-white" : "text-gray-400 hover:bg-black/[0.04] hover:text-[#1a1f2e]"
+                  )}>
+                  <item.icon className={cn("h-5 w-5 shrink-0", isActive(item.href) ? "text-white" : "text-gray-600")} />
+                  <span className="font-medium">{item.name}</span>
+                </Link>
+              ))}
             </nav>
             <div className="p-3 border-t border-[#e2e5eb]">
               <button onClick={handleSignOut}
@@ -239,7 +280,7 @@ export default function Sidebar() {
           <Link key={item.name} href={item.href}
             className={cn(
               "flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all",
-              isActive(item.href) ? "text-blue-600" : "text-gray-600"
+              eslesir(item.href) ? "text-blue-600" : "text-gray-600"
             )}>
             <item.icon className="h-5 w-5" />
             <span className="text-[9px] font-bold uppercase tracking-wider">{item.name}</span>

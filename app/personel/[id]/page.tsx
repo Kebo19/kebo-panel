@@ -7,23 +7,28 @@ import { createClient } from "@/lib/supabase/client";
 import { useYetki } from "@/lib/useYetki";
 import { tv, paraGirdisi, fmtEsnek } from "@/lib/para";
 import { bugun, fmtTarih as fmtTarihOrtak } from "@/lib/tarih";
+import { ayinGunleri, aylikOzet, type AylikOzet } from "@/lib/puantaj";
 import { ODEME_HESAPLARI, HESAP_ETIKET } from "@/lib/cari";
 import {
   ArrowLeft, Phone, CreditCard, Landmark, Users, CalendarDays,
   FileText, Wallet, Save, Loader2, AlertTriangle, CheckCircle2,
-  User, Shield, Trash2, RotateCcw, Plus, X, TrendingUp, TrendingDown, Minus
+  Trash2, RotateCcw, Plus, X, TrendingDown, Minus, Lock, ClipboardList
 } from "lucide-react";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
 interface Personel {
-  id: string; isim: string; telefon?: string; tc_kimlik?: string; iban?: string;
+  id: string; isim: string; telefon?: string;
   departman?: string; maas?: number; ise_giris_tarihi?: string; isten_cikis_tarihi?: string;
   durum: "aktif" | "ayrildi"; notlar?: string; ekleyen_kullanici?: string; created_at?: string;
 }
 
 interface Avans { id: string; personel_id?: string | null; rapor_id?: string | null; personel_isim: string; tutar: number; tarih: string; odeme_yontemi: string; kasa_kaynagi: string; aciklama: string; created_at: string; }
-interface Prim { id: string; personel_isim: string; tutar: number; tarih: string; aciklama: string; odendi: boolean; odeme_tarihi?: string; created_at: string; }
+// TC kimlik ve IBAN `personel_hassas` tablosunda (sadece Tam Yetkili okur/yazar).
+interface Hassas { tc_kimlik: string; iban: string; }
+
+// personeller'den okunacak kolonlar — tc_kimlik/iban ve eski leave_date/role/aktif HARİÇ.
+const PERSONEL_KOLONLARI = "id,isim,telefon,departman,maas,ise_giris_tarihi,isten_cikis_tarihi,durum,notlar,ekleyen_kullanici,created_at";
 interface Kesinti { id: string; personel_id?: string | null; rapor_id?: string | null; personel_isim: string; tutar: number; tarih: string; aciklama: string; created_at: string; }
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -78,25 +83,25 @@ export default function PersonelDetayPage() {
   const [orijinal, setOrijinal] = useState<Personel | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const isAdmin = useYetki().tamYetkili;
+  const { tamYetkili: isAdmin, yukleniyor: yetkiYukleniyor } = useYetki();
+  const [hassas, setHassas] = useState<Hassas>({ tc_kimlik: "", iban: "" });
+  const [hassasOrijinal, setHassasOrijinal] = useState<Hassas>({ tc_kimlik: "", iban: "" });
+  const [puantajOzet, setPuantajOzet] = useState<AylikOzet | null>(null);
   const [toast, setToast] = useState<{ tip: "basari" | "hata"; mesaj: string } | null>(null);
   const [cikisOnayAcik, setCikisOnayAcik] = useState(false);
   const [silmeOnayAcik, setSilmeOnayAcik] = useState(false);
-  const [aktifTab, setAktifTab] = useState<"bilgiler" | "avans" | "prim" | "kesinti">("bilgiler");
+  const [aktifTab, setAktifTab] = useState<"bilgiler" | "avans" | "kesinti">("bilgiler");
 
-  // Avans/Prim/Kesinti state
+  // Avans/Kesinti state
   const [avanslar, setAvanslar] = useState<Avans[]>([]);
-  const [primler, setPrimler] = useState<Prim[]>([]);
   const [kesintiler, setKesintiler] = useState<Kesinti[]>([]);
 
   // Modal state
   const [avansModal, setAvansModal] = useState(false);
-  const [primModal, setPrimModal] = useState(false);
   const [kesintiModal, setKesintiModal] = useState(false);
 
   // Form state
   const [yeniAvans, setYeniAvans] = useState({ tutar: "", tarih: bugun(), kasa_kaynagi: "Nakit", aciklama: "" });
-  const [yeniPrim, setYeniPrim] = useState({ tutar: "", tarih: bugun(), aciklama: "" });
   const [yeniKesinti, setYeniKesinti] = useState({ tutar: "", tarih: bugun(), aciklama: "" });
   const [formSaving, setFormSaving] = useState(false);
 
@@ -108,32 +113,52 @@ export default function PersonelDetayPage() {
   // ── Veri çek ──
   // Kayıtlar personel id'siyle bağlı; id'si olmayan eski kayıtlar isimle eşleştirilir.
   const finansalVeriCek = useCallback(async (p: { id: string; isim: string }) => {
-    const getir = async (tablo: "avanslar" | "primler" | "kesintiler") => {
+    const getir = async (tablo: "avanslar" | "kesintiler") => {
       const [idli, isimli] = await Promise.all([
         supabase.from(tablo).select("*").eq("personel_id", String(p.id)),
         supabase.from(tablo).select("*").is("personel_id", null).eq("personel_isim", p.isim),
       ]);
       return [...(idli.data || []), ...(isimli.data || [])].sort((x, y) => String(y.tarih).localeCompare(String(x.tarih)));
     };
-    const [a, pr, k] = await Promise.all([getir("avanslar"), getir("primler"), getir("kesintiler")]);
+    const [a, k] = await Promise.all([getir("avanslar"), getir("kesintiler")]);
     setAvanslar(a as Avans[]);
-    setPrimler(pr as Prim[]);
     setKesintiler(k as Kesinti[]);
+  }, [supabase]);
+
+  // Bu ayın puantaj özeti (günlük rapordan / puantaj sayfasından girilir).
+  const puantajCek = useCallback(async (p: Personel) => {
+    const b = bugun();
+    const gunler = ayinGunleri(Number(b.slice(0, 4)), Number(b.slice(5, 7)));
+    const { data } = await supabase.from("puantaj").select("personel_id,tarih,durum,fazla_mesai_saat")
+      .eq("personel_id", Number(p.id)).gte("tarih", gunler[0]).lte("tarih", gunler[gunler.length - 1]);
+    setPuantajOzet(aylikOzet(data || [], gunler, { giris: p.ise_giris_tarihi, cikis: p.isten_cikis_tarihi, sonGun: b }));
   }, [supabase]);
 
   useEffect(() => {
     const init = async () => {
-      const { data, error } = await supabase.from("personeller").select("*").eq("id", params.id).single();
+      const { data, error } = await supabase.from("personeller").select(PERSONEL_KOLONLARI).eq("id", params.id).single();
       if (error || !data) { showToast("hata", "Personel bulunamadı."); setLoading(false); return; }
-      setPersonel(data as Personel);
-      setOrijinal(data as Personel);
-      await finansalVeriCek(data);
+      const p = data as unknown as Personel;
+      setPersonel(p);
+      setOrijinal(p);
+      await Promise.all([finansalVeriCek(p), puantajCek(p)]);
       setLoading(false);
     };
     init();
   }, [params.id]);
 
-  const degisiklikVarMi = JSON.stringify(personel) !== JSON.stringify(orijinal);
+  // Hassas bilgiler: sadece Tam Yetkili okur (RLS de zaten engeller).
+  useEffect(() => {
+    if (yetkiYukleniyor || !isAdmin || !params.id) return;
+    (async () => {
+      const { data } = await supabase.from("personel_hassas").select("tc_kimlik,iban").eq("personel_id", Number(params.id)).maybeSingle();
+      const h = { tc_kimlik: data?.tc_kimlik || "", iban: data?.iban || "" };
+      setHassas(h); setHassasOrijinal(h);
+    })();
+  }, [yetkiYukleniyor, isAdmin, params.id, supabase]);
+
+  const hassasDegisti = isAdmin && JSON.stringify(hassas) !== JSON.stringify(hassasOrijinal);
+  const degisiklikVarMi = JSON.stringify(personel) !== JSON.stringify(orijinal) || hassasDegisti;
 
   // ── Personel kaydet ──
   const handleKaydet = async () => {
@@ -146,14 +171,21 @@ export default function PersonelDetayPage() {
     setSaving(true);
     try {
       const { error } = await supabase.from("personeller").update({
-        isim: veri.isim, telefon: veri.telefon, tc_kimlik: veri.tc_kimlik, iban: veri.iban,
+        isim: veri.isim, telefon: veri.telefon,
         departman: veri.departman, maas: veri.maas, ise_giris_tarihi: veri.ise_giris_tarihi,
         isten_cikis_tarihi: veri.isten_cikis_tarihi || null, durum: veri.durum, notlar: veri.notlar,
       }).eq("id", veri.id);
       if (error) { showToast("hata", "Kayıt hatası: " + error.message); return; }
+      if (hassasDegisti) {
+        const { error: hErr } = await supabase.from("personel_hassas").upsert({
+          personel_id: Number(veri.id), tc_kimlik: hassas.tc_kimlik || null, iban: hassas.iban || null, updated_at: new Date().toISOString(),
+        }, { onConflict: "personel_id" });
+        if (hErr) { showToast("hata", "Kimlik/IBAN kaydedilemedi: " + hErr.message); return; }
+        setHassasOrijinal(hassas);
+      }
       // İsim değiştiyse bağlı kayıtlardaki isim de güncellensin (eski, id'siz kayıtlar id'ye bağlanır).
       if (orijinal && orijinal.isim !== veri.isim) {
-        for (const tablo of ["avanslar", "primler", "kesintiler"] as const) {
+        for (const tablo of ["avanslar", "kesintiler"] as const) {
           await supabase.from(tablo).update({ personel_isim: veri.isim }).eq("personel_id", String(veri.id));
           await supabase.from(tablo).update({ personel_isim: veri.isim, personel_id: String(veri.id) }).is("personel_id", null).eq("personel_isim", orijinal.isim);
         }
@@ -209,33 +241,6 @@ export default function PersonelDetayPage() {
     finansalVeriCek(personel);
   };
 
-  // ── Prim kaydet ──
-  const primKaydet = async () => {
-    if (!personel || !yeniPrim.tutar) return;
-    setFormSaving(true);
-    const { error } = await supabase.from("primler").insert({
-      personel_id: String(personel.id),
-      personel_isim: personel.isim,
-      tutar: tv(yeniPrim.tutar),
-      tarih: yeniPrim.tarih,
-      aciklama: yeniPrim.aciklama,
-      odendi: false,
-    });
-    setFormSaving(false);
-    if (error) { showToast("hata", "Kayıt hatası: " + error.message); return; }
-    showToast("basari", "Prim kaydedildi.");
-    setPrimModal(false);
-    setYeniPrim({ tutar: "", tarih: bugun(), aciklama: "" });
-    finansalVeriCek(personel);
-  };
-
-  // ── Prim ödendi işaretle ──
-  const primOdendi = async (id: string) => {
-    await supabase.from("primler").update({ odendi: true, odeme_tarihi: bugun() }).eq("id", id);
-    if (personel) finansalVeriCek(personel);
-    showToast("basari", "Prim ödendi olarak işaretlendi.");
-  };
-
   // ── Kesinti kaydet ──
   const kesintiKaydet = async () => {
     if (!personel || !yeniKesinti.tutar) return;
@@ -263,11 +268,6 @@ export default function PersonelDetayPage() {
     await supabase.from("avanslar").delete().eq("id", id);
     if (personel) finansalVeriCek(personel);
   };
-  const primKaldir = async (id: string) => {
-    if (!confirm("Bu prim kaydını silmek istiyor musunuz?")) return;
-    await supabase.from("primler").delete().eq("id", id);
-    if (personel) finansalVeriCek(personel);
-  };
   const kesintiKaldir = async (id: string) => {
     const k = kesintiler.find(x => x.id === id);
     if (k?.rapor_id) { showToast("hata", "Bu kesinti günlük rapordan geliyor; raporu düzenleyerek değiştirin."); return; }
@@ -278,8 +278,6 @@ export default function PersonelDetayPage() {
 
   // ── Özet hesapla ──
   const toplamAvans = avanslar.reduce((s, a) => s + a.tutar, 0);
-  const toplamPrim = primler.reduce((s, p) => s + p.tutar, 0);
-  const odenmemisPrim = primler.filter(p => !p.odendi).reduce((s, p) => s + p.tutar, 0);
   const toplamKesinti = kesintiler.reduce((s, k) => s + k.tutar, 0);
 
   if (loading) return <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center"><div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>;
@@ -330,10 +328,9 @@ export default function PersonelDetayPage() {
           {[
             { key: "bilgiler", label: "Bilgiler" },
             { key: "avans", label: `Avans (${avanslar.length})` },
-            { key: "prim", label: `Prim (${primler.length})` },
             { key: "kesinti", label: `Kesinti (${kesintiler.length})` },
           ].map(t => (
-            <button key={t.key} onClick={() => setAktifTab(t.key as any)}
+            <button key={t.key} onClick={() => setAktifTab(t.key as "bilgiler" | "avans" | "kesinti")}
               className={`text-xs font-bold px-4 py-2 rounded-xl transition-colors ${aktifTab === t.key ? "bg-blue-600 text-white" : "text-gray-500 hover:text-[#1a1f2e]"}`}>
               {t.label}
             </button>
@@ -364,16 +361,41 @@ export default function PersonelDetayPage() {
               <p className="text-[10px] text-amber-600 uppercase tracking-widest">Avans</p>
               <p className="text-sm font-black text-amber-600">₺{fmt(toplamAvans)}</p>
             </div>
-            <div className="text-center bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-3 py-2">
-              <p className="text-[10px] text-emerald-600 uppercase tracking-widest">Bekleyen Prim</p>
-              <p className="text-sm font-black text-emerald-600">₺{fmt(odenmemisPrim)}</p>
-            </div>
             <div className="text-center bg-red-500/5 border border-red-500/20 rounded-xl px-3 py-2">
               <p className="text-[10px] text-red-600 uppercase tracking-widest">Kesinti</p>
               <p className="text-sm font-black text-red-600">₺{fmt(toplamKesinti)}</p>
             </div>
           </div>
         </div>
+
+        {/* ── BU AYIN PUANTAJI ── */}
+        {puantajOzet && (
+          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2.5">
+                <ClipboardList size={15} className="text-blue-600" />
+                <span className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Bu Ayın Puantajı</span>
+              </div>
+              <Link href="/puantaj" className="text-[11px] font-semibold text-blue-600 hover:underline">Puantaj tablosu →</Link>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {[
+                { e: "Çalıştı", v: puantajOzet.calisti, c: "text-emerald-700" },
+                { e: "İzin", v: puantajOzet.izin + puantajOzet.ucretsiz_izin, c: "text-sky-700" },
+                { e: "Rapor", v: puantajOzet.rapor, c: "text-violet-700" },
+                { e: "Gelmedi", v: puantajOzet.gelmedi, c: "text-red-700" },
+                { e: "Fazla mesai", v: `${fmt(puantajOzet.fazlaMesai)} sa`, c: "text-amber-700" },
+                { e: "Girilmemiş", v: puantajOzet.girilmemis, c: "text-gray-500" },
+              ].map(x => (
+                <div key={x.e} className="bg-[#f7f8fa] border border-[#e2e5eb] rounded-xl px-2 py-2 text-center">
+                  <p className="text-[10px] text-gray-500">{x.e}</p>
+                  <p className={`text-sm font-black ${x.c}`}>{x.v}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-gray-500 mt-2">Prim ayrı tutulmuyor (maaş hesabında eklenecek).</p>
+          </div>
+        )}
 
         {/* ── BİLGİLER TAB ── */}
         {aktifTab === "bilgiler" && (
@@ -382,17 +404,6 @@ export default function PersonelDetayPage() {
               <FieldCard icon={<Phone size={15} />} label="Telefon" color="text-orange-600">
                 <input type="tel" value={personel.telefon || ""} placeholder="05__ ___ __ __"
                   onChange={e => setPersonel({ ...personel, telefon: e.target.value })} className={inputCls} />
-              </FieldCard>
-              <FieldCard icon={<CreditCard size={15} />} label="TC Kimlik No" color="text-blue-600">
-                <input type="text" value={personel.tc_kimlik || ""} placeholder="11 haneli TC no" maxLength={11}
-                  onChange={e => setPersonel({ ...personel, tc_kimlik: e.target.value.replace(/\D/g, "") })} className={inputCls} />
-              </FieldCard>
-              <FieldCard icon={<Landmark size={15} />} label="IBAN" color="text-emerald-600">
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-bold">TR</span>
-                  <input type="text" value={personel.iban || ""} placeholder="__ ____ ____ ____ ____ __"
-                    onChange={e => setPersonel({ ...personel, iban: e.target.value })} className={`${inputCls} pl-9`} />
-                </div>
               </FieldCard>
               <FieldCard icon={<Users size={15} />} label="Departman" color="text-purple-600">
                 <select value={personel.departman || ""} onChange={e => setPersonel({ ...personel, departman: e.target.value })} className={inputCls}>
@@ -412,6 +423,25 @@ export default function PersonelDetayPage() {
                   onChange={e => setPersonel({ ...personel, ise_giris_tarihi: e.target.value })} className={inputCls} />
               </FieldCard>
             </div>
+            {isAdmin ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <FieldCard icon={<CreditCard size={15} />} label="TC Kimlik No" color="text-blue-600">
+                  <input type="text" value={hassas.tc_kimlik} placeholder="11 haneli TC no" maxLength={11} inputMode="numeric"
+                    onChange={e => setHassas({ ...hassas, tc_kimlik: e.target.value.replace(/\D/g, "") })} className={inputCls} />
+                </FieldCard>
+                <FieldCard icon={<Landmark size={15} />} label="IBAN" color="text-emerald-600">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-bold">TR</span>
+                    <input type="text" value={hassas.iban} placeholder="__ ____ ____ ____ ____ __"
+                      onChange={e => setHassas({ ...hassas, iban: e.target.value })} className={`${inputCls} pl-9`} />
+                  </div>
+                </FieldCard>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-[12px] text-gray-500 bg-[#ffffff] border border-[#e2e5eb] rounded-2xl px-4 py-3">
+                <Lock size={13} className="text-gray-400 shrink-0" /> Kimlik ve banka bilgisi sadece Tam Yetkili&apos;ye açık.
+              </div>
+            )}
             <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
               <div className="flex items-center gap-2.5 mb-3">
                 <FileText size={15} className="text-gray-500" />
@@ -475,54 +505,6 @@ export default function PersonelDetayPage() {
                     <button onClick={() => avansKaldir(a.id)} className="text-gray-700 hover:text-red-600 transition-colors shrink-0">
                       <Trash2 size={13} />
                     </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── PRİM TAB ── */}
-        {aktifTab === "prim" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <p className="text-xs text-gray-500">Toplam: <span className="text-emerald-600 font-black">₺{fmt(toplamPrim)}</span></p>
-                <p className="text-xs text-gray-500">Ödenmemiş: <span className="text-yellow-600 font-black">₺{fmt(odenmemisPrim)}</span></p>
-              </div>
-              <button onClick={() => setPrimModal(true)}
-                className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl transition-colors">
-                <Plus size={13} /> Prim Ekle
-              </button>
-            </div>
-            {primler.length === 0 ? (
-              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl py-12 text-center text-gray-600 text-xs uppercase tracking-widest">Prim kaydı yok</div>
-            ) : (
-              <div className="space-y-2">
-                {primler.map(p => (
-                  <div key={p.id} className={`bg-[#ffffff] border rounded-2xl p-4 flex items-center justify-between gap-3 ${p.odendi ? "border-emerald-500/20" : "border-yellow-500/20"}`}>
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${p.odendi ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-yellow-500/10 border border-yellow-500/20"}`}>
-                        <TrendingUp size={15} className={p.odendi ? "text-emerald-600" : "text-yellow-600"} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-[#1a1f2e]">₺{fmt(p.tutar)}</p>
-                        <p className="text-[11px] text-gray-500">{fmtTarih(p.tarih)}{p.odeme_tarihi ? ` · Ödendi: ${fmtTarih(p.odeme_tarihi)}` : ""}</p>
-                        {p.aciklama && <p className="text-[11px] text-gray-600 truncate">{p.aciklama}</p>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {!p.odendi && (
-                        <button onClick={() => primOdendi(p.id)}
-                          className="text-xs font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-colors">
-                          Ödendi
-                        </button>
-                      )}
-                      {p.odendi && <span className="text-[10px] text-emerald-600 font-bold bg-emerald-500/10 px-2 py-1 rounded-lg">✓ Ödendi</span>}
-                      <button onClick={() => primKaldir(p.id)} className="text-gray-700 hover:text-red-600 transition-colors">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
                   </div>
                 ))}
               </div>
@@ -594,33 +576,6 @@ export default function PersonelDetayPage() {
             <button onClick={() => setAvansModal(false)} className="flex-1 text-xs font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] py-2.5 rounded-xl transition-colors">İptal</button>
             <button onClick={avansKaydet} disabled={formSaving || !yeniAvans.tutar}
               className="flex-1 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-40 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
-              {formSaving ? <Loader2 size={12} className="animate-spin" /> : null} Kaydet
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* ── PRİM MODAL ── */}
-      <Modal baslik="Prim Ekle" acik={primModal} onKapat={() => setPrimModal(false)}>
-        <div className="space-y-3">
-          <div>
-            <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Tutar (₺)</p>
-            <input type="text" inputMode="decimal" value={yeniPrim.tutar} onChange={e => setYeniPrim({ ...yeniPrim, tutar: paraGirdisi(e.target.value) })}
-              placeholder="0" className={inputCls} />
-          </div>
-          <div>
-            <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Tarih</p>
-            <input type="date" value={yeniPrim.tarih} onChange={e => setYeniPrim({ ...yeniPrim, tarih: e.target.value })} className={inputCls} />
-          </div>
-          <div>
-            <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Açıklama</p>
-            <input type="text" value={yeniPrim.aciklama} onChange={e => setYeniPrim({ ...yeniPrim, aciklama: e.target.value })}
-              placeholder="Prim nedeni..." className={inputCls} />
-          </div>
-          <div className="flex gap-2 pt-2">
-            <button onClick={() => setPrimModal(false)} className="flex-1 text-xs font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] py-2.5 rounded-xl transition-colors">İptal</button>
-            <button onClick={primKaydet} disabled={formSaving || !yeniPrim.tutar}
-              className="flex-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
               {formSaving ? <Loader2 size={12} className="animate-spin" /> : null} Kaydet
             </button>
           </div>

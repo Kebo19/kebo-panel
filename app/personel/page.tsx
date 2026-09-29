@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -148,12 +148,12 @@ function DepartmanBolum({
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 function PersonellerPageInner() {
-  const router = useRouter();
   const supabase = createClient();
+  const searchParams = useSearchParams();
 
   const [personeller, setPersoneller] = useState<Personel[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"aktif" | "ayrildi">("aktif");
+  const [tab, setTab] = useState<"aktif" | "ayrildi">(searchParams.get("tab") === "ayrildi" ? "ayrildi" : "aktif");
   const [aramaMetni, setAramaMetni] = useState("");
   const [acikBolumler, setAcikBolumler] = useState<Record<string, boolean>>({
     Mutfak: true, Banko: true, Kurye: true, Temizlik: false, Yönetim: false, Diğer: false,

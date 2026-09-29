@@ -1,0 +1,8 @@
+-- Canlıya uygulandı (29.09.2026): kebo_kapsam_genisleme + rapor_kaydet_puantaj.
+-- Yeni tablolar: puantaj, sabit_giderler, receteler, urun_satislari, personel_hassas,
+-- geri_bildirim, hata_kayitlari, islem_gecmisi (+ kebo_islem_kaydet tetikleyicisi 14 tabloda),
+-- storage bucket 'geri-bildirim'. Yeni kolonlar: kasa_manuel_islemler.ekstre_ref (tekil),
+-- stok_fatura_kalemleri.cari_id, faturalar.belge_id. Fonksiyon: personel_belge_eksik_sayisi().
+-- Sağlık: 6 FK indeksi, profiles / rapor_degisiklik_talepleri politikaları (select auth.*),
+-- cariler politikaları ayrıştırıldı. rapor_kaydet: _ekler.puantaj (personel_id+tarih upsert).
+-- Tam SQL: Supabase migration geçmişinde 'kebo_kapsam_genisleme' ve 'rapor_kaydet_puantaj'.
