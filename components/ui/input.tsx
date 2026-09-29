@@ -8,7 +8,7 @@ export function Input({
   return (
     <input
       type={type}
-      className={`bg-[#f7f8fa] border border-black/10 h-12 rounded-2xl px-4 text-[#1a1f2e] outline-none focus:border-orange-500/50 transition-all duration-300 ${className}`}
+      className={`bg-white/[0.035] border border-white/[0.08] h-12 rounded-2xl px-4 text-white outline-none transition-all duration-300 placeholder:text-white/25 focus:border-[#d9b866]/40 focus:bg-white/[0.05] ${className}`}
       {...props}
     />
   );
