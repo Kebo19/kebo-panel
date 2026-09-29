@@ -16,7 +16,8 @@ export default function YeniPersonelPage() {
   const [loading, setLoading] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
   const [ekleyen, setEkleyen] = useState("");
-  const { tamYetkili } = useYetki();
+  const { izin } = useYetki();
+  const hassasYetki = izin("personel_hassas");
 
   const [form, setForm] = useState({
     isim: "",
@@ -39,7 +40,7 @@ export default function YeniPersonelPage() {
     if (!form.isim) { setHata("Lütfen personel adını giriniz."); return; }
     setLoading(true); setHata(null);
 
-    // TC kimlik / IBAN personeller tablosuna YAZILMAZ; personel_hassas'a (sadece Tam Yetkili) yazılır.
+    // TC kimlik / IBAN personeller tablosuna YAZILMAZ; personel_hassas'a (personel_hassas yetkisi) yazılır.
     const { data, error } = await supabase.from("personeller").insert([{
       isim: form.isim,
       telefon: form.telefon || null,
@@ -54,7 +55,7 @@ export default function YeniPersonelPage() {
 
     const tc = form.tc_kimlik.trim();
     const iban = form.iban !== "TR" ? form.iban.trim() : "";
-    if (tamYetkili && (tc || iban)) {
+    if (hassasYetki && (tc || iban)) {
       const { error: hErr } = await supabase.from("personel_hassas").upsert({
         personel_id: Number(data.id), tc_kimlik: tc || null, iban: iban || null,
       }, { onConflict: "personel_id" });
@@ -96,7 +97,7 @@ export default function YeniPersonelPage() {
               className="w-full bg-[#f4f5f7] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40" />
           </div>
 
-          {tamYetkili ? (
+          {hassasYetki ? (
             <>
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><CreditCard size={12} /> TC Kimlik No</label>
@@ -116,7 +117,7 @@ export default function YeniPersonelPage() {
             </>
           ) : (
             <div className="flex items-center gap-2 text-[11px] text-gray-500 bg-[#f7f8fa] border border-[#e2e5eb] rounded-xl px-3 py-2.5">
-              <Lock size={12} className="shrink-0" /> Kimlik ve banka bilgisi sadece Tam Yetkili&apos;ye açık.
+              <Lock size={12} className="shrink-0" /> Kimlik ve banka bilgisi için TC kimlik &amp; IBAN yetkisi gerekir.
             </div>
           )}
 

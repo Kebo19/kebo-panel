@@ -8,16 +8,59 @@ import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard, Wallet, ClipboardList, Users, Settings, LogOut,
   Utensils, BarChart3, Menu, X, Building2, FileText, ChevronDown,
-  Package, TrendingUp, ChefHat, CalendarCheck, Sparkles
+  Package, TrendingUp, ChefHat, CalendarCheck, Sparkles, ShieldCheck
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { YetkiAnahtari } from "@/lib/yetki";
+
+interface MenuOgesi { name: string; icon: LucideIcon; href: string; izin?: YetkiAnahtari | "tam_yetkili" }
+
+const MENU: { ust: MenuOgesi[]; finans: MenuOgesi[]; alt: MenuOgesi[]; mobil: MenuOgesi[] } = {
+  ust: [
+    { name: "Anasayfa", icon: LayoutDashboard, href: "/", izin: "anasayfa" },
+    { name: "Kasa Raporu", icon: ClipboardList, href: "/raporlar", izin: "rapor_gir" },
+    { name: "Rapor Analizi", icon: BarChart3, href: "/rapor-analiz", izin: "rapor_analiz" },
+    { name: "Kâr / Zarar", icon: TrendingUp, href: "/kar-zarar", izin: "kar_zarar" },
+    { name: "Stok", icon: Package, href: "/stok", izin: "stok" },
+    { name: "Reçete & Maliyet", icon: ChefHat, href: "/stok/recete", izin: "recete" },
+    { name: "Personel", icon: Users, href: "/personel", izin: "personel" },
+    { name: "Puantaj", icon: CalendarCheck, href: "/puantaj", izin: "puantaj" },
+  ],
+  // "Kasa & Finans" grubu; hiçbiri görünmüyorsa grup gizlenir.
+  finans: [
+    { name: "Kasa", icon: Wallet, href: "/kasa", izin: "kasa" },
+    { name: "Cariler", icon: Building2, href: "/cariler", izin: "cari" },
+    { name: "Faturalar", icon: FileText, href: "/faturalar", izin: "cari" },
+  ],
+  alt: [
+    { name: "Ayarlar", icon: Settings, href: "/ayarlar" },
+    { name: "Yenilikler", icon: Sparkles, href: "/yenilikler" },
+  ],
+  mobil: [
+    { name: "Anasayfa", icon: LayoutDashboard, href: "/", izin: "anasayfa" },
+    { name: "Kasa Raporu", icon: ClipboardList, href: "/raporlar", izin: "rapor_gir" },
+    { name: "Stok", icon: Package, href: "/stok", izin: "stok" },
+    { name: "Personel", icon: Users, href: "/personel", izin: "personel" },
+    { name: "Puantaj", icon: CalendarCheck, href: "/puantaj", izin: "puantaj" },
+    { name: "Kasa", icon: Wallet, href: "/kasa", izin: "kasa" },
+    { name: "Cariler", icon: Building2, href: "/cariler", izin: "cari" },
+    { name: "Kâr / Zarar", icon: TrendingUp, href: "/kar-zarar", izin: "kar_zarar" },
+    { name: "Rapor Analizi", icon: BarChart3, href: "/rapor-analiz", izin: "rapor_analiz" },
+  ],
+};
+
+/** Ayarlar'ın alt sayfaları (menüde Ayarlar'ın altında girintili). */
+function ayarAltMenuler(tamYetkili: boolean): MenuOgesi[] {
+  return tamYetkili ? [{ name: "Yetkilendirme", icon: ShieldCheck, href: "/ayarlar/yetkiler", izin: "tam_yetkili" }] : [];
+}
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
-  // Rol profiles.role alanından okunur (e-posta listesi yok). Sayfa erişimi ayrıca
-  // sunucu tarafında (proxy.ts) ve veritabanında (RLS) korunur.
+  // Rol ve yetkiler profiles tablosundan okunur. Sayfa erişimi ayrıca sunucu
+  // tarafında (proxy.ts) ve veritabanında (RLS) korunur.
   const yetki = useYetki();
   const isAdmin = yetki.tamYetkili;
   const loading = yetki.yukleniyor;
@@ -39,45 +82,27 @@ export default function Sidebar() {
     router.refresh();
   };
 
-  const menuItems = [
-    ...(isAdmin ? [{ name: "Anasayfa", icon: LayoutDashboard, href: "/" }] : []),
-    { name: "Kasa Raporu", icon: ClipboardList, href: "/raporlar" },
-    ...(isAdmin ? [
-      { name: "Rapor Analizi", icon: BarChart3, href: "/rapor-analiz" },
-      { name: "Kâr / Zarar", icon: TrendingUp, href: "/kar-zarar" },
-    ] : []),
-    { name: "Stok", icon: Package, href: "/stok" },
-    { name: "Reçete & Maliyet", icon: ChefHat, href: "/stok/recete" },
-    { name: "Personel", icon: Users, href: "/personel" },
-    { name: "Puantaj", icon: CalendarCheck, href: "/puantaj" },
-  ];
+  // TEK menü tanımı: her öğe gereken yetkiyle. `izin` yoksa herkese açık,
+  // "tam_yetkili" ise sadece Tam Yetkili görür.
+  const gorunur = (m: MenuOgesi) =>
+    !m.izin ? true : m.izin === "tam_yetkili" ? isAdmin : yetki.izin(m.izin);
 
-  // Kasa & Finans grubunun altında, menünün en sonunda.
-  const altMenuItems = [
-    { name: "Ayarlar", icon: Settings, href: "/ayarlar" },
-    { name: "Yenilikler", icon: Sparkles, href: "/yenilikler" },
-  ];
+  const menuItems = MENU.ust.filter(gorunur);
+  const kasaAltMenuler = MENU.finans.filter(gorunur);
+  const altMenuItems = MENU.alt.filter(gorunur);
 
-  const kasaAltMenuler = [
-    { name: "Kasa", icon: Wallet, href: "/kasa" },
-    { name: "Cariler", icon: Building2, href: "/cariler" },
-    { name: "Faturalar", icon: FileText, href: "/faturalar" },
-  ];
-
+  // Mobil alt çubuk: ilk 4 izinli öğe + Ayarlar.
   const bottomNavItems = [
-    ...(isAdmin ? [{ name: "Anasayfa", icon: LayoutDashboard, href: "/" }] : []),
-    { name: "Kasa Raporu", icon: ClipboardList, href: "/raporlar" },
-    { name: "Stok", icon: Package, href: "/stok" },
-    { name: "Personel", icon: Users, href: "/personel" },
-    ...(isAdmin ? [] : [{ name: "Puantaj", icon: CalendarCheck, href: "/puantaj" }]),
+    ...MENU.mobil.filter(gorunur).slice(0, 4),
     { name: "Ayarlar", icon: Settings, href: "/ayarlar" },
-  ].slice(0, 5);
+  ];
+  const rolYazisi = isAdmin ? "Yönetici" : "Yetkili kullanıcı";
 
   const eslesir = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
   // En uzun eşleşen menü adresi aktif sayılır (/stok/recete açıkken "Stok" değil
   // "Reçete & Maliyet" seçili görünsün).
-  const aktifHref = [...menuItems, ...kasaAltMenuler, ...altMenuItems, ...bottomNavItems]
+  const aktifHref = [...menuItems, ...kasaAltMenuler, ...altMenuItems, ...bottomNavItems, ...ayarAltMenuler(isAdmin)]
     .map(m => m.href).filter(eslesir).sort((a, b) => b.length - a.length)[0];
   const isActive = (href: string) => href === aktifHref;
 
@@ -121,7 +146,7 @@ export default function Sidebar() {
           ))}
 
           {/* ── KASA GRUBU ── */}
-          {isAdmin && (
+          {kasaAltMenuler.length > 0 && (
             <div>
               <button onClick={() => setKasaAcik(!kasaAcik)}
                 className={cn(
@@ -172,11 +197,25 @@ export default function Sidebar() {
               <span className="font-medium">{item.name}</span>
             </Link>
           ))}
+          {ayarAltMenuler(isAdmin).map(item => (
+            <Link key={item.name} href={item.href}
+              className={cn(
+                "ml-4 flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-sm group",
+                isActive(item.href)
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
+                  : "text-gray-500 hover:bg-black/[0.04] hover:text-[#1a1f2e]"
+              )}>
+              <item.icon className={cn("h-3.5 w-3.5 shrink-0",
+                isActive(item.href) ? "text-white" : "text-gray-600 group-hover:text-blue-600"
+              )} />
+              <span className="font-medium text-xs">{item.name}</span>
+            </Link>
+          ))}
         </nav>
 
         <div className="p-3 border-t border-[#e2e5eb]">
           <p className="px-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold border-b border-[#e2e5eb] pb-3 mb-2">
-            {isAdmin ? "Yönetici" : "Şube Müdürü"}{yetki.kullaniciAdi ? ` · ${yetki.kullaniciAdi}` : ""}
+            {rolYazisi}{yetki.adSoyad ? ` · ${yetki.adSoyad}` : ""}
           </p>
           <button onClick={handleSignOut}
             className="flex items-center gap-3 px-3 py-2.5 w-full text-gray-500 hover:bg-red-500/10 hover:text-red-600 rounded-xl transition-colors text-sm">
@@ -208,7 +247,7 @@ export default function Sidebar() {
           <div className="lg:hidden fixed top-0 right-0 bottom-0 w-72 bg-[#ffffff] border-l border-[#e2e5eb] z-50 flex flex-col">
             <div className="h-14 px-4 flex items-center justify-between border-b border-[#e2e5eb]">
               <span className="text-xs text-gray-600 uppercase tracking-widest font-semibold">
-                {isAdmin ? "Yönetici" : "Şube Müdürü"}
+                {rolYazisi}
               </span>
               <button onClick={() => setDrawerAcik(false)}
                 className="p-1.5 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-lg transition-colors">
@@ -226,7 +265,7 @@ export default function Sidebar() {
                   <span className="font-medium">{item.name}</span>
                 </Link>
               ))}
-              {isAdmin && (
+              {kasaAltMenuler.length > 0 && (
                 <div>
                   <button onClick={() => setKasaAcik(!kasaAcik)}
                     className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-sm text-gray-400 hover:bg-black/[0.04] hover:text-[#1a1f2e] transition-colors">
@@ -260,6 +299,16 @@ export default function Sidebar() {
                   )}>
                   <item.icon className={cn("h-5 w-5 shrink-0", isActive(item.href) ? "text-white" : "text-gray-600")} />
                   <span className="font-medium">{item.name}</span>
+                </Link>
+              ))}
+              {ayarAltMenuler(isAdmin).map(item => (
+                <Link key={item.name} href={item.href}
+                  className={cn(
+                    "ml-4 flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm",
+                    isActive(item.href) ? "bg-blue-600 text-white" : "text-gray-400 hover:bg-black/[0.04] hover:text-[#1a1f2e]"
+                  )}>
+                  <item.icon className={cn("h-4 w-4 shrink-0", isActive(item.href) ? "text-white" : "text-gray-600")} />
+                  <span className="font-medium text-xs">{item.name}</span>
                 </Link>
               ))}
             </nav>

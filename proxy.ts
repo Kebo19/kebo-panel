@@ -1,20 +1,20 @@
 import { createServerClient } from '@supabase/ssr'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
-import { rolCoz, yoneticiSayfasiMi, MUDUR_ANA_SAYFA, TAM_YETKILI } from '@/lib/yetki'
+import { rolCoz, yetkilerCoz, sayfaErisimi, anaSayfaBul, TAM_YETKILI, MUDUR } from '@/lib/yetki'
 
 // Next 16'da `middleware.ts` dosyası `proxy.ts` olarak yeniden adlandırıldı.
 //
 // Görevleri:
 //  1) Giriş yapmamış kullanıcıyı /login'e yönlendirmek.
-//  2) Rol kontrolü: Anasayfa, Kasa & Finans (Kasa, Cariler, Faturalar) ve
-//     Rapor Analiz sadece "Tam Yetkili" rolüne açık. Müdür bu adreslere URL
-//     yazarak gitse bile Kasa Raporu'na yönlendirilir. (Veriyi asıl koruyan
-//     veritabanındaki RLS kurallarıdır; bu katman ekranları korur.)
+//  2) Yetki kontrolü: her sayfanın gerektirdiği yetki lib/yetki.ts → sayfaIzni.
+//     İzni olmayan kullanıcı kendi açılış sayfasına (anaSayfaBul) yönlendirilir.
+//     Pasif ya da rolsüz kullanıcının oturumu kapatılır → /login?pasif=1.
+//     (Veriyi asıl koruyan veritabanındaki RLS kurallarıdır; bu katman ekranları korur.)
 //
-// Rol, `profiles.role` alanından veritabanı trigger'ı ile kullanıcının
-// app_metadata.rol alanına kopyalanır; getUser() bunu sunucudan taze okur,
-// böylece her istekte ek sorgu gerekmez.
+// Rol ve yetkiler `profiles` tablosundan veritabanı trigger'ı ile kullanıcının
+// app_metadata.rol / app_metadata.yetkiler alanlarına kopyalanır; getUser() bunu
+// sunucudan taze okur, böylece her istekte ek sorgu gerekmez.
 
 // Supabase soğuk başlangıçta cevap vermeyebilir; Vercel'in 504 hatasına düşmemek
 // için kendi zaman aşımımızı koyuyoruz.
@@ -82,17 +82,29 @@ export async function proxy(request: NextRequest) {
   }
 
   let rol = rolCoz(user.app_metadata?.rol)
-  if (!rol) {
+  let yetkiler = yetkilerCoz(user.app_metadata?.yetkiler)
+  if (!rol || (rol === MUDUR && !Array.isArray(user.app_metadata?.yetkiler))) {
     // Trigger henüz çalışmadıysa profil tablosundan oku.
-    const { data } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+    const { data } = await supabase.from('profiles').select('role, yetkiler').eq('id', user.id).maybeSingle()
     rol = rolCoz(data?.role)
+    yetkiler = yetkilerCoz(data?.yetkiler)
   }
-  const anaSayfa = rol === TAM_YETKILI ? '/' : MUDUR_ANA_SAYFA
+
+  if (rol !== TAM_YETKILI && rol !== MUDUR) {
+    // Pasif ya da rolü tanımsız hesap: oturumu kapat, giriş sayfasında uyarı göster.
+    await supabase.auth.signOut()
+    if (loginSayfasi) return supabaseResponse
+    const yanit = yonlendir('/login', { pasif: '1' })
+    supabaseResponse.cookies.getAll().forEach(c => yanit.cookies.set(c))
+    return yanit
+  }
+
+  const anaSayfa = anaSayfaBul(rol, yetkiler)
 
   if (loginSayfasi) return yonlendir(anaSayfa)
 
-  if (yoneticiSayfasiMi(yol) && rol !== TAM_YETKILI) {
-    return yonlendir(MUDUR_ANA_SAYFA)
+  if (!sayfaErisimi(rol, yetkiler, yol)) {
+    return yonlendir(anaSayfa)
   }
 
   return supabaseResponse

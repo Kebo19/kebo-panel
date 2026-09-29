@@ -35,6 +35,7 @@ const DURUMLAR = [
 
 export default function BildirimlerPage() {
   const yetki = useYetki();
+  const yonetimIzni = yetki.izin("yonetim");
   const [sekme, setSekme] = useState<"bildirim" | "hata">("bildirim");
   const [bildirimler, setBildirimler] = useState<Bildirim[]>([]);
   const [hatalar, setHatalar] = useState<HataKaydi[]>([]);
@@ -65,10 +66,10 @@ export default function BildirimlerPage() {
   }, []);
 
   useEffect(() => {
-    if (!yetki.tamYetkili) return;
+    if (!yonetimIzni) return;
     const t = setTimeout(yukle, 0);
     return () => clearTimeout(t);
-  }, [yukle, yetki.tamYetkili]);
+  }, [yukle, yonetimIzni]);
 
   const durumDegistir = async (id: string, durum: string) => {
     const onceki = bildirimler;
@@ -78,7 +79,7 @@ export default function BildirimlerPage() {
   };
 
   if (yetki.yukleniyor) return <main className="p-5 text-sm text-gray-500">Yükleniyor...</main>;
-  if (!yetki.tamYetkili) return <main className="p-5 text-sm text-gray-500">Bu sayfa sadece Tam Yetkili kullanıcılara açıktır.</main>;
+  if (!yonetimIzni) return <main className="p-5 text-sm text-gray-500">Bu sayfa için yönetim (işlem geçmişi &amp; bildirimler) yetkisi gerekir.</main>;
 
   const yeniSayisi = bildirimler.filter(b => b.durum === "yeni").length;
 

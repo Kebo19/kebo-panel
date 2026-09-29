@@ -133,9 +133,9 @@ interface Cari {
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
-// Yetkiler profiles.role alanından gelir (lib/useYetki). "Tam Yetkili" raporları
-// doğrudan düzenler ve talepleri onaylar; "Müdür" yeni rapor girer, mevcut rapordaki
-// değişikliği onaya gönderir.
+// Yetkiler profiles tablosundan gelir (lib/useYetki). "rapor_duzenle" yetkisi olan
+// raporları doğrudan düzenler/siler ve talepleri onaylar; sadece "rapor_gir" olan
+// yeni rapor girer, mevcut rapordaki değişikliği onaya gönderir.
 interface PersonelKisa { id: string; isim: string; }
 /** Puantaj listesi için personel (ayrılanlar dahil; tarihe göre süzülür). */
 interface PuantajPersoneli extends PersonelKisa { durum: string | null; ise_giris_tarihi: string | null; isten_cikis_tarihi: string | null; }
@@ -777,8 +777,12 @@ function AkilliGiderInput({
 export default function RaporlarPage() {
   const supabase = useMemo(() => createClient(), []);
   const yetki = useYetki();
-  const isAdmin = yetki.tamYetkili;
-  const isOnayliDuzenleyici = yetki.mudur;
+  // rapor_duzenle: raporu doğrudan düzenleme/silme, talep onayı, tarih/fark uyarısını geçme.
+  // Sadece rapor_gir yetkisi olan kullanıcı düzenleme yapınca değişiklik talebi oluşur.
+  const isAdmin = yetki.izin("rapor_duzenle");
+  const isOnayliDuzenleyici = yetki.izin("rapor_gir");
+  // kasa_manuel_islemler okuma yetkisi (RLS) — yoksa nakit hareketleri yüklenmez/gönderilmez.
+  const kasaOkur = yetki.izin("kasa") || yetki.izin("kar_zarar") || yetki.izin("rapor_analiz") || yetki.izin("anasayfa");
   const userEmail = yetki.email;
 
   // ── Auth & Data ──
@@ -851,7 +855,7 @@ export default function RaporlarPage() {
   const [nakitDevredenKagit, setNakitDevredenKagit] = useState("");
   const [nakitDevredenSistem, setNakitDevredenSistem] = useState<number | null>(null);
   const [oncekiSayimVar, setOncekiSayimVar] = useState<boolean | null>(null);
-  // Müdür mevcut raporu açtığında kasa hareketlerini okuyamaz; o durumda kayıtta bu liste gönderilmez (silinmesin).
+  // Rapor düzenleme + kasa okuma yetkisi yoksa kasa hareketleri yüklenmez; o durumda kayıtta bu liste gönderilmez (silinmesin).
   const [nakitHareketYuklendi, setNakitHareketYuklendi] = useState(true);
   const kartYaz = (alan: YemekKartiAlani, v: string) => setKartlar(o => ({ ...o, [alan]: v }));
   const [giderler, setGiderler] = useState<SatirRaporu[]>(()=>[{id:1,aciklama:"",tutar:"",tip:"normal"}]);
@@ -883,7 +887,7 @@ export default function RaporlarPage() {
   const [kontrolOnay, setKontrolOnay] = useState(false);
   // Kağıda elle yazılmış kontrol toplamları (paket toplamları, brüt, net) — panel hesabıyla karşılaştırılır
   const [taramaKontrol, setTaramaKontrol] = useState<Record<string, number>>({});
-  // Toplamlar uyuşmazsa kayıt durur; sadece Tam Yetkili farkı bilerek onaylayıp kaydedebilir
+  // Toplamlar uyuşmazsa kayıt durur; sadece rapor_duzenle yetkisi olan farkı bilerek onaylayıp kaydedebilir
   const [farkOnay, setFarkOnay] = useState(false);
   // Yeni raporda önce tarih seçilip onaylanır, sonra form (ve tarama) açılır.
   const [tarihOnaylandi, setTarihOnaylandi] = useState(false);
@@ -898,7 +902,7 @@ export default function RaporlarPage() {
   const veriCek = useCallback(async () => {
     if (yetki.yukleniyor) return;
     setLoading(true);
-    if (yetki.tamYetkili) {
+    if (isAdmin) {
       const { data: talepler } = await supabase.from("rapor_degisiklik_talepleri")
         .select("*").order("talep_tarihi", { ascending: false });
       if (talepler) {
@@ -947,7 +951,7 @@ export default function RaporlarPage() {
       setGiderOnerileri([...gecmisGiderler]);
     }
     setLoading(false);
-  }, [secilenAy, secilenYil, supabase, yetki.yukleniyor, yetki.tamYetkili]);
+  }, [secilenAy, secilenYil, supabase, yetki.yukleniyor, isAdmin]);
 
   useEffect(()=>{veriCek();},[veriCek]);
 
@@ -1125,7 +1129,7 @@ export default function RaporlarPage() {
     setNakitSayim(r.nakit_kasa_sayim != null ? paraYaz(Number(r.nakit_kasa_sayim)) : "");
     setNakitDevredenKagit(r.nakit_devreden_kagit != null ? paraYaz(Number(r.nakit_devreden_kagit)) : "");
     setNakitHareketleri([]); setNakitHareketYuklendi(false);
-    if (isAdmin) {
+    if (isAdmin && kasaOkur) {
       const { data: nh, error: nhHata } = await supabase.from("kasa_manuel_islemler")
         .select("id,aciklama,hedef_hesap,tutar").eq("rapor_id", r.id).eq("kaynak", "rapor_nakit").order("created_at");
       if (!nhHata) {
@@ -1508,7 +1512,7 @@ export default function RaporlarPage() {
           })) } : {}),
         },
       };
-      // Müdür mevcut bir raporu düzenliyorsa: rapor doğrudan güncellenmez, Tam Yetkili onayına gider.
+      // rapor_duzenle yetkisi yoksa: rapor doğrudan güncellenmez, onaya (değişiklik talebi) gider.
       if (selectedRapor && !isAdmin) {
         if (!isOnayliDuzenleyici) { alert("Bu raporu düzenleme yetkiniz yok."); return; }
         const { error: talepError } = await supabase.from("rapor_degisiklik_talepleri").insert([{
@@ -2272,7 +2276,7 @@ export default function RaporlarPage() {
                   </div>
                   <div className="p-3 space-y-3">
                     {!nakitHareketYuklendi && (
-                      <p className="text-[11px] text-gray-500">Bu raporun kasa hareketlerini sadece Tam Yetkili kullanıcılar görebilir.</p>
+                      <p className="text-[11px] text-gray-500">Bu raporun kasa hareketlerini görmek için rapor düzenleme ve kasa yetkisi gerekir.</p>
                     )}
                     {nakitHareketYuklendi && (
                       <div className="space-y-2">
@@ -2340,7 +2344,7 @@ export default function RaporlarPage() {
                 {isAdmin && (
                   <label className="flex items-center gap-2 text-[12px] font-semibold text-red-900 cursor-pointer select-none">
                     <input type="checkbox" checked={farkOnay} onChange={e => setFarkOnay(e.target.checked)} className="w-4 h-4 accent-red-600"/>
-                    Farkı biliyorum, yine de kaydet (sadece Tam Yetkili)
+                    Farkı biliyorum, yine de kaydet (rapor düzenleme yetkisi)
                   </label>
                 )}
               </div>

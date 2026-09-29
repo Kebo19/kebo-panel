@@ -23,7 +23,7 @@ import { geminiIstek } from "@/lib/gemini";
 
 export async function POST(req: Request) {
   // Sadece giriş yapmış panel kullanıcıları AI'yi kullanabilir (Gemini kotası korunur).
-  const oturum = await oturumKontrol();
+  const oturum = await oturumKontrol({ izin: "rapor_analiz" });
   if (!oturum.ok) return oturum.yanit;
   try {
     const { system, messages, max_tokens, json } = (await req.json()) || {};

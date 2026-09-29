@@ -2,7 +2,7 @@
 
 // ─── AYLIK KÂR / ZARAR ──────────────────────────────────────────────────────
 // Hesap mantığı lib/karZarar.ts'de (karZararHesapla). Bu sayfa sadece veriyi
-// çeker ve gösterir. Sadece Tam Yetkili.
+// çeker ve gösterir. Kâr / Zarar (kar_zarar) yetkisi ister.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -97,7 +97,8 @@ export default function KarZararPage() {
     setYukleniyor(false);
   }, [supabase, ay, aylar6]);
 
-  useEffect(() => { if (yetki.tamYetkili) yukle(); }, [yukle, yetki.tamYetkili]);
+  const karZararIzni = yetki.izin("kar_zarar");
+  useEffect(() => { if (karZararIzni) yukle(); }, [yukle, karZararIzni]);
 
   const sonuclar = useMemo<KarZararSonuc[]>(() => {
     if (!veri) return [];
@@ -114,9 +115,9 @@ export default function KarZararPage() {
   }));
 
   if (yetki.yukleniyor) return <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center"><Loader2 className="animate-spin text-gray-400" /></div>;
-  if (!yetki.tamYetkili) return (
+  if (!karZararIzni) return (
     <div className="min-h-screen bg-[#f4f5f7] flex flex-col items-center justify-center gap-2 text-gray-600">
-      <Lock size={22} /><p className="text-sm">Bu sayfa sadece Tam Yetkili kullanıcılara açık.</p>
+      <Lock size={22} /><p className="text-sm">Bu sayfa için Kâr / Zarar yetkisi gerekir.</p>
     </div>
   );
 

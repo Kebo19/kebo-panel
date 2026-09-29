@@ -39,8 +39,9 @@ const yuzde = (v: number | null, d = 1) => (v === null ? "—" : `%${sayi(v, d)}
 export default function ReceteMaliyetPage() {
   const supabase = useMemo(() => createClient(), []);
   const yetki = useYetki();
-  const izinli = yetki.tamYetkili || yetki.mudur;
-  const tamYetkili = yetki.tamYetkili;
+  const izinli = yetki.izin("recete");
+  // Food cost faturaları okur (RLS: cari | kar_zarar | anasayfa) → cari veya kâr/zarar yetkisi ister.
+  const foodCostIzni = yetki.izin("cari") || yetki.izin("kar_zarar");
 
   const [sekme, setSekme] = useState<Sekme>("recete");
   const [yukleniyor, setYukleniyor] = useState(true);
@@ -71,8 +72,8 @@ export default function ReceteMaliyetPage() {
         hepsiniCek<Recete>((a, b) => supabase.from("receteler").select("id,menu_urun,stok_urun_id,miktar").order("menu_urun").order("id").range(a, b)),
         hepsiniCek<Satis>((a, b) => supabase.from("urun_satislari").select("tarih,menu_urun,adet,tutar").gte("tarih", gunEkle(bugunStr, -90)).order("tarih").order("id").range(a, b)),
         hepsiniCek<RaporVerisi>((a, b) => supabase.from("gunluk_raporlar").select("*").gte("tarih", altiAyBasi).order("tarih").order("id").range(a, b)),
-        // Faturalar sadece Tam Yetkili'ye okunur (RLS) → Müdür'de food cost gösterilmez
-        tamYetkili
+        // Fatura okuma yetkisi yoksa food cost gösterilmez (boş veri 0 diye gösterilmesin)
+        foodCostIzni
           ? hepsiniCek<Fatura>((a, b) => supabase.from("faturalar").select("fatura_tarihi,toplam_tutar").gte("fatura_tarihi", altiAyBasi).order("fatura_tarihi").order("id").range(a, b))
           : Promise.resolve([] as Fatura[]),
       ]);
@@ -84,7 +85,7 @@ export default function ReceteMaliyetPage() {
     } finally {
       setYukleniyor(false);
     }
-  }, [supabase, bugunStr, altiAyBasi, tamYetkili]);
+  }, [supabase, bugunStr, altiAyBasi, foodCostIzni]);
 
   const recetelerCek = useCallback(async () => {
     const r = await hepsiniCek<Recete>((a, b) => supabase.from("receteler").select("id,menu_urun,stok_urun_id,miktar").order("menu_urun").order("id").range(a, b));
@@ -270,7 +271,7 @@ export default function ReceteMaliyetPage() {
   const SEKMELER: { k: Sekme; l: string; i: React.ReactNode }[] = [
     { k: "recete", l: "Reçeteler", i: <BookOpen size={13}/> },
     { k: "tuketim", l: "Teorik / Gerçek", i: <Scale size={13}/> },
-    { k: "foodcost", l: tamYetkili ? "Food cost" : "Paket tüketimi", i: <Percent size={13}/> },
+    { k: "foodcost", l: foodCostIzni ? "Food cost" : "Paket tüketimi", i: <Percent size={13}/> },
     { k: "yukle", l: "Satış yükle", i: <FileSpreadsheet size={13}/> },
   ];
 
@@ -515,8 +516,8 @@ export default function ReceteMaliyetPage() {
 
         {/* ─── FOOD COST ─── */}
         {sekme === "foodcost" && (
-          <div className={`grid grid-cols-1 gap-4 ${tamYetkili ? "xl:grid-cols-2" : ""}`}>
-            {tamYetkili && (
+          <div className={`grid grid-cols-1 gap-4 ${foodCostIzni ? "xl:grid-cols-2" : ""}`}>
+            {foodCostIzni && (
             <div className={`${kutu} p-4 space-y-3`}>
               <div>
                 <h2 className="text-sm font-bold">Food cost % (aylık)</h2>

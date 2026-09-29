@@ -95,7 +95,7 @@ function TrendBadge({ value, prev }: { value: number; prev: number }) {
 export default function RaporAnalizPage() {
   const supabase = createClient();
   const yetki = useYetki();
-  const yetkili = yetki.tamYetkili;
+  const yetkili = yetki.izin("rapor_analiz");
   const yetkiYukleniyor = yetki.yukleniyor;
 
   const [baslangic, setBaslangic] = useState(() => ayBasi(bugun()));
@@ -408,7 +408,7 @@ ${isletmeOzeti}`,
       <div className="bg-[#ffffff] border border-red-500/20 rounded-2xl p-8 max-w-sm text-center">
         <AlertTriangle className="h-10 w-10 text-red-600 mx-auto mb-4" />
         <h1 className="text-[#1a1f2e] font-black text-lg mb-2">Erişim Kısıtlı</h1>
-        <p className="text-gray-500 text-sm">Yalnızca yöneticiler görebilir.</p>
+        <p className="text-gray-500 text-sm">Bu sayfa için Rapor Analizi yetkisi gerekir.</p>
       </div>
     </div>
   );

@@ -24,7 +24,7 @@ interface Personel {
 }
 
 interface Avans { id: string; personel_id?: string | null; rapor_id?: string | null; personel_isim: string; tutar: number; tarih: string; odeme_yontemi: string; kasa_kaynagi: string; aciklama: string; created_at: string; }
-// TC kimlik ve IBAN `personel_hassas` tablosunda (sadece Tam Yetkili okur/yazar).
+// TC kimlik ve IBAN `personel_hassas` tablosunda (sadece personel_hassas yetkisi okur/yazar).
 interface Hassas { tc_kimlik: string; iban: string; }
 
 // personeller'den okunacak kolonlar — tc_kimlik/iban ve eski leave_date/role/aktif HARİÇ.
@@ -83,7 +83,10 @@ export default function PersonelDetayPage() {
   const [orijinal, setOrijinal] = useState<Personel | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { tamYetkili: isAdmin, yukleniyor: yetkiYukleniyor } = useYetki();
+  const { tamYetkili, izin, yukleniyor: yetkiYukleniyor } = useYetki();
+  // isAdmin: TC/IBAN görme-düzenleme yetkisi (personel_hassas)
+  const isAdmin = izin("personel_hassas");
+  const personelYetkisi = izin("personel");
   const [hassas, setHassas] = useState<Hassas>({ tc_kimlik: "", iban: "" });
   const [hassasOrijinal, setHassasOrijinal] = useState<Hassas>({ tc_kimlik: "", iban: "" });
   const [puantajOzet, setPuantajOzet] = useState<AylikOzet | null>(null);
@@ -147,7 +150,7 @@ export default function PersonelDetayPage() {
     init();
   }, [params.id]);
 
-  // Hassas bilgiler: sadece Tam Yetkili okur (RLS de zaten engeller).
+  // Hassas bilgiler: sadece personel_hassas yetkisi okur (RLS de zaten engeller).
   useEffect(() => {
     if (yetkiYukleniyor || !isAdmin || !params.id) return;
     (async () => {
@@ -439,7 +442,7 @@ export default function PersonelDetayPage() {
               </div>
             ) : (
               <div className="flex items-center gap-2 text-[12px] text-gray-500 bg-[#ffffff] border border-[#e2e5eb] rounded-2xl px-4 py-3">
-                <Lock size={13} className="text-gray-400 shrink-0" /> Kimlik ve banka bilgisi sadece Tam Yetkili&apos;ye açık.
+                <Lock size={13} className="text-gray-400 shrink-0" /> Kimlik ve banka bilgisi için TC kimlik &amp; IBAN yetkisi gerekir.
               </div>
             )}
             <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
@@ -460,12 +463,12 @@ export default function PersonelDetayPage() {
                 onChange={e => setPersonel({ ...personel, isten_cikis_tarihi: e.target.value })} className={inputCls} />
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {personel.durum === "ayrildi" && isAdmin && (
+              {personel.durum === "ayrildi" && personelYetkisi && (
                 <button onClick={handleAktiflesir} className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 rounded-xl hover:bg-emerald-500/15 transition-colors">
                   <RotateCcw size={12} /> Tekrar Aktifleştir
                 </button>
               )}
-              {isAdmin && (
+              {tamYetkili && (
                 <button onClick={() => setSilmeOnayAcik(true)} className="flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-xl hover:bg-red-500/15 transition-colors">
                   <Trash2 size={12} /> Personeli Sil
                 </button>

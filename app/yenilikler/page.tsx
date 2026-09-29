@@ -7,6 +7,7 @@ const SURUMLER: { tarih: string; baslik: string; maddeler: string[] }[] = [
     tarih: "29.09.2026",
     baslik: "Personel, maliyet ve finans",
     maddeler: [
+      "Yetkilendirme: Ayarlar > Yetkilendirme'den kullanıcı ekleme ve kişi bazında erişim",
       "Puantaj: günlük raporda o gün çalışanlar işaretlenir; aylık puantaj tablosu eklendi.",
       "Kâr / Zarar sayfası: dönemin gelir, gider ve kârı tek ekranda.",
       "Sabit giderler: kira, fatura gibi düzenli giderler tanımlanabiliyor.",
@@ -18,7 +19,7 @@ const SURUMLER: { tarih: string; baslik: string; maddeler: string[] }[] = [
       "Rapor Analizi sadeleşti.",
       "Sağ alttaki “?” düğmesiyle her sayfadan sorun bildirilebiliyor.",
       "İşlem geçmişi: kim, neyi, ne zaman değiştirdi görülebiliyor.",
-      "Personel kimlik numarası ve IBAN bilgisi sadece Tam Yetkili kullanıcılara açık.",
+      "Personel kimlik numarası ve IBAN bilgisi sadece yetkili kullanıcılara açık.",
     ],
   },
   {

@@ -35,7 +35,9 @@ function ayKaydir(ay: string, n: number): string {
 
 export default function PuantajPage() {
   const supabase = createClient();
-  const { yukleniyor: yetkiYukleniyor, tamYetkili, mudur, kullaniciAdi } = useYetki();
+  const { yukleniyor: yetkiYukleniyor, izin, kullaniciAdi } = useYetki();
+  const gorebilir = izin("puantaj");
+  const duzenleyebilir = izin("puantaj_duzenle");
 
   const [ay, setAy] = useState(() => bugun().slice(0, 7));
   const [loading, setLoading] = useState(true);
@@ -45,7 +47,7 @@ export default function PuantajPage() {
   const [avanslar, setAvanslar] = useState<ParaKaydi[]>([]);
   const [kesintiler, setKesintiler] = useState<ParaKaydi[]>([]);
 
-  // Hücre düzenleme (sadece Tam Yetkili)
+  // Hücre düzenleme (puantaj_duzenle yetkisi)
   const [duzen, setDuzen] = useState<{ personel: Personel; gun: string; durum: PuantajDurum | null; fazla: string; aciklama: string } | null>(null);
   const [kaydediliyor, setKaydediliyor] = useState(false);
 
@@ -113,7 +115,7 @@ export default function PuantajPage() {
   };
 
   const hucreAc = (p: Personel, gun: string) => {
-    if (!tamYetkili) return;
+    if (!duzenleyebilir) return;
     const k = harita[String(p.id)]?.[gun];
     setDuzen({
       personel: p, gun,
@@ -146,7 +148,7 @@ export default function PuantajPage() {
     setDuzen(null); veriCek();
   };
 
-  if (!yetkiYukleniyor && !tamYetkili && !mudur) {
+  if (!yetkiYukleniyor && !gorebilir) {
     return <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center text-sm text-gray-500">Bu sayfayı görme yetkiniz yok.</div>;
   }
 
@@ -186,7 +188,7 @@ export default function PuantajPage() {
         <div className="flex items-start gap-2 text-[12px] text-blue-800 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5">
           <Info size={14} className="shrink-0 mt-0.5" />
           <span>Maaş hesabı yakında; bu tablo maaş hesabının temelidir. Günlük puantaj, günlük rapordaki &quot;Bugün Çalışanlar&quot; kartından girilir.
-            {tamYetkili ? " Bir hücreye tıklayarak düzeltebilirsiniz." : " Düzeltme için Tam Yetkili kullanıcıya başvurun."}</span>
+            {duzenleyebilir ? " Bir hücreye tıklayarak düzeltebilirsiniz." : " Düzeltme için puantaj düzenleme yetkisi gerekir."}</span>
         </div>
 
         {/* Lejant */}
@@ -239,9 +241,9 @@ export default function PuantajPage() {
                           const eksik = !d && aralikta && g <= bugunStr;
                           return (
                             <td key={g} className={`px-0.5 py-1 text-center ${g === bugunStr ? "bg-blue-50/60" : ""} ${!aralikta && !d ? "bg-[#f7f8fa]" : ""}`}>
-                              <button type="button" onClick={() => hucreAc(p, g)} disabled={!tamYetkili}
+                              <button type="button" onClick={() => hucreAc(p, g)} disabled={!duzenleyebilir}
                                 title={d ? `${DURUM_ETIKET[d]}${fm ? ` · ${fm} sa fazla mesai` : ""}${k?.aciklama ? ` · ${k.aciklama}` : ""}` : eksik ? "Girilmemiş" : ""}
-                                className={`relative w-7 h-7 rounded-md border text-[11px] font-bold inline-flex items-center justify-center ${tamYetkili ? "cursor-pointer hover:ring-1 hover:ring-blue-400" : "cursor-default"} ${
+                                className={`relative w-7 h-7 rounded-md border text-[11px] font-bold inline-flex items-center justify-center ${duzenleyebilir ? "cursor-pointer hover:ring-1 hover:ring-blue-400" : "cursor-default"} ${
                                   d ? DURUM_RENK[d] : eksik ? "border-dashed border-gray-300 text-gray-300" : "border-transparent text-transparent"}`}>
                                 {d ? DURUM_KISA[d] : eksik ? "·" : ""}
                                 {fm > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-amber-500 text-white text-[8px] leading-[14px]">{fmtEsnek(fm)}</span>}
@@ -308,7 +310,7 @@ export default function PuantajPage() {
         )}
       </div>
 
-      {/* ── HÜCRE DÜZENLE (Tam Yetkili) ── */}
+      {/* ── HÜCRE DÜZENLE (puantaj_duzenle) ── */}
       {duzen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !kaydediliyor && setDuzen(null)}>
           <div className="bg-white border border-[#e2e5eb] rounded-2xl p-5 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>

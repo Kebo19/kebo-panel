@@ -5,16 +5,19 @@ import { createClient } from "@/lib/supabase/client";
 import { yetkiOnbelleginiTemizle, useYetki } from "@/lib/useYetki";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut, User, History, MessageSquareWarning, Sparkles, ChevronRight } from "lucide-react";
+import { LogOut, User, History, MessageSquareWarning, Sparkles, ChevronRight, ShieldCheck } from "lucide-react";
 
 export default function AyarlarPage() {
   const supabase = createClient();
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const { tamYetkili } = useYetki();
+  const { tamYetkili, izin } = useYetki();
 
   const kartlar = [
     ...(tamYetkili ? [
+      { href: "/ayarlar/yetkiler", icon: ShieldCheck, baslik: "Yetkilendirme", aciklama: "Kullanıcı ekleme ve kişi bazında erişim yetkileri" },
+    ] : []),
+    ...(izin("yonetim") ? [
       { href: "/ayarlar/gecmis", icon: History, baslik: "İşlem geçmişi", aciklama: "Kim, neyi, ne zaman ekledi / değiştirdi / sildi" },
       { href: "/ayarlar/bildirimler", icon: MessageSquareWarning, baslik: "Sorun bildirimleri ve hata kayıtları", aciklama: "Kullanıcıların bildirdiği sorunlar ve sistem hataları" },
     ] : []),

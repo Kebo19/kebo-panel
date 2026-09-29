@@ -14,6 +14,8 @@ import { bugun, ayBasi, aySonu, fmtTarih } from "@/lib/tarih";
 import { donemOzeti, raporOzeti, type RaporVerisi } from "@/lib/hesap";
 import { buAyinOdemeDonemi } from "@/lib/cari";
 import { sabitGiderDurum, type SabitGiderDurum } from "@/lib/karZarar";
+import { useYetki } from "@/lib/useYetki";
+import { sayfaErisimi } from "@/lib/yetki";
 
 interface BekleyenSabitGider { id: string; ad: string; tutar: number; degisken: boolean; gun: number; durum: SabitGiderDurum }
 
@@ -45,6 +47,12 @@ function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; pr
 }
 
 export default function Anasayfa() {
+  // Anasayfa "anasayfa" yetkisi ister (proxy.ts). Bu yetki RLS'te faturalar, sabit
+  // giderler ve kasa hareketlerini okumayı da açar; kartlar okunabilen veriye göre
+  // gösterilir, bağlantılar ise sadece kullanıcının açabildiği sayfalara verilir.
+  const yetki = useYetki();
+  const acabilir = (yol: string) => !yetki.yukleniyor && sayfaErisimi(yetki.rol, yetki.yetkiler, yol);
+  const [cariOkundu, setCariOkundu] = useState(false);
   const [loading, setLoading] = useState(true);
   const [kullanici, setKullanici] = useState("");
   const [sabitGiderler, setSabitGiderler] = useState<{ bekleyen: BekleyenSabitGider[]; aktifSayi: number } | null>(null);
@@ -65,16 +73,16 @@ export default function Anasayfa() {
 
       const bugunStr = bugun();
       const donem = buAyinOdemeDonemi();
-      const [{ data: personeller }, { data: bugunData }, { data: aylik }, { data: odenecek }, { data: belgeEksik }] = await Promise.all([
+      const [{ data: personeller }, { data: bugunData }, { data: aylik }, { data: odenecek, error: odenecekHata }, { data: belgeEksik }] = await Promise.all([
         supabase.from("personeller").select("departman,durum"),
         supabase.from("gunluk_raporlar").select("*").eq("tarih", bugunStr).maybeSingle(),
         supabase.from("gunluk_raporlar").select("*").gte("tarih", ayBasi(bugunStr)).lte("tarih", aySonu(bugunStr.slice(0, 4), bugunStr.slice(5, 7))),
         supabase.from("faturalar").select("toplam_tutar,fatura_tarihi,durum").neq("durum", "odendi").lte("fatura_tarihi", donem.donemBit),
-        // TC/IBAN personel_hassas'ta (sadece Tam Yetkili okur); eksik sayısı herkese rpc ile gelir.
+        // TC/IBAN personel_hassas'ta (personel_hassas yetkisi okur); eksik sayısı herkese rpc ile gelir.
         supabase.rpc("personel_belge_eksik_sayisi"),
       ]);
 
-      // Bu ay ödenecek sabit giderler (sadece Tam Yetkili okuyabilir; hata olursa kart gösterilmez)
+      // Bu ay ödenecek sabit giderler (RLS: kasa | anasayfa | kar_zarar; hata olursa kart gösterilmez)
       const [{ data: sabitler, error: sabitHata }, { data: sabitOdemeler }] = await Promise.all([
         supabase.from("sabit_giderler").select("id,ad,tutar,degisken,gun").eq("aktif", true).order("gun"),
         supabase.from("kasa_manuel_islemler").select("kaynak_id,islem_tarihi").eq("kaynak", "sabit_gider")
@@ -108,6 +116,7 @@ export default function Anasayfa() {
       const ay = donemOzeti((aylik || []) as RaporVerisi[]);
 
       // Cari: bu ödeme dönemine kadar kesilmiş, ödenmemiş faturalar
+      setCariOkundu(!odenecekHata);
       let cariOdenecek = 0, cariGeciken = 0;
       (odenecek || []).forEach(f => {
         cariOdenecek += Number(f.toplam_tutar) || 0;
@@ -185,7 +194,7 @@ export default function Anasayfa() {
             { label: "Aylık Brüt", value: d.aylikCiro, color: "blue", icon: <BarChart3 size={13} />, sub: `${d.donemRapor} rapor` },
             { label: "Aylık Net", value: d.aylikNet, color: "emerald", icon: <TrendingUp size={13} />, sub: `Ort. ${fmtK(d.gunOrt)}/gün brüt` },
             { label: "Aktif Kadro", value: d.aktifPersonel, color: "purple", icon: <Users size={13} />, sub: `${d.kurye} kurye · ${d.mutfak} mutfak`, noTL: true },
-            { label: "Cari Ödenecek", value: d.cariOdenecek, color: d.cariGeciken > 0 ? "red" : "amber", icon: <Building2 size={13} />, sub: d.cariGeciken > 0 ? `⚠ ${fmtK(d.cariGeciken)} gecikmiş` : `Vade: ${d.cariVade}` },
+            ...(cariOkundu ? [{ label: "Cari Ödenecek", value: d.cariOdenecek, color: d.cariGeciken > 0 ? "red" : "amber", icon: <Building2 size={13} />, sub: d.cariGeciken > 0 ? `⚠ ${fmtK(d.cariGeciken)} gecikmiş` : `Vade: ${d.cariVade}` }] : []),
           ] as { label: string; value: number; color: Renk; icon: React.ReactNode; sub: string; noTL?: boolean }[]).map(c => (
             <div key={c.label} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4 relative overflow-hidden group transition-all">
               <div className={`absolute top-0 right-0 w-20 h-20 ${RENK[c.color].parilti} blur-xl rounded-full transition-all`} />
@@ -209,8 +218,9 @@ export default function Anasayfa() {
           const geciken = bekleyen.filter(x => x.durum === "gecikti").length;
           const toplam = bekleyen.reduce((t, x) => t + (x.degisken ? 0 : x.tutar), 0);
           const degiskenVar = bekleyen.some(x => x.degisken);
-          return (
-            <Link href="/kasa" className={`block bg-[#ffffff] border rounded-2xl p-4 transition-all hover:border-blue-500/30 ${geciken > 0 ? "border-red-500/30" : "border-[#e2e5eb]"}`}>
+          const kartSinifi = `block bg-[#ffffff] border rounded-2xl p-4 transition-all hover:border-blue-500/30 ${geciken > 0 ? "border-red-500/30" : "border-[#e2e5eb]"}`;
+          const icerik = (
+            <>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${geciken > 0 ? "bg-red-500/10 text-red-600" : "bg-amber-500/10 text-amber-600"}`}><CalendarClock size={13} /></div>
@@ -223,7 +233,7 @@ export default function Anasayfa() {
                 </div>
                 <div className="flex items-center gap-2">
                   {bekleyen.length > 0 && <p className="text-lg font-black text-[#1a1f2e]">₺{fmt(toplam)}{degiskenVar && <span className="text-[10px] font-medium text-gray-500"> + değişken</span>}</p>}
-                  <ChevronRight size={14} className="text-gray-400" />
+                  {acabilir("/kasa") && <ChevronRight size={14} className="text-gray-400" />}
                 </div>
               </div>
               {bekleyen.length > 0 && (
@@ -235,8 +245,11 @@ export default function Anasayfa() {
                   ))}
                 </div>
               )}
-            </Link>
+            </>
           );
+          return acabilir("/kasa")
+            ? <Link href="/kasa" className={kartSinifi}>{icerik}</Link>
+            : <div className={kartSinifi}>{icerik}</div>;
         })()}
 
         {/* ── ORTA: Bugün + Aylık + Kadro ── */}
@@ -266,9 +279,11 @@ export default function Anasayfa() {
               <div className="py-6 text-center">
                 <AlertTriangle className="h-8 w-8 text-amber-700/30 mx-auto mb-2" />
                 <p className="text-xs text-gray-600">Kasa kapanışı yapılmadı</p>
-                <Link href="/raporlar" className="inline-flex items-center gap-1 mt-3 text-xs font-bold text-blue-600 hover:text-blue-700">
-                  Rapor Ekle <ChevronRight size={12} />
-                </Link>
+                {acabilir("/raporlar") && (
+                  <Link href="/raporlar" className="inline-flex items-center gap-1 mt-3 text-xs font-bold text-blue-600 hover:text-blue-700">
+                    Rapor Ekle <ChevronRight size={12} />
+                  </Link>
+                )}
               </div>
             )}
           </div>
@@ -361,7 +376,7 @@ export default function Anasayfa() {
               { href: "/kasa", icon: Wallet, label: "Kasa", sub: "Bakiye & işlemler", color: "emerald" },
               { href: "/rapor-analiz", icon: BarChart3, label: "Rapor Analizi", sub: "Dönem & Roadrunner", color: "purple" },
               { href: "/personel", icon: Users, label: "Personeller", sub: `${d.aktifPersonel} kişi`, color: "amber" },
-            ] as { href: string; icon: typeof FileText; label: string; sub: string; color: Renk }[]).map(item => (
+            ] as { href: string; icon: typeof FileText; label: string; sub: string; color: Renk }[]).filter(item => acabilir(item.href)).map(item => (
               <Link key={item.href} href={item.href}
                 className={`group bg-[#ffffff] border border-[#e2e5eb] ${RENK[item.color].kenar} rounded-2xl p-4 transition-all`}>
                 <div className={`w-9 h-9 rounded-xl ${RENK[item.color].zemin} flex items-center justify-center mb-3 ${RENK[item.color].zeminHover} transition-all`}>

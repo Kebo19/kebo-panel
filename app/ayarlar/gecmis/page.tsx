@@ -30,6 +30,7 @@ const ISLEM_RENK: Record<string, string> = {
 
 export default function IslemGecmisiPage() {
   const yetki = useYetki();
+  const yonetimIzni = yetki.izin("yonetim");
   const [tablo, setTablo] = useState("");
   const [kullanici, setKullanici] = useState("");
   const [bas, setBas] = useState("");
@@ -61,16 +62,16 @@ export default function IslemGecmisiPage() {
   }, [tablo, kullanici, bas, bit, sayfa]);
 
   useEffect(() => {
-    if (!yetki.tamYetkili) return;
+    if (!yonetimIzni) return;
     const t = setTimeout(yukle, 250);
     return () => clearTimeout(t);
-  }, [yukle, yetki.tamYetkili]);
+  }, [yukle, yonetimIzni]);
 
   // Filtre değişince ilk sayfaya dön.
   const filtre = (ayarla: (v: string) => void) => (v: string) => { ayarla(v); setSayfa(0); };
 
   if (yetki.yukleniyor) return <main className="p-5 text-sm text-gray-500">Yükleniyor...</main>;
-  if (!yetki.tamYetkili) return <main className="p-5 text-sm text-gray-500">Bu sayfa sadece Tam Yetkili kullanıcılara açıktır.</main>;
+  if (!yonetimIzni) return <main className="p-5 text-sm text-gray-500">Bu sayfa için yönetim (işlem geçmişi &amp; bildirimler) yetkisi gerekir.</main>;
 
   const sayfaSayisi = Math.max(1, Math.ceil(toplam / SAYFA_BOYU));
   const girdi = "rounded-xl border border-[#e2e5eb] bg-[#ffffff] px-3 py-2 text-[13px] outline-none focus:border-blue-400";

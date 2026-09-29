@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { rolCoz, yetkilerCoz, anaSayfaBul, TAM_YETKILI, MUDUR } from "@/lib/yetki";
+import { yetkiOnbelleginiTemizle } from "@/lib/useYetki";
 import { Loader2, Lock, Mail, Eye, EyeOff, AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
@@ -14,6 +16,13 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  const PASIF_MESAJ = "Hesabınız pasif ya da henüz yetki verilmemiş. Lütfen yöneticinize başvurun.";
+
+  useEffect(() => {
+    // proxy.ts pasif kullanıcıyı /login?pasif=1'e gönderir.
+    if (new URLSearchParams(window.location.search).get("pasif") === "1") setError(PASIF_MESAJ);
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -22,7 +31,15 @@ export default function LoginPage() {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       if (data.session) {
-        router.push("/");
+        yetkiOnbelleginiTemizle();
+        const { data: profil } = await supabase.from("profiles").select("role, yetkiler").eq("id", data.session.user.id).maybeSingle();
+        const rol = rolCoz(profil?.role);
+        if (rol !== TAM_YETKILI && rol !== MUDUR) {
+          await supabase.auth.signOut();
+          setError(PASIF_MESAJ);
+          return;
+        }
+        router.push(anaSayfaBul(rol, yetkilerCoz(profil?.yetkiler)));
         router.refresh();
       }
     } catch {

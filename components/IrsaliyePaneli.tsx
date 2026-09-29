@@ -59,7 +59,7 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
   onDegisti: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
-  const { tamYetkili } = useYetki();
+  const cariYetkisi = useYetki().izin("cari");
   const urunMap = useMemo(() => new Map(urunler.map(u => [u.id, u])), [urunler]);
 
   // ── Cariler (tedarikçi seçimi + fatura işleme) ──
@@ -197,9 +197,9 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
     setKdvOrani(vk === null || vk === undefined ? "" : String(Number(vk)));
     setKdvCariyeKaydet(true);
     setMevcutFatura(null);
-    setFaturaIsle(!!cid && tamYetkili);
+    setFaturaIsle(!!cid && cariYetkisi);
     setTeslimTarihi(bugun()); setTeslimBelge(belgeId);
-    if (tamYetkili) {
+    if (cariYetkisi) {
       const mevcut = await belgeFaturasi(belgeId);
       setMevcutFatura(mevcut);
       if (mevcut) setFaturaIsle(false);
@@ -424,7 +424,7 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
               })}
 
               {/* Cariye fatura olarak işle */}
-              {tamYetkili ? (
+              {cariYetkisi ? (
                 <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 space-y-2.5">
                   <label className="flex items-center gap-2 text-xs font-bold text-[#1a1f2e] cursor-pointer">
                     <input type="checkbox" checked={faturaIsle} onChange={e => setFaturaIsle(e.target.checked)} className="w-4 h-4 accent-blue-600" />
@@ -482,7 +482,7 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
                   )}
                 </div>
               ) : (
-                <p className="text-[10px] text-gray-500">Cariye fatura işleme Tam Yetkili kullanıcı tarafından yapılır.</p>
+                <p className="text-[10px] text-gray-500">Cariye fatura işleme için Cariler &amp; Faturalar yetkisi gerekir.</p>
               )}
             </div>
             <div className="px-5 py-4 border-t border-[#e2e5eb] flex justify-end gap-2">

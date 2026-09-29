@@ -42,7 +42,7 @@ JSON ŞEMASI:
 }
 
 export async function POST(req: Request) {
-  const oturum = await oturumKontrol();
+  const oturum = await oturumKontrol({ izin: "stok" });
   if (!oturum.ok) return oturum.yanit;
   try {
     const { dosyaBase64, mediaType, urunler } = await req.json();

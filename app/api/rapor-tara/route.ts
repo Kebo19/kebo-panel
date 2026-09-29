@@ -130,7 +130,7 @@ Boş satırları (giderler, avanslar, kesintiler, iadeler, kuryeHavuz) dizilere 
 sadece gerçekten bir şey yazılmış satırları diziye koy.`;
 
 export async function POST(req: Request) {
-  const oturum = await oturumKontrol();
+  const oturum = await oturumKontrol({ izin: "rapor_gir" });
   if (!oturum.ok) return oturum.yanit;
   try {
     const govde = await req.json();

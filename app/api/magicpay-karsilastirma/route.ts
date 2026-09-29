@@ -81,8 +81,8 @@ function paymentBreakdownTopla(pb: Record<string, unknown> | undefined | null) {
 const TARIH_DESENI = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(req: Request) {
-  // Ciro verisi: sadece Tam Yetkili kullanıcılar.
-  const oturum = await oturumKontrol({ sadeceTamYetkili: true });
+  // Ciro verisi: Rapor Analizi yetkisi olan kullanıcılar.
+  const oturum = await oturumKontrol({ izin: "rapor_analiz" });
   if (!oturum.ok) return oturum.yanit;
   try {
     const { searchParams } = new URL(req.url);
