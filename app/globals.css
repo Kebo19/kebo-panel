@@ -1,101 +1,97 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: light;
-
-  --background: #f4f5f7;
-  --foreground: #1a1f2e;
-
-  --card: #ffffff;
-  --card-foreground: #1a1f2e;
-
-  --popover: #ffffff;
-  --popover-foreground: #1a1f2e;
-
-  --primary: #f97316;
-  --primary-foreground: #ffffff;
-
-  --secondary: #f1f2f5;
-  --secondary-foreground: #1a1f2e;
-
-  --muted: #f1f2f5;
-  --muted-foreground: #6b7280;
-
-  --accent: #f97316;
-  --accent-foreground: #ffffff;
-
-  --border: rgba(15,20,30,0.1);
-  --input: rgba(15,20,30,0.1);
-  --ring: #f97316;
-
+  color-scheme: dark;
+  --background: #0b0d0f;
+  --foreground: #f4f0e8;
+  --card: #111417;
+  --card-foreground: #f4f0e8;
+  --popover: #15191d;
+  --popover-foreground: #f4f0e8;
+  --primary: #d7b46a;
+  --primary-foreground: #0b0d0f;
+  --secondary: #171b1f;
+  --secondary-foreground: #f4f0e8;
+  --muted: #171b1f;
+  --muted-foreground: #969da6;
+  --accent: #d7b46a;
+  --accent-foreground: #0b0d0f;
+  --border: rgba(255,255,255,.085);
+  --input: rgba(255,255,255,.10);
+  --ring: #d7b46a;
   --radius: 1rem;
 }
 
-* {
-  border-color: var(--border);
-}
-
-html {
-  background: #f4f5f7;
-  color-scheme: light;
-}
-
+* { border-color: var(--border); }
+html { background: #0b0d0f; color-scheme: dark; }
 body {
-  background: #f4f5f7;
-  color: #1a1f2e;
+  background:
+    radial-gradient(circle at 80% -10%, rgba(215,180,106,.075), transparent 30%),
+    radial-gradient(circle at 15% 0%, rgba(255,255,255,.025), transparent 28%),
+    #0b0d0f;
+  color: #f4f0e8;
   font-family: var(--font-inter), Arial, Helvetica, sans-serif;
   letter-spacing: -0.01em;
 }
 
-input {
-  color: #1a1f2e !important;
-  color-scheme: light;
-}
+::selection { background: rgba(215,180,106,.25); color: #fff8e8; }
+button { cursor: pointer; }
+input, textarea, select { color: #f4f0e8 !important; color-scheme: dark; }
+input::placeholder, textarea::placeholder { color: #737b84 !important; }
 
-input::placeholder {
-  color: #9ca3af !important;
-}
-
-button {
-  cursor: pointer;
-}
-
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #cbd1db;
-  border-radius: 999px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(215,180,106,.28); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(215,180,106,.45); }
+::-webkit-scrollbar-track { background: transparent; }
 
 .kebo-input {
-  background: #f7f8fa !important;
-  border: 1px solid rgba(15,20,30,0.08) !important;
+  background: #111417 !important;
+  border: 1px solid rgba(255,255,255,.09) !important;
   height: 48px !important;
   border-radius: 14px !important;
-  color: #1a1f2e !important;
+  color: #f4f0e8 !important;
 }
 
-/* ── Giriş animasyonu: kartlar sayfa açılışında hafifçe belirir ── */
-@keyframes kebo-fade-up {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+/* Existing screens use a light palette in many places. These aliases let the
+   entire ERP move to the premium dark system without changing business logic. */
+.bg-\[\#f4f5f7\] { background-color: #0b0d0f !important; }
+.bg-\[\#ffffff\] { background-color: #111417 !important; }
+.bg-white { background-color: #111417 !important; }
+.text-\[\#1a1f2e\] { color: #f4f0e8 !important; }
+.text-gray-900, .text-gray-800, .text-gray-700 { color: #e8e2d7 !important; }
+.text-gray-600, .text-gray-500, .text-gray-400 { color: #8f969f !important; }
+.border-\[\#e2e5eb\] { border-color: rgba(255,255,255,.085) !important; }
+.bg-black\/\[0\.04\] { background-color: rgba(255,255,255,.045) !important; }
+
+/* Champagne accent */
+.text-blue-600, .text-blue-700 { color: #d7b46a !important; }
+.bg-blue-600 { background-color: #d7b46a !important; color: #0b0d0f !important; }
+.bg-blue-500 { background-color: #d7b46a !important; }
+.border-blue-500\/30, .border-blue-500\/20 { border-color: rgba(215,180,106,.28) !important; }
+.shadow-blue-900\/20 { --tw-shadow-color: rgba(215,180,106,.18) !important; }
+.ring-blue-500 { --tw-ring-color: #d7b46a !important; }
+
+/* Premium surfaces */
+.kebo-surface {
+  background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
+  border: 1px solid rgba(255,255,255,.085);
+  box-shadow: 0 18px 55px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.025);
+  backdrop-filter: blur(18px);
 }
-.kebo-anim-in {
-  animation: kebo-fade-up 0.35s ease-out both;
+.kebo-glow { box-shadow: 0 0 0 1px rgba(215,180,106,.10), 0 20px 60px rgba(215,180,106,.07); }
+
+@keyframes kebo-fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.kebo-anim-in { animation: kebo-fade-up .45s cubic-bezier(.22,1,.36,1) both; }
+@keyframes kebo-pop { 0% { transform: scale(1); } 40% { transform: scale(1.05); } 100% { transform: scale(1); } }
+.kebo-anim-pop { animation: kebo-pop .28s ease-out; }
+
+@keyframes kebo-shimmer { from { transform: translateX(-120%); } to { transform: translateX(120%); } }
+.kebo-shimmer::after {
+  content: ""; position: absolute; inset: 0; width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.055), transparent);
+  transform: translateX(-120%); animation: kebo-shimmer 2.8s ease-in-out infinite;
 }
 
-/* ── Sayı değiştiğinde küçük bir vurgu ── */
-@keyframes kebo-pop {
-  0%   { transform: scale(1); }
-  40%  { transform: scale(1.06); }
-  100% { transform: scale(1); }
-}
-.kebo-anim-pop {
-  animation: kebo-pop 0.28s ease-out;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .001ms !important; }
 }
