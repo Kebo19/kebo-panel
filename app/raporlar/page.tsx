@@ -1155,13 +1155,20 @@ export default function RaporlarPage() {
     const brutCiro = tOnline + (kapidaKasada ? 0 : tKapida) + tKasa + tGider;
     const netCiro  = brutCiro - tGider - tIade - tIndirim;
     // ── Kuryeler: SADECE tip==="sabit" (Roadrunner, 14.08.2026+) olan satırlarda min. 30 paket garantisi var.
+    // Ödemeye esas paket: Kurye 1 ve Kurye 2 (havuz dışındaki ilk iki satır) 30'un altındaysa 30'a
+    // tamamlanır, 30 ve üstündeyse yazılan sayı alınır; havuz olduğu gibi eklenir. Tarihe bakılmaz.
+    // Hiçbir şey yazılmamış boş kurye satırına garanti eklenmez.
+    let garantiSira = 0;
     const kuryelerHesap = kuryeler.map(k=>{
       const normalPaket = parseInt(k.paketSayisi)||0;
       const uzakPaket = parseInt(k.uzakPaket||"")||0;
       const paket9km = parseInt(k.paket9km||"")||0;
       const gercek = normalPaket + uzakPaket + paket9km;
-      const uygulanan = k.tip==="sabit" ? Math.max(gercek, KURYE_GARANTI_PAKET) : gercek;
-      return { ...k, normalPaket, uzakPaket, paket9km, gercekPaket:gercek, uygulananPaket:uygulanan, garantiUygulandi: k.tip==="sabit" && gercek<KURYE_GARANTI_PAKET };
+      const garantiSatiri = k.tip!=="havuz" && garantiSira++ < 2;
+      const dolu = gercek>0 || tv(k.nakit)>0 || tv(k.pos)>0 || (!!k.isim && !/^Kurye \d$/.test(k.isim.trim()));
+      const garantiUygulandi = garantiSatiri && dolu && gercek<KURYE_GARANTI_PAKET;
+      const uygulanan = garantiUygulandi ? KURYE_GARANTI_PAKET : gercek;
+      return { ...k, normalPaket, uzakPaket, paket9km, gercekPaket:gercek, uygulananPaket:uygulanan, garantiUygulandi };
     });
     const tKuryePaket=kuryelerHesap.reduce((a,k)=>a+k.uygulananPaket,0);
     const tKuryeGercekPaket=kuryelerHesap.reduce((a,k)=>a+k.gercekPaket,0);
@@ -2024,11 +2031,7 @@ Soru: ${soruFinal}`
                     </div>
                   </div>
                   <div className="p-3 space-y-3">
-                    {tarih && tarih < ROADRUNNER_GECIS_GUNU ? (
-                      <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">{fmtTarih(tarih)} Roadrunner öncesi: kuryeler kendi personelimiz, 30 paket garantisi uygulanmaz.</p>
-                    ) : (
-                      <p className="text-[10px] text-gray-600">Sabit 1 ve Sabit 2&apos;de günlük en az <span className="text-amber-600 font-bold">30 paket</span> garantisi var — altında kalırsa ödemeye esas 30 alınır. Havuzda garanti ve isim yok.</p>
-                    )}
+                    <p className="text-[10px] text-gray-600">Kurye 1 ve Kurye 2&apos;de günlük en az <span className="text-amber-600 font-bold">30 paket</span> garantisi var — altında kalırsa ödemeye esas 30 alınır. Havuzda garanti ve isim yok.</p>
                     <div className="grid grid-cols-12 gap-1.5">
                       <div className="col-span-3 text-[9px] text-gray-600 uppercase tracking-wider">Kurye</div>
                       <div className="col-span-3 text-[9px] text-gray-600 uppercase tracking-wider text-center">Gerçek / Esas Paket</div>
@@ -2065,14 +2068,14 @@ Soru: ${soruFinal}`
                                     onChange={e=>kuryeDegistir(k.id,"paketSayisi",e.target.value)}
                                     className="flex-1 w-0 bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs font-bold px-2 rounded-lg outline-none disabled:opacity-40 text-center"/>
                                 )}
-                                {sabit && (
+                                {k.tip!=="havuz" && (
                                   <span title="Ödemede esas alınan paket (garanti uygulandıysa)"
                                     className={`shrink-0 w-9 h-7 flex items-center justify-center text-[10px] font-black rounded-lg border ${k.garantiUygulandi ? "border-amber-500/40 bg-amber-500/10 text-amber-700" : "border-[#e2e5eb] text-gray-600"}`}>
                                     {k.uygulananPaket}
                                   </span>
                                 )}
                               </div>
-                              {sabit && k.garantiUygulandi && (
+                              {k.garantiUygulandi && (
                                 <p className="text-[9px] text-amber-700 mt-0.5">Garanti uygulandı (30)</p>
                               )}
                             </div>
