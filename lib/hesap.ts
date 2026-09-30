@@ -1,3 +1,4 @@
+import { tv } from "./para";
 // ─── KEBO CİRO HESAPLARI ────────────────────────────────────────────────────
 // Günlük rapor rakamlarının TEK kaynağı. Anasayfa, Kasa Raporu, Rapor Analiz,
 // Kasa ve yazdırma/dışa aktarma çıktıları hep bu fonksiyonları kullanır.
@@ -82,6 +83,15 @@ export function yeniYapiMi(r: RaporVerisi): boolean {
  */
 export const kapidaKasadaMi = (tarih: string): boolean =>
   !!tarih && tarih < ROADRUNNER_GECIS_GUNU;
+
+/** 28.09.2026 ve sonrası kuryelerin kapıda topladığı nakit bizim kasamıza, POS'u bizim POS'umuza girer. */
+export const kuryeTahsilatiBizdeMi = (tarih: string): boolean => !!tarih && tarih >= KENDI_POS_GECIS_GUNU;
+
+/** Kuryelerin o gün kapıda topladığı nakit ve POS (sadece kendi POS dönemi; öncesinde 0). */
+export function kuryeTahsilati(r: Pick<RaporVerisi, "tarih" | "kurye_raporlari">): { nakit: number; pos: number } {
+  if (!kuryeTahsilatiBizdeMi(r.tarih)) return { nakit: 0, pos: 0 };
+  return (r.kurye_raporlari || []).reduce<{ nakit: number; pos: number }>((t, k) => ({ nakit: t.nakit + tv(k.nakit), pos: t.pos + tv(k.pos) }), { nakit: 0, pos: 0 });
+}
 
 export interface PlatformKirilimi {
   // platform → tutar
@@ -235,5 +245,5 @@ export function roadrunnerKuryeUcreti(k: KuryeSatiri) {
   const garantiFarki = uygulanan - gercek;
   const ucret = normal * RR_PAKET_UCRETI + uzak * RR_PAKET_UCRETI * RR_UZAK_KATSAYI
     + km9 * RR_PAKET_UCRETI * RR_KM9_KATSAYI + garantiFarki * RR_PAKET_UCRETI;
-  return { sabit, normal, uzak, km9, gercek, uygulanan, garantiFarki, ucret, nakit: n(k.nakit), pos: n(k.pos) };
+  return { sabit, normal, uzak, km9, gercek, uygulanan, garantiFarki, ucret, nakit: tv(k.nakit), pos: tv(k.pos) };
 }

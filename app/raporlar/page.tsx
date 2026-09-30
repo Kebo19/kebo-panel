@@ -2264,7 +2264,9 @@ export default function RaporlarPage() {
             {(() => {
               const cikis = nakitHareketleri.reduce((t, h) => t + tv(h.tutar), 0);
               const devreden = nakitDevredenSistem;
-              const beklenen = devreden == null ? null : devreden + tv(kasaNakit) - cikis;
+              // 28.09'dan itibaren kuryelerin kapıda topladığı nakit de kasaya girer
+              const kuryeNakit = tarih >= KENDI_POS_GECIS_GUNU ? kuryeler.reduce((t, k) => t + tv(k.nakit), 0) : 0;
+              const beklenen = devreden == null ? null : devreden + tv(kasaNakit) + kuryeNakit - cikis;
               const sayim = nakitSayim.trim() ? tv(nakitSayim) : null;
               const fark = beklenen != null && sayim != null ? Math.round((sayim - beklenen) * 100) / 100 : null;
               const kagitDevreden = nakitDevredenKagit.trim() ? tv(nakitDevredenKagit) : null;

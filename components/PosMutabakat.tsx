@@ -14,10 +14,12 @@ import {
   POS_KATEGORI, YEMEK_KARTI_KATEGORI, YEMEK_KARTI_YASAL_UST_SINIR, POS_TARIH_TOLERANS, ayAnahtari,
   type BankaHareketi, type PosDurum,
 } from "@/lib/mutabakat";
+import { kuryeTahsilati, type RaporVerisi } from "@/lib/hesap";
 
 export interface MutabakatRaporu {
   tarih: string;
   kasa_pos?: number | null;
+  kurye_raporlari?: RaporVerisi["kurye_raporlari"];
 }
 
 const DURUM_STIL: Record<PosDurum, string> = {
@@ -79,7 +81,7 @@ export default function PosMutabakat({ raporlar, baslangic, bitis }: {
     const posHareket = hareketler.filter(h =>
       h.kategori === POS_KATEGORI && h.hesap === POS_BANKA_HESABI && h.tarih <= gunEkle(bitis, 1 + POS_TARIH_TOLERANS));
     return posMutabakati(
-      raporlar.map(r => ({ tarih: r.tarih, pos: Number(r.kasa_pos) || 0 })),
+      raporlar.map(r => ({ tarih: r.tarih, pos: (Number(r.kasa_pos) || 0) + kuryeTahsilati(r).pos })),
       posHareket, bugun(),
     );
   }, [raporlar, hareketler, bitis]);

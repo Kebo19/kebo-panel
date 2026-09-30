@@ -21,13 +21,13 @@ export const metadata: Metadata = {
 
 // Next 16'da themeColor metadata yerine viewport export'unda tanımlanır.
 export const viewport: Viewport = {
-  themeColor: "#090a0b",
+  themeColor: "#2563eb",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="tr" suppressHydrationWarning className={inter.variable}>
-      <body className="min-h-screen bg-[#090a0b] text-white antialiased" suppressHydrationWarning>
+      <body className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] antialiased" suppressHydrationWarning>
         <LayoutClient>{children}</LayoutClient>
       </body>
     </html>

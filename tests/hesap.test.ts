@@ -97,3 +97,12 @@ describe("Migros ve Alo indirimi", () => {
     expect(netCiro(r)).toBe(645);
   });
 });
+
+import { kuryeTahsilati } from "@/lib/hesap";
+describe("kurye kapıda tahsilatı", () => {
+  it("28.09 ve sonrası kasaya/POS'a girer, Türkçe sayı biçimi okunur", () => {
+    const k = [{ nakit: "1.250", pos: "300,50" }, { nakit: 200, pos: "" }] as never;
+    expect(kuryeTahsilati({ tarih: "2026-10-01", kurye_raporlari: k })).toEqual({ nakit: 1450, pos: 300.5 });
+    expect(kuryeTahsilati({ tarih: "2026-09-01", kurye_raporlari: k })).toEqual({ nakit: 0, pos: 0 });
+  });
+});

@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { tv, paraGirdisi } from "@/lib/para";
 import { bugun, buAyYil, gunEkle, fmtTarih as tarihYaz } from "@/lib/tarih";
-import { donemOzeti as raporDonemOzeti, yemekKartiToplam, type RaporVerisi } from "@/lib/hesap";
+import { donemOzeti as raporDonemOzeti, yemekKartiToplam, kuryeTahsilati, type RaporVerisi } from "@/lib/hesap";
 import { KASA_GIDER_KATEGORILERI, TUM_KASA_GIDER_KATEGORILERI, KASA_GELIR_KATEGORILERI, TAHSILAT_KATS, TRANSFER_KATEGORISI } from "@/lib/karZarar";
 import { hepsiniCek } from "@/lib/hepsiniCek";
 import SabitGiderler from "@/components/SabitGiderler";
@@ -203,7 +203,8 @@ export default function KasaPage() {
   // POS ve yemek kartı tutarları bankaya geçene kadar hiçbir hesaba eklenmez.
   const bakiyeler = useMemo(() => {
     const b: Record<string, number> = { Nakit: 0, TEB: 0, VakıfBank: 0, Enpara: 0 };
-    raporlar.forEach(r => { b.Nakit += Number(r.kasa_nakit)||0; });
+    // 28.09'dan itibaren kuryelerin kapıda topladığı nakit de kasaya girer.
+    raporlar.forEach(r => { b.Nakit += (Number(r.kasa_nakit)||0) + kuryeTahsilati(r as unknown as RaporVerisi).nakit; });
     manuelIslemler.forEach(i => {
       const m = Number(i.tutar)||0;
       if (i.tip==="gelir" && i.hesap in b) b[i.hesap] += m;
