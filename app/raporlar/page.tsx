@@ -21,6 +21,8 @@ import {
   ROADRUNNER_GECIS_GUNU, KENDI_POS_GECIS_GUNU, kuryeTahsilati, roadrunnerTahsilati, KURYE_GARANTI_PAKET, YEMEK_KARTLARI, type YemekKartiAlani,
 } from "@/lib/hesap";
 import { useYetki } from "@/lib/useYetki";
+import { magicpayGorebilirMi, type PanelRaporu } from "@/lib/magicpay";
+import { RaporMagicpayPaneli } from "@/components/MagicpayKarsilastirma";
 import { alanEtiketi } from "@/lib/tarama";
 import { yuklemeIcinHazirla, jsonCevap } from "@/lib/gorsel";
 import { PUANTAJ_DURUMLARI, DURUM_ETIKET, DURUM_KISA, DURUM_RENK, durumGecerliMi, gunlukOzetMetni, puantajListesi, puantajFarklari, type PuantajDurum, type PuantajGirdisi } from "@/lib/puantaj";
@@ -787,6 +789,8 @@ export default function RaporlarPage() {
   // kasa_manuel_islemler okuma yetkisi (RLS) — yoksa nakit hareketleri yüklenmez/gönderilmez.
   const kasaOkur = yetki.izin("kasa") || yetki.izin("kar_zarar") || yetki.izin("rapor_analiz") || yetki.izin("anasayfa");
   const userEmail = yetki.email;
+  // Rapor açılınca yanında MagicPay karşılaştırması — sadece lib/magicpay.ts → MAGICPAY_GORENLER.
+  const magicpayGorur = magicpayGorebilirMi(yetki.userId);
 
   // ── Auth & Data ──
   const [loading, setLoading] = useState(true);
@@ -2532,7 +2536,18 @@ export default function RaporlarPage() {
                 </button>
               </div>
             </div>
-            <div className="p-5">{renderForm()}</div>
+            {selectedRapor && magicpayGorur ? (
+              <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_420px]">
+                <div className="p-5 min-w-0">{renderForm()}</div>
+                <aside className="p-5 pt-0 xl:pt-5 xl:pl-0">
+                  <div className="xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto xl:rounded-2xl">
+                    <RaporMagicpayPaneli rapor={selectedRapor as unknown as PanelRaporu} />
+                  </div>
+                </aside>
+              </div>
+            ) : (
+              <div className="p-5">{renderForm()}</div>
+            )}
           </div>
         )}
 

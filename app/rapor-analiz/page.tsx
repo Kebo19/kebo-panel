@@ -14,7 +14,7 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, LineChart, Line, Ca
 import { fmt } from "@/lib/para";
 import { bugun, ayBasi, gunEkle, gunFarki, fmtTarih } from "@/lib/tarih";
 import {
-  raporOzeti, donemOzeti, platformKirilimi, indirimToplam, PLATFORMLAR, PLATFORM_RENK, type RaporVerisi, type PlatformAdi,
+  raporOzeti, donemOzeti, platformKirilimi, PLATFORMLAR, PLATFORM_RENK, type RaporVerisi, type PlatformAdi,
   RR_PAKET_UCRETI, RR_UZAK_KATSAYI, RR_KM9_KATSAYI, RR_POS_KOMISYON_ORANI, KURYE_GARANTI_PAKET as RR_KURYE_GARANTI,
   roadrunnerKuryesiMi, roadrunnerKuryeUcreti, tahsilatRoadrunnerdaMi, type KuryeSatiri, YEMEK_KARTLARI,
 } from "@/lib/hesap";
@@ -30,8 +30,7 @@ interface GunlukRapor extends RaporVerisi {
   kasa_nakit: number; kasa_pos: number; kasa_edenred: number; kasa_metropol?: number;
   gunluk_gider: number; iade_tutar: number; toplam_ciro: number;
   kurye_raporlari?: KuryeSatiri[];
-  // 02.09.2026: MagicPay karşılaştırması için — platform indirim alanları (select("*")
-  // zaten hepsini getiriyor, burada sadece TypeScript'e tanıtıyoruz).
+  // Platform indirim alanları (select("*") zaten hepsini getiriyor, burada sadece TypeScript'e tanıtıyoruz).
   os_kebo_ys_indirim?: number; os_cnf_ys_indirim?: number;
   os_kebo_trendyol_indirim?: number; os_cnf_trendyol_indirim?: number;
   ko_kebo_ys_indirim?: number; ko_cnf_ys_indirim?: number;
@@ -57,7 +56,7 @@ const RAPOR_TURLERI = [
   { key: "platform", label: "Platformlar", desc: "Platformların online + kapıda satışları, payları ve karşılaştırması" },
   { key: "gunluk", label: "Gün Gün", desc: "Seçilen tarih aralığında her günün detayı" },
   { key: "roadrunner", label: "Roadrunner", desc: "Seçilen dönem için kurye paket ücreti, POS komisyonu ve tahsilat mutabakatı (haftalık hesap için tarih aralığını o haftaya ayarlayın)" },
-  { key: "pos", label: "POS & Kart", desc: "POS ve yemek kartı satışlarının bankaya yatan tutarlarla mutabakatı; MagicPay karşılaştırması" },
+  { key: "pos", label: "POS & Kart", desc: "POS ve yemek kartı satışlarının bankaya yatan tutarlarla mutabakatı" },
 ] as const;
 type RaporTuru = typeof RAPOR_TURLERI[number]["key"];
 
@@ -118,11 +117,6 @@ export default function RaporAnalizPage() {
   const [analizYukleniyor, setAnalizYukleniyor] = useState(false);
   const chatSonRef = useRef<HTMLDivElement>(null);
 
-  // MagicPay karşılaştırma (02.09.2026) — dış API'ye her tab açılışında değil, sadece
-  // kullanıcı "Karşılaştır" butonuna bastığında istek atıyoruz.
-  const [mpVeri, setMpVeri] = useState<{ gunler: any[]; kurye: any } | null>(null);
-  const [mpYukleniyor, setMpYukleniyor] = useState(false);
-  const [mpHata, setMpHata] = useState("");
 
   // Karşılaştırma için aynı uzunlukta bir önceki dönem
   const oncekiAralik = useMemo(() => {
@@ -298,23 +292,6 @@ GÜNLÜK PERFORMANS:
 - Son 7 Gün Trendi: ${gunlukTrendler || "Yeterli veri yok"}
     `.trim();
   }, [raporlar, stats, baslangic, bitis, odemeFiltre]);
-
-  // ── MagicPay Karşılaştırma ──
-  const magicpayKarsilastir = async () => {
-    if (!baslangic || !bitis) return;
-    setMpYukleniyor(true);
-    setMpHata("");
-    try {
-      const res = await fetch(`/api/magicpay-karsilastirma?start=${baslangic}&end=${bitis}`);
-      const d = await res.json();
-      if (!res.ok) throw new Error(d?.error || "MagicPay verisi alınamadı.");
-      setMpVeri(d);
-    } catch (err: any) {
-      setMpHata(err?.message || "MagicPay verisi alınamadı.");
-      setMpVeri(null);
-    }
-    setMpYukleniyor(false);
-  };
 
   // ── Güçlü AI Analiz ──
   const analizYap = async () => {
@@ -851,112 +828,11 @@ ${isletmeOzeti}`,
               </div>
             )}
 
-            {/* ── POS & KART (banka mutabakatı + MagicPay karşılaştırma) ── */}
+            {/* ── POS & KART (banka mutabakatı) ── */}
             {raporTuru === "pos" && (
               <div className="space-y-4">
                 <PosMutabakat raporlar={raporlar} baslangic={baslangic} bitis={bitis} />
 
-                {/* MagicPay karşılaştırma — işlevi aynen korunuyor */}
-                <p className="pt-2 text-[11px] font-black text-yazi uppercase tracking-widest flex items-center gap-1.5">
-                  <RefreshCw size={12} className="text-blue-400" /> MagicPay Karşılaştırma
-                </p>
-                <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-4 text-[11px] text-gray-700 leading-relaxed flex items-start gap-2.5">
-                  <RefreshCw size={15} className="text-blue-400 shrink-0 mt-0.5" />
-                  <div>
-                    <p>MagicPay (kebo-admin-ui) POS/online sipariş sisteminden çekilen rakamlar, buraya elle girilen günlük raporla karşılaştırılır. Hiçbir veri otomatik değiştirilmez veya kaydedilmez.</p>
-                    <p className="mt-1.5 text-gray-500">
-                      Not: MagicPay&apos;in &quot;Brüt&quot; (indirim öncesi) ve &quot;Net&quot; (indirim sonrası, gider/iade düşülmeden) tanımları
-                      Kebo Panel&apos;deki Brüt/Net Ciro tanımından farklı — bu ikisi ayrı sütunlarda gösterilir, aralarındaki fark tek başına
-                      hata anlamına gelmez. İndirim, İade ve Nakit karşılaştırmaları ise birebir aynı tanımı kullandığı için daha güvenilirdir.
-                    </p>
-                  </div>
-                </div>
-
-                <button onClick={magicpayKarsilastir} disabled={mpYukleniyor}
-                  className="flex items-center gap-2 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 disabled:opacity-40 px-4 py-2.5 rounded-xl transition-colors">
-                  {mpYukleniyor ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-                  {mpVeri ? "Yenile" : "MagicPay ile Karşılaştır"}
-                </button>
-
-                {mpHata && (
-                  <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 text-xs text-red-300 flex items-start gap-2">
-                    <AlertTriangle size={14} className="shrink-0 mt-0.5" /> {mpHata}
-                  </div>
-                )}
-
-                {mpVeri && (
-                  <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
-                    <div className="px-5 py-3 border-b border-cizgi">
-                      <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold">Gün Gün Karşılaştırma</p>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-cizgi">
-                            {["Tarih", "Kebo Brüt", "MP Brüt", "Kebo Net", "MP Net", "Kebo İndirim", "MP İndirim", "Fark", "Kebo İade", "MP İade", "Fark", "Kebo Nakit", "MP Nakit", "Fark"].map(h => (
-                              <th key={h} className="text-left px-3 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold whitespace-nowrap">{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-cizgi">
-                          {mpVeri.gunler.map(g => {
-                            const kr = raporlar.find(r => r.tarih === g.tarih);
-                            const keboIndirim = kr ? indirimToplam(kr) : null;
-                            const krOzet = kr ? raporOzeti(kr) : null;
-                            const keboBrut = krOzet ? krOzet.brut : null;
-                            const keboNet = krOzet ? krOzet.net : null;
-                            const keboIade = kr ? (kr.iade_tutar || 0) : null;
-                            const keboNakit = kr ? (kr.kasa_nakit || 0) : null;
-                            const farkli = (a: number | null, b: number, tol = 1) => a !== null && Math.abs(a - b) > tol;
-                            return (
-                              <tr key={g.tarih} className="hover:bg-white/[0.03] transition-colors">
-                                <td className="px-3 py-3 font-medium text-gray-700 whitespace-nowrap">{fmtTarih(g.tarih)}</td>
-                                <td className="px-3 py-3">{kr ? `₺${fmt(keboBrut as number)}` : "—"}</td>
-                                <td className="px-3 py-3 text-blue-400">₺{fmt(g.brutMP)}</td>
-                                <td className="px-3 py-3">{kr ? `₺${fmt(keboNet as number)}` : "—"}</td>
-                                <td className="px-3 py-3 text-blue-400">₺{fmt(g.netMP)}</td>
-                                <td className="px-3 py-3">{kr ? `₺${fmt(keboIndirim as number)}` : "—"}</td>
-                                <td className="px-3 py-3 text-orange-400">₺{fmt(g.indirimMP)}</td>
-                                <td className={`px-3 py-3 font-bold ${kr && farkli(keboIndirim, g.indirimMP) ? "text-red-400" : "text-emerald-400"}`}>
-                                  {kr ? (farkli(keboIndirim, g.indirimMP) ? `₺${fmt(Math.abs((keboIndirim as number) - g.indirimMP))}` : "✓") : "—"}
-                                </td>
-                                <td className="px-3 py-3">{kr ? `₺${fmt(keboIade as number)}` : "—"}</td>
-                                <td className="px-3 py-3 text-orange-400">₺{fmt(g.iadeMP)}</td>
-                                <td className={`px-3 py-3 font-bold ${kr && farkli(keboIade, g.iadeMP) ? "text-red-400" : "text-emerald-400"}`}>
-                                  {kr ? (farkli(keboIade, g.iadeMP) ? `₺${fmt(Math.abs((keboIade as number) - g.iadeMP))}` : "✓") : "—"}
-                                </td>
-                                <td className="px-3 py-3">{kr ? `₺${fmt(keboNakit as number)}` : "—"}</td>
-                                <td className="px-3 py-3 text-orange-400">₺{fmt(g.nakitMP)}</td>
-                                <td className={`px-3 py-3 font-bold ${kr && farkli(keboNakit, g.nakitMP) ? "text-red-400" : "text-emerald-400"}`}>
-                                  {kr ? (farkli(keboNakit, g.nakitMP) ? `₺${fmt(Math.abs((keboNakit as number) - g.nakitMP))}` : "✓") : "—"}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                    {mpVeri.gunler.some(g => !raporlar.find(r => r.tarih === g.tarih)) && (
-                      <p className="px-5 py-3 text-[10px] text-gray-500 border-t border-cizgi">&quot;—&quot; gösterilen günler için Kebo Panel&apos;de bu tarihte kaydedilmiş bir rapor bulunamadı.</p>
-                    )}
-                  </div>
-                )}
-
-                {mpVeri?.kurye && (
-                  <div className="bg-kart border border-cizgi rounded-2xl p-5">
-                    <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-3 flex items-center gap-1.5"><Truck size={12} /> MagicPay Kurye Teslimat (seçili gün)</p>
-                    <div className="space-y-2">
-                      {mpVeri.kurye.kuryeler.map((k: any) => (
-                        <div key={k.isim} className="flex flex-wrap items-center justify-between gap-2 bg-alan rounded-xl border border-cizgi px-4 py-2.5">
-                          <span className="font-bold text-yazi">{k.isim}</span>
-                          <span className="text-gray-500">{k.teslimat} teslimat</span>
-                          <span className="text-emerald-400 font-bold">₺{fmt(k.tahsilat)} tahsilat</span>
-                          {k.iadeGerekenTutar > 0 && <span className="text-red-400 font-bold">₺{fmt(k.iadeGerekenTutar)} Kebo&apos;ya iade gerekiyor</span>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 

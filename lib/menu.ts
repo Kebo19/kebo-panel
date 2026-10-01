@@ -4,10 +4,11 @@
 import {
   LayoutDashboard, Wallet, ClipboardList, Users, Settings, BarChart3, Building2,
   FileText, Package, TrendingUp, ChefHat, CalendarCheck, Sparkles, ShieldCheck,
-  Bell, History, UserRound,
+  Bell, History, UserRound, ScanSearch,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { YetkiAnahtari } from "@/lib/yetki";
+import { magicpayGorebilirMi } from "@/lib/magicpay";
 
 export interface MenuOgesi {
   name: string;
@@ -19,7 +20,8 @@ export interface MenuOgesi {
   aciklama: string;
   /** Ek arama kelimeleri */
   anahtar?: string;
-  izin?: YetkiAnahtari | "tam_yetkili";
+  /** "ozel_magicpay": sadece lib/magicpay.ts → MAGICPAY_GORENLER (rol/yetki yetmez) */
+  izin?: YetkiAnahtari | "tam_yetkili" | "ozel_magicpay";
 }
 
 export const MENU: { ust: MenuOgesi[]; finans: MenuOgesi[]; alt: MenuOgesi[]; ayarAlt: MenuOgesi[] } = {
@@ -32,6 +34,8 @@ export const MENU: { ust: MenuOgesi[]; finans: MenuOgesi[]; alt: MenuOgesi[]; ay
     { name: "Reçete & Maliyet", icon: ChefHat, href: "/stok/recete", izin: "recete", renk: "#fb923c", aciklama: "Ürün maliyetleri", anahtar: "reçete maliyet" },
     { name: "Personel", icon: Users, href: "/personel", izin: "personel", renk: "#c084fc", aciklama: "Kadro ve belgeler", anahtar: "personel çalışan kadro" },
     { name: "Puantaj", icon: CalendarCheck, href: "/puantaj", izin: "puantaj", renk: "#2dd4bf", aciklama: "Devam takibi", anahtar: "puantaj mesai izin" },
+    // Sadece Murat görür (lib/magicpay.ts). Listenin sonunda: anasayfa kısayolları MENU.ust sırasına bağlı.
+    { name: "MagicPay Kontrol", icon: ScanSearch, href: "/magicpay", izin: "ozel_magicpay", renk: "#22d3ee", aciklama: "Kasa raporu ↔ MagicPay", anahtar: "magicpay adisyon karşılaştırma kontrol paket kasa" },
   ],
   finans: [
     { name: "Kasa", icon: Wallet, href: "/kasa", izin: "kasa", renk: "#34d399", aciklama: "Bakiye ve işlemler", anahtar: "kasa banka nakit teb vakıfbank enpara bakiye" },
@@ -65,6 +69,17 @@ export function sayfaBul(pathname: string): MenuOgesi | undefined {
   return TUM_SAYFALAR
     .filter(m => m.href === "/" ? pathname === "/" : pathname === m.href || pathname.startsWith(m.href + "/"))
     .sort((a, b) => b.href.length - a.href.length)[0];
+}
+
+/** Menü öğesini bu kullanıcı görebilir mi? (Kenar menü ve Ctrl+K aynı kuralı kullanır.) */
+export function menuGorunurMu(
+  m: MenuOgesi,
+  k: { userId: string; tamYetkili: boolean; izin: (a: YetkiAnahtari) => boolean },
+): boolean {
+  if (!m.izin) return true;
+  if (m.izin === "tam_yetkili") return k.tamYetkili;
+  if (m.izin === "ozel_magicpay") return magicpayGorebilirMi(k.userId);
+  return k.izin(m.izin);
 }
 
 /** Türkçe karakterleri sadeleştirerek arama */

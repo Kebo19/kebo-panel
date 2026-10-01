@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { rolCoz, yetkilerCoz, sayfaErisimi, anaSayfaBul, TAM_YETKILI, MUDUR } from '@/lib/yetki'
+import { magicpayGorebilirMi, MAGICPAY_SAYFASI } from '@/lib/magicpay'
 
 // Next 16'da `middleware.ts` dosyası `proxy.ts` olarak yeniden adlandırıldı.
 //
@@ -104,6 +105,11 @@ export async function proxy(request: NextRequest) {
   if (loginSayfasi) return yonlendir(anaSayfa)
 
   if (!sayfaErisimi(rol, yetkiler, yol)) {
+    return yonlendir(anaSayfa)
+  }
+
+  // MagicPay Kontrol: rol/yetki yetmez, sadece listedeki kişi (lib/magicpay.ts).
+  if ((yol === MAGICPAY_SAYFASI || yol.startsWith(MAGICPAY_SAYFASI + '/')) && !magicpayGorebilirMi(user.id)) {
     return yonlendir(anaSayfa)
   }
 

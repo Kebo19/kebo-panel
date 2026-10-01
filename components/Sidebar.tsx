@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Wallet, LogOut, Menu, X, ChevronDown, Search, Settings } from "lucide-react";
 import { useYetki, yetkiOnbelleginiTemizle } from "@/lib/useYetki";
 import { createClient } from "@/lib/supabase/client";
-import { MENU, MOBIL_SIRA, sayfaBul, type MenuOgesi } from "@/lib/menu";
+import { MENU, MOBIL_SIRA, sayfaBul, menuGorunurMu, type MenuOgesi } from "@/lib/menu";
 import { cn } from "@/lib/utils";
 import KeboLogo from "@/components/kabuk/KeboLogo";
 import { aramayiAc } from "@/components/kabuk/KomutPaleti";
@@ -65,8 +65,7 @@ export default function Sidebar() {
     router.refresh();
   };
 
-  const gorunur = (m: MenuOgesi) =>
-    !m.izin ? true : m.izin === "tam_yetkili" ? isAdmin : yetki.izin(m.izin);
+  const gorunur = (m: MenuOgesi) => menuGorunurMu(m, yetki);
 
   const menuItems = MENU.ust.filter(gorunur);
   const kasaAltMenuler = MENU.finans.filter(gorunur);

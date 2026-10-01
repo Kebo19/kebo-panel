@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Search, CornerDownLeft, ArrowUp, ArrowDown } from "lucide-react";
-import { TUM_SAYFALAR, sadelestir, type MenuOgesi } from "@/lib/menu";
+import { TUM_SAYFALAR, sadelestir, menuGorunurMu, type MenuOgesi } from "@/lib/menu";
 import { useYetki } from "@/lib/useYetki";
 import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
 import { cn } from "@/lib/utils";
@@ -40,8 +40,7 @@ export default function KomutPaleti() {
     if (acik) { setSorgu(""); setSecili(0); setTimeout(() => girdi.current?.focus(), 30); }
   }, [acik]);
 
-  const gorunur = (m: MenuOgesi) =>
-    !m.izin ? true : m.izin === "tam_yetkili" ? yetki.tamYetkili : yetki.izin(m.izin);
+  const gorunur = (m: MenuOgesi) => menuGorunurMu(m, yetki);
 
   const sonuclar = useMemo(() => {
     const q = sadelestir(sorgu.trim());
