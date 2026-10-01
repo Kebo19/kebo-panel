@@ -223,6 +223,7 @@ const KART_ANAHTARLARI: { ad: YemekKartiAdi; kelimeler: string[] }[] = [
   { ad: "Setcard", kelimeler: ["setcard", "set card"] },
   { ad: "Pluxee", kelimeler: ["pluxee", "sodexo"] },
   { ad: "Paye", kelimeler: ["paye"] },
+  { ad: "Multinet", kelimeler: ["multinet"] },
 ];
 
 const kucult = (s: string) => s.toLocaleLowerCase("tr-TR").replace(/ı/g, "i");

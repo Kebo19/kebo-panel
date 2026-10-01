@@ -4,6 +4,16 @@ import { Sparkles } from "lucide-react";
 // başına bir öğe eklemek yeterli.
 const SURUMLER: { tarih: string; baslik: string; maddeler: string[] }[] = [
   {
+    tarih: "02.10.2026",
+    baslik: "Kredi kartları ve yemek kartı alacakları",
+    maddeler: [
+      "Kasa'da TEB ve Enpara kredi kartları: limit, güncel borç, kullanılabilir limit, ekstre borcu, son ödeme günü ve dönem harcaması.",
+      "Gider, cari ödemesi ve sabit gider kredi kartından yapılabiliyor; kartın borcuna eklenir. \"Borç öde\" ile bankadan karta ödeme.",
+      "Kasa'da her yemek kartı için 1 Ekim'den beri satış, bankaya yatan ve bekleyen alacak.",
+      "Kasa raporuna Multinet eklendi (formda ve fiş taramasında).",
+    ],
+  },
+  {
     tarih: "01.10.2026",
     baslik: "Yeni koyu tasarım ve kurye tahsilatı",
     maddeler: [

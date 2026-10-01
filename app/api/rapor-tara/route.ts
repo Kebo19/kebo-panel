@@ -25,7 +25,7 @@ A) YENİ FORM (tek sayfa, başlık "KEBO Günlük Kasa Formu", bölümler 1–7 
      Chick'n Fride Migros online → online.cnf.migrosYemek, Chick'n Fride Migros kapıda → kapida.cnf.migrosYemek,
      Alo Paket kapıda → kapida.kebo.alo.
      İndirim → online.<marka>.<platform>.indirim ; kapıda indirimleri her zaman 0.
-  2. KASA: Nakit, POS ve yemek kartları: Edenred, Metropol, Setcard, Pluxee, Paye.
+  2. KASA: Nakit, POS ve yemek kartları: Edenred, Metropol, Setcard, Pluxee, Paye, Multinet.
      Altındaki "Brüt Ciro" ve "Net Ciro" kutularını "kontrol.brut" ve "kontrol.net" alanlarına yaz.
   3. GİDERLER: Açıklama | Personel (avans ise) | Tutar. Personel sütunu DOLU olan satır avanstır →
      "avanslar" dizisine {personel, aciklama, tutar}; personel sütunu boş olan satır → "giderler".
@@ -113,7 +113,7 @@ JSON ŞEMASI (tam olarak bu anahtarları kullan, eksik bırakma):
       "alo": {"tutar": number, "paket": number}
     }
   },
-  "kasa": {"nakit": number, "pos": number, "edenred": number, "metropol": number, "setcard": number, "pluxee": number, "paye": number},
+  "kasa": {"nakit": number, "pos": number, "edenred": number, "metropol": number, "setcard": number, "pluxee": number, "paye": number, "multinet": number},
   "kontrol": {"paketKebo": number, "paketCnf": number, "paketToplam": number, "gider": number, "brut": number, "net": number},
   "giderler": [{"aciklama": "string", "tutar": number}],
   "avanslar": [{"personel": "string", "aciklama": "string", "tutar": number}],

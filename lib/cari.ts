@@ -67,4 +67,12 @@ export function faturaDurumHesapla(faturaTarihi: string, mevcutDurum: string, do
 
 /** Kasa & cari ödemelerinde seçilebilen hesaplar (Kasa sayfasındaki bakiyelerle aynı). */
 export const ODEME_HESAPLARI = ["Nakit", "TEB", "VakıfBank", "Enpara"] as const;
-export const HESAP_ETIKET: Record<string, string> = { Nakit: "Nakit Kasa", TEB: "TEB", VakıfBank: "VakıfBank", Enpara: "Enpara" };
+export const HESAP_ETIKET: Record<string, string> = {
+  Nakit: "Nakit Kasa", TEB: "TEB", VakıfBank: "VakıfBank", Enpara: "Enpara",
+  "TEB Kredi Kartı": "TEB Kredi Kartı", "Enpara Kredi Kartı": "Enpara Kredi Kartı",
+};
+/** Kredi kartları (kredi_kartlari tablosundaki adlar). Karttan ödeme kartın borcunu artırır. */
+export const KART_HESAPLARI = ["TEB Kredi Kartı", "Enpara Kredi Kartı"] as const;
+/** Gider / ödeme yapılabilecek bütün hesaplar */
+export const GIDER_HESAPLARI = [...ODEME_HESAPLARI, ...KART_HESAPLARI] as const;
+export const kartMi = (h: string) => (KART_HESAPLARI as readonly string[]).includes(h);

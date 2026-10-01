@@ -12,13 +12,13 @@ import {
 import VadeTakvimi from "@/components/VadeTakvimi";
 import CariEkstre from "@/components/CariEkstre";
 
-import { buAyinOdemeDonemi, faturaDurumHesapla, ODEME_HESAPLARI, HESAP_ETIKET } from "@/lib/cari";
+import { buAyinOdemeDonemi, faturaDurumHesapla, GIDER_HESAPLARI, HESAP_ETIKET, kartMi } from "@/lib/cari";
 import { tv, fmt2, paraGirdisi } from "@/lib/para";
 import { bugun, fmtTarih as fmtTarihOrtak } from "@/lib/tarih";
 
 // Ödeme yöntemleri: ilk dördü Kasa & Finans'taki hesaplardır — seçilirse ödeme Kasa'ya
 // otomatik gider hareketi olarak yazılır (veritabanı trigger'ı). Diğerleri kasaya yansımaz.
-const ODEME_SECENEKLERI = [...ODEME_HESAPLARI, "Kredi Kartı", "Çek", "Diğer"] as const;
+const ODEME_SECENEKLERI = [...GIDER_HESAPLARI, "Çek", "Diğer"] as const;
 
 interface Cari {
   id: string; cari_kodu: string; unvan: string; vergi_no: string;
@@ -275,11 +275,11 @@ export default function CarilerPage() {
     const tutar = manuelTutar ? tv(manuelTutar) : seciliToplam;
     if (!tutar || tutar <= 0) { showToast("hata", "Tutar giriniz veya fatura seçiniz."); return; }
     setFormSaving(true);
-    const hesap = (ODEME_HESAPLARI as readonly string[]).includes(odemeYontemi) ? odemeYontemi : null;
+    const hesap = (GIDER_HESAPLARI as readonly string[]).includes(odemeYontemi) ? odemeYontemi : null;
     const { error } = await supabase.from("cari_odemeler").insert([{
       cari_id: seciliCari.id, cari_unvan: seciliCari.unvan,
       tutar, tarih: odemeTarih,
-      odeme_yontemi: hesap && hesap !== "Nakit" ? `Banka (${hesap})` : odemeYontemi,
+      odeme_yontemi: hesap && kartMi(hesap) ? `Kredi Kartı (${hesap})` : hesap && hesap !== "Nakit" ? `Banka (${hesap})` : odemeYontemi,
       hesap, fatura_idleri: faturaIdleri,
       aciklama: odemeAciklama || `${faturaIdleri.length > 0 ? faturaIdleri.length + " fatura için ödeme" : "Manuel ödeme"}`,
     }]);
@@ -290,7 +290,7 @@ export default function CarilerPage() {
     }
     setFormSaving(false);
     setSeciliFaturalar(new Set());
-    showToast("basari", hesap ? `Ödeme kaydedildi ve ${HESAP_ETIKET[hesap]} hesabından düşüldü.` : "Ödeme kaydedildi.");
+    showToast("basari", hesap ? (kartMi(hesap) ? `Ödeme kaydedildi ve ${HESAP_ETIKET[hesap]} borcuna eklendi.` : `Ödeme kaydedildi ve ${HESAP_ETIKET[hesap]} hesabından düşüldü.`) : "Ödeme kaydedildi.");
     if (aktifTab === "buay") buAyVeriCek();
     setOdemeModalAcik(false);
     cariDetayAc(seciliCari);
@@ -961,7 +961,9 @@ export default function CarilerPage() {
                 </div>
               </div>
               <p className="text-[11px] text-gray-500 -mt-2">
-                {(ODEME_HESAPLARI as readonly string[]).includes(odemeYontemi)
+                {kartMi(odemeYontemi)
+                  ? `Ödeme ${HESAP_ETIKET[odemeYontemi]} borcuna otomatik eklenecek (Kasa & Finans'a ayrıca girmeyin).`
+                  : (GIDER_HESAPLARI as readonly string[]).includes(odemeYontemi)
                   ? `Ödeme ${HESAP_ETIKET[odemeYontemi]} bakiyesinden otomatik düşülecek (Kasa & Finans'a ayrıca girmeyin).`
                   : "Bu yöntem Kasa bakiyelerine yansımaz."}
               </p>

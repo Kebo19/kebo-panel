@@ -10,6 +10,10 @@ import { KASA_GIDER_KATEGORILERI, TUM_KASA_GIDER_KATEGORILERI, KASA_GELIR_KATEGO
 import { hepsiniCek } from "@/lib/hepsiniCek";
 import SabitGiderler from "@/components/SabitGiderler";
 import EkstreYukle from "@/components/EkstreYukle";
+import { KrediKartlariPaneli, KartAyarPenceresi, YemekKartiPaneli } from "@/components/KasaKartlari";
+import { krediKartiDurumu, yemekKartiAlacaklari, VARSAYILAN_KARTLAR, type KrediKarti } from "@/lib/kasaHesaplari";
+import { YEMEK_KARTLARI } from "@/lib/hesap";
+import { YEMEK_KARTI_KATEGORI, yemekKartiBul } from "@/lib/mutabakat";
 import Link from "next/link";
 import {
   PlusCircle, Building2, Coins,
@@ -44,7 +48,14 @@ const KAYNAK_ROZET: Record<string, string> = { banka_ekstre: "ekstre", sabit_gid
 
 const HESAPLAR = ["Nakit", "TEB", "VakıfBank", "Enpara"];
 const HESAP_LABEL: Record<string, string> = { Nakit: "Nakit Kasa", TEB: "TEB", VakıfBank: "VakıfBank", Enpara: "Enpara" };
-const HESAP_COLOR: Record<string, string> = { Nakit: "#3B82F6", TEB: "#10B981", VakıfBank: "#F59E0B", Enpara: "#8B5CF6" };
+const HESAP_COLOR: Record<string, string> = { Nakit: "#3B82F6", TEB: "#10B981", VakıfBank: "#F59E0B", Enpara: "#8B5CF6",
+  "TEB Kredi Kartı": "#34d399", "Enpara Kredi Kartı": "#c084fc" };
+/** Kredi kartı borç/limit takibinin başladığı gün (yemek kartı alacakları da bu günden sayılır) */
+const KART_BASLANGIC = "2026-10-01";
+const varsayilanKart = (ad: string, i: number): KrediKarti => ({
+  id: "", ad, banka: ad.split(" ")[0], kart_limiti: 0, hesap_kesim_gunu: null, son_odeme_gunu: null,
+  acilis_borcu: 0, acilis_tarihi: KART_BASLANGIC, aktif: true, sira: i,
+});
 
 // Kategoriler lib/karZarar.ts'de (Sabit giderler, Ekstre yükle ve Kâr/Zarar ile ortak).
 const GIDER_KATEGORILERI = KASA_GIDER_KATEGORILERI;
@@ -105,7 +116,7 @@ function HesapBadge({ hesap }: { hesap: string }) {
   return (
     <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg"
       style={{ backgroundColor: color + "18", color }}>
-      {hesap === "Nakit" ? <Banknote size={10}/> : <CreditCard size={10}/>}
+      {hesap === "Nakit" ? <Banknote size={10}/> : hesap.includes("Kredi Kartı") ? <CreditCard size={10}/> : <Building2 size={10}/>}
       {HESAP_LABEL[hesap] || hesap}
     </span>
   );
@@ -121,6 +132,10 @@ export default function KasaPage() {
   const [manuelIslemler, setManuelIslemler] = useState<ManuelIslem[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<string|null>(null);
   const [aktifSekme, setAktifSekme] = useState<"genel"|"giderler"|"islemler">("genel");
+  const [krediKartlari, setKrediKartlari] = useState<KrediKarti[]>(() => VARSAYILAN_KARTLAR.map(varsayilanKart));
+  const [kartTabloYok, setKartTabloYok] = useState(false);
+  const [duzenlenenKart, setDuzenlenenKart] = useState<KrediKarti|null>(null);
+  const [iYemekKarti, setIYemekKarti] = useState<string>(YEMEK_KARTLARI[0].ad);
 
   const [secilenAy, setSecilenAy] = useState(() => buAyYil().ay);
   const [secilenYil, setSecilenYil] = useState(() => buAyYil().yil);
@@ -166,6 +181,10 @@ export default function KasaPage() {
           .order("islem_tarihi",{ascending:false}).order("id",{ascending:false}).range(a, b)),
       ]);
       setRaporlar(r); setManuelIslemler(m);
+      // Kredi kartları (tablo yoksa varsayılan iki kart, ayarsız)
+      const { data: kk, error: kkHata } = await supabase.from("kredi_kartlari").select("*").eq("aktif", true).order("sira");
+      if (kkHata) { setKartTabloYok(true); setKrediKartlari(VARSAYILAN_KARTLAR.map(varsayilanKart)); }
+      else { setKartTabloYok(false); setKrediKartlari((kk || []).map(k => ({ ...k, kart_limiti: Number(k.kart_limiti) || 0, acilis_borcu: Number(k.acilis_borcu) || 0 })) as KrediKarti[]); }
     } catch (e) {
       alert("Veri alınamadı: " + (e instanceof Error ? e.message : String(e)));
     }
@@ -217,6 +236,17 @@ export default function KasaPage() {
     });
     return b as {Nakit:number;TEB:number;VakıfBank:number;Enpara:number};
   }, [raporlar,manuelIslemler]);
+
+  // ── Kredi kartları ve yemek kartı alacakları ──
+  const kartDurumlari = useMemo(() => krediKartlari.map(k => krediKartiDurumu(k, manuelIslemler, bugun())), [krediKartlari, manuelIslemler]);
+  const kartAdlari = useMemo(() => krediKartlari.map(k => k.ad), [krediKartlari]);
+  const yemekKartlari = useMemo(() => yemekKartiAlacaklari(raporlar, manuelIslemler, KART_BASLANGIC, `${secilenYil}-${secilenAy}`),
+    [raporlar, manuelIslemler, secilenAy, secilenYil]);
+  const kartOde = (k: KrediKarti) => {
+    setIslemTipi("transfer"); setIHedef(k.ad);
+    setIHesap(HESAPLAR.includes(k.banka) ? k.banka : "TEB");
+    setIAciklama(""); setIslemFormAcik(true);
+  };
 
   // ── Seçilen ayın finansal sonucu ──
   // Satış tarafı günlük raporlardan (lib/hesap), gider tarafı rapor giderleri + manuel giderler.
@@ -340,11 +370,15 @@ export default function KasaPage() {
     try {
       const {data:{user}} = await supabase.auth.getUser();
       const ekleyen = user?.email?.split("@")[0]||"Bilinmiyor";
+      // Yemek kartı tahsilatında kart adı açıklamaya yazılır (alacak ve mutabakat açıklamadan eşler)
+      const ykAciklama = islemTipi==="gelir" && iKategori===YEMEK_KARTI_KATEGORI && yemekKartiBul(iAciklama)!==iYemekKarti
+        ? [`${iYemekKarti} tahsilatı`, iAciklama].filter(Boolean).join(" — ") : iAciklama;
+      const kartaOdeme = islemTipi==="transfer" && kartAdlari.includes(iHedef);
       const { error } = await supabase.from("kasa_manuel_islemler").insert([{
         tip: islemTipi, hesap: iHesap,
         hedef_hesap: islemTipi==="transfer"?iHedef:null,
-        kategori: islemTipi==="transfer"?`${iHesap} → ${iHedef}`:iKategori,
-        tutar: t, aciklama: iAciklama,
+        kategori: islemTipi==="transfer" ? (kartaOdeme ? "Kredi kartı ödemesi" : `${iHesap} → ${iHedef}`) : iKategori,
+        tutar: t, aciklama: ykAciklama,
         islem_tarihi: iTarih, ekleyen_kullanici: ekleyen,
       }]);
       if (error) { alert("Hata: "+error.message); return; }
@@ -468,9 +502,19 @@ export default function KasaPage() {
               </div>
               <p className="text-xl font-black text-emerald-400 tracking-tight">₺{fmt2(toplam)}</p>
               <p className="text-[9px] text-gray-600 mt-0.5">tüm hesaplar</p>
+              {kartDurumlari.some(d => d.borc !== 0) && (
+                <p className="text-[10px] text-gray-500 mt-1">Kart borcu <span className="text-red-300 font-semibold">−₺{fmt2(kartDurumlari.reduce((t,d)=>t+d.borc,0))}</span> · Net <span className="text-yazi font-semibold">₺{fmt2(toplam - kartDurumlari.reduce((t,d)=>t+d.borc,0))}</span></p>
+              )}
             </div>
           </div>
         </div>
+
+        {/* ── KREDİ KARTLARI ── */}
+        <KrediKartlariPaneli durumlar={kartDurumlari} onOde={kartOde} onDuzenle={setDuzenlenenKart} tabloYok={kartTabloYok}/>
+
+        {/* ── YEMEK KARTI ALACAKLARI ── */}
+        <YemekKartiPaneli kartlar={yemekKartlari.kartlar} belirsizYatan={yemekKartlari.belirsizYatan}
+          toplamBekleyen={yemekKartlari.toplamBekleyen} baslangic={KART_BASLANGIC} ayAdi={AYLAR.find(m=>m.v===secilenAy)?.l || ""}/>
 
         {/* ── SEKME NAVİGASYONU ── */}
         <div className="flex gap-1 bg-kart border border-cizgi rounded-2xl p-1">
@@ -834,7 +878,8 @@ export default function KasaPage() {
                 <div>
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">Hesap</p>
                   <select value={gHesap} onChange={e=>setGHesap(e.target.value)} className={inputCls}>
-                    {HESAPLAR.map(h=><option key={h} value={h} className="bg-kart">{HESAP_LABEL[h]}</option>)}
+                    <optgroup label="Hesaplar">{HESAPLAR.map(h=><option key={h} value={h} className="bg-kart">{HESAP_LABEL[h]}</option>)}</optgroup>
+                    <optgroup label="Kredi kartları">{kartAdlari.map(h=><option key={h} value={h} className="bg-kart">{h}</option>)}</optgroup>
                   </select>
                 </div>
                 <div>
@@ -865,6 +910,11 @@ export default function KasaPage() {
         </div>
       )}
 
+      {duzenlenenKart && (
+        <KartAyarPenceresi kart={duzenlenenKart} onKapat={()=>setDuzenlenenKart(null)}
+          onKaydedildi={()=>{ setDuzenlenenKart(null); veriCek(true); }}/>
+      )}
+
       {/* ── GELİR/TRANSFER FORMU ── */}
       {islemFormAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -889,15 +939,18 @@ export default function KasaPage() {
               <div>
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">Kaynak Hesap</p>
                 <select value={iHesap} onChange={e=>setIHesap(e.target.value)} className={inputCls}>
-                  {HESAPLAR.map(h=><option key={h} value={h} className="bg-kart">{HESAP_LABEL[h]}</option>)}
+                  <optgroup label="Hesaplar">{HESAPLAR.map(h=><option key={h} value={h} className="bg-kart">{HESAP_LABEL[h]}</option>)}</optgroup>
+                  <optgroup label={islemTipi==="gelir" ? "Kredi kartları (iade)" : "Kredi kartları (nakit avans)"}>{kartAdlari.map(h=><option key={h} value={h} className="bg-kart">{h}</option>)}</optgroup>
                 </select>
               </div>
               {islemTipi==="transfer" && (
                 <div>
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">Hedef Hesap</p>
                   <select value={iHedef} onChange={e=>setIHedef(e.target.value)} className={inputCls}>
-                    {HESAPLAR.filter(h=>h!==iHesap).map(h=><option key={h} value={h} className="bg-kart">{HESAP_LABEL[h]}</option>)}
+                    <optgroup label="Hesaplar">{HESAPLAR.filter(h=>h!==iHesap).map(h=><option key={h} value={h} className="bg-kart">{HESAP_LABEL[h]}</option>)}</optgroup>
+                    <optgroup label="Kredi kartı borç ödemesi">{kartAdlari.filter(h=>h!==iHesap).map(h=><option key={h} value={h} className="bg-kart">{h}</option>)}</optgroup>
                   </select>
+                  {kartAdlari.includes(iHedef) && <p className="mt-1.5 text-[11px] text-gray-500">Kart borcu ödemesi: {HESAP_LABEL[iHesap]||iHesap} bakiyesi azalır, kartın borcu düşer. Kâr/zarara girmez.</p>}
                 </div>
               )}
               {islemTipi==="gelir" && (
@@ -906,6 +959,17 @@ export default function KasaPage() {
                   <select value={iKategori} onChange={e=>setIKategori(e.target.value)} className={inputCls}>
                     {GELIR_KATEGORILERI.map(k=><option key={k} value={k} className="bg-kart">{k}</option>)}
                   </select>
+                </div>
+              )}
+              {islemTipi==="gelir" && iKategori===YEMEK_KARTI_KATEGORI && (
+                <div>
+                  <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">Hangi yemek kartı?</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {YEMEK_KARTLARI.map(k=>(
+                      <button key={k.ad} type="button" onClick={()=>setIYemekKarti(k.ad)}
+                        className={`text-[11px] font-semibold py-2 rounded-lg border transition-colors ${iYemekKarti===k.ad?"border-altin/50 bg-altin/10 text-altin-acik":"border-cizgi text-gray-600 hover:text-yazi"}`}>{k.ad}</button>
+                    ))}
+                  </div>
                 </div>
               )}
               <div className="grid grid-cols-2 gap-3">

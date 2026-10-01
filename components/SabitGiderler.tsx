@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useYetki } from "@/lib/useYetki";
 import { tv, fmt2, paraGirdisi, paraYaz } from "@/lib/para";
 import { bugun, ayBasi, aySonu, fmtTarih } from "@/lib/tarih";
-import { ODEME_HESAPLARI, HESAP_ETIKET } from "@/lib/cari";
+import { GIDER_HESAPLARI, HESAP_ETIKET } from "@/lib/cari";
 import { KASA_GIDER_KATEGORILERI, AY_ADLARI, sabitGiderDurum, type SabitGiderDurum } from "@/lib/karZarar";
 import { CalendarClock, Plus, Pencil, Loader2, X, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 
@@ -254,7 +254,7 @@ export default function SabitGiderler({ onChange }: { onChange?: () => void }) {
               </div>
               <label className="block"><span className={etiketCls}>Ödeneceği hesap</span>
                 <select value={form.hesap} onChange={e => setForm({ ...form, hesap: e.target.value })} className={inputCls}>
-                  {ODEME_HESAPLARI.map(h => <option key={h} value={h}>{HESAP_ETIKET[h]}</option>)}
+                  {GIDER_HESAPLARI.map(h => <option key={h} value={h}>{HESAP_ETIKET[h]}</option>)}
                 </select>
               </label>
               <label className="block"><span className={etiketCls}>Not</span>
@@ -296,7 +296,7 @@ export default function SabitGiderler({ onChange }: { onChange?: () => void }) {
               <div className="grid grid-cols-2 gap-3">
                 <label className="block"><span className={etiketCls}>Hesap</span>
                   <select value={oHesap} onChange={e => setOHesap(e.target.value)} className={inputCls}>
-                    {ODEME_HESAPLARI.map(h => <option key={h} value={h}>{HESAP_ETIKET[h]}</option>)}
+                    {GIDER_HESAPLARI.map(h => <option key={h} value={h}>{HESAP_ETIKET[h]}</option>)}
                   </select>
                 </label>
                 <label className="block"><span className={etiketCls}>Tarih</span>

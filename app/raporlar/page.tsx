@@ -121,7 +121,7 @@ interface GunlukRapor {
   ko_cnf_migros_yemek: number; ko_cnf_migros_yemek_paket: number;
   ko_cnf_alo: number; ko_cnf_alo_paket: number;
   kasa_nakit: number; kasa_pos: number; kasa_edenred: number; kasa_metropol: number;
-  kasa_setcard?: number; kasa_pluxee?: number; kasa_paye?: number;
+  kasa_setcard?: number; kasa_pluxee?: number; kasa_paye?: number; kasa_multinet?: number;
   nakit_kasa_sayim?: number | null; nakit_devreden_kagit?: number | null;
   gunluk_gider: number; gider_aciklama?: string;
   iade_tutar: number; iade_aciklama?: string;
@@ -849,7 +849,7 @@ export default function RaporlarPage() {
   const [koCnfMigrosYemek, setKoCnfMigrosYemek] = useState<PlatformGiris>({tutar:"",paket:""});
   const [koCnfAlo, setKoCnfAlo] = useState<PlatformGiris>({tutar:"",paket:""});
   const [kasaNakit, setKasaNakit] = useState(""); const [kasaPos, setKasaPos] = useState("");
-  // Yemek kartları (Edenred, Metropol, Setcard, Pluxee, Paye) — lib/hesap.ts YEMEK_KARTLARI
+  // Yemek kartları (Edenred, Metropol, Setcard, Pluxee, Paye, Multinet) — lib/hesap.ts YEMEK_KARTLARI
   const bosKartlar = (): Record<YemekKartiAlani, string> => Object.fromEntries(YEMEK_KARTLARI.map(k => [k.alan, ""])) as Record<YemekKartiAlani, string>;
   const [kartlar, setKartlar] = useState<Record<YemekKartiAlani, string>>(bosKartlar);
   // ── 7. Nakit kasa: önceki günlerden kalan nakit, ondan yapılan ödemeler/bankaya yatırmalar, gün sonu sayımı ──
@@ -1102,7 +1102,7 @@ export default function RaporlarPage() {
       os_migros:"Migros (Online, eski)", os_chicknfride:"Chick'N Fride (Online, eski)",
       ko_yemeksepeti:"Yemeksepeti (Kapıda, eski)", ko_getir:"Getir (Kapıda)", ko_trendyol:"Trendyol (Kapıda, eski)",
       ko_migros:"Migros (Kapıda, eski)", ko_alo_paket:"Alo Paket (eski)", ko_chicknfride:"Chick'N Fride (Kapıda, eski)",
-      kasa_nakit:"Kasa Nakit", kasa_pos:"Kasa POS", kasa_edenred:"Kasa Edenred", kasa_metropol:"Kasa Metropol", kasa_setcard:"Kasa Setcard", kasa_pluxee:"Kasa Pluxee", kasa_paye:"Kasa Paye",
+      kasa_nakit:"Kasa Nakit", kasa_pos:"Kasa POS", kasa_edenred:"Kasa Edenred", kasa_metropol:"Kasa Metropol", kasa_setcard:"Kasa Setcard", kasa_pluxee:"Kasa Pluxee", kasa_paye:"Kasa Paye", kasa_multinet:"Kasa Multinet",
       gunluk_gider:"Günlük Gider", iade_tutar:"İade Tutarı", toplam_ciro:"Brüt Ciro",
       gider_aciklama:"Gider Açıklaması", iade_aciklama:"İade Açıklaması",
     };
@@ -1864,7 +1864,7 @@ export default function RaporlarPage() {
                 <CurrencyInput label="POS" value={kasaPos} onChange={setKasaPos} disabled={isReadOnly}/>
               </div>
               <p className="px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wide">Yemek kartları</p>
-              <div className="p-3 pt-1.5 grid grid-cols-2 md:grid-cols-5 gap-2.5">
+              <div className="p-3 pt-1.5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
                 {YEMEK_KARTLARI.map(k => (
                   <CurrencyInput key={k.alan} label={k.ad} value={kartlar[k.alan]} onChange={v => kartYaz(k.alan, v)} disabled={isReadOnly}/>
                 ))}

@@ -54,7 +54,7 @@ export interface RaporVerisi {
   ko_cnf_ys_indirim?: number | null; ko_cnf_trendyol_indirim?: number | null;
   // Kasa, gider, iade
   kasa_nakit?: number | null; kasa_pos?: number | null; kasa_edenred?: number | null; kasa_metropol?: number | null;
-  kasa_setcard?: number | null; kasa_pluxee?: number | null; kasa_paye?: number | null;
+  kasa_setcard?: number | null; kasa_pluxee?: number | null; kasa_paye?: number | null; kasa_multinet?: number | null;
   gunluk_gider?: number | null; iade_tutar?: number | null;
   kurye_raporlari?: KuryeSatiri[] | null;
 }
@@ -179,6 +179,7 @@ export const YEMEK_KARTLARI = [
   { alan: "kasa_setcard", ad: "Setcard" },
   { alan: "kasa_pluxee", ad: "Pluxee" },
   { alan: "kasa_paye", ad: "Paye" },
+  { alan: "kasa_multinet", ad: "Multinet" },
 ] as const;
 export type YemekKartiAlani = typeof YEMEK_KARTLARI[number]["alan"];
 
