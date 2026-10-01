@@ -6,10 +6,10 @@ import LayoutClient from "@/components/LayoutClient";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "KEBO ERP",
+  title: "KEBO Panel",
   description: "Premium Restaurant ERP Management System",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "KEBO", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "KEBO", statusBarStyle: "black" },
   icons: {
     icon: [
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
@@ -21,13 +21,13 @@ export const metadata: Metadata = {
 
 // Next 16'da themeColor metadata yerine viewport export'unda tanımlanır.
 export const viewport: Viewport = {
-  themeColor: "#2563eb",
+  themeColor: "#0a0a0b",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="tr" suppressHydrationWarning className={inter.variable}>
-      <body className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] antialiased" suppressHydrationWarning>
+      <body className="min-h-screen text-yazi antialiased" suppressHydrationWarning>
         <LayoutClient>{children}</LayoutClient>
       </body>
     </html>

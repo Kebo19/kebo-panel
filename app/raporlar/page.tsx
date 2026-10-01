@@ -1,5 +1,6 @@
 "use client";
 
+import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -17,7 +18,7 @@ import { bugun, buAyYil, aySonu, gunEkle, gunFarki, fmtTarih } from "@/lib/tarih
 import {
   brutCiro as brutHesapla, netCiro as netHesapla, raporOzeti, donemOzeti, platformKirilimi, paketToplam,
   kapidaKasadaMi, kuryeGercekPaket, yeniYapiMi, PLATFORM_RENK, PLATFORMLAR,
-  ROADRUNNER_GECIS_GUNU, KENDI_POS_GECIS_GUNU, KURYE_GARANTI_PAKET, YEMEK_KARTLARI, type YemekKartiAlani,
+  ROADRUNNER_GECIS_GUNU, KENDI_POS_GECIS_GUNU, kuryeTahsilati, roadrunnerTahsilati, KURYE_GARANTI_PAKET, YEMEK_KARTLARI, type YemekKartiAlani,
 } from "@/lib/hesap";
 import { useYetki } from "@/lib/useYetki";
 import { alanEtiketi } from "@/lib/tarama";
@@ -201,14 +202,14 @@ function EksikRaporBanner({enSonRaporTarihi, onEkle}: {enSonRaporTarihi:string|n
   }, [enSonRaporTarihi]);
   if (eksik.length===0) return null;
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-red-500/20 bg-[#fef2f2] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="relative overflow-hidden rounded-2xl border border-red-500/20 bg-red-500/10 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div className="absolute inset-0 bg-gradient-to-r from-red-100/60 to-transparent pointer-events-none"/>
       <div className="relative flex items-start gap-3">
         <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 shrink-0">
-          <Bell className="h-4 w-4 text-red-600 animate-pulse"/>
+          <Bell className="h-4 w-4 text-red-400 animate-pulse"/>
         </div>
         <div>
-          <p className="text-xs font-bold text-red-600 uppercase tracking-widest">{eksik.length} Günlük Rapor Eksik</p>
+          <p className="text-xs font-bold text-red-400 uppercase tracking-widest">{eksik.length} Günlük Rapor Eksik</p>
           <p className="text-[11px] text-gray-500 mt-0.5">
             {eksik.slice(0,4).join(" · ")}{eksik.length>4 ? ` · +${eksik.length-4} gün` : ""}
           </p>
@@ -260,21 +261,21 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
   if (raporlar.length===0) return null;
 
   return (
-    <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden shadow-2xl">
+    <div className="rounded-2xl border border-cizgi bg-kart overflow-hidden shadow-2xl">
       <button onClick={()=>setAcik(!acik)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-black/[0.03] transition-colors">
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.03] transition-colors">
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-            <Activity className="h-3.5 w-3.5 text-blue-600"/>
+            <Activity className="h-3.5 w-3.5 text-blue-400"/>
           </div>
           <span className="text-sm font-semibold text-gray-800 tracking-tight">Dönem Analizi</span>
-          <span className="text-[10px] text-gray-600 bg-black/[0.04] border border-white/10 px-2 py-0.5 rounded-full">{raporlar.length} gün</span>
+          <span className="text-[10px] text-gray-600 bg-white/[0.04] border border-white/10 px-2 py-0.5 rounded-full">{raporlar.length} gün</span>
         </div>
         {acik ? <ChevronUp className="h-4 w-4 text-gray-600"/> : <ChevronDown className="h-4 w-4 text-gray-600"/>}
       </button>
 
       {acik && (
-        <div className="border-t border-[#e2e5eb] p-5 space-y-5">
+        <div className="border-t border-cizgi p-5 space-y-5">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               {label:"Günlük Ort. Brüt", value:`₺${fmt(gunlukOrt)}`, sub:"brüt ciro", spark:trendValues, color:"#60A5FA"},
@@ -282,7 +283,7 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
               {label:"En Yüksek Gün",    value:`₺${fmt(ozet.enYuksekBrut)}`, sub:ozet.enYuksekTarih?fmtTarih(ozet.enYuksekTarih):"—", spark:null, color:"#FBBF24"},
               {label:"Toplam Paket",     value:fmt(ozet.paket), sub:"adet dağıtım (uzak + 9km dahil)", spark:null, color:"#A78BFA"},
             ].map(card=>(
-              <div key={card.label} className="bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4 hover:border-[#d8dde5] transition-colors">
+              <div key={card.label} className="bg-alan rounded-xl border border-cizgi p-4 hover:border-cizgi-guclu transition-colors">
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-2">{card.label}</p>
                 <div className="flex items-end justify-between gap-2">
                   <div>
@@ -296,7 +297,7 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-            <div className="xl:col-span-2 bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
+            <div className="xl:col-span-2 bg-alan rounded-xl border border-cizgi p-4">
               <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium mb-3 flex items-center gap-1.5">
                 <PieChart className="h-3 w-3"/> Platform Dağılımı
               </p>
@@ -311,11 +312,11 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
                           <span className="text-[11px] text-gray-500">{d.label}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-bold text-[#1a1f2e]">₺{fmt(d.value)}</span>
+                          <span className="text-[11px] font-bold text-yazi">₺{fmt(d.value)}</span>
                           <span className="text-[10px] text-gray-600 w-7 text-right">{Math.round(pct)}%</span>
                         </div>
                       </div>
-                      <div className="h-1 bg-black/[0.04] rounded-full overflow-hidden">
+                      <div className="h-1 bg-white/[0.04] rounded-full overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-700"
                           style={{width:`${pct}%`, backgroundColor:d.color, opacity:0.7}}/>
                       </div>
@@ -324,14 +325,14 @@ function DashboardPanel({raporlar}: {raporlar:GunlukRapor[]}) {
                 })}
               </div>
               {(markaData.kebo + markaData.cnf) > 0 && (
-                <div className="mt-3 pt-3 border-t border-[#e2e5eb] flex items-center justify-between text-[11px]">
-                  <span className="text-amber-700 font-semibold">🍔 Kebo ₺{fmt(markaData.kebo)}</span>
-                  <span className="text-red-700 font-semibold">🍗 Chick&apos;N Fride ₺{fmt(markaData.cnf)}</span>
+                <div className="mt-3 pt-3 border-t border-cizgi flex items-center justify-between text-[11px]">
+                  <span className="text-amber-300 font-semibold">🍔 Kebo ₺{fmt(markaData.kebo)}</span>
+                  <span className="text-red-300 font-semibold">🍗 Chick&apos;N Fride ₺{fmt(markaData.cnf)}</span>
                 </div>
               )}
             </div>
 
-            <div className="xl:col-span-3 bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
+            <div className="xl:col-span-3 bg-alan rounded-xl border border-cizgi p-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium flex items-center gap-1.5">
                   <BarChart3 className="h-3 w-3"/> Günlük Ciro Trendi
@@ -399,11 +400,11 @@ function PrintModal({rapor, onClose}: {rapor:GunlukRapor, onClose:()=>void}) {
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-      <div className="bg-white text-gray-900 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+      <div className="bg-kart text-gray-900 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
         <div className="bg-gray-50 border-b px-5 py-3 flex items-center justify-between">
           <h3 className="font-bold text-sm text-gray-700 flex items-center gap-2"><Printer className="h-4 w-4"/>Yazdırma Önizlemesi</h3>
           <div className="flex gap-2">
-            <button onClick={doPrint} className="bg-[#0c1a3a] text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 hover:bg-[#162040]">
+            <button onClick={doPrint} className="bg-alan-2 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 hover:bg-cizgi-guclu">
               <Printer className="h-3.5 w-3.5"/>Yazdır / PDF
             </button>
             <button onClick={onClose} className="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold px-4 py-2 rounded-lg">Kapat</button>
@@ -430,7 +431,7 @@ function PrintModal({rapor, onClose}: {rapor:GunlukRapor, onClose:()=>void}) {
             <div className="row"><span style={{color:"#888",fontSize:"10px"}}>{kapidaKasada
               ? "↳ Kendi kuryelerimiz topladı; tutar kasa sayımının içinde (brüte ayrıca eklenmez)"
               : rapor.tarih >= KENDI_POS_GECIS_GUNU
-                ? "↳ Kendi POS'umuzla tahsil edildi; kasa raporunda yok (brüte ayrıca eklenir)"
+                ? "↳ Brüte ayrıca eklenir. Kurye 1 ve 2'ninki kasaya / POS'a teslim edilir; havuzunki Roadrunner'da kalır, borçtan düşülür"
                 : "↳ Roadrunner'da kalır, haftalık mutabakatla mahsup edilir (brüte ayrıca eklenir)"}</span><span></span></div>
             <hr className="divider"/>
             <div className="section-title">Fiziki Kasa</div>
@@ -567,7 +568,7 @@ function CurrencyInput({label, value, onChange, disabled=false}:
         <input
           type="text" inputMode="decimal" value={value} disabled={disabled}
           onChange={e=>onChange(paraGirdisi(e.target.value))}
-          className="w-full bg-[#f7f8fa] border border-[#dde1e8] hover:border-[#b9c2d1] focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 text-[#1a1f2e] text-[15px] font-bold h-10 pl-7 pr-3 rounded-xl outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"
+          className="w-full bg-alan border border-cizgi-guclu hover:border-altin/40 focus:border-altin/50 focus:ring-2 focus:ring-altin/40 text-yazi text-[15px] font-bold h-10 pl-7 pr-3 rounded-xl outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"
           placeholder="0"
         />
       </div>
@@ -600,7 +601,7 @@ function HucreGirdi({value, onChange, tip, disabled, etiket, renk, soluk}:
       <input type="text" inputMode={tip === "para" ? "decimal" : "numeric"} value={value} disabled={disabled}
         onChange={e => onChange(tip === "para" ? paraGirdisi(e.target.value) : e.target.value.replace(/\D/g, ""))}
         placeholder="0" aria-label={etiket}
-        className={`w-full ${soluk && !value ? "bg-[#eef0f3] border-dashed" : "bg-[#f7f8fa]"} border border-[#dde1e8] hover:border-[#b9c2d1] focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 text-[15px] font-bold h-10 px-3 rounded-lg outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-gray-400 ${tip === "adet" ? "text-center" : "text-right"} ${renk || "text-[#1a1f2e]"}`}/>
+        className={`w-full ${soluk && !value ? "bg-alan-2 border-dashed" : "bg-alan"} border border-cizgi-guclu hover:border-altin/40 focus:border-altin/50 focus:ring-2 focus:ring-altin/40 text-[15px] font-bold h-10 px-3 rounded-lg outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-gray-400 ${tip === "adet" ? "text-center" : "text-right"} ${renk || "text-yazi"}`}/>
     </label>
   );
 }
@@ -608,7 +609,7 @@ const BosHucre = () => <div className="hidden md:block h-10"/>;
 const sayi = (v?: string) => parseInt(v || "", 10) || 0;
 /** Satır/marka toplam paketi: salt okunur rozet */
 const PaketRozet = ({ adet, vurgu }: { adet: number; vurgu?: boolean }) => (
-  <div className={`h-10 rounded-lg flex items-center justify-center text-[15px] font-black text-[#1a1f2e] border ${vurgu ? "border-2 border-[#1a1f2e]" : "border-[#e2e5eb] bg-[#fafbfc]"}`}>{adet}</div>
+  <div className={`h-10 rounded-lg flex items-center justify-center text-[15px] font-black text-yazi border ${vurgu ? "border-2 border-altin/60" : "border-cizgi bg-alan"}`}>{adet}</div>
 );
 
 function SatisSatiri({ad, online, onOnline, indirim, onIndirim, kapida, onKapida, disabled, soluk = []}: {
@@ -620,20 +621,20 @@ function SatisSatiri({ad, online, onOnline, indirim, onIndirim, kapida, onKapida
   kapida?: PlatformGiris; onKapida?: (v: PlatformGiris) => void;
 }) {
   return (
-    <div className={`${SATIS_IZGARA} rounded-lg md:rounded-none border md:border-0 border-[#e2e5eb] p-2.5 md:p-0`}>
+    <div className={`${SATIS_IZGARA} rounded-lg md:rounded-none border md:border-0 border-cizgi p-2.5 md:p-0`}>
       <p className="text-[13px] font-semibold text-gray-800 mb-1.5 md:mb-0 flex items-center justify-between">{ad}
-        <span className="md:hidden text-[11px] font-bold text-gray-700 border border-[#e2e5eb] rounded px-1.5">{sayi(online?.paket) + sayi(kapida?.paket)} pkt</span></p>
+        <span className="md:hidden text-[11px] font-bold text-gray-700 border border-cizgi rounded px-1.5">{sayi(online?.paket) + sayi(kapida?.paket)} pkt</span></p>
       <div className="grid grid-cols-3 gap-2 md:contents">
         {online && onOnline ? <>
           <HucreGirdi etiket="Online ₺" tip="para" value={online.tutar} onChange={v => onOnline({ ...online, tutar: v })} disabled={disabled} soluk={soluk.includes("online")}/>
-          <HucreGirdi etiket="Paket" tip="adet" value={online.paket} onChange={v => onOnline({ ...online, paket: v })} disabled={disabled} renk="text-amber-700" soluk={soluk.includes("online")}/>
+          <HucreGirdi etiket="Paket" tip="adet" value={online.paket} onChange={v => onOnline({ ...online, paket: v })} disabled={disabled} renk="text-amber-300" soluk={soluk.includes("online")}/>
         </> : <><BosHucre/><BosHucre/></>}
-        {onIndirim ? <HucreGirdi etiket="İndirim ₺" tip="para" value={indirim || ""} onChange={onIndirim} disabled={disabled} renk="text-red-600" soluk={soluk.includes("indirim")}/> : <BosHucre/>}
+        {onIndirim ? <HucreGirdi etiket="İndirim ₺" tip="para" value={indirim || ""} onChange={onIndirim} disabled={disabled} renk="text-red-400" soluk={soluk.includes("indirim")}/> : <BosHucre/>}
       </div>
       <div className={`grid grid-cols-3 gap-2 md:contents ${kapida ? "mt-2 md:mt-0" : ""}`}>
         {kapida && onKapida ? <>
-          <HucreGirdi etiket="Kapıda ₺" tip="para" value={kapida.tutar} onChange={v => onKapida({ ...kapida, tutar: v })} disabled={disabled} renk="text-purple-700" soluk={soluk.includes("kapida")}/>
-          <HucreGirdi etiket="Paket" tip="adet" value={kapida.paket} onChange={v => onKapida({ ...kapida, paket: v })} disabled={disabled} renk="text-amber-700" soluk={soluk.includes("kapida")}/>
+          <HucreGirdi etiket="Kapıda ₺" tip="para" value={kapida.tutar} onChange={v => onKapida({ ...kapida, tutar: v })} disabled={disabled} renk="text-purple-300" soluk={soluk.includes("kapida")}/>
+          <HucreGirdi etiket="Paket" tip="adet" value={kapida.paket} onChange={v => onKapida({ ...kapida, paket: v })} disabled={disabled} renk="text-amber-300" soluk={soluk.includes("kapida")}/>
         </> : <><BosHucre/><BosHucre/></>}
       </div>
       <div className="hidden md:block"><PaketRozet adet={sayi(online?.paket) + sayi(kapida?.paket)}/></div>
@@ -680,7 +681,7 @@ function PlatformSatir({label, value, onChange, indirim, onIndirimChange, disabl
   {label:string, value:PlatformGiris, onChange:(v:PlatformGiris)=>void,
    indirim?:string, onIndirimChange?:(v:string)=>void, disabled?:boolean}) {
   return (
-    <div className="rounded-xl border border-[#dde1e8] bg-[#f7f8fa] p-3 hover:border-[#d8dde5] transition-colors">
+    <div className="rounded-xl border border-cizgi-guclu bg-alan p-3 hover:border-cizgi-guclu transition-colors">
       <p className="text-[13px] text-gray-800 font-semibold mb-2">{label}</p>
       <div className="flex items-center gap-2">
         <div className="relative flex-[1.4]">
@@ -688,7 +689,7 @@ function PlatformSatir({label, value, onChange, indirim, onIndirimChange, disabl
           <input type="text" inputMode="decimal" value={value.tutar} disabled={disabled}
             onChange={e=>onChange({...value, tutar: paraGirdisi(e.target.value)})}
             placeholder="0"
-            className="w-full bg-[#f7f8fa] border border-[#dde1e8] hover:border-[#b9c2d1] focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 text-[#1a1f2e] text-[15px] font-bold h-10 pl-7 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"/>
+            className="w-full bg-alan border border-cizgi-guclu hover:border-altin/40 focus:border-altin/50 focus:ring-2 focus:ring-altin/40 text-yazi text-[15px] font-bold h-10 pl-7 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"/>
         </div>
         <div className="relative flex-1">
           <Package size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-700/70 pointer-events-none"/>
@@ -696,7 +697,7 @@ function PlatformSatir({label, value, onChange, indirim, onIndirimChange, disabl
             onChange={e=>onChange({...value, paket: e.target.value})}
             placeholder="0"
             title="Paket sayısı"
-            className="w-full bg-[#f7f8fa] border border-[#dde1e8] hover:border-[#b9c2d1] focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/15 text-amber-700 text-[15px] font-bold h-10 pl-8 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"/>
+            className="w-full bg-alan border border-cizgi-guclu hover:border-altin/40 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/15 text-amber-300 text-[15px] font-bold h-10 pl-8 pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-600"/>
           <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-600 font-medium pointer-events-none hidden sm:block">pkt</span>
         </div>
       </div>
@@ -706,7 +707,7 @@ function PlatformSatir({label, value, onChange, indirim, onIndirimChange, disabl
           <input type="text" inputMode="decimal" value={indirim||""} disabled={disabled}
             onChange={e=>onIndirimChange(paraGirdisi(e.target.value))}
             placeholder="0"
-            className="w-full bg-[#fef2f2] border border-red-500/15 hover:border-red-500/30 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/15 text-red-700 text-[13px] font-bold h-8 pl-[68px] pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-700 text-right"/>
+            className="w-full bg-red-500/10 border border-red-500/15 hover:border-red-500/30 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/15 text-red-300 text-[13px] font-bold h-8 pl-[68px] pr-2 rounded-lg outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed placeholder:text-gray-700 text-right"/>
         </div>
       )}
     </div>
@@ -750,22 +751,22 @@ function AkilliGiderInput({
         value={value}
         onChange={e => { onChange(e.target.value); setArama(e.target.value); setAcik(true); }}
         onFocus={() => setAcik(true)}
-        className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/40 text-[#1a1f2e] text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"
+        className="w-full bg-alan border border-cizgi hover:border-cizgi-guclu focus:border-altin/50 text-yazi text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"
       />
       {acik && !disabled && filtreli.length > 0 && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#ffffff] border border-[#e2e5eb] rounded-xl shadow-2xl overflow-hidden">
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-kart border border-cizgi rounded-xl shadow-2xl overflow-hidden">
           {filtreli.map((o, i) => (
             <button
               key={i}
               type="button"
               onMouseDown={() => { onChange(o); setAcik(false); setArama(""); }}
-              className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-500/10 hover:text-[#1a1f2e] transition-colors flex items-center gap-2"
+              className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-500/10 hover:text-yazi transition-colors flex items-center gap-2"
             >
               <Sparkles size={9} className="text-blue-700/50 shrink-0"/>
               {o}
             </button>
           ))}
-          <div className="border-t border-[#e2e5eb] px-3 py-1 text-[10px] text-gray-700">
+          <div className="border-t border-cizgi px-3 py-1 text-[10px] text-gray-700">
             Diğer: istediğinizi yazabilirsiniz
           </div>
         </div>
@@ -1599,18 +1600,18 @@ export default function RaporlarPage() {
       {selectedRapor && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-3 text-[11px] text-gray-600">
-            <span className="flex items-center gap-1.5"><User size={11} className="text-blue-600"/>{selectedRapor.ekleyen_kullanici}</span>
-            {selectedRapor.created_at && <span className="flex items-center gap-1.5"><Clock size={11} className="text-blue-600"/>{new Date(selectedRapor.created_at).toLocaleString("tr-TR")}</span>}
+            <span className="flex items-center gap-1.5"><User size={11} className="text-blue-400"/>{selectedRapor.ekleyen_kullanici}</span>
+            {selectedRapor.created_at && <span className="flex items-center gap-1.5"><Clock size={11} className="text-blue-400"/>{new Date(selectedRapor.created_at).toLocaleString("tr-TR")}</span>}
           </div>
           {!isEditMode && (isAdmin || isOnayliDuzenleyici) && (
             <div className="flex items-center gap-2">
               <button type="button" onClick={()=>setIsEditMode(true)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-400/10 border border-amber-400/20 px-3 py-1.5 rounded-lg hover:bg-amber-400/15 transition-colors">
+                className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-3 py-1.5 rounded-lg hover:bg-amber-400/15 transition-colors">
                 <Edit3 size={12}/> Düzenle
               </button>
               {isAdmin && (
               <button type="button" onClick={()=>selectedRapor && handleRaporSil(selectedRapor)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-400/10 border border-red-400/20 px-3 py-1.5 rounded-lg hover:bg-red-400/15 transition-colors">
+                className="flex items-center gap-1.5 text-xs font-semibold text-red-400 bg-red-400/10 border border-red-400/20 px-3 py-1.5 rounded-lg hover:bg-red-400/15 transition-colors">
                 <Trash2 size={12}/> Sil
               </button>
               )}
@@ -1620,34 +1621,34 @@ export default function RaporlarPage() {
       )}
 
       {!selectedRapor && !tarihOnaylandi ? (
-        <div className="rounded-xl border border-[#e2e5eb] bg-[#fafbfc] p-5 space-y-3">
+        <div className="rounded-xl border border-cizgi bg-alan p-5 space-y-3">
           <div>
-            <p className="text-sm font-bold text-[#1a1f2e] flex items-center gap-2"><Calendar size={14} className="text-amber-700"/> 1. Rapor tarihini seçin</p>
+            <p className="text-sm font-bold text-yazi flex items-center gap-2"><Calendar size={14} className="text-amber-300"/> 1. Rapor tarihini seçin</p>
             <p className="text-[12px] text-gray-500 mt-0.5">Tarih onaylanınca rapor formu ve fişten doldurma açılır.</p>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-end gap-3">
             <div className="sm:w-56">
               <input type="date" value={tarih} onChange={e=>handleTarihChange(e.target.value)}
                 max={bugun()} style={{colorScheme:"light"}}
-                className={`bg-white text-[#1a1f2e] font-bold text-center h-12 text-[16px] rounded-xl px-3 w-full outline-none transition-all border-2 ${
-                  duplikaTarihHata ? "border-orange-500 text-orange-600"
-                  : tarihHataVarMi&&!adminOnayliGecis ? "border-red-500 text-red-600"
-                  : "border-[#e2e5eb] focus:border-amber-500/60"}`}/>
+                className={`bg-kart text-yazi font-bold text-center h-12 text-[16px] rounded-xl px-3 w-full outline-none transition-all border-2 ${
+                  duplikaTarihHata ? "border-orange-500 text-orange-400"
+                  : tarihHataVarMi&&!adminOnayliGecis ? "border-red-500 text-red-400"
+                  : "border-cizgi focus:border-amber-500/60"}`}/>
             </div>
             <button type="button"
               disabled={!tarih || duplikaTarihHata || tarih > bugun() || (tarihHataVarMi && !adminOnayliGecis)}
               onClick={()=>{ setTarihOnaylandi(true); setTimeout(()=>formAlaniRef.current?.scrollIntoView({behavior:"smooth",block:"start"}),100); }}
-              className="h-12 px-6 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-xl flex items-center justify-center gap-2 transition-colors">
+              className="h-12 px-6 text-sm font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 disabled:opacity-40 rounded-xl flex items-center justify-center gap-2 transition-colors">
               Devam <ArrowUpRight size={14}/>
             </button>
           </div>
           <div className="text-[12px] text-gray-500 space-y-0.5">
             {enSonRaporTarihi && <p>Son rapor: <strong className="text-gray-700">{fmtTarih(enSonRaporTarihi)}</strong>{beklenenTarih && <> · Sıradaki gün: <strong className="text-gray-700">{fmtTarih(beklenenTarih)}</strong></>}</p>}
           </div>
-          {duplikaTarihHata && <p className="text-xs font-semibold text-orange-600 flex items-center gap-1.5"><AlertTriangle size={12}/> {fmtTarih(tarih)} tarihli rapor zaten var. Değiştirmek için listeden açın.</p>}
+          {duplikaTarihHata && <p className="text-xs font-semibold text-orange-400 flex items-center gap-1.5"><AlertTriangle size={12}/> {fmtTarih(tarih)} tarihli rapor zaten var. Değiştirmek için listeden açın.</p>}
       {!isReadOnly && tarih && tarihHataVarMi && !adminOnayliGecis && (
-        <div className="rounded-xl border border-red-500/25 bg-[#fef2f2] px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <p className="text-xs text-red-700 flex items-center gap-2">
+        <div className="rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <p className="text-xs text-red-300 flex items-center gap-2">
             <ShieldAlert size={13} className="shrink-0"/>
             {tarih > bugun()
               ? <span><strong>İleri tarihli rapor girilemez.</strong> Tarihi düzeltin.</span>
@@ -1660,7 +1661,7 @@ export default function RaporlarPage() {
               <button type="button" onClick={()=>setAdminOnayliGecis(true)} className="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg flex items-center gap-1"><Check size={11}/> Onayla</button>
             )}
             {beklenenTarih && beklenenTarih <= bugun() && (
-              <button type="button" onClick={()=>handleTarihChange(beklenenTarih)} className="text-xs font-bold text-red-700 bg-white border border-red-300 hover:bg-red-50 px-3 py-1.5 rounded-lg">{fmtTarih(beklenenTarih)} yap</button>
+              <button type="button" onClick={()=>handleTarihChange(beklenenTarih)} className="text-xs font-bold text-red-300 bg-kart border border-red-500/25 hover:bg-red-500/10 px-3 py-1.5 rounded-lg">{fmtTarih(beklenenTarih)} yap</button>
             )}
           </div>
         </div>
@@ -1671,11 +1672,11 @@ export default function RaporlarPage() {
       {/* TARİH + CANLI METRİKLER */}
       <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 items-center">
         <div className="sm:col-span-1">
-          <label className="block text-[12px] text-amber-700 font-bold tracking-wide mb-1.5">Rapor Tarihi</label>
+          <label className="block text-[12px] text-amber-300 font-bold tracking-wide mb-1.5">Rapor Tarihi</label>
           {!selectedRapor ? (
             <div className="flex flex-col gap-1">
-              <div className="bg-[#f7f8fa] border-2 border-[#e2e5eb] text-[#1a1f2e] font-bold text-center h-11 text-[15px] rounded-xl px-3 flex items-center justify-center">{fmtTarih(tarih)}</div>
-              <button type="button" onClick={()=>setTarihOnaylandi(false)} className="text-[11px] font-semibold text-blue-600 hover:underline self-start">Tarihi değiştir</button>
+              <div className="bg-alan border-2 border-cizgi text-yazi font-bold text-center h-11 text-[15px] rounded-xl px-3 flex items-center justify-center">{fmtTarih(tarih)}</div>
+              <button type="button" onClick={()=>setTarihOnaylandi(false)} className="text-[11px] font-semibold text-blue-400 hover:underline self-start">Tarihi değiştir</button>
             </div>
           ) : (
           <div className="flex flex-col gap-1">
@@ -1684,21 +1685,21 @@ export default function RaporlarPage() {
               min={!isAdmin&&!selectedRapor&&beklenenTarih?beklenenTarih:undefined}
               max={!isAdmin&&!selectedRapor&&beklenenTarih?beklenenTarih:undefined}
               style={{colorScheme:"light"}}
-              className={`bg-[#f7f8fa] text-[#1a1f2e] font-bold text-center h-11 text-[15px] rounded-xl px-3 w-full outline-none focus:ring-2 focus:ring-amber-500/20 transition-all border-2 ${
-                duplikaTarihHata ? "border-orange-500 text-orange-600"
-                : tarihHataVarMi&&!adminOnayliGecis ? "border-red-500 text-red-600"
-                : "border-[#e2e5eb] focus:border-amber-500/60"
+              className={`bg-alan text-yazi font-bold text-center h-11 text-[15px] rounded-xl px-3 w-full outline-none focus:ring-2 focus:ring-amber-500/20 transition-all border-2 ${
+                duplikaTarihHata ? "border-orange-500 text-orange-400"
+                : tarihHataVarMi&&!adminOnayliGecis ? "border-red-500 text-red-400"
+                : "border-cizgi focus:border-amber-500/60"
               }`} required/>
-            {duplikaTarihHata && <p className="text-[11px] font-semibold text-orange-600 flex items-center gap-1"><AlertTriangle size={11}/> Bu tarih mevcut</p>}
+            {duplikaTarihHata && <p className="text-[11px] font-semibold text-orange-400 flex items-center gap-1"><AlertTriangle size={11}/> Bu tarih mevcut</p>}
             {enSonRaporTarihi && <p className="text-[11px] text-gray-500 font-medium">Son rapor: <span className="text-gray-700 font-bold">{fmtTarih(enSonRaporTarihi)}</span></p>}
           </div>
           )}
         </div>
         {[
-          {label:"Brüt Ciro", value:`₺${fmt(ch.brutCiro)}`, color:"text-blue-600", border:"border-blue-500/10 bg-blue-500/5"},
-          {label:"Net Ciro",  value:`₺${fmt(ch.netCiro)}`,  color:"text-emerald-600", border:"border-emerald-500/10 bg-emerald-500/5"},
-          {label:"Paket",     value:`${fmt(ch.tKuryeGercekPaket)}`, color:"text-amber-600", border:"border-amber-500/10 bg-amber-500/5"},
-          {label:"Ort. Sepet",value:`₺${fmt(ch.paketOrt)}`, color:"text-purple-600", border:"border-purple-500/10 bg-purple-500/5"},
+          {label:"Brüt Ciro", value:`₺${fmt(ch.brutCiro)}`, color:"text-blue-400", border:"border-blue-500/10 bg-blue-500/5"},
+          {label:"Net Ciro",  value:`₺${fmt(ch.netCiro)}`,  color:"text-emerald-400", border:"border-emerald-500/10 bg-emerald-500/5"},
+          {label:"Paket",     value:`${fmt(ch.tKuryeGercekPaket)}`, color:"text-amber-400", border:"border-amber-500/10 bg-amber-500/5"},
+          {label:"Ort. Sepet",value:`₺${fmt(ch.paketOrt)}`, color:"text-purple-400", border:"border-purple-500/10 bg-purple-500/5"},
         ].map(c=>(
           <div key={c.label} className={`rounded-xl border ${c.border} px-4 py-3 transition-transform hover:-translate-y-0.5 hover:shadow-sm`}>
             <p className="text-[12px] text-gray-500 font-semibold">{c.label}</p>
@@ -1712,11 +1713,11 @@ export default function RaporlarPage() {
         <div className="rounded-xl border-2 border-indigo-500/30 bg-indigo-500/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center shrink-0">
-              {taramaYukleniyor ? <Loader2 size={14} className="text-indigo-600 animate-spin"/> : <Camera size={14} className="text-indigo-600"/>}
+              {taramaYukleniyor ? <Loader2 size={14} className="text-indigo-400 animate-spin"/> : <Camera size={14} className="text-indigo-400"/>}
             </div>
             <div>
-              <p className="text-xs font-bold text-indigo-700">Fişten Doldur</p>
-              <p className="text-[10px] text-gray-500">Formun fotoğrafını seçin. Eski önlü arkalı formda iki yüzü birlikte seçin ya da sonra &quot;Sayfa ekle&quot; deyin. <a href="/kebo-gunluk-kasa-formu.pdf" target="_blank" rel="noopener" className="text-indigo-600 font-semibold hover:underline">Boş formu indir (PDF)</a></p>
+              <p className="text-xs font-bold text-indigo-300">Fişten Doldur</p>
+              <p className="text-[10px] text-gray-500">Formun fotoğrafını seçin. Eski önlü arkalı formda iki yüzü birlikte seçin ya da sonra &quot;Sayfa ekle&quot; deyin. <a href="/kebo-gunluk-kasa-formu.pdf" target="_blank" rel="noopener" className="text-indigo-400 font-semibold hover:underline">Boş formu indir (PDF)</a></p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -1727,12 +1728,12 @@ export default function RaporlarPage() {
             {taramaIleDoldu && (
               <button type="button" disabled={taramaYukleniyor} onClick={() => ekDosyaInputRef.current?.click()}
                 title="Diğer yüzü okut; mevcut değerler korunur"
-                className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-white border border-indigo-300 hover:bg-indigo-50 disabled:opacity-40 px-3.5 py-2 rounded-xl transition-colors">
+                className="flex items-center gap-1.5 text-xs font-bold text-indigo-300 bg-kart border border-indigo-500/25 hover:bg-indigo-500/10 disabled:opacity-40 px-3.5 py-2 rounded-xl transition-colors">
                 <Plus size={13}/> Sayfa ekle
               </button>
             )}
             <button type="button" disabled={taramaYukleniyor} onClick={() => dosyaInputRef.current?.click()}
-              className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 px-3.5 py-2 rounded-xl transition-colors">
+              className="flex items-center gap-1.5 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 disabled:opacity-40 px-3.5 py-2 rounded-xl transition-colors">
               {taramaYukleniyor ? "Okunuyor..." : <><Camera size={13}/> {taramaIleDoldu ? "Baştan tara" : "Tara"}</>}
             </button>
           </div>
@@ -1740,14 +1741,14 @@ export default function RaporlarPage() {
       )}
       {taramaHata && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2.5 flex items-center gap-2">
-          <AlertTriangle size={13} className="text-red-600 shrink-0"/>
-          <p className="text-xs text-red-700">{taramaHata}</p>
+          <AlertTriangle size={13} className="text-red-400 shrink-0"/>
+          <p className="text-xs text-red-300">{taramaHata}</p>
         </div>
       )}
       {taramaIleDoldu && !isReadOnly && (
-        <div className="rounded-xl border border-indigo-500/25 bg-indigo-50 px-4 py-3 space-y-2">
-          <p className="text-xs font-bold text-indigo-800 flex items-center gap-1.5"><Check size={13}/> Form fişten dolduruldu. Aşağıdaki değerleri kağıtla karşılaştırıp gerekirse düzeltin, sonra kaydedin.</p>
-          {taramaTarihNotu && <p className="text-[12px] text-amber-800 font-semibold flex items-center gap-1.5"><AlertTriangle size={12}/> {taramaTarihNotu}</p>}
+        <div className="rounded-xl border border-indigo-500/25 bg-indigo-500/10 px-4 py-3 space-y-2">
+          <p className="text-xs font-bold text-indigo-200 flex items-center gap-1.5"><Check size={13}/> Form fişten dolduruldu. Aşağıdaki değerleri kağıtla karşılaştırıp gerekirse düzeltin, sonra kaydedin.</p>
+          {taramaTarihNotu && <p className="text-[12px] text-amber-200 font-semibold flex items-center gap-1.5"><AlertTriangle size={12}/> {taramaTarihNotu}</p>}
           {Object.keys(taramaKontrol).length > 0 && (() => {
             const pk = (...l: PlatformGiris[]) => l.reduce((t, x) => t + (parseInt(x.paket || "", 10) || 0), 0);
             const kebo = pk(osKeboYs, osKeboTrendyol, osKeboMigros, osKeboAlo, koKeboYs, koKeboTrendyol, koKeboMigrosYemek, koKeboAlo);
@@ -1762,14 +1763,14 @@ export default function RaporlarPage() {
             ];
             return (
               <div>
-                <p className="text-[12px] font-bold text-indigo-800 mb-1">Kağıttaki toplamlar ile panelin hesabı:</p>
+                <p className="text-[12px] font-bold text-indigo-200 mb-1">Kağıttaki toplamlar ile panelin hesabı:</p>
                 <div className="flex flex-wrap gap-1.5">
                   {satirlar.filter(([k]) => taramaKontrol[k] > 0).map(([k, ad, kagit, panel, para]) => {
                     const fark = Math.round((panel - kagit) * 100) / 100;
                     const tamam = Math.abs(fark) < (para ? 1 : 0.5);
                     const f = (x: number) => para ? `₺${fmt(x)}` : String(x);
                     return (
-                      <span key={k} className={`text-[11px] font-semibold rounded-lg px-2 py-0.5 border ${tamam ? "text-emerald-800 bg-emerald-50 border-emerald-200" : "text-red-800 bg-red-50 border-red-200"}`}>
+                      <span key={k} className={`text-[11px] font-semibold rounded-lg px-2 py-0.5 border ${tamam ? "text-emerald-200 bg-emerald-500/10 border-emerald-500/25" : "text-red-200 bg-red-500/10 border-red-500/25"}`}>
                         {tamam ? "✓" : "⚠"} {ad}: kağıt {f(kagit)}{tamam ? "" : ` · panel ${f(panel)} (fark ${fark > 0 ? "+" : ""}${para ? fmt(fark) : fark})`}
                       </span>
                     );
@@ -1780,10 +1781,10 @@ export default function RaporlarPage() {
           })()}
           {taramaBelirsizAlanlar.length > 0 && (
             <div>
-              <p className="text-[12px] font-bold text-amber-800 mb-1">Özellikle şu alanlara bakın (okuma belirsiz):</p>
+              <p className="text-[12px] font-bold text-amber-200 mb-1">Özellikle şu alanlara bakın (okuma belirsiz):</p>
               <div className="flex flex-wrap gap-1.5">
                 {taramaBelirsizAlanlar.map(a => (
-                  <span key={a} className="text-[11px] font-semibold text-amber-900 bg-amber-100 border border-amber-300 rounded-lg px-2 py-0.5">{alanEtiketi(a)}</span>
+                  <span key={a} className="text-[11px] font-semibold text-amber-100 bg-amber-500/15 border border-amber-500/25 rounded-lg px-2 py-0.5">{alanEtiketi(a)}</span>
                 ))}
               </div>
             </div>
@@ -1796,34 +1797,34 @@ export default function RaporlarPage() {
           <div className="space-y-3">
 
             {/* ── 1. SATIŞLAR (kağıt formla aynı tablo) ── */}
-            <div className="rounded-xl border border-[#e2e5eb] bg-white overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#e2e5eb] flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[14px] font-bold text-[#1a1f2e]">1. Satışlar</span>
-                <span title={ch.kapidaKasada ? "13.08.2026 öncesi: kendi kuryelerimizin topladığı para kasa sayımının içinde" : tarih >= KENDI_POS_GECIS_GUNU ? "28.09.2026'dan itibaren kendi POS'umuz: kapıda tutar adisyon kasa raporunda yok, brüte ayrıca eklenir" : "Roadrunner'da kalır, haftalık mutabakatla mahsup edilir"}
-                  className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
-                  Kapıda: {ch.kapidaKasada ? "kasa sayımına dahil" : tarih >= KENDI_POS_GECIS_GUNU ? "brüte ayrıca eklenir" : "Roadrunner'da, brüte ayrıca eklenir"}
+            <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
+              <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[14px] font-bold text-yazi">1. Satışlar</span>
+                <span title={ch.kapidaKasada ? "13.08.2026 öncesi: kendi kuryelerimizin topladığı para kasa sayımının içinde" : tarih >= KENDI_POS_GECIS_GUNU ? "28.09.2026'dan itibaren: kapıda ödemenin tamamı brüte eklenir. Kurye 1 ve 2 parayı gün sonu kasaya / POS'a teslim eder; havuz kuryelerininki Roadrunner'da kalır, borcumuzdan düşülür" : "Roadrunner'da kalır, haftalık mutabakatla mahsup edilir"}
+                  className="text-[10px] font-semibold text-purple-300 bg-purple-500/10 border border-purple-500/25 px-2 py-0.5 rounded-full">
+                  Kapıda: {ch.kapidaKasada ? "kasa sayımına dahil" : tarih >= KENDI_POS_GECIS_GUNU ? "brüte eklenir · havuzunki Roadrunner'da" : "Roadrunner'da, brüte ayrıca eklenir"}
                 </span>
               </div>
               <div className="p-3 space-y-2">
                 <div className={`hidden ${SATIS_IZGARA} text-[11px] font-bold text-gray-500 px-0.5`}>
                   <span/>
                   <span className="text-right pr-3">Online ₺</span><span className="text-center">Paket</span>
-                  <span className="text-right pr-3 text-red-600">İndirim ₺</span>
-                  <span className="text-right pr-3 text-purple-700">Kapıda ₺</span><span className="text-center">Paket</span>
+                  <span className="text-right pr-3 text-red-400">İndirim ₺</span>
+                  <span className="text-right pr-3 text-purple-300">Kapıda ₺</span><span className="text-center">Paket</span>
                   <span className="text-center">Toplam</span>
                 </div>
-                <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wide pt-1">🍔 Kebo</p>
+                <p className="text-[11px] font-bold text-amber-300 uppercase tracking-wide pt-1">🍔 Kebo</p>
                 <SatisSatiri ad="Yemeksepeti" online={osKeboYs} onOnline={setOsKeboYs} indirim={osKeboYsIndirim} onIndirim={setOsKeboYsIndirim} kapida={koKeboYs} onKapida={setKoKeboYs} disabled={isReadOnly}/>
                 <SatisSatiri ad="Trendyol" online={osKeboTrendyol} onOnline={setOsKeboTrendyol} indirim={osKeboTrendyolIndirim} onIndirim={setOsKeboTrendyolIndirim} kapida={koKeboTrendyol} onKapida={setKoKeboTrendyol} disabled={isReadOnly}/>
                 <SatisSatiri ad="Migros" online={osKeboMigros} onOnline={setOsKeboMigros} indirim={osKeboMigrosIndirim} onIndirim={setOsKeboMigrosIndirim} kapida={koKeboMigrosYemek} onKapida={setKoKeboMigrosYemek} disabled={isReadOnly}/>
                 <SatisSatiri ad="Alo Paket" online={osKeboAlo} onOnline={setOsKeboAlo} indirim={osKeboAloIndirim} onIndirim={setOsKeboAloIndirim} kapida={koKeboAlo} onKapida={setKoKeboAlo} soluk={["online","indirim"]} disabled={isReadOnly}/>
-                <p className="text-[11px] font-bold text-red-700 uppercase tracking-wide pt-2">🍗 Chick&apos;n Fride</p>
+                <p className="text-[11px] font-bold text-red-300 uppercase tracking-wide pt-2">🍗 Chick&apos;n Fride</p>
                 <SatisSatiri ad="Yemeksepeti" online={osCnfYs} onOnline={setOsCnfYs} indirim={osCnfYsIndirim} onIndirim={setOsCnfYsIndirim} kapida={koCnfYs} onKapida={setKoCnfYs} soluk={["kapida"]} disabled={isReadOnly}/>
                 <SatisSatiri ad="Trendyol" online={osCnfTrendyol} onOnline={setOsCnfTrendyol} indirim={osCnfTrendyolIndirim} onIndirim={setOsCnfTrendyolIndirim} kapida={koCnfTrendyol} onKapida={setKoCnfTrendyol} soluk={["kapida"]} disabled={isReadOnly}/>
                 <SatisSatiri ad="Migros" online={osCnfMigrosYemek} onOnline={setOsCnfMigrosYemek} indirim={osCnfMigrosIndirim} onIndirim={setOsCnfMigrosIndirim} kapida={koCnfMigrosYemek} onKapida={setKoCnfMigrosYemek} soluk={["kapida"]} disabled={isReadOnly}/>
                 {/* Eski raporlarda girilmiş Chick'n Fride kapıda / kapıda indirim varsa kaybolmasın diye gösterilir */}
                 {(tv(koCnfAlo.tutar)+tv(koKeboYsIndirim)+tv(koKeboTrendyolIndirim)+tv(koCnfYsIndirim)+tv(koCnfTrendyolIndirim)) > 0 && (
-                  <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <p className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
                     Bu raporda eski formdan kalan Chick&apos;n Fride Alo Paket / kapıda indirim tutarı var (₺{fmt(tv(koCnfAlo.tutar))} Alo, ₺{fmt(tv(koKeboYsIndirim)+tv(koKeboTrendyolIndirim)+tv(koCnfYsIndirim)+tv(koCnfTrendyolIndirim))} indirim). Hesaplara dahil.
                   </p>
                 )}
@@ -1832,31 +1833,31 @@ export default function RaporlarPage() {
                   const kebo = pk(osKeboYs, osKeboTrendyol, osKeboMigros, osKeboAlo, koKeboYs, koKeboTrendyol, koKeboMigrosYemek, koKeboAlo);
                   const cnf = pk(osCnfYs, osCnfTrendyol, osCnfMigrosYemek, koCnfYs, koCnfTrendyol, koCnfMigrosYemek, koCnfAlo);
                   return (
-                    <div className="border-t border-[#e2e5eb] pt-2.5 mt-1 space-y-2">
+                    <div className="border-t border-cizgi pt-2.5 mt-1 space-y-2">
                       <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1.5 text-[12px] font-semibold text-gray-600">
-                        <span>KEBO <b className="ml-1 inline-block min-w-14 text-center rounded-md border border-[#cfd5df] text-[#1a1f2e] px-2 py-0.5">{kebo}</b></span>
-                        <span>Chick&apos;n <b className="ml-1 inline-block min-w-14 text-center rounded-md border border-[#cfd5df] text-[#1a1f2e] px-2 py-0.5">{cnf}</b></span>
-                        <span className="text-[#1a1f2e] font-bold">Dükkân <b className="ml-1 inline-block min-w-14 text-center rounded-md border-2 border-[#1a1f2e] text-[#1a1f2e] px-2 py-0.5">{kebo + cnf}</b> <span className="font-medium text-gray-500">paket</span></span>
+                        <span>KEBO <b className="ml-1 inline-block min-w-14 text-center rounded-md border border-cizgi-guclu text-yazi px-2 py-0.5">{kebo}</b></span>
+                        <span>Chick&apos;n <b className="ml-1 inline-block min-w-14 text-center rounded-md border border-cizgi-guclu text-yazi px-2 py-0.5">{cnf}</b></span>
+                        <span className="text-yazi font-bold">Dükkân <b className="ml-1 inline-block min-w-14 text-center rounded-md border-2 border-altin/60 text-yazi px-2 py-0.5">{kebo + cnf}</b> <span className="font-medium text-gray-500">paket</span></span>
                       </div>
                       <div className="flex flex-wrap gap-x-5 gap-y-1 text-[13px] font-black pt-1.5">
-                        <span className="text-blue-700">Online ₺{fmt(ch.tOnline)}</span>
-                        <span className={ch.indirimUyari ? "text-red-700" : "text-red-600"}>İndirim ₺{fmt(ch.tIndirim)} <span className="font-semibold text-[11px]">(%{ch.indirimOrani.toFixed(1)})</span></span>
-                        <span className="text-purple-700">Kapıda ₺{fmt(ch.tKapida)}</span>
+                        <span className="text-blue-300">Online ₺{fmt(ch.tOnline)}</span>
+                        <span className={ch.indirimUyari ? "text-red-300" : "text-red-400"}>İndirim ₺{fmt(ch.tIndirim)} <span className="font-semibold text-[11px]">(%{ch.indirimOrani.toFixed(1)})</span></span>
+                        <span className="text-purple-300">Kapıda ₺{fmt(ch.tKapida)}</span>
                       </div>
                     </div>
                   );
                 })()}
                 {ch.indirimUyari && (
-                  <p className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-2"><AlertTriangle size={13}/> İndirim online cironun %15&apos;ini geçti — rakamları kontrol edin.</p>
+                  <p className="text-[12px] text-red-300 bg-red-500/10 border border-red-500/25 rounded-lg px-3 py-2 flex items-center gap-2"><AlertTriangle size={13}/> İndirim online cironun %15&apos;ini geçti — rakamları kontrol edin.</p>
                 )}
               </div>
             </div>
 
             {/* ── 2. KASA ── */}
-            <div className="rounded-xl border border-[#e2e5eb] bg-white overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#e2e5eb] flex items-center justify-between">
-                <span className="text-[14px] font-bold text-[#1a1f2e]">2. Kasa</span>
-                <span className="text-sm font-black text-emerald-700">₺{fmt(ch.tKasa)}</span>
+            <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
+              <div className="px-4 py-3 border-b border-cizgi flex items-center justify-between">
+                <span className="text-[14px] font-bold text-yazi">2. Kasa</span>
+                <span className="text-sm font-black text-emerald-300">₺{fmt(ch.tKasa)}</span>
               </div>
               <div className="p-3 grid grid-cols-2 gap-2.5">
                 <CurrencyInput label="Nakit" value={kasaNakit} onChange={setKasaNakit} disabled={isReadOnly}/>
@@ -1868,17 +1869,17 @@ export default function RaporlarPage() {
                   <CurrencyInput key={k.alan} label={k.ad} value={kartlar[k.alan]} onChange={v => kartYaz(k.alan, v)} disabled={isReadOnly}/>
                 ))}
               </div>
-              <div className="mx-3 mb-2 flex flex-wrap items-center justify-between gap-2 text-[13px] text-gray-600 border-t border-[#e2e5eb] pt-2.5">
-                <span>Kasa ₺<b className="text-[#1a1f2e]">{fmt(ch.tKasa)}</b> + Giderler ₺<b className="text-red-700">{fmt(ch.tGider)}</b>{ch.kapidaKasada ? "" : <> + Kapıda ₺<b className="text-purple-700">{fmt(ch.tKapida)}</b></>} + Online ₺<b className="text-blue-700">{fmt(ch.tOnline)}</b></span>
+              <div className="mx-3 mb-2 flex flex-wrap items-center justify-between gap-2 text-[13px] text-gray-600 border-t border-cizgi pt-2.5">
+                <span>Kasa ₺<b className="text-yazi">{fmt(ch.tKasa)}</b> + Giderler ₺<b className="text-red-300">{fmt(ch.tGider)}</b>{ch.kapidaKasada ? "" : <> + Kapıda ₺<b className="text-purple-300">{fmt(ch.tKapida)}</b></>} + Online ₺<b className="text-blue-300">{fmt(ch.tOnline)}</b></span>
               </div>
               <div className="mx-3 mb-3 grid grid-cols-2 gap-2.5">
-                <div className="rounded-xl bg-blue-50 border border-blue-200 px-5 py-5">
-                  <p className="text-[13px] font-bold text-blue-700 uppercase tracking-wide">Brüt ciro</p>
-                  <p className="text-3xl md:text-4xl font-black text-blue-700 mt-1">₺{fmt(ch.brutCiro)}</p>
+                <div className="rounded-xl bg-blue-500/10 border border-blue-500/25 px-5 py-5">
+                  <p className="text-[13px] font-bold text-blue-300 uppercase tracking-wide">Brüt ciro</p>
+                  <p className="text-3xl md:text-4xl font-black text-blue-300 mt-1">₺{fmt(ch.brutCiro)}</p>
                 </div>
-                <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-5 py-5">
-                  <p className="text-[13px] font-bold text-emerald-700 uppercase tracking-wide">Net ciro</p>
-                  <p className="text-3xl md:text-4xl font-black text-emerald-700 mt-1">₺{fmt(ch.netCiro)}</p>
+                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/25 px-5 py-5">
+                  <p className="text-[13px] font-bold text-emerald-300 uppercase tracking-wide">Net ciro</p>
+                  <p className="text-3xl md:text-4xl font-black text-emerald-300 mt-1">₺{fmt(ch.netCiro)}</p>
                 </div>
               </div>
             </div>
@@ -1887,23 +1888,23 @@ export default function RaporlarPage() {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
 
               {/* Giderler */}
-              <div className="rounded-xl border border-red-500/20 bg-[#ffffff] overflow-hidden">
+              <div className="rounded-xl border border-red-500/20 bg-kart overflow-hidden">
                 <div className="px-4 py-3 border-b border-red-500/15 flex flex-wrap items-center justify-between gap-2 bg-red-500/[0.03]">
-                  <span className="text-[13px] font-bold text-red-700 flex items-center gap-2">3. Giderler <span className="font-medium text-[11px] text-gray-500">(avans dahil · iade/iptal buraya değil 5. bölüme)</span></span>
+                  <span className="text-[13px] font-bold text-red-300 flex items-center gap-2">3. Giderler <span className="font-medium text-[11px] text-gray-500">(avans dahil · iade/iptal buraya değil 5. bölüme)</span></span>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-black text-red-700">₺{fmt(ch.tGider)}</span>
+                    <span className="text-sm font-black text-red-300">₺{fmt(ch.tGider)}</span>
                     {!isReadOnly && (
                       <>
                         <button type="button" onClick={()=>giderEkle("normal")}
-                          className="text-[11px] font-semibold text-gray-700 hover:text-red-700 bg-black/[0.04] hover:bg-red-500/10 border border-[#d8dde5] hover:border-red-500/30 px-2.5 py-1 rounded-lg transition-colors">
+                          className="text-[11px] font-semibold text-gray-700 hover:text-red-300 bg-white/[0.04] hover:bg-red-500/10 border border-cizgi-guclu hover:border-red-500/30 px-2.5 py-1 rounded-lg transition-colors">
                           + Normal
                         </button>
                         <button type="button" onClick={()=>giderEkle("firma")}
-                          className="text-[11px] font-semibold text-gray-700 hover:text-blue-700 bg-black/[0.04] hover:bg-blue-500/10 border border-[#d8dde5] hover:border-blue-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
+                          className="text-[11px] font-semibold text-gray-700 hover:text-blue-300 bg-white/[0.04] hover:bg-blue-500/10 border border-cizgi-guclu hover:border-blue-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
                           <Building2 size={11}/> Firma
                         </button>
                         <button type="button" onClick={()=>giderEkle("personel")}
-                          className="text-[11px] font-semibold text-gray-700 hover:text-teal-700 bg-black/[0.04] hover:bg-teal-500/10 border border-[#d8dde5] hover:border-teal-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
+                          className="text-[11px] font-semibold text-gray-700 hover:text-teal-300 bg-white/[0.04] hover:bg-teal-500/10 border border-cizgi-guclu hover:border-teal-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
                           <Users2 size={11}/> Personel
                         </button>
                       </>
@@ -1915,19 +1916,19 @@ export default function RaporlarPage() {
                     <div key={item.id} className="space-y-1.5">
                       {item.tip === "firma" ? (
                         <div className="flex items-center gap-1.5 mb-1">
-                          <Building2 size={11} className="text-blue-600"/>
-                          <span className="text-[11px] font-semibold text-blue-700">Firma Ödemesi</span>
+                          <Building2 size={11} className="text-blue-400"/>
+                          <span className="text-[11px] font-semibold text-blue-300">Firma Ödemesi</span>
                         </div>
                       ) : item.tip === "personel" ? (
                         <div className="flex items-center gap-1.5 mb-1">
-                          <Users2 size={11} className="text-teal-600"/>
-                          <span className="text-[11px] font-semibold text-teal-700">Personel Tüketimi — kasadan fiş çıkar, otomatik avans olarak işlenir</span>
+                          <Users2 size={11} className="text-teal-400"/>
+                          <span className="text-[11px] font-semibold text-teal-300">Personel Tüketimi — kasadan fiş çıkar, otomatik avans olarak işlenir</span>
                         </div>
                       ) : null}
 
                       {item.tip === "firma" ? (
                         isReadOnly ? (
-                          <div className="w-full bg-[#f7f8fa] border border-blue-500/20 text-blue-700 text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5">
+                          <div className="w-full bg-alan border border-blue-500/20 text-blue-300 text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5">
                             <Building2 size={9}/> {item.firmaUnvan || item.aciklama}
                           </div>
                         ) : (
@@ -1942,11 +1943,11 @@ export default function RaporlarPage() {
                                   ? { firmaId: firma.id, firmaUnvan: firma.unvan, aciklama: firma.unvan }
                                   : { firmaId: undefined, firmaUnvan: undefined, aciklama: "" });
                               }}
-                              className="w-full bg-[#f7f8fa] border border-blue-500/20 text-[#1a1f2e] text-xs h-7 pl-6 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40 appearance-none"
+                              className="w-full bg-alan border border-blue-500/20 text-yazi text-xs h-7 pl-6 pr-2 rounded-lg outline-none focus:border-altin/50 disabled:opacity-40 appearance-none"
                             >
                               <option value="">Firma seçiniz...</option>
                               {cariListesi.map(c => (
-                                <option key={c.id} value={c.id} className="bg-[#ffffff]">
+                                <option key={c.id} value={c.id} className="bg-kart">
                                   {c.unvan} {c.cari_kodu ? `(${c.cari_kodu})` : ""}
                                 </option>
                               ))}
@@ -1957,14 +1958,14 @@ export default function RaporlarPage() {
                         <div className="space-y-1.5">
                           <select disabled={isReadOnly} value={item.personelId || personelIdBul(item.personelIsim) || ""}
                             onChange={e => { const p = avansPersonelListesi.find(x => x.id === e.target.value); giderDegistir(item.id, { personelId: p?.id, personelIsim: p?.isim || "" }); }}
-                            className="w-full bg-[#f7f8fa] border border-teal-500/20 text-[#1a1f2e] text-xs h-7 px-2.5 rounded-lg outline-none focus:border-teal-500/40 disabled:opacity-40 appearance-none">
+                            className="w-full bg-alan border border-teal-500/20 text-yazi text-xs h-7 px-2.5 rounded-lg outline-none focus:border-teal-500/40 disabled:opacity-40 appearance-none">
                             <option value="">Personel seçiniz...</option>
                             {item.personelIsim && !personelIdBul(item.personelIsim) && <option value="">{item.personelIsim} (listede yok)</option>}
-                            {avansPersonelListesi.map(p=>(<option key={p.id} value={p.id} className="bg-[#ffffff]">{p.isim}</option>))}
+                            {avansPersonelListesi.map(p=>(<option key={p.id} value={p.id} className="bg-kart">{p.isim}</option>))}
                           </select>
                           <input type="text" placeholder="Ne tüketti? (örn: 1 adet kola)" disabled={isReadOnly} value={item.aciklama}
                             onChange={e=>giderDegistir(item.id, { aciklama: e.target.value })}
-                            className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-teal-500/40 text-[#1a1f2e] text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
+                            className="w-full bg-alan border border-cizgi hover:border-cizgi-guclu focus:border-teal-500/40 text-yazi text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
                         </div>
                       ) : (
                         <AkilliGiderInput
@@ -1981,33 +1982,33 @@ export default function RaporlarPage() {
                           <input
                             type="text" inputMode="decimal" placeholder="0" disabled={isReadOnly} value={item.tutar}
                             onChange={e=>giderDegistir(item.id,{ tutar: e.target.value })}
-                            className="w-full bg-[#f7f8fa] border border-[#dde1e8] text-[#1a1f2e] text-[14px] font-bold h-9 pl-7 pr-2 rounded-lg outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/15 disabled:opacity-40"
+                            className="w-full bg-alan border border-cizgi-guclu text-yazi text-[14px] font-bold h-9 pl-7 pr-2 rounded-lg outline-none focus:border-altin/50 focus:ring-2 focus:ring-altin/40 disabled:opacity-40"
                           />
                         </div>
                         {!isReadOnly && giderler.length>1 && (
-                          <button type="button" onClick={()=>giderSil(item.id)} className="text-gray-500 hover:text-red-600 px-1.5"><Trash2 size={13}/></button>
+                          <button type="button" onClick={()=>giderSil(item.id)} className="text-gray-500 hover:text-red-400 px-1.5"><Trash2 size={13}/></button>
                         )}
                       </div>
-                      {idx < giderler.length-1 && <div className="border-t border-[#e2e5eb] mt-1"/>}
+                      {idx < giderler.length-1 && <div className="border-t border-cizgi mt-1"/>}
                     </div>
                   ))}
                 </div>
                 {/* Toplam gider — kağıt formdaki "TOPLAM GİDER" satırının karşılığı; satırlardan otomatik hesaplanır */}
-                <div className="mx-3 mb-3 rounded-lg border-2 border-[#1a1f2e] px-3.5 py-2.5 flex items-center justify-between">
-                  <span className="text-[13px] font-bold text-[#1a1f2e]">Toplam gider <span className="font-medium text-[11px] text-gray-500">(avanslar dahil)</span></span>
-                  <span className="text-[17px] font-black text-red-700">₺{fmt(ch.tGider)}</span>
+                <div className="mx-3 mb-3 rounded-lg border-2 border-altin/60 px-3.5 py-2.5 flex items-center justify-between">
+                  <span className="text-[13px] font-bold text-yazi">Toplam gider <span className="font-medium text-[11px] text-gray-500">(avanslar dahil)</span></span>
+                  <span className="text-[17px] font-black text-red-300">₺{fmt(ch.tGider)}</span>
                 </div>
               </div>
 
               {/* İade + Kurye + Notlar */}
               <div className="space-y-3">
                 {/* Personel Kesintisi — kasayı/gideri etkilemez, sadece ay sonu maaştan düşülür */}
-                <div className="rounded-xl border border-rose-500/15 bg-[#ffffff] overflow-hidden">
+                <div className="rounded-xl border border-rose-500/15 bg-kart overflow-hidden">
                   <div className="px-3 py-2 border-b border-rose-500/15 flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-rose-600 uppercase tracking-wider flex items-center gap-1.5"><Users2 size={11}/>4. Personel Kesintisi</span>
+                    <span className="text-[10px] font-semibold text-rose-400 uppercase tracking-wider flex items-center gap-1.5"><Users2 size={11}/>4. Personel Kesintisi</span>
                     {!isReadOnly && (
                       <button type="button" onClick={()=>setKesintiSatirlari([...kesintiSatirlari,{id:Date.now(),personelIsim:"",tutar:"",aciklama:""}])}
-                        className="text-[10px] text-gray-600 hover:text-rose-600 border border-[#e2e5eb] hover:border-rose-500/30 px-2 py-0.5 rounded transition-colors">+ Kesinti</button>
+                        className="text-[10px] text-gray-600 hover:text-rose-400 border border-cizgi hover:border-rose-500/30 px-2 py-0.5 rounded transition-colors">+ Kesinti</button>
                     )}
                   </div>
                   <div className="p-3 space-y-2">
@@ -2020,7 +2021,7 @@ export default function RaporlarPage() {
                         <div className="grid grid-cols-12 gap-1.5">
                           <select disabled={isReadOnly} value={k.personelId || personelIdBul(k.personelIsim) || ""}
                             onChange={e=>{ const p = avansPersonelListesi.find(x=>x.id===e.target.value); setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,personelId:p?.id,personelIsim:p?.isim||""}:x)); }}
-                            className="col-span-6 bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs rounded-lg px-2 outline-none focus:border-rose-500/40 disabled:opacity-40">
+                            className="col-span-6 bg-alan border border-cizgi text-yazi h-7 text-xs rounded-lg px-2 outline-none focus:border-rose-500/40 disabled:opacity-40">
                             <option value="">Personel seç...</option>
                             {k.personelIsim && !personelIdBul(k.personelIsim) && <option value="">{k.personelIsim} (listede yok)</option>}
                             {avansPersonelListesi.map(p=>(<option key={p.id} value={p.id}>{p.isim}</option>))}
@@ -2029,25 +2030,25 @@ export default function RaporlarPage() {
                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-[10px]">₺</span>
                             <input type="text" inputMode="decimal" placeholder="0" disabled={isReadOnly} value={k.tutar}
                               onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,tutar:paraGirdisi(e.target.value)}:x))}
-                              className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-rose-500/40 disabled:opacity-40"/>
+                              className="w-full bg-alan border border-cizgi text-yazi text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-rose-500/40 disabled:opacity-40"/>
                           </div>
-                          {!isReadOnly && <button type="button" onClick={()=>setKesintiSatirlari(kesintiSatirlari.filter(x=>x.id!==k.id))} className="col-span-1 text-gray-700 hover:text-red-600 flex items-center justify-center"><Trash2 size={11}/></button>}
+                          {!isReadOnly && <button type="button" onClick={()=>setKesintiSatirlari(kesintiSatirlari.filter(x=>x.id!==k.id))} className="col-span-1 text-gray-700 hover:text-red-400 flex items-center justify-center"><Trash2 size={11}/></button>}
                         </div>
                         <input type="text" placeholder="Kesinti sebebi (örn: eksik ürün gönderimi)" disabled={isReadOnly} value={k.aciklama}
                           onChange={e=>setKesintiSatirlari(kesintiSatirlari.map(x=>x.id===k.id?{...x,aciklama:e.target.value}:x))}
-                          className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-[11px] h-6 px-2 rounded-lg outline-none focus:border-rose-500/40 disabled:opacity-40 placeholder:text-gray-700"/>
+                          className="w-full bg-alan border border-cizgi text-yazi text-[11px] h-6 px-2 rounded-lg outline-none focus:border-rose-500/40 disabled:opacity-40 placeholder:text-gray-700"/>
                       </div>
                     ))}
                     <p className="text-[9px] text-gray-600">Kaydedince ilgili personelin profilindeki Kesinti geçmişine işlenir; ay sonu maaş hesabında oradan görünür.</p>
                   </div>
                 </div>
                 {/* İadeler */}
-                <div className="rounded-xl border border-orange-500/15 bg-[#ffffff] overflow-hidden">
+                <div className="rounded-xl border border-orange-500/15 bg-kart overflow-hidden">
                   <div className="px-3 py-2 border-b border-orange-500/15 flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-orange-600 uppercase tracking-wider flex items-center gap-1.5"><RotateCcw size={11}/>5. İptal / İade</span>
+                    <span className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider flex items-center gap-1.5"><RotateCcw size={11}/>5. İptal / İade</span>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-black text-orange-600">₺{fmt(ch.tIade)}</span>
-                      {!isReadOnly && <button type="button" onClick={iadeEkle} className="text-[10px] text-gray-600 hover:text-orange-600 border border-[#e2e5eb] hover:border-orange-500/30 w-5 h-5 rounded flex items-center justify-center transition-colors">+</button>}
+                      <span className="text-xs font-black text-orange-400">₺{fmt(ch.tIade)}</span>
+                      {!isReadOnly && <button type="button" onClick={iadeEkle} className="text-[10px] text-gray-600 hover:text-orange-400 border border-cizgi hover:border-orange-500/30 w-5 h-5 rounded flex items-center justify-center transition-colors">+</button>}
                     </div>
                   </div>
                   <div className="p-3 space-y-2">
@@ -2055,41 +2056,57 @@ export default function RaporlarPage() {
                       <div key={item.id} className="space-y-1.5">
                         <input type="text" placeholder="İptal / iade fiş açıklaması..." disabled={isReadOnly} value={item.aciklama}
                           onChange={e=>iadeDegistir(item.id,"aciklama",e.target.value)}
-                          className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/40 text-[#1a1f2e] text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
+                          className="w-full bg-alan border border-cizgi hover:border-cizgi-guclu focus:border-altin/50 text-yazi text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
                         <div className="flex gap-1">
                           <div className="relative flex-1">
                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-xs">₺</span>
                             <input type="text" placeholder="0" disabled={isReadOnly} value={item.tutar}
                               onChange={e=>iadeDegistir(item.id,"tutar",e.target.value)}
-                              className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"/>
+                              className="w-full bg-alan border border-cizgi text-yazi text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-altin/50 disabled:opacity-40"/>
                           </div>
-                          {!isReadOnly && iadeler.length>1 && <button type="button" onClick={()=>iadeSil(item.id)} className="text-gray-700 hover:text-red-600 px-1"><Trash2 size={11}/></button>}
+                          {!isReadOnly && iadeler.length>1 && <button type="button" onClick={()=>iadeSil(item.id)} className="text-gray-700 hover:text-red-400 px-1"><Trash2 size={11}/></button>}
                         </div>
-                        {idx < iadeler.length-1 && <div className="border-t border-[#e2e5eb] mt-1"/>}
+                        {idx < iadeler.length-1 && <div className="border-t border-cizgi mt-1"/>}
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Kuryeler */}
-                <div className="rounded-xl border border-amber-500/15 bg-[#ffffff] overflow-hidden">
+                <div className="rounded-xl border border-amber-500/15 bg-kart overflow-hidden">
                   <div className="px-3 py-2 border-b border-amber-500/15 flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider flex items-center gap-1.5"><Truck size={11}/>6. Kurye</span>
+                    <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5"><Truck size={11}/>6. Kurye</span>
                     <div className="flex items-center gap-2">
                       {ch.kuryeFark===0
-                        ? <span className="text-[10px] text-emerald-600 flex items-center gap-1"><CheckCircle2 size={10}/>Dengede</span>
-                        : <span className="text-[10px] text-red-600 flex items-center gap-1"><AlertTriangle size={10}/>{ch.kuryeFark>0?`₺${fmt(ch.kuryeFark)} eksik`:`₺${fmt(Math.abs(ch.kuryeFark))} fazla`}</span>
+                        ? <span className="text-[10px] text-emerald-400 flex items-center gap-1"><CheckCircle2 size={10}/>Dengede</span>
+                        : <span className="text-[10px] text-red-400 flex items-center gap-1"><AlertTriangle size={10}/>{ch.kuryeFark>0?`₺${fmt(ch.kuryeFark)} eksik`:`₺${fmt(Math.abs(ch.kuryeFark))} fazla`}</span>
                       }
-                      {!isReadOnly && <button type="button" onClick={kuryeEkle} className="text-[10px] text-gray-600 hover:text-amber-600 border border-[#e2e5eb] hover:border-amber-500/30 px-2 py-0.5 rounded transition-colors">+ Havuz Kurye</button>}
+                      {!isReadOnly && <button type="button" onClick={kuryeEkle} className="text-[10px] text-gray-600 hover:text-amber-400 border border-cizgi hover:border-amber-500/30 px-2 py-0.5 rounded transition-colors">+ Havuz Kurye</button>}
                     </div>
                   </div>
                   <div className="p-3 space-y-3">
-                    <p className="text-[10px] text-gray-600">Kurye 1 ve Kurye 2&apos;de günlük en az <span className="text-amber-600 font-bold">30 paket</span> garantisi var — altında kalırsa ödemeye esas 30 alınır. Havuzda garanti ve isim yok.</p>
+                    <p className="text-[10px] text-gray-600">Kurye 1 ve Kurye 2&apos;de günlük en az <span className="text-amber-400 font-bold">30 paket</span> garantisi var — altında kalırsa ödemeye esas 30 alınır. Havuzda garanti ve isim yok.</p>
+                    {tarih >= KENDI_POS_GECIS_GUNU && (() => {
+                      const teslim = kuryeTahsilati({ tarih, kurye_raporlari: kuryeler });
+                      const rr = roadrunnerTahsilati({ tarih, kurye_raporlari: kuryeler });
+                      return (
+                        <div className="grid grid-cols-2 gap-2 text-[10px]">
+                          <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-2.5 py-1.5" title="Kurye 1 ve 2 gün sonu kasaya / POS'a teslim eder; kasa sayımında bu tutar beklenir">
+                            <div className="font-semibold text-emerald-300">Kasaya teslim (Kurye 1-2)</div>
+                            <div className="text-yazi font-bold">Nakit ₺{fmt(teslim.nakit)} · POS ₺{fmt(teslim.pos)}</div>
+                          </div>
+                          <div className="rounded-lg border border-purple-500/25 bg-purple-500/5 px-2.5 py-1.5" title="Havuz kuryelerinin topladığı para Roadrunner'da kalır, ona olan borcumuzdan düşülür. Ciroya yine eklenir, kasada beklenmez.">
+                            <div className="font-semibold text-purple-300">Roadrunner&apos;da (havuz)</div>
+                            <div className="text-yazi font-bold">₺{fmt(rr.nakit + rr.pos)} · borçtan düşer</div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     <div className="grid grid-cols-12 gap-1.5">
                       <div className="col-span-3 text-[9px] text-gray-600 uppercase tracking-wider">Kurye</div>
                       <div className="col-span-3 text-[9px] text-gray-600 uppercase tracking-wider text-center">Gerçek / Esas Paket</div>
-                      <div className="col-span-3 text-[9px] text-amber-600 uppercase tracking-wider">Nakit</div>
-                      <div className="col-span-3 text-[9px] text-blue-600 uppercase tracking-wider">Kredi/POS</div>
+                      <div className="col-span-3 text-[9px] text-amber-400 uppercase tracking-wider">Nakit</div>
+                      <div className="col-span-3 text-[9px] text-blue-400 uppercase tracking-wider">Kredi/POS</div>
                     </div>
                     {ch.kuryelerHesap.map((k)=>{
                       const sabit = k.tip==="sabit";
@@ -2098,65 +2115,65 @@ export default function RaporlarPage() {
                           <div className="grid grid-cols-12 gap-1.5 items-center">
                             <div className="col-span-3">
                               {isReadOnly ? (
-                                <div className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs rounded-lg px-2 flex items-center gap-1">
-                                  {sabit && <Truck size={9} className="text-amber-700 shrink-0"/>}{k.isim || "—"}
+                                <div className="bg-alan border border-cizgi text-yazi h-7 text-xs rounded-lg px-2 flex items-center gap-1">
+                                  {sabit && <Truck size={9} className="text-amber-300 shrink-0"/>}{k.isim || "—"}
                                 </div>
                               ) : (
                                 <div className="relative">
-                                  {sabit && <Truck size={9} className="absolute left-2 top-1/2 -translate-y-1/2 text-amber-700"/>}
+                                  {sabit && <Truck size={9} className="absolute left-2 top-1/2 -translate-y-1/2 text-amber-300"/>}
                                   <input type="text" placeholder={sabit?"Kurye adı":k.tip==="havuz"?"Havuz (isim gerekmez)":"Kurye adı"} disabled={isReadOnly} value={k.isim}
                                     onChange={e=>kuryeDegistir(k.id,"isim",e.target.value)}
-                                    className={`w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs rounded-lg ${sabit?"pl-6":"pl-2"} pr-2 outline-none focus:border-amber-500/40 disabled:opacity-40`}/>
+                                    className={`w-full bg-alan border border-cizgi text-yazi h-7 text-xs rounded-lg ${sabit?"pl-6":"pl-2"} pr-2 outline-none focus:border-amber-500/40 disabled:opacity-40`}/>
                                 </div>
                               )}
                             </div>
                             <div className="col-span-3">
                               <div className="flex items-center gap-1">
                                 {isReadOnly ? (
-                                  <div className="flex-1 bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs font-bold rounded-lg flex items-center justify-center">
+                                  <div className="flex-1 bg-alan border border-cizgi text-yazi h-7 text-xs font-bold rounded-lg flex items-center justify-center">
                                     {k.gercekPaket}
                                   </div>
                                 ) : (
                                   <input type="number" placeholder="0" disabled={isReadOnly} value={k.paketSayisi}
                                     onChange={e=>kuryeDegistir(k.id,"paketSayisi",e.target.value)}
-                                    className="flex-1 w-0 bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] h-7 text-xs font-bold px-2 rounded-lg outline-none disabled:opacity-40 text-center"/>
+                                    className="flex-1 w-0 bg-alan border border-cizgi text-yazi h-7 text-xs font-bold px-2 rounded-lg outline-none disabled:opacity-40 text-center"/>
                                 )}
                                 {k.tip!=="havuz" && (
                                   <span title="Ödemede esas alınan paket (garanti uygulandıysa)"
-                                    className={`shrink-0 w-9 h-7 flex items-center justify-center text-[10px] font-black rounded-lg border ${k.garantiUygulandi ? "border-amber-500/40 bg-amber-500/10 text-amber-700" : "border-[#e2e5eb] text-gray-600"}`}>
+                                    className={`shrink-0 w-9 h-7 flex items-center justify-center text-[10px] font-black rounded-lg border ${k.garantiUygulandi ? "border-amber-500/40 bg-amber-500/10 text-amber-300" : "border-cizgi text-gray-600"}`}>
                                     {k.uygulananPaket}
                                   </span>
                                 )}
                               </div>
                               {k.garantiUygulandi && (
-                                <p className="text-[9px] text-amber-700 mt-0.5">Garanti uygulandı (30)</p>
+                                <p className="text-[9px] text-amber-300 mt-0.5">Garanti uygulandı (30)</p>
                               )}
                             </div>
                             <div className="col-span-3">
-                              <div className={`relative rounded-lg border ${isReadOnly ? "border-amber-500/20 bg-amber-500/5" : "border-[#e2e5eb]"}`}>
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-amber-600 text-[10px] font-bold">₺</span>
+                              <div className={`relative rounded-lg border ${isReadOnly ? "border-amber-500/20 bg-amber-500/5" : "border-cizgi"}`}>
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-amber-400 text-[10px] font-bold">₺</span>
                                 {isReadOnly ? (
-                                  <div className="h-7 pl-5 pr-2 flex items-center text-xs font-bold text-amber-700">
+                                  <div className="h-7 pl-5 pr-2 flex items-center text-xs font-bold text-amber-300">
                                     {k.nakit ? fmt(Number(k.nakit)) : "0"}
                                   </div>
                                 ) : (
                                   <input type="text" placeholder="0" disabled={isReadOnly} value={k.nakit}
                                     onChange={e=>kuryeDegistir(k.id,"nakit",e.target.value)}
-                                    className="w-full bg-[#f7f8fa] text-[#1a1f2e] h-7 text-xs font-bold pl-5 pr-1 rounded-lg outline-none focus:border-amber-500/40 disabled:opacity-40"/>
+                                    className="w-full bg-alan text-yazi h-7 text-xs font-bold pl-5 pr-1 rounded-lg outline-none focus:border-amber-500/40 disabled:opacity-40"/>
                                 )}
                               </div>
                             </div>
                             <div className="col-span-3">
-                              <div className={`relative rounded-lg border ${isReadOnly ? "border-blue-500/20 bg-blue-500/5" : "border-[#e2e5eb]"}`}>
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-blue-600 text-[10px] font-bold">₺</span>
+                              <div className={`relative rounded-lg border ${isReadOnly ? "border-blue-500/20 bg-blue-500/5" : "border-cizgi"}`}>
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-blue-400 text-[10px] font-bold">₺</span>
                                 {isReadOnly ? (
-                                  <div className="h-7 pl-5 pr-2 flex items-center text-xs font-bold text-blue-700">
+                                  <div className="h-7 pl-5 pr-2 flex items-center text-xs font-bold text-blue-300">
                                     {k.pos ? fmt(Number(k.pos)) : "0"}
                                   </div>
                                 ) : (
                                   <input type="text" placeholder="0" disabled={isReadOnly} value={k.pos}
                                     onChange={e=>kuryeDegistir(k.id,"pos",e.target.value)}
-                                    className="w-full bg-[#f7f8fa] text-[#1a1f2e] h-7 text-xs font-bold pl-5 pr-1 rounded-lg outline-none focus:border-blue-500/40 disabled:opacity-40"/>
+                                    className="w-full bg-alan text-yazi h-7 text-xs font-bold pl-5 pr-1 rounded-lg outline-none focus:border-altin/50 disabled:opacity-40"/>
                                 )}
                               </div>
                             </div>
@@ -2165,56 +2182,56 @@ export default function RaporlarPage() {
                               ücretlendiriyor — haftalık mutabakat hesabı Rapor Analiz'de bunları kullanır. */}
                           {(!isReadOnly || tv(k.uzakPaket)>0 || tv(k.paket9km)>0) && (
                             <div className="flex items-center gap-1.5 mt-1.5 pl-1">
-                              <span className="text-[9px] text-orange-600 font-semibold shrink-0">Uzak (1.5x)</span>
+                              <span className="text-[9px] text-orange-400 font-semibold shrink-0">Uzak (1.5x)</span>
                               {isReadOnly ? (
-                                <span className="text-[11px] font-bold text-orange-700">{k.uzakPaket||0}</span>
+                                <span className="text-[11px] font-bold text-orange-300">{k.uzakPaket||0}</span>
                               ) : (
                                 <input type="number" placeholder="0" disabled={isReadOnly} value={k.uzakPaket||""}
                                   onChange={e=>kuryeDegistir(k.id,"uzakPaket",e.target.value)}
-                                  className="w-14 bg-[#f7f8fa] border border-orange-500/20 text-[#1a1f2e] h-6 text-[11px] font-bold px-1.5 rounded-lg outline-none focus:border-orange-500/40 disabled:opacity-40 text-center"/>
+                                  className="w-14 bg-alan border border-orange-500/20 text-yazi h-6 text-[11px] font-bold px-1.5 rounded-lg outline-none focus:border-altin/50 disabled:opacity-40 text-center"/>
                               )}
-                              <span className="text-[9px] text-red-600 font-semibold shrink-0 ml-2">9km+ (2x)</span>
+                              <span className="text-[9px] text-red-400 font-semibold shrink-0 ml-2">9km+ (2x)</span>
                               {isReadOnly ? (
-                                <span className="text-[11px] font-bold text-red-700">{k.paket9km||0}</span>
+                                <span className="text-[11px] font-bold text-red-300">{k.paket9km||0}</span>
                               ) : (
                                 <input type="number" placeholder="0" disabled={isReadOnly} value={k.paket9km||""}
                                   onChange={e=>kuryeDegistir(k.id,"paket9km",e.target.value)}
-                                  className="w-14 bg-[#f7f8fa] border border-red-500/20 text-[#1a1f2e] h-6 text-[11px] font-bold px-1.5 rounded-lg outline-none focus:border-red-500/40 disabled:opacity-40 text-center"/>
+                                  className="w-14 bg-alan border border-red-500/20 text-yazi h-6 text-[11px] font-bold px-1.5 rounded-lg outline-none focus:border-red-500/40 disabled:opacity-40 text-center"/>
                               )}
                             </div>
                           )}
                           {!isReadOnly && k.tip!=="sabit" && (
                             <button type="button" onClick={()=>kuryeSil(k.id)}
-                              className="absolute -right-5 top-1/2 -translate-y-1/2 text-gray-700 hover:text-red-600 transition-colors">
+                              className="absolute -right-5 top-1/2 -translate-y-1/2 text-gray-700 hover:text-red-400 transition-colors">
                               <Trash2 size={11}/>
                             </button>
                           )}
                         </div>
                       );
                     })}
-                    <div className="pt-1 border-t border-[#e2e5eb] flex items-center justify-between text-[10px]">
+                    <div className="pt-1 border-t border-cizgi flex items-center justify-between text-[10px]">
                       <span className="text-gray-600">Gerçek toplam: <span className="text-gray-700 font-bold">{ch.tKuryeGercekPaket} pkt</span></span>
-                      <span className="text-gray-600">Ödemeye esas toplam: <span className="text-amber-600 font-bold">{ch.tKuryePaket} pkt</span></span>
+                      <span className="text-gray-600">Ödemeye esas toplam: <span className="text-amber-400 font-bold">{ch.tKuryePaket} pkt</span></span>
                     </div>
                     {(ch.tKuryeUzakPaket>0 || ch.tKuryePaket9km>0) && (
                       <div className="flex items-center justify-between text-[10px]">
-                        <span className="text-gray-600">Uzak (1.5x): <span className="text-orange-700 font-bold">{ch.tKuryeUzakPaket} pkt</span></span>
-                        <span className="text-gray-600">9km üzeri (2x): <span className="text-red-700 font-bold">{ch.tKuryePaket9km} pkt</span></span>
+                        <span className="text-gray-600">Uzak (1.5x): <span className="text-orange-300 font-bold">{ch.tKuryeUzakPaket} pkt</span></span>
+                        <span className="text-gray-600">9km üzeri (2x): <span className="text-red-300 font-bold">{ch.tKuryePaket9km} pkt</span></span>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Notlar */}
-                <div className="rounded-xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden">
-                  <div className="px-3 py-2 border-b border-[#e2e5eb]">
+                <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
+                  <div className="px-3 py-2 border-b border-cizgi">
                     <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5"><StickyNote size={11}/>8. Notlar</span>
                   </div>
                   <div className="p-3">
                     <textarea value={notlar} disabled={isReadOnly} onChange={e=>setNotlar(e.target.value)}
                       placeholder="Özel durumlar, hatırlatmalar..."
                       rows={2}
-                      className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/40 text-[#1a1f2e] text-xs px-3 py-2 rounded-lg outline-none transition-all resize-none disabled:opacity-40 placeholder:text-gray-700"/>
+                      className="w-full bg-alan border border-cizgi hover:border-cizgi-guclu focus:border-altin/50 text-yazi text-xs px-3 py-2 rounded-lg outline-none transition-all resize-none disabled:opacity-40 placeholder:text-gray-700"/>
                   </div>
                 </div>
 
@@ -2222,9 +2239,9 @@ export default function RaporlarPage() {
             </div>
 
             {/* ── BUGÜN ÇALIŞANLAR (puantaj) ── */}
-            <div className="rounded-xl border border-[#e2e5eb] bg-white overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#e2e5eb] flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[14px] font-bold text-[#1a1f2e] flex items-center gap-1.5"><Users2 size={14} className="text-blue-600"/>Bugün Çalışanlar <span className="font-medium text-[11px] text-gray-500">puantaj · varsayılan herkes çalıştı</span></span>
+            <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
+              <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[14px] font-bold text-yazi flex items-center gap-1.5"><Users2 size={14} className="text-blue-400"/>Bugün Çalışanlar <span className="font-medium text-[11px] text-gray-500">puantaj · varsayılan herkes çalıştı</span></span>
                 <span className="text-[12px] font-semibold text-gray-700">{gunlukOzetMetni(puantajPersonelleri.map(p => puantajSatiri(p.id).durum))}</span>
               </div>
               <div className="p-3 space-y-1.5">
@@ -2232,8 +2249,8 @@ export default function RaporlarPage() {
                 {puantajPersonelleri.map(p => {
                   const x = puantajSatiri(p.id);
                   return (
-                    <div key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-1.5 border-b border-[#f0f1f4] last:border-b-0">
-                      <span className="text-[12px] font-semibold text-[#1a1f2e] w-full sm:w-40 truncate">{p.isim}</span>
+                    <div key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-1.5 border-b border-cizgi last:border-b-0">
+                      <span className="text-[12px] font-semibold text-yazi w-full sm:w-40 truncate">{p.isim}</span>
                       <div className="flex flex-wrap gap-1 flex-1">
                         {PUANTAJ_DURUMLARI.map(d => {
                           const secili = x.durum === d;
@@ -2241,7 +2258,7 @@ export default function RaporlarPage() {
                             <button key={d} type="button" disabled={isReadOnly} title={DURUM_ETIKET[d]}
                               onClick={() => puantajDegistir(p.id, { durum: d })}
                               className={`text-[11px] font-semibold min-w-[30px] h-7 px-2 rounded-md border transition-colors disabled:cursor-not-allowed ${
-                                secili ? DURUM_RENK[d] : "bg-white text-gray-500 border-[#e2e5eb] hover:border-[#c9ced8] disabled:opacity-50"}`}>
+                                secili ? DURUM_RENK[d] : "bg-kart text-gray-500 border-cizgi hover:border-cizgi-guclu disabled:opacity-50"}`}>
                               <span className="md:hidden">{DURUM_KISA[d]}</span><span className="hidden md:inline">{DURUM_ETIKET[d]}</span>
                             </button>
                           );
@@ -2251,7 +2268,7 @@ export default function RaporlarPage() {
                         Fazla mesai
                         <input type="text" inputMode="decimal" placeholder="0" disabled={isReadOnly} value={x.fazla}
                           onChange={e => puantajDegistir(p.id, { fazla: e.target.value.replace(/\./g, ",").replace(/[^0-9,]/g, "").slice(0, 5) })}
-                          className="w-14 h-7 bg-[#f7f8fa] border border-[#e2e5eb] focus:border-blue-500/40 text-[#1a1f2e] text-xs px-2 rounded-md outline-none disabled:opacity-40 text-right"/>
+                          className="w-14 h-7 bg-alan border border-cizgi focus:border-altin/50 text-yazi text-xs px-2 rounded-md outline-none disabled:opacity-40 text-right"/>
                         saat
                       </label>
                     </div>
@@ -2264,8 +2281,8 @@ export default function RaporlarPage() {
             {(() => {
               const cikis = nakitHareketleri.reduce((t, h) => t + tv(h.tutar), 0);
               const devreden = nakitDevredenSistem;
-              // 28.09'dan itibaren kuryelerin kapıda topladığı nakit de kasaya girer
-              const kuryeNakit = tarih >= KENDI_POS_GECIS_GUNU ? kuryeler.reduce((t, k) => t + tv(k.nakit), 0) : 0;
+              // 28.09'dan itibaren Kurye 1 ve 2'nin kapıda topladığı nakit kasaya girer; havuz kuryelerininki Roadrunner'da kalır
+              const kuryeNakit = kuryeTahsilati({ tarih, kurye_raporlari: kuryeler }).nakit;
               const beklenen = devreden == null ? null : devreden + tv(kasaNakit) + kuryeNakit - cikis;
               const sayim = nakitSayim.trim() ? tv(nakitSayim) : null;
               const fark = beklenen != null && sayim != null ? Math.round((sayim - beklenen) * 100) / 100 : null;
@@ -2273,10 +2290,10 @@ export default function RaporlarPage() {
               const hareketDegistir = (id: number, alan: Partial<NakitHareket>) =>
                 setNakitHareketleri(l => l.map(h => h.id === id ? { ...h, ...alan, ...(alan.tutar !== undefined ? { tutar: paraGirdisi(alan.tutar) } : {}) } : h));
               return (
-                <div className="rounded-xl border border-[#e2e5eb] bg-white overflow-hidden">
-                  <div className="px-4 py-3 border-b border-[#e2e5eb] flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[14px] font-bold text-[#1a1f2e]">7. Nakit Kasa <span className="font-medium text-[11px] text-gray-500">önceki günlerden kalan nakit · günlük ciroya girmez</span></span>
-                    {devreden != null && <span className="text-[12px] text-gray-600">Devreden (sistem): <b className="text-[#1a1f2e]">₺{fmt(devreden)}</b></span>}
+                <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
+                  <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[14px] font-bold text-yazi">7. Nakit Kasa <span className="font-medium text-[11px] text-gray-500">önceki günlerden kalan nakit · günlük ciroya girmez</span></span>
+                    {devreden != null && <span className="text-[12px] text-gray-600">Devreden (sistem): <b className="text-yazi">₺{fmt(devreden)}</b></span>}
                   </div>
                   <div className="p-3 space-y-3">
                     {!nakitHareketYuklendi && (
@@ -2289,45 +2306,45 @@ export default function RaporlarPage() {
                           <div key={h.id} className="grid grid-cols-[1fr_110px] md:grid-cols-[1fr_150px_140px_28px] gap-2 items-center">
                             <input type="text" placeholder="Kime / ne için" disabled={isReadOnly} value={h.aciklama}
                               onChange={e => hareketDegistir(h.id, { aciklama: e.target.value })}
-                              className="col-span-2 md:col-span-1 w-full bg-[#f7f8fa] border border-[#dde1e8] text-[13px] h-9 px-3 rounded-lg outline-none focus:border-blue-500/50 disabled:opacity-50"/>
+                              className="col-span-2 md:col-span-1 w-full bg-alan border border-cizgi-guclu text-[13px] h-9 px-3 rounded-lg outline-none focus:border-altin/50 disabled:opacity-50"/>
                             <select disabled={isReadOnly} value={h.banka} onChange={e => hareketDegistir(h.id, { banka: e.target.value as NakitHareket["banka"] })}
-                              className="w-full bg-[#f7f8fa] border border-[#dde1e8] text-[13px] h-9 px-2 rounded-lg outline-none disabled:opacity-50">
+                              className="w-full bg-alan border border-cizgi-guclu text-[13px] h-9 px-2 rounded-lg outline-none disabled:opacity-50">
                               <option value="">Ödeme (kasadan çıktı)</option>
                               {NAKIT_BANKALAR.map(b => <option key={b} value={b}>Bankaya yatırıldı: {b}</option>)}
                             </select>
                             <input type="text" inputMode="decimal" placeholder="₺ 0" disabled={isReadOnly} value={h.tutar}
                               onChange={e => hareketDegistir(h.id, { tutar: e.target.value })}
-                              className="w-full bg-[#f7f8fa] border border-[#dde1e8] text-[14px] font-bold text-right h-9 px-3 rounded-lg outline-none focus:border-blue-500/50 disabled:opacity-50"/>
-                            {!isReadOnly && <button type="button" onClick={() => setNakitHareketleri(l => l.filter(x => x.id !== h.id))} className="text-gray-400 hover:text-red-600 justify-self-center"><Trash2 size={14}/></button>}
+                              className="w-full bg-alan border border-cizgi-guclu text-[14px] font-bold text-right h-9 px-3 rounded-lg outline-none focus:border-altin/50 disabled:opacity-50"/>
+                            {!isReadOnly && <button type="button" onClick={() => setNakitHareketleri(l => l.filter(x => x.id !== h.id))} className="text-gray-400 hover:text-red-400 justify-self-center"><Trash2 size={14}/></button>}
                           </div>
                         ))}
                         {!isReadOnly && (
                           <button type="button" onClick={() => setNakitHareketleri(l => [...l, { id: Date.now(), aciklama: "", banka: "", tutar: "" }])}
-                            className="text-[12px] font-semibold text-blue-700 hover:underline">+ Ödeme / bankaya yatırma ekle</button>
+                            className="text-[12px] font-semibold text-blue-300 hover:underline">+ Ödeme / bankaya yatırma ekle</button>
                         )}
                       </div>
                     )}
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-3 items-end border-t border-[#e2e5eb] pt-3">
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-3 items-end border-t border-cizgi pt-3">
                       <div className="text-[13px] text-gray-600 space-y-0.5">
-                        <p>Devreden <b className="text-[#1a1f2e]">{devreden == null ? "—" : `₺${fmt(devreden)}`}</b> + bugünkü nakit satış <b className="text-[#1a1f2e]">₺{fmt(tv(kasaNakit))}</b> − çıkışlar <b className="text-red-700">₺{fmt(cikis)}</b></p>
-                        <p className="text-[14px]">= Kasada olması gereken: <b className="text-[#1a1f2e]">{beklenen == null ? "—" : `₺${fmt(beklenen)}`}</b></p>
+                        <p>Devreden <b className="text-yazi">{devreden == null ? "—" : `₺${fmt(devreden)}`}</b> + bugünkü nakit satış <b className="text-yazi">₺{fmt(tv(kasaNakit))}</b> − çıkışlar <b className="text-red-300">₺{fmt(cikis)}</b></p>
+                        <p className="text-[14px]">= Kasada olması gereken: <b className="text-yazi">{beklenen == null ? "—" : `₺${fmt(beklenen)}`}</b></p>
                         {kagitDevreden != null && devreden != null && Math.abs(kagitDevreden - devreden) >= 1 && (
-                          <p className="text-[11px] text-amber-700">Kağıttaki devreden ₺{fmt(kagitDevreden)} · sistemdeki ₺{fmt(devreden)}</p>
+                          <p className="text-[11px] text-amber-300">Kağıttaki devreden ₺{fmt(kagitDevreden)} · sistemdeki ₺{fmt(devreden)}</p>
                         )}
                       </div>
                       <label className="block">
-                        <span className="block text-[12px] font-bold text-[#1a1f2e] mb-1">Kasa sayıldıysa: toplam nakit <span className="font-medium text-gray-500">(isteğe bağlı)</span></span>
+                        <span className="block text-[12px] font-bold text-yazi mb-1">Kasa sayıldıysa: toplam nakit <span className="font-medium text-gray-500">(isteğe bağlı)</span></span>
                         <input type="text" inputMode="decimal" placeholder="₺ 0" disabled={isReadOnly} value={nakitSayim} onChange={e => setNakitSayim(paraGirdisi(e.target.value))}
-                          className="w-full border-2 border-[#1a1f2e] text-[16px] font-black text-right h-11 px-3 rounded-lg outline-none disabled:opacity-50"/>
+                          className="w-full border-2 border-altin/60 text-[16px] font-black text-right h-11 px-3 rounded-lg outline-none disabled:opacity-50"/>
                       </label>
                     </div>
                     {fark != null && (
                       oncekiSayimVar === false ? (
-                        <p className="text-[12px] text-blue-800 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">İlk sayım: nakit kasa bakiyesi bu sayıma göre başlatılacak (fark ₺{fmt(fark)} &quot;Nakit kasa açılış&quot; olarak kaydedilir, kâr/zarara girmez).</p>
+                        <p className="text-[12px] text-blue-200 bg-blue-500/10 border border-blue-500/25 rounded-lg px-3 py-2">İlk sayım: nakit kasa bakiyesi bu sayıma göre başlatılacak (fark ₺{fmt(fark)} &quot;Nakit kasa açılış&quot; olarak kaydedilir, kâr/zarara girmez).</p>
                       ) : Math.abs(fark) < 1 ? (
-                        <p className="text-[12px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">✓ Kasa tuttu.</p>
+                        <p className="text-[12px] font-semibold text-emerald-200 bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-3 py-2">✓ Kasa tuttu.</p>
                       ) : (
-                        <p className={`text-[13px] font-bold rounded-lg px-3 py-2 border ${fark < 0 ? "text-red-800 bg-red-50 border-red-200" : "text-amber-800 bg-amber-50 border-amber-200"}`}>
+                        <p className={`text-[13px] font-bold rounded-lg px-3 py-2 border ${fark < 0 ? "text-red-200 bg-red-500/10 border-red-500/25" : "text-amber-200 bg-amber-500/10 border-amber-500/25"}`}>
                           {fark < 0 ? `Kasa açığı: ₺${fmt(Math.abs(fark))}` : `Kasa fazlası: ₺${fmt(fark)}`} — kaydedilince Kasa &amp; Finans&apos;a &quot;Kasa sayım farkı&quot; olarak işlenir.
                         </p>
                       )
@@ -2339,14 +2356,14 @@ export default function RaporlarPage() {
 
             {/* ── TOPLAM UYUŞMAZLIKLARI: düzeltilmeden kayıt yapılmaz ── */}
             {!isReadOnly && uyumsuzluklar.length > 0 && (
-              <div className="rounded-xl border-2 border-red-400 bg-red-50 px-4 py-3 space-y-2">
-                <p className="text-[13px] font-black text-red-800 flex items-center gap-2"><AlertTriangle size={15}/> Toplamlar uyuşmuyor — düzeltilmeden kaydedilemez</p>
-                <ul className="text-[12px] text-red-800 list-disc pl-5 space-y-0.5">
+              <div className="rounded-xl border-2 border-red-400 bg-red-500/10 px-4 py-3 space-y-2">
+                <p className="text-[13px] font-black text-red-200 flex items-center gap-2"><AlertTriangle size={15}/> Toplamlar uyuşmuyor — düzeltilmeden kaydedilemez</p>
+                <ul className="text-[12px] text-red-200 list-disc pl-5 space-y-0.5">
                   {uyumsuzluklar.map(u => <li key={u}>{u}</li>)}
                 </ul>
-                <p className="text-[11px] text-red-700">Satış tablosundaki paket sayılarını, kurye paketlerini ya da kağıttaki toplamı kontrol edin.</p>
+                <p className="text-[11px] text-red-300">Satış tablosundaki paket sayılarını, kurye paketlerini ya da kağıttaki toplamı kontrol edin.</p>
                 {isAdmin && (
-                  <label className="flex items-center gap-2 text-[12px] font-semibold text-red-900 cursor-pointer select-none">
+                  <label className="flex items-center gap-2 text-[12px] font-semibold text-red-100 cursor-pointer select-none">
                     <input type="checkbox" checked={farkOnay} onChange={e => setFarkOnay(e.target.checked)} className="w-4 h-4 accent-red-600"/>
                     Farkı biliyorum, yine de kaydet (rapor düzenleme yetkisi)
                   </label>
@@ -2355,63 +2372,63 @@ export default function RaporlarPage() {
             )}
 
             {/* ÖZET BANT */}
-            <div className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1">
+            <div className="rounded-xl border border-cizgi bg-alan px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1">
               <div className="flex flex-wrap items-center gap-4 text-xs">
                 <div>
                   <p className="text-[9px] text-gray-600 uppercase tracking-widest">Online</p>
-                  <p className="text-sm font-black text-blue-600">₺{fmt(ch.tOnline)}</p>
+                  <p className="text-sm font-black text-blue-400">₺{fmt(ch.tOnline)}</p>
                 </div>
                 {!ch.kapidaKasada && ch.tKapida>0 && (<>
                   <span className="text-gray-800 hidden sm:block">+</span>
                   <div>
                     <p className="text-[9px] text-gray-600 uppercase tracking-widest">Kapıda</p>
-                    <p className="text-sm font-black text-purple-600">₺{fmt(ch.tKapida)}</p>
+                    <p className="text-sm font-black text-purple-400">₺{fmt(ch.tKapida)}</p>
                   </div>
                 </>)}
                 <span className="text-gray-800 hidden sm:block">+</span>
                 <div>
                   <p className="text-[9px] text-gray-600 uppercase tracking-widest">Kasa</p>
-                  <p className="text-sm font-black text-emerald-600">₺{fmt(ch.tKasa)}</p>
+                  <p className="text-sm font-black text-emerald-400">₺{fmt(ch.tKasa)}</p>
                 </div>
                 <span className="text-gray-800 hidden sm:block">+</span>
                 <div>
                   <p className="text-[9px] text-gray-600 uppercase tracking-widest">Gider</p>
-                  <p className="text-sm font-black text-red-700">₺{fmt(ch.tGider)}</p>
+                  <p className="text-sm font-black text-red-300">₺{fmt(ch.tGider)}</p>
                 </div>
                 <span className="text-gray-800 hidden sm:block">=</span>
                 <div>
-                  <p className="text-[9px] text-blue-600 uppercase tracking-widest font-bold">Brüt</p>
-                  <p className="text-sm font-black text-blue-700">₺{fmt(ch.brutCiro)}</p>
+                  <p className="text-[9px] text-blue-400 uppercase tracking-widest font-bold">Brüt</p>
+                  <p className="text-sm font-black text-blue-300">₺{fmt(ch.brutCiro)}</p>
                 </div>
                 <span className="text-gray-800 hidden sm:block">−</span>
-                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">Gider</p><p className="text-sm font-black text-red-600">₺{fmt(ch.tGider)}</p></div>
+                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">Gider</p><p className="text-sm font-black text-red-400">₺{fmt(ch.tGider)}</p></div>
                 <span className="text-gray-800 hidden sm:block">−</span>
-                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">İade</p><p className="text-sm font-black text-orange-600">₺{fmt(ch.tIade)}</p></div>
+                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">İade</p><p className="text-sm font-black text-orange-400">₺{fmt(ch.tIade)}</p></div>
                 {ch.tIndirim>0 && (<>
                   <span className="text-gray-800 hidden sm:block">−</span>
-                  <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">İndirim</p><p className="text-sm font-black text-orange-700">₺{fmt(ch.tIndirim)}</p></div>
+                  <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">İndirim</p><p className="text-sm font-black text-orange-300">₺{fmt(ch.tIndirim)}</p></div>
                 </>)}
                 <span className="text-gray-800 hidden sm:block">=</span>
-                <div><p className="text-[9px] text-emerald-700 uppercase tracking-widest font-bold">Net Ciro</p><p className="text-base font-black text-emerald-600">₺{fmt(ch.netCiro)}</p></div>
+                <div><p className="text-[9px] text-emerald-300 uppercase tracking-widest font-bold">Net Ciro</p><p className="text-base font-black text-emerald-400">₺{fmt(ch.netCiro)}</p></div>
               </div>
               <div className="flex items-center gap-2">
                 <button type="button" onClick={()=>{formuTemizle();setFormAcik(false);}}
-                  className="text-xs font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] px-4 py-2 rounded-xl transition-colors">
+                  className="text-xs font-semibold text-gray-500 hover:text-yazi border border-cizgi hover:border-cizgi-guclu px-4 py-2 rounded-xl transition-colors">
                   İptal
                 </button>
                 {!isReadOnly && taramaIleDoldu && (
-                  <label className="flex items-center gap-2 text-[12px] font-semibold text-indigo-800 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 cursor-pointer select-none">
+                  <label className="flex items-center gap-2 text-[12px] font-semibold text-indigo-200 bg-indigo-500/10 border border-indigo-500/25 rounded-xl px-3 py-2 cursor-pointer select-none">
                     <input type="checkbox" checked={kontrolOnay} onChange={e=>setKontrolOnay(e.target.checked)} className="w-4 h-4 accent-indigo-600"/>
                     Kağıt formla karşılaştırdım, değerler doğru
                   </label>
                 )}
                 {!isReadOnly && kayitEngeli && (
-                  <span className="text-[11px] font-semibold text-amber-700">{kayitEngeli}</span>
+                  <span className="text-[11px] font-semibold text-amber-300">{kayitEngeli}</span>
                 )}
                 {!isReadOnly && (
                   <button type="submit" disabled={saving||!!kayitEngeli}
                     title={kayitEngeli||undefined}
-                    className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 px-6 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-blue-900/30">
+                    className="text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 disabled:opacity-40 px-6 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-altin/20">
                     {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>}
                     {selectedRapor ? "Kaydet" : "Raporu Kaydet"}
                   </button>
@@ -2428,7 +2445,7 @@ export default function RaporlarPage() {
 
   // ── Loading ──
   if (loading) return (
-    <div className="h-screen bg-[#f4f5f7] flex flex-col items-center justify-center gap-3">
+    <div className="h-screen bg-zemin flex flex-col items-center justify-center gap-3">
       <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"/>
       <span className="text-[10px] text-gray-600 uppercase tracking-[0.3em]">KEBO ERP Yükleniyor</span>
     </div>
@@ -2436,41 +2453,39 @@ export default function RaporlarPage() {
 
   // ── MAIN RENDER ──
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased">
+    <div className="min-h-screen bg-zemin text-yazi font-sans antialiased">
 
       {/* NAV HEADER */}
-      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-cizgi bg-zemin/95 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/40">
-              <Layers className="h-4 w-4 text-white"/>
-            </div>
+            <SayfaSimgesi />
             <div>
-              <h1 className="text-sm font-black tracking-tight text-[#1a1f2e] leading-none">KEBO ERP</h1>
-              <p className="text-[10px] text-gray-600 leading-none mt-0.5">Kasa Kapanış Sistemi</p>
+              <h1 className="text-sm font-black tracking-tight text-yazi leading-none">Kasa Raporu</h1>
+              <p className="text-[10px] text-gray-600 leading-none mt-0.5">Gün sonu kapanışı</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {raporlar.length>0 && (
               <>
                 <button onClick={()=>exportCSV(raporlar,secilenAy,secilenYil)}
-                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-emerald-600 border border-[#e2e5eb] hover:border-emerald-500/30 px-3 py-2 rounded-xl transition-colors">
+                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-emerald-400 border border-cizgi hover:border-emerald-500/30 px-3 py-2 rounded-xl transition-colors">
                   <FileDown size={13}/> CSV
                 </button>
                 <button onClick={()=>exportPDF(raporlar,secilenAy,secilenYil)}
-                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-red-600 border border-[#e2e5eb] hover:border-red-500/30 px-3 py-2 rounded-xl transition-colors">
+                  className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-red-400 border border-cizgi hover:border-red-500/30 px-3 py-2 rounded-xl transition-colors">
                   <FileDown size={13}/> PDF
                 </button>
               </>
             )}
             <button onClick={veriCek}
-              className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] rounded-xl transition-colors">
+              className="p-2 text-gray-600 hover:text-yazi border border-cizgi hover:border-cizgi-guclu rounded-xl transition-colors">
               <RefreshCw size={14}/>
             </button>
             {isAdmin && (
               <button onClick={()=>{setOnayModalTab("bekleyen");setOnayModalAcik(true);}}
                 className={`relative flex items-center gap-1.5 text-[11px] font-semibold border px-3 py-2 rounded-xl transition-colors ${
-                  onayBekleyenler.length>0 ? "text-amber-700 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/15" : "text-gray-500 hover:text-[#1a1f2e] border-[#e2e5eb] hover:border-[#d8dde5]"
+                  onayBekleyenler.length>0 ? "text-amber-300 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/15" : "text-gray-500 hover:text-yazi border-cizgi hover:border-cizgi-guclu"
                 }`}>
                 <AlertTriangle size={13}/> Onay Bekleyenler
                 {onayBekleyenler.length>0 && (
@@ -2479,7 +2494,7 @@ export default function RaporlarPage() {
               </button>
             )}
             <button onClick={yeniRaporAc}
-              className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-colors shadow-lg shadow-blue-900/30">
+              className="flex items-center gap-2 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 px-4 py-2 rounded-xl transition-colors shadow-lg shadow-altin/20">
               <PlusCircle size={14}/> Yeni Rapor
             </button>
           </div>
@@ -2491,14 +2506,14 @@ export default function RaporlarPage() {
         {!formAcik && <EksikRaporBanner enSonRaporTarihi={enSonRaporTarihi} onEkle={yeniRaporAc}/>}
 
         {formAcik && (
-          <div className="kebo-anim-in rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden shadow-2xl">
-            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
+          <div className="kebo-anim-in rounded-2xl border border-cizgi bg-kart overflow-hidden shadow-2xl">
+            <div className="px-5 py-4 border-b border-cizgi flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/20 flex items-center justify-center">
-                  <TrendingUp className="h-3.5 w-3.5 text-blue-600"/>
+                  <TrendingUp className="h-3.5 w-3.5 text-blue-400"/>
                 </div>
                 <div>
-                  <h2 className="text-sm font-bold text-[#1a1f2e]">
+                  <h2 className="text-sm font-bold text-yazi">
                     {selectedRapor ? (isEditMode ? "Raporu Düzenle" : "Rapor Detayı") : "Yeni Gün Sonu Raporu"}
                   </h2>
                   <p className="text-[13px] text-gray-500 font-medium">{tarih ? fmtTarih(tarih) : "Tarih seçilmedi"}</p>
@@ -2507,12 +2522,12 @@ export default function RaporlarPage() {
               <div className="flex items-center gap-2">
                 {selectedRapor && (
                   <button onClick={()=>setPrintRapor(selectedRapor)}
-                    className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] rounded-xl transition-colors">
+                    className="p-2 text-gray-600 hover:text-yazi border border-cizgi hover:border-cizgi-guclu rounded-xl transition-colors">
                     <Printer size={14}/>
                   </button>
                 )}
                 <button onClick={()=>{formuTemizle();setFormAcik(false);}}
-                  className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] rounded-xl transition-colors">
+                  className="p-2 text-gray-600 hover:text-yazi border border-cizgi hover:border-cizgi-guclu rounded-xl transition-colors">
                   <X size={14}/>
                 </button>
               </div>
@@ -2524,10 +2539,10 @@ export default function RaporlarPage() {
         {!formAcik && <DashboardPanel raporlar={raporlar}/>}
 
         {!formAcik && (
-          <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden shadow-xl">
-            <div className="px-5 py-4 border-b border-[#e2e5eb] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="rounded-2xl border border-cizgi bg-kart overflow-hidden shadow-xl">
+            <div className="px-5 py-4 border-b border-cizgi flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-black/[0.04] border border-[#e2e5eb] flex items-center justify-center">
+                <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-cizgi flex items-center justify-center">
                   <FileText className="h-3.5 w-3.5 text-gray-400"/>
                 </div>
                 <div>
@@ -2540,20 +2555,20 @@ export default function RaporlarPage() {
               <div className="flex items-center gap-3">
                 {raporlar.length>0 && (
                   <div className="flex sm:hidden items-center gap-1">
-                    <button onClick={()=>exportCSV(raporlar,secilenAy,secilenYil)} className="text-[10px] text-gray-600 hover:text-emerald-600 border border-[#e2e5eb] px-2.5 py-1.5 rounded-lg transition-colors">CSV</button>
-                    <button onClick={()=>exportPDF(raporlar,secilenAy,secilenYil)} className="text-[10px] text-gray-600 hover:text-red-600 border border-[#e2e5eb] px-2.5 py-1.5 rounded-lg transition-colors">PDF</button>
+                    <button onClick={()=>exportCSV(raporlar,secilenAy,secilenYil)} className="text-[10px] text-gray-600 hover:text-emerald-400 border border-cizgi px-2.5 py-1.5 rounded-lg transition-colors">CSV</button>
+                    <button onClick={()=>exportPDF(raporlar,secilenAy,secilenYil)} className="text-[10px] text-gray-600 hover:text-red-400 border border-cizgi px-2.5 py-1.5 rounded-lg transition-colors">PDF</button>
                   </div>
                 )}
-                <div className="flex items-center gap-2 bg-[#f7f8fa] border border-[#e2e5eb] px-3 py-2 rounded-xl">
+                <div className="flex items-center gap-2 bg-alan border border-cizgi px-3 py-2 rounded-xl">
                   <Calendar size={12} className="text-gray-600"/>
                   <select value={secilenAy} onChange={e=>setSecilenAy(e.target.value)}
                     className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer">
-                    {AYLAR.map(m=><option key={m.value} value={m.value} className="bg-[#ffffff]">{m.label}</option>)}
+                    {AYLAR.map(m=><option key={m.value} value={m.value} className="bg-kart">{m.label}</option>)}
                   </select>
                   <span className="text-gray-700">/</span>
                   <select value={secilenYil} onChange={e=>setSecilenYil(e.target.value)}
                     className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer">
-                    {["2024","2025","2026","2027"].map(y=><option key={y} value={y} className="bg-[#ffffff]">{y}</option>)}
+                    {["2024","2025","2026","2027"].map(y=><option key={y} value={y} className="bg-kart">{y}</option>)}
                   </select>
                 </div>
               </div>
@@ -2562,15 +2577,15 @@ export default function RaporlarPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#e2e5eb] bg-[#f7f8fa]">
+                  <tr className="border-b border-cizgi bg-alan">
                     {["Tarih","Brüt Ciro","Net Ciro","Paket","Sepet Ort.","Gider+İade",""].map((h,i)=>(
                       <th key={i} className={`px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest ${
-                        h==="Net Ciro"?"text-emerald-600":h==="Paket"?"text-amber-600":h==="Sepet Ort."?"text-purple-600":h==="Gider+İade"?"text-red-600":"text-gray-600"
+                        h==="Net Ciro"?"text-emerald-400":h==="Paket"?"text-amber-400":h==="Sepet Ort."?"text-purple-400":h==="Gider+İade"?"text-red-400":"text-gray-600"
                       }`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#0f1624]">
+                <tbody className="divide-y divide-cizgi">
                   {raporlar.length===0 ? (
                     <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-600 text-xs uppercase tracking-widest">Bu dönemde rapor bulunmuyor</td></tr>
                   ) : raporlar.map((rapor)=>{
@@ -2581,16 +2596,16 @@ export default function RaporlarPage() {
                     return (
                       <tr key={rapor.id}
                         onClick={()=>{setSelectedRapor(rapor);raporuFormaYukle(rapor);setIsEditMode(false);setFormAcik(true);}}
-                        className="hover:bg-black/[0.03] cursor-pointer transition-colors group">
-                        <td className="px-4 py-3.5 font-semibold text-gray-700 group-hover:text-blue-600 transition-colors">
+                        className="hover:bg-white/[0.03] cursor-pointer transition-colors group">
+                        <td className="px-4 py-3.5 font-semibold text-gray-700 group-hover:text-blue-400 transition-colors">
                           {fmtTarih(rapor.tarih)}
                           {(rapor.gider_aciklama?.includes("|| NOT:") || rapor.gider_aciklama?.startsWith("NOT:")) && <span className="ml-1.5 text-[9px] text-blue-700/60 bg-blue-500/10 px-1.5 py-0.5 rounded-full">Not</span>}
                         </td>
-                        <td className="px-4 py-3.5 text-blue-600 font-semibold">₺{fmt(brutCiro)}</td>
-                        <td className="px-4 py-3.5 text-emerald-600 font-black">₺{fmt(net)}</td>
-                        <td className="px-4 py-3.5 text-amber-600 font-semibold">{paket}</td>
-                        <td className="px-4 py-3.5 text-purple-600 font-bold">₺{fmt(ort)}</td>
-                        <td className="px-4 py-3.5 text-red-600 font-medium">{gi>0?`-₺${fmt(gi)}`:"—"}</td>
+                        <td className="px-4 py-3.5 text-blue-400 font-semibold">₺{fmt(brutCiro)}</td>
+                        <td className="px-4 py-3.5 text-emerald-400 font-black">₺{fmt(net)}</td>
+                        <td className="px-4 py-3.5 text-amber-400 font-semibold">{paket}</td>
+                        <td className="px-4 py-3.5 text-purple-400 font-bold">₺{fmt(ort)}</td>
+                        <td className="px-4 py-3.5 text-red-400 font-medium">{gi>0?`-₺${fmt(gi)}`:"—"}</td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <span className="text-[10px] text-gray-500 flex items-center gap-1"><Eye size={10}/> İncele</span>
@@ -2606,13 +2621,13 @@ export default function RaporlarPage() {
                 </tbody>
                 {raporlar.length>0 && (
                   <tfoot>
-                    <tr className="border-t-2 border-[#e2e5eb] bg-[#f7f8fa]">
+                    <tr className="border-t-2 border-cizgi bg-alan">
                       <td className="px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold">Dönem Toplamı</td>
-                      <td className="px-4 py-3 text-blue-600 font-black">₺{fmt(tabloToplam.brut)}</td>
-                      <td className="px-4 py-3 text-emerald-600 font-black text-sm">₺{fmt(tabloToplam.net)}</td>
-                      <td className="px-4 py-3 text-amber-600 font-black">{tabloToplam.paket}</td>
-                      <td className="px-4 py-3 text-purple-600 font-black">₺{fmt(tabloToplam.paketOrt)}</td>
-                      <td className="px-4 py-3 text-red-600 font-black">-₺{fmt(tabloToplam.giderIade)}</td>
+                      <td className="px-4 py-3 text-blue-400 font-black">₺{fmt(tabloToplam.brut)}</td>
+                      <td className="px-4 py-3 text-emerald-400 font-black text-sm">₺{fmt(tabloToplam.net)}</td>
+                      <td className="px-4 py-3 text-amber-400 font-black">{tabloToplam.paket}</td>
+                      <td className="px-4 py-3 text-purple-400 font-black">₺{fmt(tabloToplam.paketOrt)}</td>
+                      <td className="px-4 py-3 text-red-400 font-black">-₺{fmt(tabloToplam.giderIade)}</td>
                       <td/>
                     </tr>
                   </tfoot>
@@ -2631,18 +2646,18 @@ export default function RaporlarPage() {
       {printRapor && <PrintModal rapor={printRapor} onClose={()=>setPrintRapor(null)}/>}
       {onayModalAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e5eb]">
-              <p className="text-sm font-black text-[#1a1f2e] flex items-center gap-2"><AlertTriangle size={15} className="text-amber-600"/> Rapor Değişiklik Talepleri</p>
-              <button onClick={()=>setOnayModalAcik(false)} className="text-gray-600 hover:text-[#1a1f2e]"><X size={16}/></button>
+          <div className="bg-kart border border-cizgi rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-cizgi">
+              <p className="text-sm font-black text-yazi flex items-center gap-2"><AlertTriangle size={15} className="text-amber-400"/> Rapor Değişiklik Talepleri</p>
+              <button onClick={()=>setOnayModalAcik(false)} className="text-gray-600 hover:text-yazi"><X size={16}/></button>
             </div>
             <div className="flex gap-2 px-5 pt-3">
               <button onClick={()=>setOnayModalTab("bekleyen")}
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${onayModalTab==="bekleyen"?"bg-amber-500/15 text-amber-700 border border-amber-500/30":"text-gray-500 hover:text-[#1a1f2e]"}`}>
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${onayModalTab==="bekleyen"?"bg-amber-500/15 text-amber-300 border border-amber-500/30":"text-gray-500 hover:text-yazi"}`}>
                 Bekleyen ({onayBekleyenler.length})
               </button>
               <button onClick={()=>setOnayModalTab("gecmis")}
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${onayModalTab==="gecmis"?"bg-blue-500/15 text-blue-700 border border-blue-500/30":"text-gray-500 hover:text-[#1a1f2e]"}`}>
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${onayModalTab==="gecmis"?"bg-blue-500/15 text-blue-300 border border-blue-500/30":"text-gray-500 hover:text-yazi"}`}>
                 Geçmiş ({onayGecmisi.length})
               </button>
             </div>
@@ -2655,7 +2670,7 @@ export default function RaporlarPage() {
                   return (
                     <div key={talep.id} className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-bold text-[#1a1f2e]">{fmtTarih(talep.rapor_tarihi)} tarihli rapor</p>
+                        <p className="text-xs font-bold text-yazi">{fmtTarih(talep.rapor_tarihi)} tarihli rapor</p>
                         <p className="text-[10px] text-gray-500">{talep.talep_eden} · {new Date(talep.talep_tarihi).toLocaleString("tr-TR")}</p>
                       </div>
                       <div className="space-y-1 mb-3">
@@ -2667,14 +2682,14 @@ export default function RaporlarPage() {
                             <span className="flex items-center gap-1.5">
                               <span className="text-gray-600 line-through">{typeof f.eskiDeger==="number"?`₺${fmt(f.eskiDeger)}`:(f.eskiDeger ? String(f.eskiDeger) : "—")}</span>
                               <span className="text-gray-600">→</span>
-                              <span className="text-emerald-600 font-semibold">{typeof f.yeniDeger==="number"?`₺${fmt(f.yeniDeger)}`:(f.yeniDeger ? String(f.yeniDeger) : "—")}</span>
+                              <span className="text-emerald-400 font-semibold">{typeof f.yeniDeger==="number"?`₺${fmt(f.yeniDeger)}`:(f.yeniDeger ? String(f.yeniDeger) : "—")}</span>
                             </span>
                           </div>
                         ))}
                       </div>
                       <div className="flex gap-2">
                         <button onClick={()=>handleTalepReddet(talep)} disabled={onayIslemId===talep.id}
-                          className="flex-1 text-xs font-bold text-red-600 border border-red-500/30 hover:bg-red-500/10 disabled:opacity-40 py-2 rounded-lg transition-colors">
+                          className="flex-1 text-xs font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 disabled:opacity-40 py-2 rounded-lg transition-colors">
                           Reddet
                         </button>
                         <button onClick={()=>handleTalepOnayla(talep)} disabled={onayIslemId===talep.id}
@@ -2691,11 +2706,11 @@ export default function RaporlarPage() {
                   <p className="text-xs text-gray-600 text-center py-8">Henüz bir geçmiş kaydı yok.</p>
                 ) : onayGecmisi.map(talep => (
                   <div key={talep.id} className={`rounded-xl border p-3 text-[11px] ${talep.durum==="onaylandi"?"border-emerald-500/20 bg-emerald-500/5":"border-red-500/20 bg-red-500/5"}`}>
-                    <p className="text-[#1a1f2e] font-semibold mb-1">{fmtTarih(talep.rapor_tarihi)} tarihli rapor</p>
+                    <p className="text-yazi font-semibold mb-1">{fmtTarih(talep.rapor_tarihi)} tarihli rapor</p>
                     <p className="text-gray-400">
                       <span className="font-semibold">{talep.talep_eden}</span> düzenleme yaptı ({new Date(talep.talep_tarihi).toLocaleString("tr-TR")})
                     </p>
-                    <p className={talep.durum==="onaylandi"?"text-emerald-600":"text-red-600"}>
+                    <p className={talep.durum==="onaylandi"?"text-emerald-400":"text-red-400"}>
                       <span className="font-semibold">{talep.onaylayan}</span> {talep.durum==="onaylandi"?"onayladı":"reddetti"} ({talep.onay_tarihi ? new Date(talep.onay_tarihi).toLocaleString("tr-TR") : "—"})
                     </p>
                     {talep.durum==="reddedildi" && talep.red_sebebi && (

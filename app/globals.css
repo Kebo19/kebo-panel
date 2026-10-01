@@ -1,72 +1,158 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   KEBO PANEL · GÖRSEL DİL
+   Koyu zemin, sıcak altın vurgu. Bütün sayfalar renkleri buradaki adlardan alır:
+     zemin   sayfa arka planı           kart    kart / panel yüzeyi
+     alan    girdi, hafif yüzey         alan-2  üzerine gelince / seçili yüzey
+     cizgi   ince kenar                 cizgi-guclu  vurgulu kenar
+     yazi    ana metin                  altin   marka vurgusu (aktif menü, ana buton)
+   Tailwind gri tonları koyu zemine göre ters çevrildi: numara büyüdükçe metin
+   açılır (gray-600 etiket, gray-800 vurgulu metin). Bu sayede eski sayfalardaki
+   text-gray-* sınıfları koyu temada da okunur kalır.
+   ───────────────────────────────────────────────────────────────────────────── */
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
-  --background: #f4f5f7;
-  --foreground: #1a1f2e;
+  --zemin: #0a0a0b;
+  --kart: #131315;
+  --alan: #1a1a1d;
+  --alan-2: #232327;
+  --cizgi: rgba(255, 255, 255, 0.075);
+  --cizgi-guclu: rgba(255, 255, 255, 0.15);
+  --yazi: #f5f2ec;
+  --altin: #d9b866;
+  --altin-acik: #ecd49a;
+  --altin-koyu: #a8853f;
 
-  --card: #ffffff;
-  --card-foreground: #1a1f2e;
-
-  --popover: #ffffff;
-  --popover-foreground: #1a1f2e;
-
-  --primary: #f97316;
-  --primary-foreground: #ffffff;
-
-  --secondary: #f1f2f5;
-  --secondary-foreground: #1a1f2e;
-
-  --muted: #f1f2f5;
-  --muted-foreground: #6b7280;
-
-  --accent: #f97316;
-  --accent-foreground: #ffffff;
-
-  --border: rgba(15,20,30,0.1);
-  --input: rgba(15,20,30,0.1);
-  --ring: #f97316;
-
+  /* shadcn bileşenleri için */
+  --background: var(--zemin);
+  --foreground: var(--yazi);
+  --card: var(--kart);
+  --card-foreground: var(--yazi);
+  --popover: var(--kart);
+  --popover-foreground: var(--yazi);
+  --primary: var(--altin);
+  --primary-foreground: #1a1408;
+  --secondary: var(--alan);
+  --secondary-foreground: var(--yazi);
+  --muted: var(--alan);
+  --muted-foreground: #8b8b93;
+  --accent: var(--altin);
+  --accent-foreground: #1a1408;
+  --border: var(--cizgi);
+  --input: var(--cizgi);
+  --ring: var(--altin);
   --radius: 1rem;
 }
 
+@theme inline {
+  --color-zemin: var(--zemin);
+  --color-kart: var(--kart);
+  --color-alan: var(--alan);
+  --color-alan-2: var(--alan-2);
+  --color-cizgi: var(--cizgi);
+  --color-cizgi-guclu: var(--cizgi-guclu);
+  --color-yazi: var(--yazi);
+  --color-altin: var(--altin);
+  --color-altin-acik: var(--altin-acik);
+  --color-altin-koyu: var(--altin-koyu);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+@theme {
+  /* Koyu zemin için ters gri ölçeği */
+  --color-gray-50: #19191c;
+  --color-gray-100: #1f1f23;
+  --color-gray-200: #2a2a2f;
+  --color-gray-300: #3a3a41;
+  --color-gray-400: #6c6c74;
+  --color-gray-500: #85858e;
+  --color-gray-600: #9d9da6;
+  --color-gray-700: #bcbcc3;
+  --color-gray-800: #dcdce0;
+  --color-gray-900: #f0f0f2;
+
+  --animate-kebo-shimmer: kebo-shimmer 2.4s linear infinite;
+}
+
 * {
-  border-color: var(--border);
+  border-color: var(--cizgi);
 }
 
 html {
-  background: #f4f5f7;
-  color-scheme: light;
+  background: var(--zemin);
 }
 
 body {
-  background: #f4f5f7;
-  color: #1a1f2e;
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(217, 184, 102, 0.07), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(217, 184, 102, 0.04), transparent 60%),
+    var(--zemin);
+  background-attachment: fixed;
+  color: var(--yazi);
   font-family: var(--font-inter), Arial, Helvetica, sans-serif;
   letter-spacing: -0.01em;
 }
 
-input {
-  color: #1a1f2e !important;
-  color-scheme: light;
+::selection {
+  background: rgba(217, 184, 102, 0.3);
+  color: #fff;
 }
 
-input::placeholder {
-  color: #9ca3af !important;
+input,
+select,
+textarea {
+  color: var(--yazi);
+  color-scheme: dark;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #5f5f67 !important;
+}
+
+select option {
+  background: var(--kart);
+  color: var(--yazi);
 }
 
 button {
   cursor: pointer;
 }
 
+@layer base {
+  :focus-visible {
+    outline: 2px solid rgba(217, 184, 102, 0.55);
+    outline-offset: 2px;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd1db;
+  background: #2c2c31;
   border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a41;
 }
 
 ::-webkit-scrollbar-track {
@@ -74,23 +160,88 @@ button {
 }
 
 .kebo-input {
-  background: #f7f8fa !important;
-  border: 1px solid rgba(15,20,30,0.08) !important;
+  background: var(--alan) !important;
+  border: 1px solid var(--cizgi) !important;
   height: 48px !important;
   border-radius: 14px !important;
-  color: #1a1f2e !important;
+  color: var(--yazi) !important;
 }
 
-/* ── Giriş animasyonu: kartlar sayfa açılışında hafifçe belirir ── */
+/* ── Ortak yüzeyler ───────────────────────────────────────────────────────── */
+
+/* Kart: hafif üst ışık + ince kenar */
+.kebo-kart {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0) 40%), var(--kart);
+  border: 1px solid var(--cizgi);
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 18px 40px -24px rgba(0, 0, 0, 0.8);
+}
+
+/* Üzerine gelince yükselen kart */
+.kebo-kart-hover {
+  transition: transform 0.25s cubic-bezier(.2, .8, .2, 1), border-color 0.25s, box-shadow 0.25s;
+}
+.kebo-kart-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(217, 184, 102, 0.28);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 24px 50px -24px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(217, 184, 102, 0.06);
+}
+
+/* Simge kutusu: bütün sayfalarda aynı ölçü ve dil */
+.kebo-simge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.9rem;
+  border: 1px solid currentColor;
+  border-color: color-mix(in oklab, currentColor 35%, transparent);
+  background: color-mix(in oklab, currentColor 12%, transparent);
+  box-shadow: 0 0 24px -6px color-mix(in oklab, currentColor 40%, transparent);
+}
+
+/* Altın ana buton */
+.kebo-btn-altin {
+  background: linear-gradient(180deg, var(--altin-acik), var(--altin) 55%, var(--altin-koyu));
+  color: #1a1408;
+  box-shadow: 0 8px 24px -10px rgba(217, 184, 102, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+/* Altın metin */
+.kebo-altin-yazi {
+  background: linear-gradient(180deg, var(--altin-acik), var(--altin) 60%, var(--altin-koyu));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Eski sayfalardaki kartlar (bg-kart + rounded) da aynı dili konuşsun */
+.bg-kart.border {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0) 45%);
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.bg-kart.border:is(.rounded-xl, .rounded-2xl):hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 40px -28px rgba(0, 0, 0, 0.9);
+}
+button:not(:disabled):active {
+  transform: scale(0.98);
+}
+tbody tr {
+  transition: background-color 0.15s;
+}
+
+/* ── Hareketler ───────────────────────────────────────────────────────────── */
+
+/* Sayfa ve kart girişi */
 @keyframes kebo-fade-up {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .kebo-anim-in {
-  animation: kebo-fade-up 0.35s ease-out both;
+  animation: kebo-fade-up 0.45s cubic-bezier(.2, .8, .2, 1) both;
 }
 
-/* ── Sayı değiştiğinde küçük bir vurgu ── */
+/* Sayı değiştiğinde küçük bir vurgu */
 @keyframes kebo-pop {
   0%   { transform: scale(1); }
   40%  { transform: scale(1.06); }
@@ -98,4 +249,47 @@ button {
 }
 .kebo-anim-pop {
   animation: kebo-pop 0.28s ease-out;
+}
+
+/* Parıltı (aktif menü, uyarılar) */
+@keyframes kebo-shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+.kebo-parilti {
+  background-image: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.12) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: kebo-shimmer 3.2s linear infinite;
+}
+
+/* Canlı nokta */
+@keyframes kebo-nabiz {
+  0%   { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55); }
+  70%  { box-shadow: 0 0 0 7px rgba(52, 211, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+.kebo-nabiz {
+  animation: kebo-nabiz 2s ease-out infinite;
+}
+
+/* Ana içerik: kart ve tablolar sırayla belirir */
+.kebo-sayfa > * {
+  animation: kebo-fade-up 0.5s cubic-bezier(.2, .8, .2, 1) both;
+}
+.kebo-sayfa > *:nth-child(2) { animation-delay: 0.04s; }
+.kebo-sayfa > *:nth-child(3) { animation-delay: 0.08s; }
+.kebo-sayfa > *:nth-child(4) { animation-delay: 0.12s; }
+.kebo-sayfa > *:nth-child(5) { animation-delay: 0.16s; }
+.kebo-sayfa > *:nth-child(n+6) { animation-delay: 0.2s; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  body { background: #fff !important; color: #000 !important; }
 }

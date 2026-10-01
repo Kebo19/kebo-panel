@@ -19,13 +19,13 @@ export interface SabitGider {
 }
 interface Odeme { kaynak_id: string; islem_tarihi: string; tutar: number }
 
-const inputCls = "w-full bg-[#f7f8fa] border border-[#e2e5eb] focus:border-blue-500/40 text-[#1a1f2e] text-[13px] h-10 px-3 rounded-xl outline-none";
+const inputCls = "w-full bg-alan border border-cizgi focus:border-altin/50 text-yazi text-[13px] h-10 px-3 rounded-xl outline-none";
 const etiketCls = "block text-[11px] font-semibold text-gray-600 mb-1";
 
 const DURUM_GORUNUM: Record<SabitGiderDurum, { yazi: string; cls: string; ikon: React.ReactNode }> = {
-  odendi: { yazi: "ÖDENDİ", cls: "bg-emerald-500/10 text-emerald-700", ikon: <CheckCircle2 size={11} /> },
-  bekliyor: { yazi: "BEKLİYOR", cls: "bg-amber-500/10 text-amber-700", ikon: <Clock size={11} /> },
-  gecikti: { yazi: "GECİKTİ", cls: "bg-red-500/10 text-red-700", ikon: <AlertTriangle size={11} /> },
+  odendi: { yazi: "ÖDENDİ", cls: "bg-emerald-500/10 text-emerald-300", ikon: <CheckCircle2 size={11} /> },
+  bekliyor: { yazi: "BEKLİYOR", cls: "bg-amber-500/10 text-amber-300", ikon: <Clock size={11} /> },
+  gecikti: { yazi: "GECİKTİ", cls: "bg-red-500/10 text-red-300", ikon: <AlertTriangle size={11} /> },
 };
 
 const bosForm = { ad: "", kategori: "Kira", tutar: "", gun: "1", hesap: "Enpara", degisken: false, notlar: "" };
@@ -140,16 +140,16 @@ export default function SabitGiderler({ onChange }: { onChange?: () => void }) {
   };
 
   return (
-    <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
-      <div className="px-5 py-4 border-b border-[#e2e5eb] flex flex-wrap items-center justify-between gap-2">
+    <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
+      <div className="px-5 py-4 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center"><CalendarClock size={14} className="text-indigo-600" /></div>
+          <div className="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center"><CalendarClock size={14} className="text-indigo-400" /></div>
           <div>
             <h3 className="text-sm font-semibold text-gray-800">Sabit giderler — {ayAdi}</h3>
             <p className="text-[11px] text-gray-500">
               {aktifler.length === 0 ? "Her ay tekrarlayan ödemeler"
                 : bekleyenToplam > 0 || gecikenSayi > 0
-                  ? <>Bekleyen ₺{fmt2(bekleyenToplam)}{gecikenSayi > 0 && <span className="text-red-600 font-semibold"> · {gecikenSayi} gecikmiş</span>}</>
+                  ? <>Bekleyen ₺{fmt2(bekleyenToplam)}{gecikenSayi > 0 && <span className="text-red-400 font-semibold"> · {gecikenSayi} gecikmiş</span>}</>
                   : "Bu ayın tüm sabit giderleri ödendi ✓"}
             </p>
           </div>
@@ -160,7 +160,7 @@ export default function SabitGiderler({ onChange }: { onChange?: () => void }) {
               <input type="checkbox" checked={pasifGoster} onChange={e => setPasifGoster(e.target.checked)} /> Pasifler
             </label>
           )}
-          <button onClick={() => formAc("yeni")} className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-2 rounded-xl">
+          <button onClick={() => formAc("yeni")} className="flex items-center gap-1.5 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 px-3 py-2 rounded-xl">
             <Plus size={13} /> Sabit gider
           </button>
         </div>
@@ -177,18 +177,18 @@ export default function SabitGiderler({ onChange }: { onChange?: () => void }) {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-[#f7f8fa] border-b border-[#e2e5eb]">
+              <tr className="bg-alan border-b border-cizgi">
                 {["Gider", "Kategori", "Tutar", "Gün", "Hesap", "Bu ay", ""].map((h, i) => (
                   <th key={i} className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-600 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#eef0f3]">
+            <tbody className="divide-y divide-cizgi">
               {satirlar.map(s => {
                 const g = DURUM_GORUNUM[s.durum];
                 return (
                   <tr key={s.id} className={s.aktif ? "" : "opacity-50"}>
-                    <td className="px-4 py-3 font-semibold text-[#1a1f2e]">
+                    <td className="px-4 py-3 font-semibold text-yazi">
                       {s.ad}
                       {s.notlar && <p className="text-[10px] font-normal text-gray-500 max-w-[200px] truncate">{s.notlar}</p>}
                     </td>
@@ -209,7 +209,7 @@ export default function SabitGiderler({ onChange }: { onChange?: () => void }) {
                         {s.aktif && s.durum !== "odendi" && (
                           <button onClick={() => odeAc(s)} className="text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg">Öde</button>
                         )}
-                        <button onClick={() => formAc(s)} title="Düzenle" className="p-1.5 text-gray-500 hover:text-[#1a1f2e]"><Pencil size={13} /></button>
+                        <button onClick={() => formAc(s)} title="Düzenle" className="p-1.5 text-gray-500 hover:text-yazi"><Pencil size={13} /></button>
                       </div>
                     </td>
                   </tr>
@@ -223,9 +223,9 @@ export default function SabitGiderler({ onChange }: { onChange?: () => void }) {
       {/* ── Ekle / düzenle ── */}
       {duzenlenen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <form onSubmit={formKaydet} className="bg-white border border-[#e2e5eb] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e5eb]">
-              <p className="text-sm font-black text-[#1a1f2e]">{duzenlenen === "yeni" ? "Sabit gider ekle" : "Sabit gideri düzenle"}</p>
+          <form onSubmit={formKaydet} className="bg-kart border border-cizgi rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-cizgi">
+              <p className="text-sm font-black text-yazi">{duzenlenen === "yeni" ? "Sabit gider ekle" : "Sabit gideri düzenle"}</p>
               <button type="button" onClick={() => setDuzenlenen(null)} className="text-gray-600"><X size={16} /></button>
             </div>
             <div className="p-5 space-y-3">
@@ -263,12 +263,12 @@ export default function SabitGiderler({ onChange }: { onChange?: () => void }) {
               <div className="flex gap-2 pt-1">
                 {duzenlenen !== "yeni" && (
                   <button type="button" onClick={() => aktiflikDegistir(duzenlenen)}
-                    className="text-xs font-semibold text-gray-600 border border-[#e2e5eb] px-3 py-2.5 rounded-xl hover:text-red-600">
+                    className="text-xs font-semibold text-gray-600 border border-cizgi px-3 py-2.5 rounded-xl hover:text-red-400">
                     {duzenlenen.aktif ? "Pasifleştir" : "Aktifleştir"}
                   </button>
                 )}
-                <button type="button" onClick={() => setDuzenlenen(null)} className="flex-1 text-xs font-semibold text-gray-500 border border-[#e2e5eb] py-2.5 rounded-xl">İptal</button>
-                <button type="submit" disabled={kaydediliyor} className="flex-1 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 py-2.5 rounded-xl flex items-center justify-center gap-2">
+                <button type="button" onClick={() => setDuzenlenen(null)} className="flex-1 text-xs font-semibold text-gray-500 border border-cizgi py-2.5 rounded-xl">İptal</button>
+                <button type="submit" disabled={kaydediliyor} className="flex-1 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 disabled:opacity-40 py-2.5 rounded-xl flex items-center justify-center gap-2">
                   {kaydediliyor && <Loader2 size={13} className="animate-spin" />} Kaydet
                 </button>
               </div>
@@ -280,10 +280,10 @@ export default function SabitGiderler({ onChange }: { onChange?: () => void }) {
       {/* ── Öde ── */}
       {odenecek && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <form onSubmit={odemeKaydet} className="bg-white border border-[#e2e5eb] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e5eb]">
+          <form onSubmit={odemeKaydet} className="bg-kart border border-cizgi rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-cizgi">
               <div>
-                <p className="text-sm font-black text-[#1a1f2e]">{odenecek.ad} — öde</p>
+                <p className="text-sm font-black text-yazi">{odenecek.ad} — öde</p>
                 <p className="text-[11px] text-gray-500">{odenecek.kategori} · kasaya gider olarak işlenir</p>
               </div>
               <button type="button" onClick={() => setOdenecek(null)} className="text-gray-600"><X size={16} /></button>
@@ -291,7 +291,7 @@ export default function SabitGiderler({ onChange }: { onChange?: () => void }) {
             <div className="p-5 space-y-3">
               <label className="block"><span className={etiketCls}>Tutar ₺ *</span>
                 <input type="text" inputMode="decimal" autoFocus={odenecek.degisken} value={oTutar} onChange={e => setOTutar(paraGirdisi(e.target.value))}
-                  placeholder={odenecek.degisken ? "Bu ayki tutarı girin" : "0"} className="w-full border-2 border-[#1a1f2e] rounded-xl h-11 px-3 text-[16px] font-black text-right outline-none" />
+                  placeholder={odenecek.degisken ? "Bu ayki tutarı girin" : "0"} className="w-full border-2 border-altin/60 rounded-xl h-11 px-3 text-[16px] font-black text-right outline-none" />
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block"><span className={etiketCls}>Hesap</span>
@@ -304,7 +304,7 @@ export default function SabitGiderler({ onChange }: { onChange?: () => void }) {
                 </label>
               </div>
               <div className="flex gap-2 pt-1">
-                <button type="button" onClick={() => setOdenecek(null)} className="flex-1 text-xs font-semibold text-gray-500 border border-[#e2e5eb] py-2.5 rounded-xl">İptal</button>
+                <button type="button" onClick={() => setOdenecek(null)} className="flex-1 text-xs font-semibold text-gray-500 border border-cizgi py-2.5 rounded-xl">İptal</button>
                 <button type="submit" disabled={kaydediliyor} className="flex-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 py-2.5 rounded-xl flex items-center justify-center gap-2">
                   {kaydediliyor && <Loader2 size={13} className="animate-spin" />} Ödendi olarak kaydet
                 </button>

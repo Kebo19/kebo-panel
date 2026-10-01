@@ -1,5 +1,6 @@
 "use client";
 
+import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { tv, paraGirdisi } from "@/lib/para";
@@ -366,7 +367,7 @@ export default function KasaPage() {
   };
 
   if (loading) return (
-    <div className="h-screen bg-[#f4f5f7] flex flex-col items-center justify-center gap-3">
+    <div className="h-screen bg-zemin flex flex-col items-center justify-center gap-3">
       <div className="w-10 h-10 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"/>
       <span className="text-[10px] text-gray-600 uppercase tracking-[0.3em]">Yükleniyor</span>
     </div>
@@ -376,39 +377,37 @@ export default function KasaPage() {
   const ayLabel = AYLAR.find(m=>m.v===secilenAy)?.l;
   const donemGiderToplam = filtreliGiderler.reduce((s,i)=>s+i.tutar,0) + donemOzeti.giderToplam;
 
-  const inputCls = "w-full bg-[#f7f8fa] border border-[#e2e5eb] focus:border-blue-500/40 text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none transition-colors placeholder:text-gray-700";
+  const inputCls = "w-full bg-alan border border-cizgi focus:border-altin/50 text-yazi text-xs h-10 px-3 rounded-xl outline-none transition-colors placeholder:text-gray-700";
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased">
+    <div className="min-h-screen bg-zemin text-yazi font-sans antialiased">
 
       {/* ── HEADER ── */}
-      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/96 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-cizgi bg-zemin/96 backdrop-blur-xl">
         <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-900/40">
-              <Wallet className="h-4 w-4 text-white"/>
-            </div>
+            <SayfaSimgesi />
             <div>
-              <h1 className="text-sm font-black text-[#1a1f2e] leading-none">Kasa & Finans</h1>
+              <h1 className="text-sm font-black text-yazi leading-none">Kasa & Finans</h1>
               <p className="text-[10px] text-gray-600 mt-0.5 leading-none">Bakiyeler · Giderler · İşlemler</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <div className="flex items-center gap-1.5 bg-[#ffffff] border border-[#e2e5eb] px-3 py-1.5 rounded-xl">
+            <div className="flex items-center gap-1.5 bg-kart border border-cizgi px-3 py-1.5 rounded-xl">
               <Calendar size={11} className="text-gray-600"/>
               <select value={secilenAy} onChange={e=>setSecilenAy(e.target.value)} className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer">
-                {AYLAR.map(m=><option key={m.v} value={m.v} className="bg-[#ffffff]">{m.l}</option>)}
+                {AYLAR.map(m=><option key={m.v} value={m.v} className="bg-kart">{m.l}</option>)}
               </select>
               <span className="text-gray-700">/</span>
               <select value={secilenYil} onChange={e=>setSecilenYil(e.target.value)} className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer">
-                {["2024","2025","2026","2027"].map(y=><option key={y} value={y} className="bg-[#ffffff]">{y}</option>)}
+                {["2024","2025","2026","2027"].map(y=><option key={y} value={y} className="bg-kart">{y}</option>)}
               </select>
             </div>
             <button onClick={()=>exportCSV(filtreliRaporlar,manuelIslemler,secilenAy,secilenYil)}
-              className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-emerald-600 border border-[#e2e5eb] hover:border-emerald-500/30 px-3 py-2 rounded-xl transition-colors">
+              className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-emerald-400 border border-cizgi hover:border-emerald-500/30 px-3 py-2 rounded-xl transition-colors">
               <FileDown size={13}/> CSV
             </button>
-            <button onClick={()=>veriCek()} className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-xl transition-colors">
+            <button onClick={()=>veriCek()} className="p-2 text-gray-600 hover:text-yazi border border-cizgi rounded-xl transition-colors">
               <RefreshCw size={14}/>
             </button>
             <button onClick={()=>setGiderFormAcik(true)}
@@ -417,7 +416,7 @@ export default function KasaPage() {
             </button>
             <EkstreYukle onKaydedildi={()=>veriCek(true)}/>
             <button onClick={()=>{ setSayimAcik(true); setSSonuc(null); }}
-              className="flex items-center gap-2 text-xs font-bold text-[#1a1f2e] bg-white border border-[#d8dde5] hover:bg-gray-50 px-3 py-2 rounded-xl transition-colors">
+              className="flex items-center gap-2 text-xs font-bold text-yazi bg-kart border border-cizgi-guclu hover:bg-gray-50 px-3 py-2 rounded-xl transition-colors">
               <Coins size={13}/> Kasa Sayımı
             </button>
             <button onClick={()=>setIslemFormAcik(true)}
@@ -437,7 +436,7 @@ export default function KasaPage() {
             const color = HESAP_COLOR[h];
             const sparkVals = h==="Nakit" ? donemOzeti.sparkData : Array(14).fill(0);
             return (
-              <div key={h} className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] p-4 hover:border-[#d8dde5] transition-colors group relative overflow-hidden">
+              <div key={h} className="rounded-2xl border border-cizgi bg-kart p-4 hover:border-cizgi-guclu transition-colors group relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-16 h-16 blur-2xl rounded-full opacity-20 group-hover:opacity-40 transition-all" style={{backgroundColor:color}}/>
                 <div className="relative">
                   <div className="flex items-center justify-between mb-3">
@@ -458,23 +457,23 @@ export default function KasaPage() {
             );
           })}
           {/* Toplam */}
-          <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/8 to-[#0c0f1a] p-4 relative overflow-hidden">
+          <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/8 to-kart p-4 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 blur-2xl rounded-full"/>
             <div className="relative">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-600">Toplam</span>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400">Toplam</span>
                 <div className="w-6 h-6 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-                  <TrendingUp size={11} className="text-emerald-600"/>
+                  <TrendingUp size={11} className="text-emerald-400"/>
                 </div>
               </div>
-              <p className="text-xl font-black text-emerald-600 tracking-tight">₺{fmt2(toplam)}</p>
+              <p className="text-xl font-black text-emerald-400 tracking-tight">₺{fmt2(toplam)}</p>
               <p className="text-[9px] text-gray-600 mt-0.5">tüm hesaplar</p>
             </div>
           </div>
         </div>
 
         {/* ── SEKME NAVİGASYONU ── */}
-        <div className="flex gap-1 bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-1">
+        <div className="flex gap-1 bg-kart border border-cizgi rounded-2xl p-1">
           {[
             {key:"genel", label:"Genel Bakış", icon:<BarChart3 size={13}/> },
             {key:"giderler", label:"Giderler", icon:<TrendingDown size={13}/>, badge: filtreliGiderler.length },
@@ -482,10 +481,10 @@ export default function KasaPage() {
           ].map(s => (
             <button key={s.key} onClick={()=>setAktifSekme(s.key as "genel"|"giderler"|"islemler")}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
-                aktifSekme===s.key ? "bg-blue-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"
+                aktifSekme===s.key ? "kebo-btn-altin text-[#1a1408] shadow-sm" : "text-gray-500 hover:text-gray-900"
               }`}>
               {s.icon} {s.label}
-              {s.badge ? <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${aktifSekme===s.key?"bg-white/20":"bg-black/[0.04]"}`}>{s.badge}</span> : null}
+              {s.badge ? <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${aktifSekme===s.key?"bg-white/20":"bg-white/[0.04]"}`}>{s.badge}</span> : null}
             </button>
           ))}
         </div>
@@ -498,43 +497,43 @@ export default function KasaPage() {
             <SabitGiderler onChange={()=>veriCek(true)}/>
             {/* Net kâr + dönem */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5 flex flex-col justify-between">
+              <div className="bg-kart border border-cizgi rounded-2xl p-5 flex flex-col justify-between">
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-4">{ayLabel} {secilenYil} Sonucu</p>
                 <div className="space-y-3">
                   {[
-                    {l:"Brüt Ciro", v:aylikSonuc.brut, c:"text-emerald-600", icon:<TrendingUp size={12}/>},
-                    {l:"Rapor gider + iade + indirim", v:-aylikSonuc.raporGider, c:"text-red-600", icon:<TrendingDown size={12}/>},
-                    {l:"Kasa & banka giderleri", v:-aylikSonuc.manuelGider, c:"text-red-600", icon:<TrendingDown size={12}/>},
+                    {l:"Brüt Ciro", v:aylikSonuc.brut, c:"text-emerald-400", icon:<TrendingUp size={12}/>},
+                    {l:"Rapor gider + iade + indirim", v:-aylikSonuc.raporGider, c:"text-red-400", icon:<TrendingDown size={12}/>},
+                    {l:"Kasa & banka giderleri", v:-aylikSonuc.manuelGider, c:"text-red-400", icon:<TrendingDown size={12}/>},
                   ].map(i=>(
                     <div key={i.l} className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-gray-500"><span className={i.c}>{i.icon}</span><span className="text-xs">{i.l}</span></div>
                       <span className={`text-sm font-black ${i.c}`}>{fmtK(i.v)}</span>
                     </div>
                   ))}
-                  <div className="border-t border-[#e2e5eb] pt-3 flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#1a1f2e]">{aylikSonuc.sonuc>=0?"Kâr":"Zarar"}</span>
-                    <span className={`text-lg font-black ${aylikSonuc.sonuc>=0?"text-blue-600":"text-red-600"}`}>{fmtK(aylikSonuc.sonuc)}</span>
+                  <div className="border-t border-cizgi pt-3 flex items-center justify-between">
+                    <span className="text-xs font-bold text-yazi">{aylikSonuc.sonuc>=0?"Kâr":"Zarar"}</span>
+                    <span className={`text-lg font-black ${aylikSonuc.sonuc>=0?"text-blue-400":"text-red-400"}`}>{fmtK(aylikSonuc.sonuc)}</span>
                   </div>
                   {aylikSonuc.digerGiris>0 && (
                     <p className="text-[10px] text-gray-500">Ayrıca ₺{fmt0(aylikSonuc.digerGiris)} sermaye/kredi girişi (satış değil, sonuca dahil edilmedi).</p>
                   )}
                   <p className="text-[10px] text-gray-500">POS + yemek kartı: ₺{fmt0(aylikSonuc.posAlacak)} — bankaya geçtiğinde &quot;İşlem → Gelir → POS / Kart Tahsilatı&quot; ile ilgili hesaba girin ya da ekstreyi yükleyin.</p>
-                  <Link href="/kar-zarar" className="inline-block text-[11px] font-bold text-blue-600 hover:text-blue-700">Ayrıntılı aylık kâr/zarar →</Link>
+                  <Link href="/kar-zarar" className="inline-block text-[11px] font-bold text-blue-400 hover:text-blue-300">Ayrıntılı aylık kâr/zarar →</Link>
                 </div>
               </div>
 
-              <div className="lg:col-span-2 bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
+              <div className="lg:col-span-2 bg-kart border border-cizgi rounded-2xl p-5">
                 <div className="flex items-center gap-2 mb-4">
-                  <BarChart3 className="h-4 w-4 text-blue-600"/>
+                  <BarChart3 className="h-4 w-4 text-blue-400"/>
                   <span className="text-sm font-semibold text-gray-800">Dönem — {ayLabel} {secilenYil}</span>
-                  <span className="text-[10px] text-gray-600 bg-black/[0.04] border border-white/10 px-2 py-0.5 rounded-full">{filtreliRaporlar.length} rapor</span>
+                  <span className="text-[10px] text-gray-600 bg-white/[0.04] border border-white/10 px-2 py-0.5 rounded-full">{filtreliRaporlar.length} rapor</span>
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
                   {[
-                    {l:"Nakit",v:donemOzeti.nakitToplam,c:"text-blue-600",bg:"bg-blue-500/5 border-blue-500/10"},
-                    {l:"POS",v:donemOzeti.posToplam,c:"text-purple-600",bg:"bg-purple-500/5 border-purple-500/10"},
-                    {l:"Yemek Kartları",v:donemOzeti.edenredToplam,c:"text-amber-600",bg:"bg-amber-500/5 border-amber-500/10"},
-                    {l:"Gider+İade",v:donemGiderToplam,c:"text-red-600",bg:"bg-red-500/5 border-red-500/10"},
+                    {l:"Nakit",v:donemOzeti.nakitToplam,c:"text-blue-400",bg:"bg-blue-500/5 border-blue-500/10"},
+                    {l:"POS",v:donemOzeti.posToplam,c:"text-purple-400",bg:"bg-purple-500/5 border-purple-500/10"},
+                    {l:"Yemek Kartları",v:donemOzeti.edenredToplam,c:"text-amber-400",bg:"bg-amber-500/5 border-amber-500/10"},
+                    {l:"Gider+İade",v:donemGiderToplam,c:"text-red-400",bg:"bg-red-500/5 border-red-500/10"},
                   ].map(c=>(
                     <div key={c.l} className={`rounded-xl border ${c.bg} px-3 py-2.5`}>
                       <p className="text-[9px] text-gray-600 uppercase tracking-widest">{c.l}</p>
@@ -554,7 +553,7 @@ export default function KasaPage() {
 
             {/* Gider dağılımı */}
             {kategoriDagilim.length > 0 && (
-              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
+              <div className="bg-kart border border-cizgi rounded-2xl p-5">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Gider Dağılımı — {ayLabel}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {kategoriDagilim.slice(0,6).map(([kat,val])=>{
@@ -563,9 +562,9 @@ export default function KasaPage() {
                       <div key={kat}>
                         <div className="flex justify-between items-center mb-1.5">
                           <span className="text-[11px] text-gray-400 truncate max-w-[160px]">{kat}</span>
-                          <span className="text-[11px] font-bold text-[#1a1f2e] ml-2">{fmtK(val)}</span>
+                          <span className="text-[11px] font-bold text-yazi ml-2">{fmtK(val)}</span>
                         </div>
-                        <div className="h-1.5 bg-[#e2e5eb] rounded-full overflow-hidden">
+                        <div className="h-1.5 bg-alan-2 rounded-full overflow-hidden">
                           <div className="h-full rounded-full bg-red-500/60" style={{width:`${(val/maxVal)*100}%`}}/>
                         </div>
                       </div>
@@ -576,21 +575,21 @@ export default function KasaPage() {
             )}
 
             {/* Günlük rapor tablosu */}
-            <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden">
-              <div className="px-5 py-4 border-b border-[#e2e5eb]">
+            <div className="rounded-2xl border border-cizgi bg-kart overflow-hidden">
+              <div className="px-5 py-4 border-b border-cizgi">
                 <h3 className="text-sm font-semibold text-gray-800">Günlük Rapor Kasa Özeti</h3>
                 <p className="text-[10px] text-gray-600 mt-0.5">{ayLabel} {secilenYil} · rapor kaynaklı veriler</p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-[#f7f8fa] border-b border-[#e2e5eb]">
+                    <tr className="bg-alan border-b border-cizgi">
                       {["Tarih","Nakit","POS","Yemek K.","Gider","İade","Net","Giren"].map((h,i)=>(
                         <th key={i} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-600">{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#0f1624]">
+                  <tbody className="divide-y divide-cizgi">
                     {filtreliRaporlar.length===0 ? (
                       <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-600 text-xs uppercase tracking-widest">Bu dönemde rapor yok</td></tr>
                     ) : filtreliRaporlar.map(r=>{
@@ -598,12 +597,12 @@ export default function KasaPage() {
                       return (
                         <tr key={r.id} className="hover:bg-white/[0.015] transition-colors">
                           <td className="px-4 py-3 font-semibold text-gray-700">{fmtTarih(r.tarih)}</td>
-                          <td className="px-4 py-3 text-blue-600 font-bold">₺{fmt2(r.kasa_nakit||0)}</td>
-                          <td className="px-4 py-3 text-purple-600 font-bold">₺{fmt2(r.kasa_pos||0)}</td>
-                          <td className="px-4 py-3 text-amber-600">₺{fmt2(yemekKartiToplam(r))}</td>
-                          <td className="px-4 py-3 text-red-600">{(r.gunluk_gider||0)>0?`-₺${fmt2(r.gunluk_gider)}`:"—"}</td>
-                          <td className="px-4 py-3 text-orange-600">{(r.iade_tutar||0)>0?`-₺${fmt2(r.iade_tutar)}`:"—"}</td>
-                          <td className={`px-4 py-3 font-black ${net>=0?"text-emerald-600":"text-red-600"}`}>₺{fmt2(net)}</td>
+                          <td className="px-4 py-3 text-blue-400 font-bold">₺{fmt2(r.kasa_nakit||0)}</td>
+                          <td className="px-4 py-3 text-purple-400 font-bold">₺{fmt2(r.kasa_pos||0)}</td>
+                          <td className="px-4 py-3 text-amber-400">₺{fmt2(yemekKartiToplam(r))}</td>
+                          <td className="px-4 py-3 text-red-400">{(r.gunluk_gider||0)>0?`-₺${fmt2(r.gunluk_gider)}`:"—"}</td>
+                          <td className="px-4 py-3 text-orange-400">{(r.iade_tutar||0)>0?`-₺${fmt2(r.iade_tutar)}`:"—"}</td>
+                          <td className={`px-4 py-3 font-black ${net>=0?"text-emerald-400":"text-red-400"}`}>₺{fmt2(net)}</td>
                           <td className="px-4 py-3 text-gray-600 text-[10px]">{r.ekleyen_kullanici}</td>
                         </tr>
                       );
@@ -611,14 +610,14 @@ export default function KasaPage() {
                   </tbody>
                   {filtreliRaporlar.length>0&&(
                     <tfoot>
-                      <tr className="border-t-2 border-[#e2e5eb] bg-[#f7f8fa] font-black">
+                      <tr className="border-t-2 border-cizgi bg-alan font-black">
                         <td className="px-4 py-3 text-[10px] text-gray-600 uppercase">Dönem Toplamı</td>
-                        <td className="px-4 py-3 text-blue-600">₺{fmt2(donemOzeti.nakitToplam)}</td>
-                        <td className="px-4 py-3 text-purple-600">₺{fmt2(donemOzeti.posToplam)}</td>
-                        <td className="px-4 py-3 text-amber-600">₺{fmt2(donemOzeti.edenredToplam)}</td>
-                        <td className="px-4 py-3 text-red-600">-₺{fmt2(donemOzeti.giderToplam)}</td>
-                        <td className="px-4 py-3 text-orange-600">-₺{fmt2(filtreliRaporlar.reduce((s,r)=>s+(r.iade_tutar||0),0))}</td>
-                        <td className="px-4 py-3 text-emerald-600">₺{fmt2(donemOzeti.nakitToplam+donemOzeti.posToplam+donemOzeti.edenredToplam-donemOzeti.giderToplam)}</td>
+                        <td className="px-4 py-3 text-blue-400">₺{fmt2(donemOzeti.nakitToplam)}</td>
+                        <td className="px-4 py-3 text-purple-400">₺{fmt2(donemOzeti.posToplam)}</td>
+                        <td className="px-4 py-3 text-amber-400">₺{fmt2(donemOzeti.edenredToplam)}</td>
+                        <td className="px-4 py-3 text-red-400">-₺{fmt2(donemOzeti.giderToplam)}</td>
+                        <td className="px-4 py-3 text-orange-400">-₺{fmt2(filtreliRaporlar.reduce((s,r)=>s+(r.iade_tutar||0),0))}</td>
+                        <td className="px-4 py-3 text-emerald-400">₺{fmt2(donemOzeti.nakitToplam+donemOzeti.posToplam+donemOzeti.edenredToplam-donemOzeti.giderToplam)}</td>
                         <td/>
                       </tr>
                     </tfoot>
@@ -635,18 +634,18 @@ export default function KasaPage() {
         {aktifSekme === "giderler" && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="bg-[#ffffff] border border-red-500/20 rounded-2xl p-4">
+              <div className="bg-kart border border-red-500/20 rounded-2xl p-4">
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Dönem Gideri</p>
-                <p className="text-xl font-black text-red-600">₺{fmt2(donemGiderToplam)}</p>
+                <p className="text-xl font-black text-red-400">₺{fmt2(donemGiderToplam)}</p>
                 <p className="text-[10px] text-gray-600 mt-1">{ayLabel} {secilenYil}</p>
               </div>
-              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
+              <div className="bg-kart border border-cizgi rounded-2xl p-4">
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Manuel Gider</p>
-                <p className="text-xl font-black text-orange-600">₺{fmt2(filtreliGiderler.reduce((s,i)=>s+i.tutar,0))}</p>
+                <p className="text-xl font-black text-orange-400">₺{fmt2(filtreliGiderler.reduce((s,i)=>s+i.tutar,0))}</p>
                 <p className="text-[10px] text-gray-600 mt-1">{filtreliGiderler.length} kayıt</p>
               </div>
               {HESAPLAR.filter(h=>hesapBaziGider[h]>0).slice(0,2).map(h=>(
-                <div key={h} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
+                <div key={h} className="bg-kart border border-cizgi rounded-2xl p-4">
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">{HESAP_LABEL[h]}&apos;dan</p>
                   <p className="text-xl font-black" style={{color:HESAP_COLOR[h]}}>₺{fmt2(hesapBaziGider[h])}</p>
                   <p className="text-[10px] text-gray-600 mt-1">ödeme çıktı</p>
@@ -656,38 +655,38 @@ export default function KasaPage() {
 
             {/* Filtreler */}
             <div className="flex flex-wrap gap-2 items-center">
-              <div className="flex items-center gap-1.5 bg-[#ffffff] border border-[#e2e5eb] rounded-xl px-3 py-1.5">
+              <div className="flex items-center gap-1.5 bg-kart border border-cizgi rounded-xl px-3 py-1.5">
                 <Tag size={11} className="text-gray-600"/>
                 <select value={katFiltre} onChange={e=>setKatFiltre(e.target.value)} className="bg-transparent text-xs text-gray-700 outline-none cursor-pointer">
-                  <option value="hepsi" className="bg-[#ffffff]">Tüm Kategoriler</option>
-                  {TUM_GIDER_KATS.map(k=><option key={k} value={k} className="bg-[#ffffff]">{k}</option>)}
+                  <option value="hepsi" className="bg-kart">Tüm Kategoriler</option>
+                  {TUM_GIDER_KATS.map(k=><option key={k} value={k} className="bg-kart">{k}</option>)}
                 </select>
               </div>
             </div>
 
             {/* Gider listesi */}
-            <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden">
+            <div className="rounded-2xl border border-cizgi bg-kart overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-[#f7f8fa] border-b border-[#e2e5eb]">
+                    <tr className="bg-alan border-b border-cizgi">
                       {["Tarih","Kategori","Hesap","Açıklama","Tutar",""].map((h,i)=>(
                         <th key={i} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-600">{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#0f1624]">
+                  <tbody className="divide-y divide-cizgi">
                     {filtreliGiderler.length===0 ? (
                       <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-600 uppercase tracking-widest">Bu dönemde gider yok</td></tr>
                     ) : filtreliGiderler.map(i=>(
                       <tr key={i.id} className="hover:bg-white/[0.015] transition-colors">
                         <td className="px-4 py-3 text-gray-400">{fmtTarih(i.islem_tarihi)}</td>
-                        <td className="px-4 py-3 text-[#1a1f2e] font-semibold">{i.kategori}{i.kaynak && <span className="ml-1.5 text-[9px] font-semibold text-blue-700 bg-blue-500/10 px-1.5 py-0.5 rounded-full">{KAYNAK_ROZET[i.kaynak] || "otomatik"}</span>}</td>
+                        <td className="px-4 py-3 text-yazi font-semibold">{i.kategori}{i.kaynak && <span className="ml-1.5 text-[9px] font-semibold text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded-full">{KAYNAK_ROZET[i.kaynak] || "otomatik"}</span>}</td>
                         <td className="px-4 py-3"><HesapBadge hesap={i.hesap}/></td>
                         <td className="px-4 py-3 text-gray-500 max-w-[200px] truncate">{i.aciklama||"—"}</td>
-                        <td className="px-4 py-3 text-red-600 font-black">-₺{fmt2(i.tutar)}</td>
+                        <td className="px-4 py-3 text-red-400 font-black">-₺{fmt2(i.tutar)}</td>
                         <td className="px-4 py-3">
-                          <button onClick={()=>setDeleteTarget(i.id)} className="text-gray-700 hover:text-red-600 transition-colors p-1">
+                          <button onClick={()=>setDeleteTarget(i.id)} className="text-gray-700 hover:text-red-400 transition-colors p-1">
                             <Trash2 size={13}/>
                           </button>
                         </td>
@@ -710,25 +709,25 @@ export default function KasaPage() {
                 <button key={t} onClick={()=>setTipFiltre(t)}
                   className={`text-xs font-bold px-4 py-2 rounded-xl transition-colors capitalize ${
                     tipFiltre===t
-                      ? t==="gelir"?"bg-emerald-600 text-white":t==="gider"?"bg-red-600 text-white":t==="transfer"?"bg-blue-600 text-white":"bg-white/10 text-white"
-                      : "bg-black/[0.04] text-gray-500 hover:text-[#1a1f2e]"
+                      ? t==="gelir"?"bg-emerald-600 text-white":t==="gider"?"bg-red-600 text-white":t==="transfer"?"kebo-btn-altin text-[#1a1408]":"bg-white/10 text-white"
+                      : "bg-white/[0.04] text-gray-500 hover:text-yazi"
                   }`}>
                   {t==="hepsi"?"Tümü":t==="gelir"?"Gelir":t==="gider"?"Gider":"Transfer"}
                 </button>
               ))}
             </div>
 
-            <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden">
+            <div className="rounded-2xl border border-cizgi bg-kart overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-[#f7f8fa] border-b border-[#e2e5eb]">
+                    <tr className="bg-alan border-b border-cizgi">
                       {["Tarih","Tip","Hesap","Kategori","Açıklama","Tutar",""].map((h,i)=>(
                         <th key={i} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-600">{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#0f1624]">
+                  <tbody className="divide-y divide-cizgi">
                     {filtreliIslemler.length===0 ? (
                       <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-600 uppercase tracking-widest">Bu dönemde işlem yok</td></tr>
                     ) : filtreliIslemler.map(i=>(
@@ -736,18 +735,18 @@ export default function KasaPage() {
                         <td className="px-4 py-3 text-gray-400">{fmtTarih(i.islem_tarihi)}</td>
                         <td className="px-4 py-3">
                           <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg ${
-                            i.tip==="gelir"?"bg-emerald-500/10 text-emerald-600":
-                            i.tip==="gider"?"bg-red-500/10 text-red-600":"bg-blue-500/10 text-blue-600"
+                            i.tip==="gelir"?"bg-emerald-500/10 text-emerald-400":
+                            i.tip==="gider"?"bg-red-500/10 text-red-400":"bg-blue-500/10 text-blue-400"
                           }`}>{i.tip==="gelir"?"Gelir":i.tip==="gider"?"Gider":"Transfer"}</span>
                         </td>
                         <td className="px-4 py-3"><HesapBadge hesap={i.hesap}/></td>
-                        <td className="px-4 py-3 text-[#1a1f2e]">{i.kategori}{i.kaynak && <span className="ml-1.5 text-[9px] font-semibold text-blue-700 bg-blue-500/10 px-1.5 py-0.5 rounded-full">{KAYNAK_ROZET[i.kaynak] || "otomatik"}</span>}</td>
+                        <td className="px-4 py-3 text-yazi">{i.kategori}{i.kaynak && <span className="ml-1.5 text-[9px] font-semibold text-blue-300 bg-blue-500/10 px-1.5 py-0.5 rounded-full">{KAYNAK_ROZET[i.kaynak] || "otomatik"}</span>}</td>
                         <td className="px-4 py-3 text-gray-500 max-w-[180px] truncate">{i.aciklama||"—"}</td>
-                        <td className={`px-4 py-3 font-black ${i.tip==="gelir"?"text-emerald-600":i.tip==="gider"?"text-red-600":"text-blue-600"}`}>
+                        <td className={`px-4 py-3 font-black ${i.tip==="gelir"?"text-emerald-400":i.tip==="gider"?"text-red-400":"text-blue-400"}`}>
                           {i.tip==="gider"?"-":""}₺{fmt2(i.tutar)}
                         </td>
                         <td className="px-4 py-3">
-                          <button onClick={()=>setDeleteTarget(i.id)} className="text-gray-700 hover:text-red-600 transition-colors p-1">
+                          <button onClick={()=>setDeleteTarget(i.id)} className="text-gray-700 hover:text-red-400 transition-colors p-1">
                             <Trash2 size={13}/>
                           </button>
                         </td>
@@ -764,11 +763,11 @@ export default function KasaPage() {
       {/* ── SİLME ONAYI ── */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-6 max-w-sm w-full">
-            <p className="text-sm font-bold text-[#1a1f2e] mb-2">İşlemi Sil</p>
+          <div className="bg-kart border border-cizgi rounded-2xl p-6 max-w-sm w-full">
+            <p className="text-sm font-bold text-yazi mb-2">İşlemi Sil</p>
             <p className="text-xs text-gray-500 mb-5">Bu işlem kalıcı olarak silinecek. Emin misiniz?</p>
             <div className="flex gap-2">
-              <button onClick={()=>setDeleteTarget(null)} className="flex-1 text-xs font-semibold text-gray-500 border border-[#e2e5eb] py-2.5 rounded-xl hover:text-[#1a1f2e] transition-colors">İptal</button>
+              <button onClick={()=>setDeleteTarget(null)} className="flex-1 text-xs font-semibold text-gray-500 border border-cizgi py-2.5 rounded-xl hover:text-yazi transition-colors">İptal</button>
               <button onClick={handleSil} className="flex-1 text-xs font-bold text-white bg-red-600 hover:bg-red-700 py-2.5 rounded-xl transition-colors">Sil</button>
             </div>
           </div>
@@ -778,34 +777,34 @@ export default function KasaPage() {
       {/* ── NAKİT KASA SAYIMI ── */}
       {sayimAcik && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white border border-[#e2e5eb] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 space-y-4">
+          <div className="bg-kart border border-cizgi rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 space-y-4">
             <div>
-              <p className="text-sm font-bold text-[#1a1f2e]">Nakit kasa sayımı</p>
+              <p className="text-sm font-bold text-yazi">Nakit kasa sayımı</p>
               <p className="text-[12px] text-gray-500 mt-0.5">Kasadaki paranın tamamını sayıp girin. Sistem olması gerekenle karşılaştırır, farkı kaydeder.</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-[12px] font-semibold text-gray-700">Sayım tarihi (gün sonu)
                 <input type="date" value={sTarih} max={bugun()} onChange={e=>{setSTarih(e.target.value); setSSonuc(null);}} style={{colorScheme:"light"}}
-                  className="mt-1 w-full border border-[#dde1e8] rounded-lg h-10 px-2 text-[14px] font-bold"/>
+                  className="mt-1 w-full border border-cizgi-guclu rounded-lg h-10 px-2 text-[14px] font-bold"/>
               </label>
               <label className="block text-[12px] font-semibold text-gray-700">Sayılan nakit ₺
                 <input type="text" inputMode="decimal" value={sTutar} onChange={e=>{setSTutar(paraGirdisi(e.target.value)); setSSonuc(null);}} placeholder="0"
-                  className="mt-1 w-full border-2 border-[#1a1f2e] rounded-lg h-10 px-2 text-[16px] font-black text-right"/>
+                  className="mt-1 w-full border-2 border-altin/60 rounded-lg h-10 px-2 text-[16px] font-black text-right"/>
               </label>
             </div>
             {sSonuc && (
-              <div className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] p-3 text-[13px] space-y-1">
+              <div className="rounded-xl border border-cizgi bg-alan p-3 text-[13px] space-y-1">
                 <p>{tarihYaz(sTarih)} gün sonunda kasada olması gereken: <b>₺{fmt2(sSonuc.beklenen)}</b></p>
                 <p>Sayılan: <b>₺{fmt2(tv(sTutar))}</b></p>
-                {Math.abs(sSonuc.fark) < 1 ? <p className="font-bold text-emerald-700">✓ Kasa tuttu, kayıt gerekmez.</p>
-                  : sSonuc.ilk ? <p className="text-blue-800">İlk sayım: bakiye bu sayıma eşitlenir (₺{fmt2(Math.abs(sSonuc.fark))} &quot;Nakit kasa açılış&quot;, kâr/zarara girmez).</p>
-                  : <p className={`font-bold ${sSonuc.fark < 0 ? "text-red-700" : "text-amber-700"}`}>{sSonuc.fark < 0 ? `Kasa açığı: ₺${fmt2(Math.abs(sSonuc.fark))}` : `Kasa fazlası: ₺${fmt2(sSonuc.fark)}`}</p>}
+                {Math.abs(sSonuc.fark) < 1 ? <p className="font-bold text-emerald-300">✓ Kasa tuttu, kayıt gerekmez.</p>
+                  : sSonuc.ilk ? <p className="text-blue-200">İlk sayım: bakiye bu sayıma eşitlenir (₺{fmt2(Math.abs(sSonuc.fark))} &quot;Nakit kasa açılış&quot;, kâr/zarara girmez).</p>
+                  : <p className={`font-bold ${sSonuc.fark < 0 ? "text-red-300" : "text-amber-300"}`}>{sSonuc.fark < 0 ? `Kasa açığı: ₺${fmt2(Math.abs(sSonuc.fark))}` : `Kasa fazlası: ₺${fmt2(sSonuc.fark)}`}</p>}
               </div>
             )}
             <div className="flex gap-2">
-              <button onClick={()=>{setSayimAcik(false); setSSonuc(null);}} className="flex-1 text-xs font-semibold text-gray-500 border border-[#e2e5eb] py-2.5 rounded-xl">Vazgeç</button>
+              <button onClick={()=>{setSayimAcik(false); setSSonuc(null);}} className="flex-1 text-xs font-semibold text-gray-500 border border-cizgi py-2.5 rounded-xl">Vazgeç</button>
               {!sSonuc
-                ? <button onClick={sayimHesapla} disabled={saving} className="flex-1 text-xs font-bold text-white bg-[#1a1f2e] py-2.5 rounded-xl disabled:opacity-50">Hesapla</button>
+                ? <button onClick={sayimHesapla} disabled={saving} className="flex-1 text-xs font-bold text-[#1a1408] kebo-btn-altin py-2.5 rounded-xl disabled:opacity-50">Hesapla</button>
                 : <button onClick={sayimKaydet} disabled={saving} className="flex-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 py-2.5 rounded-xl disabled:opacity-50">{Math.abs(sSonuc.fark) < 1 ? "Tamam" : "Farkı kaydet"}</button>}
             </div>
           </div>
@@ -815,10 +814,10 @@ export default function KasaPage() {
       {/* ── GİDER FORMU ── */}
       {giderFormAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e5eb]">
-              <p className="text-sm font-black text-[#1a1f2e]">Gider Ekle</p>
-              <button onClick={()=>setGiderFormAcik(false)} className="text-gray-600 hover:text-[#1a1f2e]"><X size={16}/></button>
+          <div className="bg-kart border border-cizgi rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-cizgi">
+              <p className="text-sm font-black text-yazi">Gider Ekle</p>
+              <button onClick={()=>setGiderFormAcik(false)} className="text-gray-600 hover:text-yazi"><X size={16}/></button>
             </div>
             <form onSubmit={handleGiderEkle} className="p-5 space-y-3">
               <div>
@@ -826,7 +825,7 @@ export default function KasaPage() {
                 <select value={gKategori} onChange={e=>setGKategori(e.target.value)} className={inputCls}>
                   {GIDER_KATEGORILERI.map(g=>(
                     <optgroup key={g.grup} label={g.grup}>
-                      {g.items.map(it=><option key={it} value={it} className="bg-[#ffffff]">{it}</option>)}
+                      {g.items.map(it=><option key={it} value={it} className="bg-kart">{it}</option>)}
                     </optgroup>
                   ))}
                 </select>
@@ -835,7 +834,7 @@ export default function KasaPage() {
                 <div>
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">Hesap</p>
                   <select value={gHesap} onChange={e=>setGHesap(e.target.value)} className={inputCls}>
-                    {HESAPLAR.map(h=><option key={h} value={h} className="bg-[#ffffff]">{HESAP_LABEL[h]}</option>)}
+                    {HESAPLAR.map(h=><option key={h} value={h} className="bg-kart">{HESAP_LABEL[h]}</option>)}
                   </select>
                 </div>
                 <div>
@@ -856,7 +855,7 @@ export default function KasaPage() {
                 <input value={gPersonel} onChange={e=>setGPersonel(e.target.value)} placeholder="Opsiyonel..." className={inputCls}/>
               </div>
               <div className="flex gap-2 pt-1">
-                <button type="button" onClick={()=>setGiderFormAcik(false)} className="flex-1 text-xs font-semibold text-gray-500 border border-[#e2e5eb] py-2.5 rounded-xl hover:text-[#1a1f2e] transition-colors">İptal</button>
+                <button type="button" onClick={()=>setGiderFormAcik(false)} className="flex-1 text-xs font-semibold text-gray-500 border border-cizgi py-2.5 rounded-xl hover:text-yazi transition-colors">İptal</button>
                 <button type="submit" disabled={saving} className="flex-1 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
                   {saving?<Loader2 size={13} className="animate-spin"/>:null} Kaydet
                 </button>
@@ -869,10 +868,10 @@ export default function KasaPage() {
       {/* ── GELİR/TRANSFER FORMU ── */}
       {islemFormAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e5eb]">
-              <p className="text-sm font-black text-[#1a1f2e]">İşlem Ekle</p>
-              <button onClick={()=>setIslemFormAcik(false)} className="text-gray-600 hover:text-[#1a1f2e]"><X size={16}/></button>
+          <div className="bg-kart border border-cizgi rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-cizgi">
+              <p className="text-sm font-black text-yazi">İşlem Ekle</p>
+              <button onClick={()=>setIslemFormAcik(false)} className="text-gray-600 hover:text-yazi"><X size={16}/></button>
             </div>
             <div className="p-5 space-y-3">
               <div className="flex gap-2">
@@ -880,8 +879,8 @@ export default function KasaPage() {
                   <button key={t} onClick={()=>setIslemTipi(t)}
                     className={`flex-1 text-xs font-bold py-2.5 rounded-xl transition-colors capitalize ${
                       islemTipi===t
-                        ? t==="gelir"?"bg-emerald-600 text-white":"bg-blue-600 text-white"
-                        : "bg-black/[0.04] text-gray-500 hover:text-[#1a1f2e]"
+                        ? t==="gelir"?"bg-emerald-600 text-white":"kebo-btn-altin text-[#1a1408]"
+                        : "bg-white/[0.04] text-gray-500 hover:text-yazi"
                     }`}>
                     {t==="gelir"?"Gelir":"Transfer"}
                   </button>
@@ -890,14 +889,14 @@ export default function KasaPage() {
               <div>
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">Kaynak Hesap</p>
                 <select value={iHesap} onChange={e=>setIHesap(e.target.value)} className={inputCls}>
-                  {HESAPLAR.map(h=><option key={h} value={h} className="bg-[#ffffff]">{HESAP_LABEL[h]}</option>)}
+                  {HESAPLAR.map(h=><option key={h} value={h} className="bg-kart">{HESAP_LABEL[h]}</option>)}
                 </select>
               </div>
               {islemTipi==="transfer" && (
                 <div>
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">Hedef Hesap</p>
                   <select value={iHedef} onChange={e=>setIHedef(e.target.value)} className={inputCls}>
-                    {HESAPLAR.filter(h=>h!==iHesap).map(h=><option key={h} value={h} className="bg-[#ffffff]">{HESAP_LABEL[h]}</option>)}
+                    {HESAPLAR.filter(h=>h!==iHesap).map(h=><option key={h} value={h} className="bg-kart">{HESAP_LABEL[h]}</option>)}
                   </select>
                 </div>
               )}
@@ -905,7 +904,7 @@ export default function KasaPage() {
                 <div>
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">Kategori</p>
                   <select value={iKategori} onChange={e=>setIKategori(e.target.value)} className={inputCls}>
-                    {GELIR_KATEGORILERI.map(k=><option key={k} value={k} className="bg-[#ffffff]">{k}</option>)}
+                    {GELIR_KATEGORILERI.map(k=><option key={k} value={k} className="bg-kart">{k}</option>)}
                   </select>
                 </div>
               )}
@@ -924,7 +923,7 @@ export default function KasaPage() {
                 <input value={iAciklama} onChange={e=>setIAciklama(e.target.value)} placeholder="Opsiyonel..." className={inputCls}/>
               </div>
               <div className="flex gap-2 pt-1">
-                <button onClick={()=>setIslemFormAcik(false)} className="flex-1 text-xs font-semibold text-gray-500 border border-[#e2e5eb] py-2.5 rounded-xl hover:text-[#1a1f2e] transition-colors">İptal</button>
+                <button onClick={()=>setIslemFormAcik(false)} className="flex-1 text-xs font-semibold text-gray-500 border border-cizgi py-2.5 rounded-xl hover:text-yazi transition-colors">İptal</button>
                 <button onClick={handleIslemEkle as any} disabled={saving} className="flex-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
                   {saving?<Loader2 size={13} className="animate-spin"/>:null} Kaydet
                 </button>

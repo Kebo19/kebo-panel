@@ -1,5 +1,7 @@
 "use client";
 
+import { motion } from "framer-motion";
+import KeboLogo from "@/components/kabuk/KeboLogo";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -50,12 +52,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center p-4 font-sans antialiased">
+    <div className="min-h-screen bg-zemin flex items-center justify-center p-4 font-sans antialiased">
 
       {/* Arka plan efekti */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-blue-600/8 blur-[100px] rounded-full" />
-        <div className="absolute bottom-0 left-1/4 w-[400px] h-[200px] bg-indigo-600/6 blur-[80px] rounded-full" />
+        <motion.div className="absolute top-[18%] left-1/2 -translate-x-1/2 w-[640px] h-[360px] bg-altin/10 blur-[120px] rounded-full"
+          animate={{ opacity: [0.6, 1, 0.6], scale: [1, 1.08, 1] }} transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }} />
+        <div className="absolute bottom-0 left-1/4 w-[400px] h-[200px] bg-[#b5562f]/10 blur-[90px] rounded-full" />
         {/* Grid */}
         <div className="absolute inset-0"
           style={{
@@ -67,33 +70,26 @@ export default function LoginPage() {
       <div className="relative w-full max-w-sm">
 
         {/* Logo & Başlık */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 shadow-2xl shadow-blue-900/50 mb-5">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 2h18l-2 7H5L3 2z"/>
-              <path d="M5 9v13h14V9"/>
-              <path d="M9 13h6"/>
-              <path d="M9 17h6"/>
-            </svg>
-          </div>
-          <h1 className="text-2xl font-black text-[#1a1f2e] tracking-tight">
-            KEBO<span className="text-blue-700">.</span>ERP
-          </h1>
-          <p className="text-gray-500 text-sm mt-1.5">Yönetim Paneline Giriş</p>
-        </div>
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}
+          className="text-center mb-8">
+          <KeboLogo boyut="buyuk" className="justify-center mb-7" />
+          <h1 className="text-[22px] font-bold text-yazi tracking-tight">Yönetim paneline giriş</h1>
+          <p className="text-gray-600 text-sm mt-1.5">Devam etmek için hesabınızla oturum açın.</p>
+        </motion.div>
 
         {/* Kart */}
-        <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl shadow-2xl overflow-hidden">
+        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}
+          className="kebo-kart !rounded-[24px] overflow-hidden">
 
           {/* Üst şerit */}
-          <div className="h-0.5 bg-gradient-to-r from-transparent via-blue-500/60 to-transparent" />
+          <div className="h-px bg-gradient-to-r from-transparent via-altin/60 to-transparent" />
 
           <div className="p-7">
             <form onSubmit={handleLogin} className="space-y-4">
 
               {/* E-posta */}
               <div>
-                <label className="block text-[11px] text-gray-500 uppercase tracking-widest font-medium mb-2">
+                <label className="block text-[12px] text-gray-700 font-medium mb-2">
                   E-posta
                 </label>
                 <div className="relative">
@@ -105,14 +101,14 @@ export default function LoginPage() {
                     onChange={e => setEmail(e.target.value)}
                     required
                     autoComplete="email"
-                    className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20 text-[#1a1f2e] text-sm h-11 pl-10 pr-4 rounded-xl outline-none transition-all placeholder:text-gray-700"
+                    className="w-full bg-alan border border-cizgi hover:border-cizgi-guclu focus:border-altin/50 focus:ring-1 focus:ring-altin/40 text-yazi text-sm h-11 pl-10 pr-4 rounded-xl outline-none transition-all placeholder:text-gray-400"
                   />
                 </div>
               </div>
 
               {/* Şifre */}
               <div>
-                <label className="block text-[11px] text-gray-500 uppercase tracking-widest font-medium mb-2">
+                <label className="block text-[12px] text-gray-700 font-medium mb-2">
                   Şifre
                 </label>
                 <div className="relative">
@@ -124,7 +120,7 @@ export default function LoginPage() {
                     onChange={e => setPassword(e.target.value)}
                     required
                     autoComplete="current-password"
-                    className="w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/20 text-[#1a1f2e] text-sm h-11 pl-10 pr-11 rounded-xl outline-none transition-all placeholder:text-gray-700"
+                    className="w-full bg-alan border border-cizgi hover:border-cizgi-guclu focus:border-altin/50 focus:ring-1 focus:ring-altin/40 text-yazi text-sm h-11 pl-10 pr-11 rounded-xl outline-none transition-all placeholder:text-gray-400"
                   />
                   <button
                     type="button"
@@ -142,7 +138,7 @@ export default function LoginPage() {
 
               {/* Hata mesajı */}
               {error && (
-                <div className="flex items-center gap-2.5 bg-red-500/8 border border-red-500/20 text-red-600 text-xs px-4 py-3 rounded-xl">
+                <div className="flex items-center gap-2.5 bg-red-500/8 border border-red-500/20 text-red-400 text-xs px-4 py-3 rounded-xl">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{error}</span>
                 </div>
@@ -152,7 +148,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading || !email || !password}
-                className="w-full h-11 mt-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2"
+                className="w-full h-11 mt-2 kebo-btn-altin hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-[#1a1408] text-sm font-bold rounded-xl transition-all shadow-lg shadow-altin/20 flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
@@ -166,10 +162,10 @@ export default function LoginPage() {
 
             </form>
           </div>
-        </div>
+        </motion.div>
 
         {/* Alt not */}
-        <p className="text-center text-[11px] text-gray-700 mt-6">
+        <p className="text-center text-[11px] text-gray-500 mt-6">
           Erişim sorununuz varsa yöneticinizle iletişime geçin.
         </p>
 

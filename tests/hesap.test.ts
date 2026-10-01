@@ -98,11 +98,22 @@ describe("Migros ve Alo indirimi", () => {
   });
 });
 
-import { kuryeTahsilati } from "@/lib/hesap";
+import { kuryeTahsilati, roadrunnerTahsilati } from "@/lib/hesap";
 describe("kurye kapıda tahsilatı", () => {
-  it("28.09 ve sonrası kasaya/POS'a girer, Türkçe sayı biçimi okunur", () => {
-    const k = [{ nakit: "1.250", pos: "300,50" }, { nakit: 200, pos: "" }] as never;
+  const k = [
+    { tip: "sabit", nakit: "1.250", pos: "300,50" },
+    { tip: "sabit", nakit: 200, pos: "" },
+    { tip: "havuz", nakit: "400", pos: "150" },
+  ] as never;
+  it("28.09 ve sonrası Kurye 1-2 kasaya/POS'a teslim eder, havuz Roadrunner'da kalır", () => {
     expect(kuryeTahsilati({ tarih: "2026-10-01", kurye_raporlari: k })).toEqual({ nakit: 1450, pos: 300.5 });
+    expect(roadrunnerTahsilati({ tarih: "2026-10-01", kurye_raporlari: k })).toEqual({ nakit: 400, pos: 150 });
+  });
+  it("13.08–27.09 arası bütün tahsilat Roadrunner'da", () => {
     expect(kuryeTahsilati({ tarih: "2026-09-01", kurye_raporlari: k })).toEqual({ nakit: 0, pos: 0 });
+    expect(roadrunnerTahsilati({ tarih: "2026-09-01", kurye_raporlari: k })).toEqual({ nakit: 1850, pos: 450.5 });
+  });
+  it("13.08 öncesi kendi kuryeler: Roadrunner yok", () => {
+    expect(roadrunnerTahsilati({ tarih: "2026-08-01", kurye_raporlari: [{ tip: "kendi", nakit: 100 }] as never })).toEqual({ nakit: 0, pos: 0 });
   });
 });

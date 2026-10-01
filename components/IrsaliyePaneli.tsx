@@ -46,7 +46,7 @@ function CariSecici({ cariler, deger, onSec }: { cariler: CariKisa[]; deger: str
 }
 interface FormSatiri { anahtar: number; urun_id: string; urun_adi_ham: string; miktar: string; birim: string; fiyat: string; }
 
-const inputCls = "w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none";
+const inputCls = "w-full bg-alan border border-cizgi text-yazi text-xs h-9 px-3 rounded-xl outline-none";
 const fmt = (v: number, d = 1) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: d }).format(v || 0);
 let sayac = 0;
 const bosSatir = (): FormSatiri => ({ anahtar: ++sayac, urun_id: "", urun_adi_ham: "", miktar: "", birim: "", fiyat: "" });
@@ -277,10 +277,10 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
   const para = (v: number) => new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
 
   return (
-    <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] p-4">
+    <div className="rounded-2xl border border-cizgi bg-kart p-4">
       <div className="flex items-center justify-between mb-3 gap-2">
         <h2 className="text-xs font-black text-gray-700 uppercase tracking-widest flex items-center gap-2">
-          <Truck size={13} className="text-amber-600"/> Yoldaki Mal (irsaliye girilmiş)
+          <Truck size={13} className="text-amber-400"/> Yoldaki Mal (irsaliye girilmiş)
         </h2>
         <button onClick={formuAc} className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-xl">
           <FileText size={12}/> İrsaliye Ekle
@@ -293,12 +293,12 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
           {belgeler.map(b => {
             const gecikti = b.ilk.beklenen_tarih && b.ilk.beklenen_tarih < bugun();
             return (
-              <div key={b.id} className={`rounded-xl border p-3 ${gecikti ? "border-red-500/25 bg-red-500/5" : "border-[#e2e5eb] bg-[#f7f8fa]"}`}>
+              <div key={b.id} className={`rounded-xl border p-3 ${gecikti ? "border-red-500/25 bg-red-500/5" : "border-cizgi bg-alan"}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-xs">
-                    <span className="font-bold text-[#1a1f2e]">{b.ilk.tedarikci || "Tedarikçi belirtilmedi"}</span>
+                    <span className="font-bold text-yazi">{b.ilk.tedarikci || "Tedarikçi belirtilmedi"}</span>
                     {b.ilk.fatura_no && <span className="text-gray-500"> · No {b.ilk.fatura_no}</span>}
-                    <span className={`ml-2 text-[11px] ${gecikti ? "text-red-600 font-semibold" : "text-gray-500"}`}>
+                    <span className={`ml-2 text-[11px] ${gecikti ? "text-red-400 font-semibold" : "text-gray-500"}`}>
                       {b.ilk.beklenen_tarih ? `Beklenen: ${fmtTarih(b.ilk.beklenen_tarih)}${gecikti ? " (gecikti)" : ""}` : "Tarih yok"}
                     </span>
                   </div>
@@ -306,7 +306,7 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
                     <button onClick={() => teslimAc(b.id)} className="flex items-center gap-1 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg">
                       <PackageCheck size={12}/> Teslim Al
                     </button>
-                    <button onClick={() => iptal(b.id)} title="İptal" className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={13}/></button>
+                    <button onClick={() => iptal(b.id)} title="İptal" className="p-1.5 text-gray-400 hover:text-red-400"><Trash2 size={13}/></button>
                   </div>
                 </div>
                 <p className="text-[11px] text-gray-600 mt-1.5">
@@ -321,23 +321,23 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
       {/* ── İRSALİYE EKLE ── */}
       {formAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#ffffff] border border-amber-500/20 rounded-2xl w-full max-w-3xl shadow-2xl max-h-[90vh] flex flex-col">
-            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[#1a1f2e] flex items-center gap-2"><FileText size={14} className="text-amber-600"/> İrsaliye / Gelecek Mal</h3>
+          <div className="bg-kart border border-amber-500/20 rounded-2xl w-full max-w-3xl shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="px-5 py-4 border-b border-cizgi flex items-center justify-between">
+              <h3 className="text-sm font-bold text-yazi flex items-center gap-2"><FileText size={14} className="text-amber-400"/> İrsaliye / Gelecek Mal</h3>
               <button onClick={() => setFormAcik(false)} className="p-1 text-gray-600"><X size={16}/></button>
             </div>
             <div className="p-5 space-y-3 overflow-y-auto">
               <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <p className="text-xs text-indigo-800">İrsaliyenin fotoğrafını ya da PDF&apos;ini yükle; kalemleri okuyup ürünlerinle eşleştireyim. Sonra kontrol edip kaydet.</p>
+                <p className="text-xs text-indigo-200">İrsaliyenin fotoğrafını ya da PDF&apos;ini yükle; kalemleri okuyup ürünlerinle eşleştireyim. Sonra kontrol edip kaydet.</p>
                 <input ref={dosyaRef} type="file" accept="image/*,application/pdf" className="hidden"
                   onChange={e => { const f = e.target.files?.[0]; if (f) tara(f); }}/>
                 <button type="button" disabled={taraniyor} onClick={() => dosyaRef.current?.click()}
-                  className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 px-3.5 py-2 rounded-xl">
+                  className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 disabled:opacity-40 px-3.5 py-2 rounded-xl">
                   {taraniyor ? <><Loader2 size={13} className="animate-spin"/> Okunuyor...</> : <><Camera size={13}/> Tara</>}
                 </button>
               </div>
               {taramaMesaj && (
-                <div className={`rounded-xl border px-3 py-2 text-xs flex items-center gap-2 ${taramaMesaj.tip === "hata" ? "border-red-500/30 bg-red-500/5 text-red-700" : "border-amber-500/30 bg-amber-500/5 text-amber-800"}`}>
+                <div className={`rounded-xl border px-3 py-2 text-xs flex items-center gap-2 ${taramaMesaj.tip === "hata" ? "border-red-500/30 bg-red-500/5 text-red-300" : "border-amber-500/30 bg-amber-500/5 text-amber-200"}`}>
                   <AlertTriangle size={13} className="shrink-0"/> {taramaMesaj.metin}
                 </div>
               )}
@@ -374,15 +374,15 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
                       <div className="col-span-5 sm:col-span-3">
                         <input type="text" inputMode="decimal" value={s.fiyat} placeholder={u?.son_fiyat ? `son: ${fmt(u.son_fiyat, 2)}` : ""} onChange={e => satirDegistir(s.anahtar, { fiyat: e.target.value })} className={inputCls}/>
                       </div>
-                      <button type="button" onClick={() => setSatirlar(x => x.length > 1 ? x.filter(y => y.anahtar !== s.anahtar) : [bosSatir()])} className="col-span-2 sm:col-span-1 text-gray-400 hover:text-red-600 flex justify-center"><Trash2 size={13}/></button>
+                      <button type="button" onClick={() => setSatirlar(x => x.length > 1 ? x.filter(y => y.anahtar !== s.anahtar) : [bosSatir()])} className="col-span-2 sm:col-span-1 text-gray-400 hover:text-red-400 flex justify-center"><Trash2 size={13}/></button>
                     </div>
                   );
                 })}
-                <button type="button" onClick={() => setSatirlar(x => [...x, bosSatir()])} className="flex items-center gap-1 text-[11px] font-semibold text-amber-700 px-1"><Plus size={12}/> Kalem ekle</button>
+                <button type="button" onClick={() => setSatirlar(x => [...x, bosSatir()])} className="flex items-center gap-1 text-[11px] font-semibold text-amber-300 px-1"><Plus size={12}/> Kalem ekle</button>
               </div>
             </div>
-            <div className="px-5 py-4 border-t border-[#e2e5eb] flex justify-end gap-2">
-              <button onClick={() => setFormAcik(false)} className="text-xs font-semibold text-gray-500 border border-[#e2e5eb] px-4 py-2 rounded-xl">İptal</button>
+            <div className="px-5 py-4 border-t border-cizgi flex justify-end gap-2">
+              <button onClick={() => setFormAcik(false)} className="text-xs font-semibold text-gray-500 border border-cizgi px-4 py-2 rounded-xl">İptal</button>
               <button onClick={kaydet} disabled={kaydediliyor} className="text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-40 px-6 py-2 rounded-xl flex items-center gap-2">
                 {kaydediliyor ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>} Yolda olarak kaydet
               </button>
@@ -394,9 +394,9 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
       {/* ── TESLİM AL ── */}
       {teslimBelgesi && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#ffffff] border border-emerald-500/20 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
-            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[#1a1f2e] flex items-center gap-2"><PackageCheck size={14} className="text-emerald-600"/> Teslim Al · {teslimBelgesi.ilk.tedarikci || "İrsaliye"}</h3>
+          <div className="bg-kart border border-emerald-500/20 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="px-5 py-4 border-b border-cizgi flex items-center justify-between">
+              <h3 className="text-sm font-bold text-yazi flex items-center gap-2"><PackageCheck size={14} className="text-emerald-400"/> Teslim Al · {teslimBelgesi.ilk.tedarikci || "İrsaliye"}</h3>
               <button onClick={() => setTeslimBelge(null)} className="p-1 text-gray-600"><X size={16}/></button>
             </div>
             <div className="p-5 space-y-3 overflow-y-auto">
@@ -412,11 +412,11 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
                 return (
                   <div key={k.id} className="grid grid-cols-12 gap-2 items-center">
                     <div className="col-span-6 text-xs">
-                      <p className="font-semibold text-[#1a1f2e]">{u?.urun_adi || k.urun_adi_ham}</p>
+                      <p className="font-semibold text-yazi">{u?.urun_adi || k.urun_adi_ham}</p>
                       <p className="text-[10px] text-gray-500">İrsaliyede: {fmt(k.miktar)} {k.birim || u?.birim}</p>
                     </div>
                     <input type="text" inputMode="decimal" value={teslimMiktarlar[k.id] || ""} onChange={e => setTeslimMiktarlar(m => ({ ...m, [k.id]: e.target.value }))} className={`${inputCls} col-span-4`}/>
-                    <span className={`col-span-2 text-[10px] font-semibold ${fark < 0 ? "text-red-600" : fark > 0 ? "text-amber-700" : "text-emerald-600"}`}>
+                    <span className={`col-span-2 text-[10px] font-semibold ${fark < 0 ? "text-red-400" : fark > 0 ? "text-amber-300" : "text-emerald-400"}`}>
                       {fark === 0 ? "tam" : fark < 0 ? `${fmt(-fark)} eksik` : `${fmt(fark)} fazla`}
                     </span>
                   </div>
@@ -426,12 +426,12 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
               {/* Cariye fatura olarak işle */}
               {cariYetkisi ? (
                 <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 space-y-2.5">
-                  <label className="flex items-center gap-2 text-xs font-bold text-[#1a1f2e] cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs font-bold text-yazi cursor-pointer">
                     <input type="checkbox" checked={faturaIsle} onChange={e => setFaturaIsle(e.target.checked)} className="w-4 h-4 accent-blue-600" />
-                    <Receipt size={13} className="text-blue-600" /> Cariye fatura olarak işle
+                    <Receipt size={13} className="text-blue-400" /> Cariye fatura olarak işle
                   </label>
                   {mevcutFatura && (
-                    <p className="text-[11px] text-amber-800 flex items-center gap-1.5"><AlertTriangle size={12} className="shrink-0" /> Bu irsaliye için zaten fatura var (No {mevcutFatura}); tekrar oluşturulmaz.</p>
+                    <p className="text-[11px] text-amber-200 flex items-center gap-1.5"><AlertTriangle size={12} className="shrink-0" /> Bu irsaliye için zaten fatura var (No {mevcutFatura}); tekrar oluşturulmaz.</p>
                   )}
                   {faturaIsle && (
                     <>
@@ -459,7 +459,7 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
                         const tc = cariMap.get(teslimCariId);
                         if (!tc || (tc.varsayilan_kdv !== null && tc.varsayilan_kdv !== undefined)) return null;
                         return (
-                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 text-[11px] text-amber-900 space-y-1.5">
+                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 text-[11px] text-amber-100 space-y-1.5">
                             <p className="flex items-start gap-1.5"><AlertTriangle size={12} className="shrink-0 mt-0.5" /> Bu carinin KDV oranı tanımlı değil, seçin; seçtiğiniz oran cariye de kaydedilsin mi?</p>
                             <label className="flex items-center gap-2 font-semibold cursor-pointer">
                               <input type="checkbox" checked={kdvCariyeKaydet} onChange={e => setKdvCariyeKaydet(e.target.checked)} className="w-3.5 h-3.5 accent-blue-600" />
@@ -468,15 +468,15 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
                           </div>
                         );
                       })()}
-                      <p className="text-[11px] font-semibold text-blue-800">Birim fiyatlar KDV hariç kabul edilir.</p>
+                      <p className="text-[11px] font-semibold text-blue-200">Birim fiyatlar KDV hariç kabul edilir.</p>
                       <div className="grid grid-cols-3 gap-2 text-[11px]">
-                        <div className="rounded-lg bg-[#ffffff] border border-[#e2e5eb] px-2 py-1.5"><p className="text-gray-500">KDV hariç</p><p className="font-bold">₺{para(faturaOnizleme.tutar)}</p></div>
-                        <div className="rounded-lg bg-[#ffffff] border border-[#e2e5eb] px-2 py-1.5"><p className="text-gray-500">KDV</p><p className="font-bold">{kdvOrani === "" ? "—" : `₺${para(faturaOnizleme.kdv)}`}</p></div>
-                        <div className="rounded-lg bg-[#ffffff] border border-[#e2e5eb] px-2 py-1.5"><p className="text-gray-500">Toplam</p><p className="font-black text-blue-700">{kdvOrani === "" ? "—" : `₺${para(faturaOnizleme.toplam)}`}</p></div>
+                        <div className="rounded-lg bg-kart border border-cizgi px-2 py-1.5"><p className="text-gray-500">KDV hariç</p><p className="font-bold">₺{para(faturaOnizleme.tutar)}</p></div>
+                        <div className="rounded-lg bg-kart border border-cizgi px-2 py-1.5"><p className="text-gray-500">KDV</p><p className="font-bold">{kdvOrani === "" ? "—" : `₺${para(faturaOnizleme.kdv)}`}</p></div>
+                        <div className="rounded-lg bg-kart border border-cizgi px-2 py-1.5"><p className="text-gray-500">Toplam</p><p className="font-black text-blue-300">{kdvOrani === "" ? "—" : `₺${para(faturaOnizleme.toplam)}`}</p></div>
                       </div>
                       <p className="text-[10px] text-gray-500">Fatura tarihi = teslim tarihi ({fmtTarih(teslimTarihi)}); vade dönem kuralıyla hesaplanır; durum &quot;bekliyor&quot;.</p>
                       {faturaOnizleme.fiyatsiz > 0 && (
-                        <p className="text-[11px] text-amber-800 flex items-center gap-1.5"><AlertTriangle size={12} className="shrink-0" /> Fiyatı olmayan kalemler faturaya 0 TL girer, faturayı sonra düzeltin ({faturaOnizleme.fiyatsiz} kalem).</p>
+                        <p className="text-[11px] text-amber-200 flex items-center gap-1.5"><AlertTriangle size={12} className="shrink-0" /> Fiyatı olmayan kalemler faturaya 0 TL girer, faturayı sonra düzeltin ({faturaOnizleme.fiyatsiz} kalem).</p>
                       )}
                     </>
                   )}
@@ -485,8 +485,8 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
                 <p className="text-[10px] text-gray-500">Cariye fatura işleme için Cariler &amp; Faturalar yetkisi gerekir.</p>
               )}
             </div>
-            <div className="px-5 py-4 border-t border-[#e2e5eb] flex justify-end gap-2">
-              <button onClick={() => setTeslimBelge(null)} className="text-xs font-semibold text-gray-500 border border-[#e2e5eb] px-4 py-2 rounded-xl">Vazgeç</button>
+            <div className="px-5 py-4 border-t border-cizgi flex justify-end gap-2">
+              <button onClick={() => setTeslimBelge(null)} className="text-xs font-semibold text-gray-500 border border-cizgi px-4 py-2 rounded-xl">Vazgeç</button>
               <button onClick={teslimAl} disabled={kaydediliyor || (faturaIsle && kdvOrani === "")} className="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 px-6 py-2 rounded-xl flex items-center gap-2">
                 {kaydediliyor ? <Loader2 size={12} className="animate-spin"/> : <PackageCheck size={12}/>} Teslim Al ve Stoğa Ekle{faturaIsle ? " + Fatura" : ""}
               </button>

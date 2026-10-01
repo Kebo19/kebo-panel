@@ -23,10 +23,10 @@ export interface MutabakatRaporu {
 }
 
 const DURUM_STIL: Record<PosDurum, string> = {
-  tuttu: "bg-emerald-500/10 text-emerald-700",
-  eksik: "bg-red-500/10 text-red-700",
-  bekliyor: "bg-amber-500/10 text-amber-700",
-  kayit_yok: "bg-black/[0.05] text-gray-500",
+  tuttu: "bg-emerald-500/10 text-emerald-300",
+  eksik: "bg-red-500/10 text-red-300",
+  bekliyor: "bg-amber-500/10 text-amber-300",
+  kayit_yok: "bg-white/[0.05] text-gray-500",
 };
 
 const AY_ADLARI = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
@@ -99,12 +99,12 @@ export default function PosMutabakat({ raporlar, baslangic, bitis }: {
         <div className="flex items-center gap-2 text-xs text-gray-500"><Loader2 size={13} className="animate-spin" /> Banka kayıtları yükleniyor…</div>
       )}
       {hata && (
-        <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 text-xs text-red-700 flex items-start gap-2">
+        <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 text-xs text-red-300 flex items-start gap-2">
           <AlertTriangle size={14} className="shrink-0 mt-0.5" /> {hata}
         </div>
       )}
       {!yukleniyor && !hata && !pos.hareketVar && !kart.hareketVar && (
-        <div className="bg-amber-500/5 border border-amber-500/30 rounded-2xl p-4 text-[12px] text-amber-800 flex items-start gap-2.5">
+        <div className="bg-amber-500/5 border border-amber-500/30 rounded-2xl p-4 text-[12px] text-amber-200 flex items-start gap-2.5">
           <Info size={15} className="shrink-0 mt-0.5" />
           <p>
             Bu dönem için bankaya yatan kart tahsilatı kaydı yok. Banka ekstresini <b>Kasa &amp; Finans &gt; Ekstre yükle</b> ile
@@ -115,8 +115,8 @@ export default function PosMutabakat({ raporlar, baslangic, bitis }: {
       )}
 
       {/* ── POS ── */}
-      <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-[#e2e5eb] flex flex-wrap items-center justify-between gap-2">
+      <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
           <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5">
             <CreditCard size={12} /> POS Mutabakatı ({POS_BANKA_HESABI})
           </p>
@@ -125,16 +125,16 @@ export default function PosMutabakat({ raporlar, baslangic, bitis }: {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 p-4 border-b border-[#e2e5eb]">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 p-4 border-b border-cizgi">
           {[
-            { label: "POS Satışı", value: `₺${fmt(pos.toplamSatis)}`, cls: "text-blue-600" },
+            { label: "POS Satışı", value: `₺${fmt(pos.toplamSatis)}`, cls: "text-blue-400" },
             { label: "Beklenen Yatış", value: `₺${fmt(pos.toplamBeklenen)}`, cls: "text-gray-800" },
-            { label: "Gerçekleşen", value: `₺${fmt(pos.toplamYatan)}`, cls: "text-emerald-600" },
-            { label: "Gerçekleşen Komisyon", value: `₺${fmt(pos.gerceklesenKomisyon)}`, cls: "text-orange-600",
+            { label: "Gerçekleşen", value: `₺${fmt(pos.toplamYatan)}`, cls: "text-emerald-400" },
+            { label: "Gerçekleşen Komisyon", value: `₺${fmt(pos.gerceklesenKomisyon)}`, cls: "text-orange-400",
               alt: pos.eslesenSatis > 0 ? `${yuzde(pos.gerceklesenKomisyon / pos.eslesenSatis)} (eşleşen günler)` : "eşleşen gün yok" },
             { label: "Beklenen Komisyon", value: `₺${fmt(pos.beklenenKomisyon)}`, cls: "text-gray-700", alt: "tüm dönem" },
           ].map(k => (
-            <div key={k.label} className="bg-[#f7f8fa] border border-[#e2e5eb] rounded-xl p-3">
+            <div key={k.label} className="bg-alan border border-cizgi rounded-xl p-3">
               <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1">{k.label}</p>
               <p className={`text-base font-black ${k.cls}`}>{k.value}</p>
               {k.alt && <p className="text-[10px] text-gray-500 mt-0.5">{k.alt}</p>}
@@ -142,7 +142,7 @@ export default function PosMutabakat({ raporlar, baslangic, bitis }: {
           ))}
         </div>
 
-        <div className="px-4 py-2.5 flex flex-wrap gap-2 border-b border-[#e2e5eb]">
+        <div className="px-4 py-2.5 flex flex-wrap gap-2 border-b border-cizgi">
           {(Object.keys(POS_DURUM_ETIKET) as PosDurum[]).map(d => (
             <span key={d} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${DURUM_STIL[d]}`}>
               {POS_DURUM_ETIKET[d]}: {pos.sayac[d]}
@@ -156,15 +156,15 @@ export default function PosMutabakat({ raporlar, baslangic, bitis }: {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-[#e2e5eb]">
+                <tr className="border-b border-cizgi">
                   {["Gün", "POS Satışı", "Beklenen Yatış", "Gerçekleşen", "Fark", "Durum"].map(h => <th key={h} className={th}>{h}</th>)}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#eef0f3]">
+              <tbody className="divide-y divide-cizgi">
                 {pos.satirlar.map(s => (
-                  <tr key={s.tarih} className="hover:bg-black/[0.03]">
+                  <tr key={s.tarih} className="hover:bg-white/[0.03]">
                     <td className={`${td} font-medium text-gray-700`}>{fmtTarih(s.tarih)}</td>
-                    <td className={`${td} text-blue-600 font-bold`}>₺{fmt(s.posSatis)}</td>
+                    <td className={`${td} text-blue-400 font-bold`}>₺{fmt(s.posSatis)}</td>
                     <td className={td}>
                       ₺{fmt(s.beklenen)} <span className="text-[10px] text-gray-400">{fmtTarih(s.beklenenTarih).slice(0, 5)}</span>
                     </td>
@@ -175,7 +175,7 @@ export default function PosMutabakat({ raporlar, baslangic, bitis }: {
                         </span></>
                       )}
                     </td>
-                    <td className={`${td} font-bold ${s.fark === null ? "text-gray-400" : Math.abs(s.fark) < 1 ? "text-emerald-600" : s.fark < 0 ? "text-red-600" : "text-amber-600"}`}>
+                    <td className={`${td} font-bold ${s.fark === null ? "text-gray-400" : Math.abs(s.fark) < 1 ? "text-emerald-400" : s.fark < 0 ? "text-red-400" : "text-amber-400"}`}>
                       {s.fark === null ? "—" : isaretli(s.fark)}
                     </td>
                     <td className={td}>
@@ -185,11 +185,11 @@ export default function PosMutabakat({ raporlar, baslangic, bitis }: {
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t border-[#e2e5eb] bg-[#f7f8fa] font-black">
+                <tr className="border-t border-cizgi bg-alan font-black">
                   <td className={`${td} text-[10px] text-gray-600 uppercase`}>Toplam</td>
-                  <td className={`${td} text-blue-600`}>₺{fmt(pos.toplamSatis)}</td>
+                  <td className={`${td} text-blue-400`}>₺{fmt(pos.toplamSatis)}</td>
                   <td className={td}>₺{fmt(pos.toplamBeklenen)}</td>
-                  <td className={`${td} text-emerald-600`}>₺{fmt(pos.toplamYatan)}</td>
+                  <td className={`${td} text-emerald-400`}>₺{fmt(pos.toplamYatan)}</td>
                   <td className={td} colSpan={2}>Komisyon (satış − yatan, eşleşen günler): ₺{fmt(pos.gerceklesenKomisyon)}</td>
                 </tr>
               </tfoot>
@@ -198,7 +198,7 @@ export default function PosMutabakat({ raporlar, baslangic, bitis }: {
         )}
 
         {pos.eslesmeyenHareketler.length > 0 && (
-          <div className="px-5 py-3 border-t border-[#e2e5eb] text-[11px] text-gray-600">
+          <div className="px-5 py-3 border-t border-cizgi text-[11px] text-gray-600">
             <p className="font-bold text-gray-700 mb-1">Hiçbir güne eşleşmeyen POS yatışları</p>
             <ul className="space-y-0.5">
               {pos.eslesmeyenHareketler.map(h => (
@@ -210,15 +210,15 @@ export default function PosMutabakat({ raporlar, baslangic, bitis }: {
       </div>
 
       {/* ── YEMEK KARTLARI ── */}
-      <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-[#e2e5eb] flex flex-wrap items-center justify-between gap-2">
+      <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
           <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5">
             <Utensils size={12} /> Yemek Kartı Mutabakatı (aylık, tüm hesaplar)
           </p>
           <label className="flex items-center gap-2 text-[11px] text-gray-600">
             Yatışları eşleştir:
             <select value={kaydirma} onChange={e => setKaydirma(Number(e.target.value))}
-              className="bg-[#f7f8fa] border border-[#e2e5eb] rounded-lg px-2 py-1 text-[11px] outline-none">
+              className="bg-alan border border-cizgi rounded-lg px-2 py-1 text-[11px] outline-none">
               <option value={0}>Aynı ay</option>
               <option value={1}>Ertesi ay (satış ayı + 1)</option>
             </select>
@@ -226,7 +226,7 @@ export default function PosMutabakat({ raporlar, baslangic, bitis }: {
         </div>
 
         {sinirAsanlar.length > 0 && (
-          <div className="mx-4 mt-4 bg-red-500/5 border border-red-500/30 rounded-xl p-3 text-[12px] text-red-700 flex items-start gap-2">
+          <div className="mx-4 mt-4 bg-red-500/5 border border-red-500/30 rounded-xl p-3 text-[12px] text-red-300 flex items-start gap-2">
             <AlertTriangle size={14} className="shrink-0 mt-0.5" />
             <p>
               <b>Yasal üst sınır %{YEMEK_KARTI_YASAL_UST_SINIR * 100}</b> aşılıyor: {sinirAsanlar.map(k => `${k.ad} (${yuzde(k.komisyonOrani || 0)})`).join(", ")}.
@@ -242,25 +242,25 @@ export default function PosMutabakat({ raporlar, baslangic, bitis }: {
             {[...kart.aylar.map(a => ({ baslik: ayEtiketi(a.ay), kartlar: a.kartlar, belirsiz: a.belirsizYatan })),
               ...(kart.aylar.length > 1 ? [{ baslik: "Dönem Toplamı", kartlar: kart.toplam, belirsiz: kart.belirsizYatan }] : []),
             ].map(blok => (
-              <div key={blok.baslik} className="border border-[#e2e5eb] rounded-xl overflow-hidden">
-                <p className="px-3 py-2 bg-[#f7f8fa] border-b border-[#e2e5eb] text-[11px] font-bold text-gray-700">{blok.baslik}</p>
+              <div key={blok.baslik} className="border border-cizgi rounded-xl overflow-hidden">
+                <p className="px-3 py-2 bg-alan border-b border-cizgi text-[11px] font-bold text-gray-700">{blok.baslik}</p>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-[#e2e5eb]">
+                      <tr className="border-b border-cizgi">
                         {["Kart", "Satış", "Yatan", "Fark", "Zımni Komisyon"].map(h => <th key={h} className={th}>{h}</th>)}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#eef0f3]">
+                    <tbody className="divide-y divide-cizgi">
                       {blok.kartlar.filter(k => k.satis > 0 || k.yatan > 0).map(k => (
                         <tr key={k.ad} className={k.sinirAsimi ? "bg-red-500/5" : ""}>
-                          <td className={`${td} font-bold text-[#1a1f2e]`}>{k.ad}</td>
-                          <td className={`${td} text-blue-600 font-bold`}>₺{fmt(k.satis)}</td>
-                          <td className={`${td} text-emerald-600`}>{k.yatan > 0 ? `₺${fmt(k.yatan)}` : "—"}</td>
-                          <td className={`${td} font-bold ${k.fark < 0 ? "text-red-600" : "text-gray-700"}`}>{k.yatan > 0 ? isaretli(k.fark) : "—"}</td>
+                          <td className={`${td} font-bold text-yazi`}>{k.ad}</td>
+                          <td className={`${td} text-blue-400 font-bold`}>₺{fmt(k.satis)}</td>
+                          <td className={`${td} text-emerald-400`}>{k.yatan > 0 ? `₺${fmt(k.yatan)}` : "—"}</td>
+                          <td className={`${td} font-bold ${k.fark < 0 ? "text-red-400" : "text-gray-700"}`}>{k.yatan > 0 ? isaretli(k.fark) : "—"}</td>
                           <td className={td}>
                             {k.komisyonOrani === null ? <span className="text-gray-400">yatış yok</span> : (
-                              <span className={`font-bold ${k.sinirAsimi ? "text-red-600" : "text-gray-700"}`}>
+                              <span className={`font-bold ${k.sinirAsimi ? "text-red-400" : "text-gray-700"}`}>
                                 {yuzde(k.komisyonOrani)}
                                 {k.sinirAsimi && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/10">Yasal üst sınır %6</span>}
                               </span>
@@ -272,7 +272,7 @@ export default function PosMutabakat({ raporlar, baslangic, bitis }: {
                   </table>
                 </div>
                 {blok.belirsiz > 0 && (
-                  <p className="px-3 py-2 border-t border-[#e2e5eb] text-[10px] text-gray-500">
+                  <p className="px-3 py-2 border-t border-cizgi text-[10px] text-gray-500">
                     Açıklamasından kartı anlaşılamayan yatış: <b>₺{fmt(blok.belirsiz)}</b> (hesaba katılmadı — açıklamaya kart adını ekleyin).
                   </p>
                 )}

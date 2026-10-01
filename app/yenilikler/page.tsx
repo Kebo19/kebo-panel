@@ -4,6 +4,19 @@ import { Sparkles } from "lucide-react";
 // başına bir öğe eklemek yeterli.
 const SURUMLER: { tarih: string; baslik: string; maddeler: string[] }[] = [
   {
+    tarih: "01.10.2026",
+    baslik: "Yeni koyu tasarım ve kurye tahsilatı",
+    maddeler: [
+      "Bütün panel yeni koyu temaya geçti: altın vurgular, KEBO logosu, her sayfada aynı simge dili.",
+      "Ctrl + K ile her yerden sayfa araması (mobilde üstteki büyüteç).",
+      "Anasayfa yenilendi: eğilim çizgili özet kartları, kadro ve bu ay panelleri, hızlı erişim.",
+      "Sayfa geçişleri, menü ve kartlarda yumuşak hareketler.",
+      "Kurye 1 ve Kurye 2 kapıda topladığı nakit ve POS'u gün sonu kasaya teslim eder; kasa beklentisine girer.",
+      "Havuz kuryelerinin kapıda tahsilatı ciroya eklenir ama kasada beklenmez; Roadrunner borcundan düşülür.",
+      "Roadrunner mutabakatında POS komisyonu yalnızca Roadrunner'ın POS'uyla çekilen tutara uygulanır.",
+    ],
+  },
+  {
     tarih: "29.09.2026",
     baslik: "Personel, maliyet ve finans",
     maddeler: [
@@ -40,7 +53,7 @@ const SURUMLER: { tarih: string; baslik: string; maddeler: string[] }[] = [
 
 export default function YeniliklerPage() {
   return (
-    <main className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] p-4 sm:p-5">
+    <main className="min-h-screen bg-zemin text-yazi p-4 sm:p-5">
       <div className="pt-5 mb-6 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center">
           <Sparkles size={18} className="text-white" />
@@ -53,13 +66,13 @@ export default function YeniliklerPage() {
 
       <div className="max-w-2xl space-y-4">
         {SURUMLER.map((s, i) => (
-          <section key={s.tarih} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
+          <section key={s.tarih} className="bg-kart border border-cizgi rounded-2xl p-5">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-[12px] font-bold tabular-nums px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+              <span className="text-[12px] font-bold tabular-nums px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-300 border border-blue-500/25">
                 {s.tarih}
               </span>
               <h2 className="text-[15px] font-bold">{s.baslik}</h2>
-              {i === 0 && <span className="ml-auto text-[11px] font-semibold text-green-700">En yeni</span>}
+              {i === 0 && <span className="ml-auto text-[11px] font-semibold text-green-300">En yeni</span>}
             </div>
             <ul className="space-y-2">
               {s.maddeler.map(m => (

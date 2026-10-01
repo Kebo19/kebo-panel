@@ -1,5 +1,6 @@
 "use client";
 
+import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { bugun, ayBasi, gunEkle } from "@/lib/tarih";
@@ -18,7 +19,7 @@ interface Fatura {
   toplam_tutar: number; aciklama: string; durum: string; islendi: boolean;
 }
 
-const inputCls = "w-full bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] focus:border-blue-500/50 text-[#1a1f2e] text-sm h-10 px-3 rounded-xl outline-none transition-all placeholder:text-gray-700";
+const inputCls = "w-full bg-alan border border-cizgi hover:border-cizgi-guclu focus:border-altin/50 text-yazi text-sm h-10 px-3 rounded-xl outline-none transition-all placeholder:text-gray-700";
 const fmt = (v: number) => new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2 }).format(v);
 const fmtTarih = (t: string) => { if (!t) return "—"; try { const p = t.split("-"); return `${p[2]}.${p[1]}.${p[0]}`; } catch { return t; } };
 const parseTutar = (s: string) => parseFloat((s || "0").replace(/\./g, "").replace(",", ".")) || 0;
@@ -57,24 +58,24 @@ function KdvOzetiBolumu({ faturalar, cariler }: { faturalar: Fatura[]; cariler: 
   };
 
   return (
-    <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
-      <button onClick={() => setAcik(!acik)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-black/[0.03] transition-colors">
-        <span className="flex items-center gap-2 text-sm font-black text-[#1a1f2e]"><Percent size={14} className="text-indigo-600" /> KDV Özeti <span className="text-[11px] font-normal text-gray-500">mali müşavir için</span></span>
+    <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
+      <button onClick={() => setAcik(!acik)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.03] transition-colors">
+        <span className="flex items-center gap-2 text-sm font-black text-yazi"><Percent size={14} className="text-indigo-400" /> KDV Özeti <span className="text-[11px] font-normal text-gray-500">mali müşavir için</span></span>
         {acik ? <ChevronUp size={14} className="text-gray-600" /> : <ChevronDown size={14} className="text-gray-600" />}
       </button>
       {acik && (
-        <div className="border-t border-[#e2e5eb] p-4 space-y-4">
+        <div className="border-t border-cizgi p-4 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <input type="month" value={ay} onChange={e => e.target.value && setAy(e.target.value)} className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none" />
+            <input type="month" value={ay} onChange={e => e.target.value && setAy(e.target.value)} className="bg-alan border border-cizgi text-yazi text-xs h-9 px-3 rounded-xl outline-none" />
             <span className="text-xs text-gray-500">{ozet.adet + ozet.tanimsiz.adet} fatura</span>
-            <button onClick={csv} disabled={ozet.adet + ozet.tanimsiz.adet === 0} className="ml-auto flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 px-3 py-2 rounded-xl">
+            <button onClick={csv} disabled={ozet.adet + ozet.tanimsiz.adet === 0} className="ml-auto flex items-center gap-1.5 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 disabled:opacity-40 px-3 py-2 rounded-xl">
               <FileSpreadsheet size={13} /> CSV dışa aktar
             </button>
           </div>
 
           <div className="grid grid-cols-3 gap-2">
-            {[{ l: "KDV hariç", v: ozet.matrah, c: "text-[#1a1f2e]" }, { l: "KDV", v: ozet.kdv, c: "text-indigo-600" }, { l: "Toplam", v: ozet.toplam, c: "text-emerald-600" }].map(k => (
-              <div key={k.l} className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] px-3 py-2.5">
+            {[{ l: "KDV hariç", v: ozet.matrah, c: "text-yazi" }, { l: "KDV", v: ozet.kdv, c: "text-indigo-400" }, { l: "Toplam", v: ozet.toplam, c: "text-emerald-400" }].map(k => (
+              <div key={k.l} className="rounded-xl border border-cizgi bg-alan px-3 py-2.5">
                 <p className="text-[10px] text-gray-500 uppercase tracking-widest">{k.l}</p>
                 <p className={`text-sm sm:text-base font-black ${k.c}`}>₺{fmt(k.v)}</p>
               </div>
@@ -82,7 +83,7 @@ function KdvOzetiBolumu({ faturalar, cariler }: { faturalar: Fatura[]; cariler: 
           </div>
 
           {ozet.tanimsizCariler.length > 0 && (
-            <div className="rounded-xl border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] text-red-800 flex gap-2">
+            <div className="rounded-xl border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] text-red-200 flex gap-2">
               <AlertTriangle size={13} className="shrink-0 mt-0.5" />
               <span>
                 <b>{ozet.tanimsizCariler.length} carinin KDV oranı tanımlı değil — Cariler&apos;den girin.</b>{" "}
@@ -92,7 +93,7 @@ function KdvOzetiBolumu({ faturalar, cariler }: { faturalar: Fatura[]; cariler: 
             </div>
           )}
           {ozet.tahminiAdet > 0 && (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 flex gap-2">
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-200 flex gap-2">
               <AlertTriangle size={13} className="shrink-0 mt-0.5" />
               <span>{ozet.tahminiAdet} faturada KDV ayrı girilmemiş; carinin tanımlı KDV oranıyla toplamdan hesaplandı.</span>
             </div>
@@ -102,18 +103,18 @@ function KdvOzetiBolumu({ faturalar, cariler }: { faturalar: Fatura[]; cariler: 
             <div className="overflow-x-auto">
               <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-2">Oran kırılımı</p>
               <table className="w-full text-xs">
-                <thead><tr className="border-b border-[#e2e5eb] text-[10px] text-gray-500 uppercase">
+                <thead><tr className="border-b border-cizgi text-[10px] text-gray-500 uppercase">
                   <th className="text-left py-2">Oran</th><th className="text-right py-2">Adet</th><th className="text-right py-2">KDV hariç</th><th className="text-right py-2">KDV</th><th className="text-right py-2">Toplam</th>
                 </tr></thead>
-                <tbody className="divide-y divide-[#eef0f3]">
+                <tbody className="divide-y divide-cizgi">
                   {ozet.oranlar.length === 0 && !ozet.tanimsiz.adet ? <tr><td colSpan={5} className="py-4 text-center text-gray-500">Bu ay fatura yok</td></tr> : ozet.oranlar.map(o => (
                     <tr key={o.oran}>
                       <td className="py-2 font-bold">%{o.oran}</td><td className="py-2 text-right">{o.adet}</td>
-                      <td className="py-2 text-right whitespace-nowrap">₺{fmt(o.matrah)}</td><td className="py-2 text-right text-indigo-600 whitespace-nowrap">₺{fmt(o.kdv)}</td><td className="py-2 text-right font-bold whitespace-nowrap">₺{fmt(o.toplam)}</td>
+                      <td className="py-2 text-right whitespace-nowrap">₺{fmt(o.matrah)}</td><td className="py-2 text-right text-indigo-400 whitespace-nowrap">₺{fmt(o.kdv)}</td><td className="py-2 text-right font-bold whitespace-nowrap">₺{fmt(o.toplam)}</td>
                     </tr>
                   ))}
                   {ozet.tanimsiz.adet > 0 && (
-                    <tr className="text-red-700">
+                    <tr className="text-red-300">
                       <td className="py-2 font-bold">KDV oranı tanımsız</td><td className="py-2 text-right">{ozet.tanimsiz.adet}</td>
                       <td className="py-2 text-right">—</td><td className="py-2 text-right">—</td><td className="py-2 text-right font-bold whitespace-nowrap">₺{fmt(ozet.tanimsiz.toplam)}</td>
                     </tr>
@@ -124,14 +125,14 @@ function KdvOzetiBolumu({ faturalar, cariler }: { faturalar: Fatura[]; cariler: 
             <div className="overflow-x-auto">
               <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-2">Cari bazında (ilk 10)</p>
               <table className="w-full text-xs">
-                <thead><tr className="border-b border-[#e2e5eb] text-[10px] text-gray-500 uppercase">
+                <thead><tr className="border-b border-cizgi text-[10px] text-gray-500 uppercase">
                   <th className="text-left py-2">Cari</th><th className="text-right py-2">Adet</th><th className="text-right py-2">KDV</th><th className="text-right py-2">Toplam</th>
                 </tr></thead>
-                <tbody className="divide-y divide-[#eef0f3]">
+                <tbody className="divide-y divide-cizgi">
                   {ozet.cariler.slice(0, 10).map(c => (
                     <tr key={c.cari_id || c.cari_unvan}>
-                      <td className="py-2 max-w-[180px] truncate">{c.cari_unvan}{c.tanimsiz && <span className="ml-1 text-[10px] font-bold text-red-600">KDV tanımsız</span>}</td><td className="py-2 text-right">{c.adet}</td>
-                      <td className="py-2 text-right text-indigo-600 whitespace-nowrap">₺{fmt(c.kdv)}</td><td className="py-2 text-right font-bold whitespace-nowrap">₺{fmt(c.toplam)}</td>
+                      <td className="py-2 max-w-[180px] truncate">{c.cari_unvan}{c.tanimsiz && <span className="ml-1 text-[10px] font-bold text-red-400">KDV tanımsız</span>}</td><td className="py-2 text-right">{c.adet}</td>
+                      <td className="py-2 text-right text-indigo-400 whitespace-nowrap">₺{fmt(c.kdv)}</td><td className="py-2 text-right font-bold whitespace-nowrap">₺{fmt(c.toplam)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -400,9 +401,9 @@ export default function FaturalarPage() {
   }), [faturalar]);
 
   const durumRenk = (durum: string) => {
-    if (durum === "odendi") return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
-    if (durum === "gecikti") return "bg-red-500/10 text-red-600 border-red-500/20";
-    return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
+    if (durum === "odendi") return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+    if (durum === "gecikti") return "bg-red-500/10 text-red-400 border-red-500/20";
+    return "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
   };
 
   const toggleAy = (key: string) => {
@@ -424,10 +425,10 @@ export default function FaturalarPage() {
     return (
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-[#e2e5eb]">
+          <tr className="border-b border-cizgi">
             <th className="px-4 py-3 w-10">
-              <button onClick={() => hepsiniSec(liste)} className="text-gray-500 hover:text-[#1a1f2e] transition-colors">
-                {hepsiSecili ? <CheckSquare size={14} className="text-blue-600" /> : <Square size={14} />}
+              <button onClick={() => hepsiniSec(liste)} className="text-gray-500 hover:text-yazi transition-colors">
+                {hepsiSecili ? <CheckSquare size={14} className="text-blue-400" /> : <Square size={14} />}
               </button>
             </th>
             {["Cari", "Fatura No", "Tarih", "Tutar", "Durum", "İşlem"].map(h => (
@@ -435,20 +436,20 @@ export default function FaturalarPage() {
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#0f1624]">
+        <tbody className="divide-y divide-cizgi">
           {liste.map(f => (
-            <tr key={f.id} className={`transition-colors ${seciliFaturalar.has(f.id) ? "bg-blue-600/10" : "hover:bg-black/[0.03]"}`}>
+            <tr key={f.id} className={`transition-colors ${seciliFaturalar.has(f.id) ? "bg-altin/10" : "hover:bg-white/[0.03]"}`}>
               <td className="px-4 py-3">
-                <button onClick={() => faturaSec(f.id)} className="text-gray-500 hover:text-[#1a1f2e] transition-colors">
+                <button onClick={() => faturaSec(f.id)} className="text-gray-500 hover:text-yazi transition-colors">
                   {seciliFaturalar.has(f.id)
-                    ? <CheckSquare size={14} className="text-blue-600" />
+                    ? <CheckSquare size={14} className="text-blue-400" />
                     : <Square size={14} />}
                 </button>
               </td>
-              <td className="px-4 py-3 text-[#1a1f2e] font-medium max-w-[150px] truncate">{f.cari_unvan}</td>
-              <td className="px-4 py-3 text-blue-600 font-bold text-[11px]">{f.fatura_no}</td>
+              <td className="px-4 py-3 text-yazi font-medium max-w-[150px] truncate">{f.cari_unvan}</td>
+              <td className="px-4 py-3 text-blue-400 font-bold text-[11px]">{f.fatura_no}</td>
               <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtTarih(f.fatura_tarihi)}</td>
-              <td className="px-4 py-3 text-emerald-600 font-black whitespace-nowrap">₺{fmt(f.toplam_tutar)}</td>
+              <td className="px-4 py-3 text-emerald-400 font-black whitespace-nowrap">₺{fmt(f.toplam_tutar)}</td>
               <td className="px-4 py-3">
                 <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${durumRenk(f.durum)}`}>
                   {f.durum === "odendi" ? "Ödendi" : f.durum === "gecikti" ? "Gecikti" : "Bekliyor"}
@@ -458,22 +459,22 @@ export default function FaturalarPage() {
                 <div className="flex items-center gap-1.5">
                   {/* "Ödendi" butonu kaldırıldı — ödeme Cariler > Ödeme Ekle'den yapılır */}
                   {f.durum === "bekliyor" && (
-                    <button onClick={() => durumGuncelle(f.id, "gecikti")} className="text-[10px] font-bold text-red-600 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded-lg hover:bg-red-500/20 transition-colors whitespace-nowrap">Gecikti</button>
+                    <button onClick={() => durumGuncelle(f.id, "gecikti")} className="text-[10px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded-lg hover:bg-red-500/20 transition-colors whitespace-nowrap">Gecikti</button>
                   )}
                   {f.durum === "gecikti" && (
-                    <button onClick={() => durumGuncelle(f.id, "bekliyor")} className="text-[10px] font-bold text-yellow-600 bg-yellow-500/10 border border-yellow-500/20 px-2 py-1 rounded-lg hover:bg-yellow-500/20 transition-colors whitespace-nowrap">Bekliyor</button>
+                    <button onClick={() => durumGuncelle(f.id, "bekliyor")} className="text-[10px] font-bold text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-1 rounded-lg hover:bg-yellow-500/20 transition-colors whitespace-nowrap">Bekliyor</button>
                   )}
-                  {f.durum === "odendi" && <span className="text-[10px] text-emerald-600 font-bold">✓</span>}
-                  <button onClick={() => sil(f.id)} className="text-gray-700 hover:text-red-600 transition-colors ml-1"><Trash2 size={13} /></button>
+                  {f.durum === "odendi" && <span className="text-[10px] text-emerald-400 font-bold">✓</span>}
+                  <button onClick={() => sil(f.id)} className="text-gray-700 hover:text-red-400 transition-colors ml-1"><Trash2 size={13} /></button>
                 </div>
               </td>
             </tr>
           ))}
         </tbody>
         <tfoot>
-          <tr className="border-t border-[#e2e5eb] bg-[#f7f8fa]">
+          <tr className="border-t border-cizgi bg-alan">
             <td colSpan={4} className="px-4 py-3 text-[10px] text-gray-600 font-bold uppercase">{liste.length} fatura</td>
-            <td className="px-4 py-3 text-emerald-600 font-black">₺{fmt(liste.reduce((s, f) => s + (f.toplam_tutar || 0), 0))}</td>
+            <td className="px-4 py-3 text-emerald-400 font-black">₺{fmt(liste.reduce((s, f) => s + (f.toplam_tutar || 0), 0))}</td>
             <td colSpan={2} />
           </tr>
         </tfoot>
@@ -482,37 +483,35 @@ export default function FaturalarPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased pb-24">
+    <div className="min-h-screen bg-zemin text-yazi font-sans antialiased pb-24">
 
       {toast && (
-        <div className={`fixed top-5 right-5 z-[80] flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-2xl text-sm font-semibold ${toast.tip === "basari" ? "bg-emerald-950 border-emerald-500/30 text-emerald-600" : "bg-red-950 border-red-500/30 text-red-600"}`}>
+        <div className={`fixed top-5 right-5 z-[80] flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-2xl text-sm font-semibold ${toast.tip === "basari" ? "bg-emerald-950 border-emerald-500/30 text-emerald-400" : "bg-red-950 border-red-500/30 text-red-400"}`}>
           {toast.tip === "basari" ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
           {toast.mesaj}
         </div>
       )}
 
       {/* HEADER */}
-      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-cizgi bg-zemin/95 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center">
-              <FileText className="h-4 w-4 text-white" />
-            </div>
+            <SayfaSimgesi />
             <div>
-              <h1 className="text-sm font-black text-[#1a1f2e] leading-none">Faturalar</h1>
+              <h1 className="text-sm font-black text-yazi leading-none">Faturalar</h1>
               <p className="text-[10px] text-gray-600 mt-0.5">{faturalar.length} fatura</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={veriCek} className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-xl transition-colors">
+            <button onClick={veriCek} className="p-2 text-gray-600 hover:text-yazi border border-cizgi rounded-xl transition-colors">
               <RefreshCw size={14} />
             </button>
-            <label className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-colors cursor-pointer border border-[#e2e5eb] text-gray-400 hover:text-[#1a1f2e] ${xlsYukleniyor ? "opacity-50" : ""}`}>
+            <label className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-colors cursor-pointer border border-cizgi text-gray-400 hover:text-yazi ${xlsYukleniyor ? "opacity-50" : ""}`}>
               {xlsYukleniyor ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
               XLS Yükle
               <input ref={fileRef} type="file" accept=".xls,.xlsx" className="hidden" onChange={xlsYukle} disabled={xlsYukleniyor} />
             </label>
-            <button onClick={() => setModalAcik(true)} className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-colors">
+            <button onClick={() => setModalAcik(true)} className="flex items-center gap-2 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 px-4 py-2 rounded-xl transition-colors">
               <Plus size={14} /> Fatura Ekle
             </button>
           </div>
@@ -529,7 +528,7 @@ export default function FaturalarPage() {
             { label: "Ödendi", value: toplamlar.odendi, color: "#34D399" },
             { label: "Gecikti", value: toplamlar.gecikti, color: "#F87171" },
           ].map(k => (
-            <div key={k.label} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
+            <div key={k.label} className="bg-kart border border-cizgi rounded-2xl p-4">
               <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1">{k.label}</p>
               <p className="text-lg font-black" style={{ color: k.color }}>₺{fmt(k.value)}</p>
             </div>
@@ -540,20 +539,20 @@ export default function FaturalarPage() {
         <KdvOzetiBolumu faturalar={faturalar} cariler={cariler} />
 
         {/* FİLTRELER */}
-        <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4 space-y-3">
+        <div className="bg-kart border border-cizgi rounded-2xl p-4 space-y-3">
           <div className="flex flex-wrap gap-2 items-center justify-between">
-            <div className="flex gap-1 bg-[#f7f8fa] border border-[#e2e5eb] rounded-xl p-1">
+            <div className="flex gap-1 bg-alan border border-cizgi rounded-xl p-1">
               {[{ key: "aylik", label: "Aylık" }, { key: "tarih", label: "Tarih Aralığı" }, { key: "cari", label: "Cari Bazlı" }].map(m => (
                 <button key={m.key} onClick={() => setGorunumModu(m.key as any)}
-                  className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${gorunumModu === m.key ? "bg-blue-600 text-white" : "text-gray-500 hover:text-[#1a1f2e]"}`}>
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${gorunumModu === m.key ? "kebo-btn-altin text-[#1a1408]" : "text-gray-500 hover:text-yazi"}`}>
                   {m.label}
                 </button>
               ))}
             </div>
-            <div className="flex gap-1 bg-[#f7f8fa] border border-[#e2e5eb] rounded-xl p-1">
+            <div className="flex gap-1 bg-alan border border-cizgi rounded-xl p-1">
               {(["hepsi", "bekliyor", "odendi", "gecikti"] as const).map(d => (
                 <button key={d} onClick={() => setDurumFiltre(d)}
-                  className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${durumFiltre === d ? "bg-blue-600 text-white" : "text-gray-500 hover:text-[#1a1f2e]"}`}>
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${durumFiltre === d ? "kebo-btn-altin text-[#1a1408]" : "text-gray-500 hover:text-yazi"}`}>
                   {d === "hepsi" ? "Hepsi" : d === "bekliyor" ? "Bekliyor" : d === "odendi" ? "Ödendi" : "Gecikti"}
                 </button>
               ))}
@@ -562,16 +561,16 @@ export default function FaturalarPage() {
 
           {gorunumModu === "tarih" && (
             <div className="flex flex-wrap gap-3 items-center">
-              <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)} className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none focus:border-blue-500/40" />
+              <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)} className="bg-alan border border-cizgi text-yazi text-xs h-9 px-3 rounded-xl outline-none focus:border-altin/50" />
               <span className="text-gray-600 text-xs">—</span>
-              <input type="date" value={bitis} onChange={e => setBitis(e.target.value)} className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none focus:border-blue-500/40" />
+              <input type="date" value={bitis} onChange={e => setBitis(e.target.value)} className="bg-alan border border-cizgi text-yazi text-xs h-9 px-3 rounded-xl outline-none focus:border-altin/50" />
               <div className="flex gap-1.5 flex-wrap">
                 {[
                   { label: "Bu ay", fn: () => { setBaslangic(ayBasi()); setBitis(bugun()); } },
                   { label: "Son 30 gün", fn: () => { setBaslangic(gunEkle(bugun(), -30)); setBitis(bugun()); } },
                   { label: "Son 3 ay", fn: () => { setBaslangic(gunEkle(bugun(), -91)); setBitis(bugun()); } },
                 ].map(b => (
-                  <button key={b.label} onClick={b.fn} className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-black/[0.04] text-gray-400 hover:bg-blue-600 hover:text-white transition-colors">{b.label}</button>
+                  <button key={b.label} onClick={b.fn} className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-white/[0.04] text-gray-400 hover:bg-altin hover:text-[#1a1408] transition-colors">{b.label}</button>
                 ))}
               </div>
             </div>
@@ -580,38 +579,38 @@ export default function FaturalarPage() {
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
             <input value={aramaMetni} onChange={e => setAramaMetni(e.target.value)} placeholder="Cari veya fatura no ara..."
-              className="w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 pl-9 pr-3 rounded-xl outline-none focus:border-blue-500/40 placeholder:text-gray-700" />
+              className="w-full bg-alan border border-cizgi text-yazi text-xs h-9 pl-9 pr-3 rounded-xl outline-none focus:border-altin/50 placeholder:text-gray-700" />
           </div>
         </div>
 
         {yukleniyor ? (
           <div className="flex items-center justify-center py-20"><div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" /></div>
         ) : filtreliFaturalar.length === 0 ? (
-          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl py-16 text-center text-gray-600 text-xs uppercase tracking-widest">Fatura bulunamadı</div>
+          <div className="bg-kart border border-cizgi rounded-2xl py-16 text-center text-gray-600 text-xs uppercase tracking-widest">Fatura bulunamadı</div>
         ) : (
           <>
             {/* AYLIK */}
             {gorunumModu === "aylik" && (
               <div className="space-y-3">
                 {aylikGruplar.map(([key, liste]) => (
-                  <div key={key} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
-                    <button onClick={() => toggleAy(key)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-black/[0.03] transition-colors">
+                  <div key={key} className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
+                    <button onClick={() => toggleAy(key)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.03] transition-colors">
                       <div className="flex items-center gap-3">
-                        <Calendar size={14} className="text-blue-600" />
-                        <span className="text-sm font-black text-[#1a1f2e]">{ayBaslik(key)}</span>
-                        <span className="text-[11px] text-gray-600 bg-black/[0.04] px-2 py-0.5 rounded-full">{liste.length} fatura</span>
+                        <Calendar size={14} className="text-blue-400" />
+                        <span className="text-sm font-black text-yazi">{ayBaslik(key)}</span>
+                        <span className="text-[11px] text-gray-600 bg-white/[0.04] px-2 py-0.5 rounded-full">{liste.length} fatura</span>
                         {liste.some(f => seciliFaturalar.has(f.id)) && (
-                          <span className="text-[11px] text-blue-600 bg-blue-500/10 px-2 py-0.5 rounded-full">
+                          <span className="text-[11px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">
                             {liste.filter(f => seciliFaturalar.has(f.id)).length} seçili
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-4">
-                        <span className="text-sm font-black text-emerald-600">₺{fmt(liste.reduce((s, f) => s + (f.toplam_tutar || 0), 0))}</span>
+                        <span className="text-sm font-black text-emerald-400">₺{fmt(liste.reduce((s, f) => s + (f.toplam_tutar || 0), 0))}</span>
                         {acikAylar.has(key) ? <ChevronUp size={14} className="text-gray-600" /> : <ChevronDown size={14} className="text-gray-600" />}
                       </div>
                     </button>
-                    {acikAylar.has(key) && <div className="border-t border-[#e2e5eb] overflow-x-auto">{faturaTablosu(liste)}</div>}
+                    {acikAylar.has(key) && <div className="border-t border-cizgi overflow-x-auto">{faturaTablosu(liste)}</div>}
                   </div>
                 ))}
               </div>
@@ -619,7 +618,7 @@ export default function FaturalarPage() {
 
             {/* TARİH ARALIKLI */}
             {gorunumModu === "tarih" && (
-              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden overflow-x-auto">
+              <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden overflow-x-auto">
                 {faturaTablosu(filtreliFaturalar)}
               </div>
             )}
@@ -628,32 +627,32 @@ export default function FaturalarPage() {
             {gorunumModu === "cari" && (
               <div className="space-y-3">
                 {cariGruplari.map(g => (
-                  <div key={g.unvan} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
+                  <div key={g.unvan} className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
                     <button onClick={() => setCariFiltre(cariFiltre === g.unvan ? "hepsi" : g.unvan)}
-                      className="w-full flex items-center justify-between px-5 py-4 hover:bg-black/[0.03] transition-colors">
+                      className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.03] transition-colors">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                          <span className="text-xs font-black text-blue-600">{g.unvan.charAt(0)}</span>
+                          <span className="text-xs font-black text-blue-400">{g.unvan.charAt(0)}</span>
                         </div>
                         <div className="text-left">
-                          <p className="text-sm font-bold text-[#1a1f2e]">{g.unvan}</p>
+                          <p className="text-sm font-bold text-yazi">{g.unvan}</p>
                           <p className="text-[10px] text-gray-600">{g.faturalar.length} fatura</p>
                         </div>
                         {g.faturalar.some(f => seciliFaturalar.has(f.id)) && (
-                          <span className="text-[11px] text-blue-600 bg-blue-500/10 px-2 py-0.5 rounded-full">
+                          <span className="text-[11px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">
                             {g.faturalar.filter(f => seciliFaturalar.has(f.id)).length} seçili
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right">
-                          <p className="text-sm font-black text-emerald-600">₺{fmt(g.toplam)}</p>
-                          <p className="text-[10px] text-yellow-600">₺{fmt(g.faturalar.filter(f => f.durum === "bekliyor").reduce((s, f) => s + f.toplam_tutar, 0))} bekliyor</p>
+                          <p className="text-sm font-black text-emerald-400">₺{fmt(g.toplam)}</p>
+                          <p className="text-[10px] text-yellow-400">₺{fmt(g.faturalar.filter(f => f.durum === "bekliyor").reduce((s, f) => s + f.toplam_tutar, 0))} bekliyor</p>
                         </div>
                         {cariFiltre === g.unvan ? <ChevronUp size={14} className="text-gray-600" /> : <ChevronDown size={14} className="text-gray-600" />}
                       </div>
                     </button>
-                    {cariFiltre === g.unvan && <div className="border-t border-[#e2e5eb] overflow-x-auto">{faturaTablosu(g.faturalar)}</div>}
+                    {cariFiltre === g.unvan && <div className="border-t border-cizgi overflow-x-auto">{faturaTablosu(g.faturalar)}</div>}
                   </div>
                 ))}
               </div>
@@ -664,12 +663,12 @@ export default function FaturalarPage() {
 
       {/* TOPLU İŞLEM ÇUBUĞU — "Ödendi İşaretle" kaldırıldı */}
       {seciliFaturalar.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#ffffff]/98 backdrop-blur-xl border-t border-blue-500/30 px-4 py-3">
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-kart/98 backdrop-blur-xl border-t border-blue-500/30 px-4 py-3">
           <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-black text-blue-600">{seciliFaturalar.size} fatura seçildi</span>
-              <span className="text-sm font-black text-[#1a1f2e]">· ₺{fmt(seciliToplam)}</span>
-              <button onClick={secimTemizle} className="text-[11px] text-gray-500 hover:text-[#1a1f2e] transition-colors">Seçimi Temizle</button>
+              <span className="text-sm font-black text-blue-400">{seciliFaturalar.size} fatura seçildi</span>
+              <span className="text-sm font-black text-yazi">· ₺{fmt(seciliToplam)}</span>
+              <button onClick={secimTemizle} className="text-[11px] text-gray-500 hover:text-yazi transition-colors">Seçimi Temizle</button>
             </div>
             <div className="flex items-center gap-2">
               <button onClick={topluGecikti} disabled={topluIslemYukleniyor}
@@ -689,10 +688,10 @@ export default function FaturalarPage() {
       {/* FATURA MODAL */}
       {modalAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-kart border border-cizgi rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-sm font-black text-[#1a1f2e]">Yeni Fatura</h3>
-              <button onClick={() => setModalAcik(false)} className="text-gray-600 hover:text-[#1a1f2e]"><X size={16} /></button>
+              <h3 className="text-sm font-black text-yazi">Yeni Fatura</h3>
+              <button onClick={() => setModalAcik(false)} className="text-gray-600 hover:text-yazi"><X size={16} /></button>
             </div>
             <div className="space-y-3">
               <div>
@@ -702,8 +701,8 @@ export default function FaturalarPage() {
                   const vk = c?.varsayilan_kdv;
                   setForm({ ...form, cari_id: e.target.value, kdv: vk === null || vk === undefined ? form.kdv : String(Number(vk)) });
                 }} className={inputCls}>
-                  <option value="" className="bg-[#ffffff]">Cari seçin...</option>
-                  {cariler.map(c => <option key={c.id} value={c.id} className="bg-[#ffffff]">{c.unvan}{c.varsayilan_kdv === null || c.varsayilan_kdv === undefined ? " (KDV tanımsız)" : ""}</option>)}
+                  <option value="" className="bg-kart">Cari seçin...</option>
+                  {cariler.map(c => <option key={c.id} value={c.id} className="bg-kart">{c.unvan}{c.varsayilan_kdv === null || c.varsayilan_kdv === undefined ? " (KDV tanımsız)" : ""}</option>)}
                 </select>
               </div>
               <div>
@@ -731,15 +730,15 @@ export default function FaturalarPage() {
                 <div>
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">KDV (%)</p>
                   <select value={form.kdv} onChange={e => setForm({ ...form, kdv: e.target.value })} className={inputCls}>
-                    {["0", "1", "10", "20"].map(v => <option key={v} value={v} className="bg-[#ffffff]">%{v}</option>)}
+                    {["0", "1", "10", "20"].map(v => <option key={v} value={v} className="bg-kart">%{v}</option>)}
                   </select>
                   {(() => { const c = cariler.find(x => x.id === form.cari_id); return c && (c.varsayilan_kdv === null || c.varsayilan_kdv === undefined)
-                    ? <p className="text-[10px] text-amber-700 mt-1">Carinin KDV oranı: Tanımsız — oranı kontrol edin.</p> : null; })()}
+                    ? <p className="text-[10px] text-amber-300 mt-1">Carinin KDV oranı: Tanımsız — oranı kontrol edin.</p> : null; })()}
                 </div>
               </div>
-              <div className="bg-[#f7f8fa] border border-[#e2e5eb] rounded-xl px-4 py-3 flex justify-between">
+              <div className="bg-alan border border-cizgi rounded-xl px-4 py-3 flex justify-between">
                 <span className="text-xs text-gray-500">Toplam (KDV Dahil)</span>
-                <span className="text-sm font-black text-emerald-600">₺{fmt(parseFloat(form.toplam_tutar) || 0)}</span>
+                <span className="text-sm font-black text-emerald-400">₺{fmt(parseFloat(form.toplam_tutar) || 0)}</span>
               </div>
               <div>
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Açıklama</p>
@@ -748,14 +747,14 @@ export default function FaturalarPage() {
               <div>
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-1.5">Durum</p>
                 <select value={form.durum} onChange={e => setForm({ ...form, durum: e.target.value })} className={inputCls}>
-                  <option value="bekliyor" className="bg-[#ffffff]">Bekliyor</option>
-                  <option value="gecikti" className="bg-[#ffffff]">Gecikti</option>
+                  <option value="bekliyor" className="bg-kart">Bekliyor</option>
+                  <option value="gecikti" className="bg-kart">Gecikti</option>
                 </select>
               </div>
               <div className="flex gap-2 pt-2">
-                <button onClick={() => setModalAcik(false)} className="flex-1 text-xs font-semibold text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] py-2.5 rounded-xl transition-colors">İptal</button>
+                <button onClick={() => setModalAcik(false)} className="flex-1 text-xs font-semibold text-gray-500 hover:text-yazi border border-cizgi py-2.5 rounded-xl transition-colors">İptal</button>
                 <button onClick={kaydet} disabled={formSaving}
-                  className="flex-1 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+                  className="flex-1 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 disabled:opacity-40 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
                   {formSaving ? <Loader2 size={12} className="animate-spin" /> : null} Kaydet
                 </button>
               </div>

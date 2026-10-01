@@ -40,24 +40,24 @@ export default function AyarlarPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] p-5">
+    <main className="min-h-screen bg-zemin text-yazi p-5">
       <h1 className="text-2xl font-black pt-5 mb-6">Ayarlar</h1>
 
       <div className="max-w-lg space-y-4">
 
         {/* Hesap Bilgisi */}
-        <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
+        <div className="bg-kart border border-cizgi rounded-2xl p-5">
           <div className="flex items-center gap-3 mb-3">
-            <User size={16} className="text-blue-600" />
+            <User size={16} className="text-blue-400" />
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Hesap</p>
           </div>
-          <p className="text-sm text-[#1a1f2e] font-semibold">{email}</p>
+          <p className="text-sm text-yazi font-semibold">{email}</p>
         </div>
 
         {/* Çıkış */}
         <button
           onClick={handleSignOut}
-          className="w-full flex items-center gap-3 bg-[#ffffff] border border-red-500/20 hover:border-red-500/40 hover:bg-red-500/5 text-red-600 rounded-2xl p-5 transition-colors text-sm font-semibold"
+          className="w-full flex items-center gap-3 bg-kart border border-red-500/20 hover:border-red-500/40 hover:bg-red-500/5 text-red-400 rounded-2xl p-5 transition-colors text-sm font-semibold"
         >
           <LogOut size={16} />
           Çıkış Yap
@@ -65,12 +65,12 @@ export default function AyarlarPage() {
 
         {kartlar.map(k => (
           <Link key={k.href} href={k.href}
-            className="flex items-center gap-4 bg-[#ffffff] border border-[#e2e5eb] hover:border-blue-300 rounded-2xl p-5 transition-colors">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-              <k.icon size={17} className="text-blue-600" />
+            className="flex items-center gap-4 bg-kart border border-cizgi hover:border-blue-500/25 rounded-2xl p-5 transition-colors">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
+              <k.icon size={17} className="text-blue-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-[#1a1f2e]">{k.baslik}</p>
+              <p className="text-sm font-semibold text-yazi">{k.baslik}</p>
               <p className="text-[12px] text-gray-500">{k.aciklama}</p>
             </div>
             <ChevronRight size={16} className="text-gray-400 shrink-0" />

@@ -1,5 +1,6 @@
 "use client";
 
+import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
 import { jsonCevap } from "@/lib/gorsel";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -15,7 +16,7 @@ import { bugun, ayBasi, gunEkle, gunFarki, fmtTarih } from "@/lib/tarih";
 import {
   raporOzeti, donemOzeti, platformKirilimi, indirimToplam, PLATFORMLAR, PLATFORM_RENK, type RaporVerisi, type PlatformAdi,
   RR_PAKET_UCRETI, RR_UZAK_KATSAYI, RR_KM9_KATSAYI, RR_POS_KOMISYON_ORANI, KURYE_GARANTI_PAKET as RR_KURYE_GARANTI,
-  roadrunnerKuryesiMi, roadrunnerKuryeUcreti, type KuryeSatiri, YEMEK_KARTLARI,
+  roadrunnerKuryesiMi, roadrunnerKuryeUcreti, tahsilatRoadrunnerdaMi, type KuryeSatiri, YEMEK_KARTLARI,
 } from "@/lib/hesap";
 import { useYetki } from "@/lib/useYetki";
 import PosMutabakat from "@/components/PosMutabakat";
@@ -83,7 +84,7 @@ function TrendBadge({ value, prev }: { value: number; prev: number }) {
   if (!prev) return null;
   const pct = ((value - prev) / prev) * 100;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${pct >= 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"}`}>
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${pct >= 0 ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
       {pct >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
       {Math.abs(pct).toFixed(1)}%
     </span>
@@ -203,6 +204,7 @@ export default function RaporAnalizPage() {
     const isimBazinda: Record<string, {
       isim: string; tip: string; normal: number; uzak: number; km9: number;
       gercek: number; uygulanan: number; garantiFarki: number; ucret: number; nakit: number; pos: number;
+      rrNakit: number; rrPos: number;
     }> = {};
 
     raporlar.forEach(r => {
@@ -213,11 +215,13 @@ export default function RaporAnalizPage() {
 
         const isim = (k?.isim || "").trim() || (sabit ? "Sabit Kurye" : "Havuz Kurye");
         const key = `${isim}__${sabit ? "sabit" : "havuz"}`;
-        if (!isimBazinda[key]) isimBazinda[key] = { isim, tip: sabit ? "sabit" : "havuz", normal: 0, uzak: 0, km9: 0, gercek: 0, uygulanan: 0, garantiFarki: 0, ucret: 0, nakit: 0, pos: 0 };
+        if (!isimBazinda[key]) isimBazinda[key] = { isim, tip: sabit ? "sabit" : "havuz", normal: 0, uzak: 0, km9: 0, gercek: 0, uygulanan: 0, garantiFarki: 0, ucret: 0, nakit: 0, pos: 0, rrNakit: 0, rrPos: 0 };
         const acc = isimBazinda[key];
         acc.normal += normal; acc.uzak += uzak; acc.km9 += km9; acc.gercek += gercek;
         acc.uygulanan += uygulanan; acc.garantiFarki += garantiFarki; acc.ucret += ucret;
         acc.nakit += nakit; acc.pos += pos;
+        // 28.09'dan itibaren sabit kuryeler (Kurye 1-2) parayı kasaya teslim eder; borçtan sadece Roadrunner'da kalan düşer.
+        if (tahsilatRoadrunnerdaMi(r.tarih, k)) { acc.rrNakit += nakit; acc.rrPos += pos; }
       });
     });
 
@@ -233,14 +237,18 @@ export default function RaporAnalizPage() {
     const toplamPaketUcreti = topla(k => k.ucret);
     const toplamNakit = topla(k => k.nakit);
     const toplamPos = topla(k => k.pos);
-    const posKomisyonu = toplamPos * RR_POS_KOMISYON_ORANI;
+    const rrNakit = topla(k => k.rrNakit);
+    const rrPos = topla(k => k.rrPos);
+    // Komisyon sadece Roadrunner'ın POS'uyla çekilen tutara (kasaya teslim edilen POS bizim POS'umuz)
+    const posKomisyonu = rrPos * RR_POS_KOMISYON_ORANI;
     const toplamBorc = toplamPaketUcreti + posKomisyonu; // Roadrunner'a ödenmesi/mahsup edilmesi gereken
-    const toplamTahsilat = toplamNakit + toplamPos; // kuryelerin müşteriden kapıda tahsil ettiği toplam
+    const toplamTahsilat = rrNakit + rrPos; // Roadrunner'da kalan kapıda tahsilat (borçtan düşer)
+    const kasayaTeslim = (toplamNakit + toplamPos) - toplamTahsilat; // Kurye 1-2'nin kasaya / POS'a teslim ettiği
     const mutabakatFarki = toplamTahsilat - toplamBorc; // (+) biz alacaklıyız, (-) biz borçluyuz
 
     return {
       kuryeListesi, toplamNormal, toplamUzak, toplamKm9, toplamGercek, toplamUygulanan, toplamGarantiFarki,
-      toplamPaketUcreti, toplamNakit, toplamPos, posKomisyonu, toplamBorc, toplamTahsilat, mutabakatFarki,
+      toplamPaketUcreti, toplamNakit, toplamPos, posKomisyonu, toplamBorc, toplamTahsilat, kasayaTeslim, mutabakatFarki,
     };
   }, [raporlar]);
 
@@ -398,44 +406,42 @@ ${isletmeOzeti}`,
   };
 
   if (yetkiYukleniyor) return (
-    <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center">
+    <div className="min-h-screen bg-zemin flex items-center justify-center">
       <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
     </div>
   );
 
   if (!yetkili) return (
-    <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center p-6">
-      <div className="bg-[#ffffff] border border-red-500/20 rounded-2xl p-8 max-w-sm text-center">
-        <AlertTriangle className="h-10 w-10 text-red-600 mx-auto mb-4" />
-        <h1 className="text-[#1a1f2e] font-black text-lg mb-2">Erişim Kısıtlı</h1>
+    <div className="min-h-screen bg-zemin flex items-center justify-center p-6">
+      <div className="bg-kart border border-red-500/20 rounded-2xl p-8 max-w-sm text-center">
+        <AlertTriangle className="h-10 w-10 text-red-400 mx-auto mb-4" />
+        <h1 className="text-yazi font-black text-lg mb-2">Erişim Kısıtlı</h1>
         <p className="text-gray-500 text-sm">Bu sayfa için Rapor Analizi yetkisi gerekir.</p>
       </div>
     </div>
   );
 
   const oncelikRenk = otomatikAnaliz?.oncelik === "iyi"
-    ? { border: "border-emerald-500/30", bg: "bg-emerald-500/5", dot: "bg-emerald-500", text: "text-emerald-600", label: "İyi Durum" }
+    ? { border: "border-emerald-500/30", bg: "bg-emerald-500/5", dot: "bg-emerald-500", text: "text-emerald-400", label: "İyi Durum" }
     : otomatikAnaliz?.oncelik === "kritik"
-    ? { border: "border-red-500/30", bg: "bg-red-500/5", dot: "bg-red-500", text: "text-red-600", label: "Kritik" }
-    : { border: "border-amber-500/30", bg: "bg-amber-500/5", dot: "bg-amber-500", text: "text-amber-600", label: "Orta" };
+    ? { border: "border-red-500/30", bg: "bg-red-500/5", dot: "bg-red-500", text: "text-red-400", label: "Kritik" }
+    : { border: "border-amber-500/30", bg: "bg-amber-500/5", dot: "bg-amber-500", text: "text-amber-400", label: "Orta" };
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased pb-10">
+    <div className="min-h-screen bg-zemin text-yazi font-sans antialiased pb-10">
 
       {/* HEADER */}
-      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-cizgi bg-zemin/95 backdrop-blur-xl">
         <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center">
-              <BarChart3 className="h-4 w-4 text-white" />
-            </div>
+            <SayfaSimgesi />
             <div>
-              <h1 className="text-sm font-black text-[#1a1f2e] leading-none">Rapor & Analiz</h1>
+              <h1 className="text-sm font-black text-yazi leading-none">Rapor & Analiz</h1>
               <p className="text-[10px] text-gray-600 mt-0.5 leading-none">AI destekli iş zekası</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 bg-[#ffffff] border border-[#e2e5eb] px-3 py-1.5 rounded-xl">
+            <div className="flex items-center gap-1.5 bg-kart border border-cizgi px-3 py-1.5 rounded-xl">
               <Calendar size={11} className="text-gray-600" />
               <input type="date" value={baslangic} onChange={e => setBaslangic(e.target.value)}
                 className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer w-28" />
@@ -444,7 +450,7 @@ ${isletmeOzeti}`,
                 className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer w-28" />
             </div>
             <button onClick={veriCek} disabled={yukleniyor}
-              className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-xl transition-colors disabled:opacity-40">
+              className="p-2 text-gray-600 hover:text-yazi border border-cizgi rounded-xl transition-colors disabled:opacity-40">
               <RefreshCw size={14} className={yukleniyor ? "animate-spin" : ""} />
             </button>
           </div>
@@ -454,11 +460,11 @@ ${isletmeOzeti}`,
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-5 space-y-5">
 
         {/* Rapor türü + filtreler */}
-        <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5 space-y-4">
+        <div className="bg-kart border border-cizgi rounded-2xl p-5 space-y-4">
           <div className="flex flex-wrap gap-2">
             {RAPOR_TURLERI.map(t => (
               <button key={t.key} onClick={() => setRaporTuru(t.key)}
-                className={`text-xs font-bold px-4 py-2 rounded-xl transition-colors ${raporTuru === t.key ? "bg-blue-600 text-white" : "bg-black/[0.04] text-gray-400 hover:text-[#1a1f2e]"}`}>
+                className={`text-xs font-bold px-4 py-2 rounded-xl transition-colors ${raporTuru === t.key ? "kebo-btn-altin text-[#1a1408]" : "bg-white/[0.04] text-gray-400 hover:text-yazi"}`}>
                 {t.label}
               </button>
             ))}
@@ -470,7 +476,7 @@ ${isletmeOzeti}`,
               <div className="flex flex-wrap gap-2 mb-3">
                 {PLATFORMLAR.map(p => (
                   <button key={p} onClick={() => setSeciliPlatformlar(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-colors border ${seciliPlatformlar.includes(p) ? "text-[#1a1f2e] border-transparent" : "bg-black/[0.04] text-gray-500 border-[#e2e5eb]"}`}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-colors border ${seciliPlatformlar.includes(p) ? "text-yazi border-transparent" : "bg-white/[0.04] text-gray-500 border-cizgi"}`}
                     style={seciliPlatformlar.includes(p) ? { backgroundColor: PLATFORM_RENK[p] } : {}}>
                     {p}
                   </button>
@@ -479,7 +485,7 @@ ${isletmeOzeti}`,
               <div className="flex gap-2">
                 {(["hepsi", "online", "kapida"] as const).map(o => (
                   <button key={o} onClick={() => setOdemeFiltre(o)}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-colors ${odemeFiltre === o ? "bg-emerald-600 text-white" : "bg-black/[0.04] text-gray-400 hover:text-[#1a1f2e]"}`}>
+                    className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-colors ${odemeFiltre === o ? "bg-emerald-600 text-white" : "bg-white/[0.04] text-gray-400 hover:text-yazi"}`}>
                     {o === "hepsi" ? "Online + Kapıda" : o === "online" ? "Sadece Online" : "Sadece Kapıda"}
                   </button>
                 ))}
@@ -493,7 +499,7 @@ ${isletmeOzeti}`,
             <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
           </div>
         ) : raporlar.length === 0 ? (
-          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl py-16 text-center text-gray-600 text-sm">
+          <div className="bg-kart border border-cizgi rounded-2xl py-16 text-center text-gray-600 text-sm">
             Bu tarih aralığında rapor bulunamadı.
           </div>
         ) : (
@@ -508,7 +514,7 @@ ${isletmeOzeti}`,
                     { label: "Toplam Gider", value: stats.toplamGider, prev: stats.oncGider, color: "#F87171" },
                     { label: "Günlük Ortalama", value: stats.gunlukOrt, prev: 0, color: "#FBBF24" },
                   ].map(k => (
-                    <div key={k.label} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
+                    <div key={k.label} className="bg-kart border border-cizgi rounded-2xl p-4">
                       <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">{k.label}</p>
                       <p className="text-xl font-black" style={{ color: k.color }}>₺{fmt(k.value)}</p>
                       {k.prev > 0 && <div className="mt-1"><TrendBadge value={k.value} prev={k.prev} /></div>}
@@ -516,31 +522,31 @@ ${isletmeOzeti}`,
                   ))}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
+                  <div className="bg-kart border border-cizgi rounded-2xl p-4">
                     <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">Gider Oranı</p>
-                    <p className="text-xl font-black text-orange-600">%{stats.giderOrani.toFixed(1)}</p>
-                    <div className="mt-2 h-1.5 bg-black/[0.04] rounded-full overflow-hidden">
+                    <p className="text-xl font-black text-orange-400">%{stats.giderOrani.toFixed(1)}</p>
+                    <div className="mt-2 h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
                       <div className="h-full rounded-full bg-orange-500/60" style={{ width: `${Math.min(stats.giderOrani, 100)}%` }} />
                     </div>
                   </div>
                   {stats.enIyi && (
-                    <div className="bg-[#ffffff] border border-emerald-500/20 rounded-2xl p-4">
-                      <p className="text-[10px] text-emerald-600 uppercase tracking-widest mb-1">En İyi Gün</p>
-                      <p className="text-sm font-bold text-[#1a1f2e]">{fmtTarih(stats.enIyi.tarih)}</p>
-                      <p className="text-lg font-black text-emerald-600">₺{fmt(stats.enIyi.brut)}</p>
+                    <div className="bg-kart border border-emerald-500/20 rounded-2xl p-4">
+                      <p className="text-[10px] text-emerald-400 uppercase tracking-widest mb-1">En İyi Gün</p>
+                      <p className="text-sm font-bold text-yazi">{fmtTarih(stats.enIyi.tarih)}</p>
+                      <p className="text-lg font-black text-emerald-400">₺{fmt(stats.enIyi.brut)}</p>
                     </div>
                   )}
                   {stats.enKotu && (
-                    <div className="bg-[#ffffff] border border-red-500/20 rounded-2xl p-4">
-                      <p className="text-[10px] text-red-600 uppercase tracking-widest mb-1">En Düşük Gün</p>
-                      <p className="text-sm font-bold text-[#1a1f2e]">{fmtTarih(stats.enKotu.tarih)}</p>
-                      <p className="text-lg font-black text-red-600">₺{fmt(stats.enKotu.brut)}</p>
+                    <div className="bg-kart border border-red-500/20 rounded-2xl p-4">
+                      <p className="text-[10px] text-red-400 uppercase tracking-widest mb-1">En Düşük Gün</p>
+                      <p className="text-sm font-bold text-yazi">{fmtTarih(stats.enKotu.tarih)}</p>
+                      <p className="text-lg font-black text-red-400">₺{fmt(stats.enKotu.brut)}</p>
                     </div>
                   )}
                 </div>
                 {/* Günlük trend grafiği */}
                 {stats.gunlukDetay.length > 1 && (
-                  <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
+                  <div className="bg-kart border border-cizgi rounded-2xl p-5">
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">Günlük Ciro Trendi</p>
                     <div className="h-[180px]">
                       <ResponsiveContainer width="100%" height="100%">
@@ -548,7 +554,7 @@ ${isletmeOzeti}`,
                           <CartesianGrid strokeDasharray="3 3" stroke="#1a2236" />
                           <XAxis dataKey="name" stroke="#444" fontSize={9} tickLine={false} />
                           <YAxis stroke="#444" fontSize={9} tickLine={false} tickFormatter={v => `₺${v >= 1000 ? (v/1000).toFixed(0)+"K" : v}`} />
-                          <Tooltip contentStyle={{ backgroundColor: "#0c0f1a", borderColor: "#1a2236", color: "#fff", fontSize: 11 }} />
+                          <Tooltip contentStyle={{ backgroundColor: "#18181b", borderColor: "rgba(255,255,255,0.1)", borderRadius: 12, color: "#fff", fontSize: 11 }} />
                           <Line type="monotone" dataKey="ciro" stroke="#3b82f6" strokeWidth={2} dot={false} name="Brüt Ciro" />
                           <Line type="monotone" dataKey="net" stroke="#34d399" strokeWidth={2} dot={false} name="Net" />
                         </LineChart>
@@ -557,7 +563,7 @@ ${isletmeOzeti}`,
                   </div>
                 )}
                 {/* Kasa ödeme dağılımı */}
-                <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5 space-y-4">
+                <div className="bg-kart border border-cizgi rounded-2xl p-5 space-y-4">
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><Wallet size={12} /> Kasa Ödeme Dağılımı</p>
                   {[
                     { label: "Nakit", value: stats.kasaNakit, color: "#34D399" },
@@ -567,23 +573,23 @@ ${isletmeOzeti}`,
                     const toplam = stats.kasaNakit + stats.kasaPos + stats.kasaKartlar.reduce((t, k) => t + k.deger, 0);
                     const pct = toplam > 0 ? (item.value / toplam) * 100 : 0;
                     return (
-                      <div key={item.label} className="bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] p-4">
+                      <div key={item.label} className="bg-alan rounded-xl border border-cizgi p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-bold text-[#1a1f2e]">{item.label}</span>
+                          <span className="text-sm font-bold text-yazi">{item.label}</span>
                           <div className="flex items-center gap-3">
                             <span className="text-xs text-gray-500">{Math.round(pct)}%</span>
                             <span className="text-lg font-black" style={{ color: item.color }}>₺{fmt(item.value)}</span>
                           </div>
                         </div>
-                        <div className="h-2 bg-black/[0.04] rounded-full overflow-hidden">
+                        <div className="h-2 bg-white/[0.04] rounded-full overflow-hidden">
                           <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: item.color }} />
                         </div>
                       </div>
                     );
                   })}
-                  <div className="pt-3 border-t border-[#e2e5eb] flex justify-between">
+                  <div className="pt-3 border-t border-cizgi flex justify-between">
                     <span className="text-xs text-gray-600">Kasa Toplamı</span>
-                    <span className="text-sm font-black text-[#1a1f2e]">₺{fmt(stats.kasaNakit + stats.kasaPos + stats.kasaKartlar.reduce((t, k) => t + k.deger, 0))}</span>
+                    <span className="text-sm font-black text-yazi">₺{fmt(stats.kasaNakit + stats.kasaPos + stats.kasaKartlar.reduce((t, k) => t + k.deger, 0))}</span>
                   </div>
                 </div>
               </div>
@@ -600,12 +606,12 @@ ${isletmeOzeti}`,
               return (
                 <div className="space-y-4">
                   {satirlar.length > 0 && (
-                    <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
+                    <div className="bg-kart border border-cizgi rounded-2xl p-5">
                       <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-4 flex items-center gap-1.5"><PieChart size={12} /> Platform Gelir Dağılımı</p>
                       <div className="h-[220px]">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={satirlar.map(r => ({ name: r.p, online: r.online, kapida: r.kapida }))}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#eef0f3" vertical={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                             <XAxis dataKey="name" stroke="#6b7280" fontSize={10} tickLine={false} />
                             <YAxis stroke="#6b7280" fontSize={9} tickLine={false} tickFormatter={v => `₺${v >= 1000 ? (v / 1000).toFixed(0) + "K" : v}`} />
                             <Tooltip formatter={(v) => `₺${fmt(Number(v))}`} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
@@ -616,29 +622,29 @@ ${isletmeOzeti}`,
                       </div>
                     </div>
                   )}
-                  <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
-                    <div className="px-5 py-3 border-b border-[#e2e5eb]">
+                  <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
+                    <div className="px-5 py-3 border-b border-cizgi">
                       <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><BarChart3 size={11} /> Platform Karşılaştırma</p>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
                         <thead>
-                          <tr className="border-b border-[#e2e5eb]">
+                          <tr className="border-b border-cizgi">
                             {["Platform", "Online Satış", "Kapıda Ödeme", "Toplam", "Pay"].map(h => (
                               <th key={h} className="text-left px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold whitespace-nowrap">{h}</th>
                             ))}
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#eef0f3]">
+                        <tbody className="divide-y divide-cizgi">
                           {satirlar.map(r => (
-                            <tr key={r.p} className="hover:bg-black/[0.03] transition-colors">
-                              <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_RENK[r.p] }} /><span className="font-bold text-[#1a1f2e] whitespace-nowrap">{r.p}</span></div></td>
-                              <td className={`px-4 py-3 font-bold ${odemeFiltre === "kapida" ? "text-gray-400" : "text-blue-600"}`}>₺{fmt(r.online)}</td>
-                              <td className={`px-4 py-3 font-bold ${odemeFiltre === "online" ? "text-gray-400" : "text-orange-600"}`}>₺{fmt(r.kapida)}</td>
+                            <tr key={r.p} className="hover:bg-white/[0.03] transition-colors">
+                              <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLATFORM_RENK[r.p] }} /><span className="font-bold text-yazi whitespace-nowrap">{r.p}</span></div></td>
+                              <td className={`px-4 py-3 font-bold ${odemeFiltre === "kapida" ? "text-gray-400" : "text-blue-400"}`}>₺{fmt(r.online)}</td>
+                              <td className={`px-4 py-3 font-bold ${odemeFiltre === "online" ? "text-gray-400" : "text-orange-400"}`}>₺{fmt(r.kapida)}</td>
                               <td className="px-4 py-3 font-black whitespace-nowrap" style={{ color: PLATFORM_RENK[r.p] }}>₺{fmt(r.toplam)}</td>
                               <td className="px-4 py-3 min-w-[120px]">
                                 <div className="flex items-center gap-2">
-                                  <div className="flex-1 h-1.5 bg-black/[0.04] rounded-full overflow-hidden">
+                                  <div className="flex-1 h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
                                     <div className="h-full rounded-full" style={{ width: `${Math.min(r.pct, 100)}%`, backgroundColor: PLATFORM_RENK[r.p] }} />
                                   </div>
                                   <span className="text-gray-500 w-10 text-right">%{r.pct.toFixed(1)}</span>
@@ -648,17 +654,17 @@ ${isletmeOzeti}`,
                           ))}
                         </tbody>
                         <tfoot>
-                          <tr className="border-t border-[#e2e5eb] bg-[#f7f8fa]">
+                          <tr className="border-t border-cizgi bg-alan">
                             <td className="px-4 py-3 text-[10px] text-gray-600 uppercase font-bold">Seçili Toplam</td>
-                            <td className="px-4 py-3 text-blue-600 font-black">₺{fmt(satirlar.reduce((t, r) => t + r.online, 0))}</td>
-                            <td className="px-4 py-3 text-orange-600 font-black">₺{fmt(satirlar.reduce((t, r) => t + r.kapida, 0))}</td>
-                            <td className="px-4 py-3 font-black text-[#1a1f2e]">₺{fmt(seciliToplam)}</td>
+                            <td className="px-4 py-3 text-blue-400 font-black">₺{fmt(satirlar.reduce((t, r) => t + r.online, 0))}</td>
+                            <td className="px-4 py-3 text-orange-400 font-black">₺{fmt(satirlar.reduce((t, r) => t + r.kapida, 0))}</td>
+                            <td className="px-4 py-3 font-black text-yazi">₺{fmt(seciliToplam)}</td>
                             <td className="px-4 py-3 text-[10px] text-gray-500 whitespace-nowrap">Tüm platformlar: ₺{fmt(stats.toplamPlatform)}</td>
                           </tr>
                         </tfoot>
                       </table>
                     </div>
-                    <p className="px-5 py-2.5 border-t border-[#e2e5eb] text-[10px] text-gray-500">
+                    <p className="px-5 py-2.5 border-t border-cizgi text-[10px] text-gray-500">
                       &quot;Toplam&quot; ve &quot;Pay&quot; üstteki ödeme filtresine ({odemeFiltre === "hepsi" ? "Online + Kapıda" : odemeFiltre === "online" ? "Sadece Online" : "Sadece Kapıda"}) göre hesaplanır; pay, tüm platformların toplamına oranıdır.
                     </p>
                   </div>
@@ -668,8 +674,8 @@ ${isletmeOzeti}`,
 
             {/* ── GÜN GÜN LİSTE ── */}
             {raporTuru === "gunluk" && (
-              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
-                <div className="px-5 py-3 border-b border-[#e2e5eb]">
+              <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-cizgi">
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5">
                     <Calendar size={11} /> Gün Gün Liste
                   </p>
@@ -677,40 +683,40 @@ ${isletmeOzeti}`,
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-[#e2e5eb]">
+                      <tr className="border-b border-cizgi">
                         {["Tarih", "Brüt Ciro", "Net", "Gider", ...seciliPlatformlar, "Paket"].map(h => (
                           <th key={h} className="text-left px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#0f1624]">
+                    <tbody className="divide-y divide-cizgi">
                       {stats.gunlukDetay.map(g => (
-                        <tr key={g.tarih} className="hover:bg-black/[0.03] transition-colors">
+                        <tr key={g.tarih} className="hover:bg-white/[0.03] transition-colors">
                           <td className="px-4 py-3 text-gray-700 font-medium whitespace-nowrap">{fmtTarih(g.tarih)}</td>
-                          <td className="px-4 py-3 text-blue-600 font-bold">₺{fmt(g.brutCiro)}</td>
-                          <td className={`px-4 py-3 font-bold ${g.net >= 0 ? "text-emerald-600" : "text-red-600"}`}>₺{fmt(g.net)}</td>
-                          <td className="px-4 py-3 text-red-600">₺{fmt(g.gider)}</td>
+                          <td className="px-4 py-3 text-blue-400 font-bold">₺{fmt(g.brutCiro)}</td>
+                          <td className={`px-4 py-3 font-bold ${g.net >= 0 ? "text-emerald-400" : "text-red-400"}`}>₺{fmt(g.net)}</td>
+                          <td className="px-4 py-3 text-red-400">₺{fmt(g.gider)}</td>
                           {seciliPlatformlar.map(p => (
                             <td key={p} className="px-4 py-3 font-bold whitespace-nowrap" style={{ color: PLATFORM_RENK[p] }}>
                               ₺{fmt(g.platformDetay[p] || 0)}
                             </td>
                           ))}
-                          <td className="px-4 py-3 text-purple-600">{g.paket}</td>
+                          <td className="px-4 py-3 text-purple-400">{g.paket}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="border-t border-[#e2e5eb] bg-[#f7f8fa]">
+                      <tr className="border-t border-cizgi bg-alan">
                         <td className="px-4 py-3 text-[10px] text-gray-600 uppercase font-bold">TOPLAM</td>
-                        <td className="px-4 py-3 text-blue-600 font-black">₺{fmt(stats.brutCiro)}</td>
-                        <td className="px-4 py-3 text-emerald-600 font-black">₺{fmt(stats.netCiro)}</td>
-                        <td className="px-4 py-3 text-red-600 font-black">₺{fmt(stats.toplamGider)}</td>
+                        <td className="px-4 py-3 text-blue-400 font-black">₺{fmt(stats.brutCiro)}</td>
+                        <td className="px-4 py-3 text-emerald-400 font-black">₺{fmt(stats.netCiro)}</td>
+                        <td className="px-4 py-3 text-red-400 font-black">₺{fmt(stats.toplamGider)}</td>
                         {seciliPlatformlar.map(p => (
                           <td key={p} className="px-4 py-3 font-black whitespace-nowrap" style={{ color: PLATFORM_RENK[p] }}>
                             ₺{fmt(stats.platformlar[p] || 0)}
                           </td>
                         ))}
-                        <td className="px-4 py-3 text-purple-600 font-black">{fmt(stats.paket)}</td>
+                        <td className="px-4 py-3 text-purple-400 font-black">{fmt(stats.paket)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -722,20 +728,20 @@ ${isletmeOzeti}`,
             {raporTuru === "roadrunner" && (
               <div className="space-y-4">
                 <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 text-[11px] text-gray-700 leading-relaxed flex items-start gap-2.5">
-                  <Truck size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                  <Truck size={15} className="text-amber-400 shrink-0 mt-0.5" />
                   <p>
                     Bu hesap, seçilen tarih aralığındaki rapor girişlerinden (Kurye bölümü) otomatik toplanır.
-                    Paket başı <span className="font-bold text-amber-700">₺{RR_PAKET_UCRETI}</span>, uzak paketlerde{" "}
-                    <span className="font-bold text-orange-700">{RR_UZAK_KATSAYI}x</span>, 9km üzeri paketlerde{" "}
-                    <span className="font-bold text-red-700">{RR_KM9_KATSAYI}x</span> ücretlendirilir; sabit kuryede
-                    (Roadrunner) günlük en az <span className="font-bold text-amber-700">{RR_KURYE_GARANTI} paket</span> garantisi vardır.
-                    Kapıda ödemelerin POS ile tahsil edilen kısmından <span className="font-bold text-blue-700">%{RR_POS_KOMISYON_ORANI * 100}</span> komisyon
+                    Paket başı <span className="font-bold text-amber-300">₺{RR_PAKET_UCRETI}</span>, uzak paketlerde{" "}
+                    <span className="font-bold text-orange-300">{RR_UZAK_KATSAYI}x</span>, 9km üzeri paketlerde{" "}
+                    <span className="font-bold text-red-300">{RR_KM9_KATSAYI}x</span> ücretlendirilir; sabit kuryede
+                    (Roadrunner) günlük en az <span className="font-bold text-amber-300">{RR_KURYE_GARANTI} paket</span> garantisi vardır.
+                    Kapıda ödemelerin POS ile tahsil edilen kısmından <span className="font-bold text-blue-300">%{RR_POS_KOMISYON_ORANI * 100}</span> komisyon
                     düşülüp Roadrunner&apos;a borcumuza eklenir. Haftalık mutabakat için üstteki tarih aralığını o haftaya ayarlayın.
                   </p>
                 </div>
 
                 {roadrunnerStats.kuryeListesi.length === 0 ? (
-                  <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl py-16 text-center text-gray-600 text-sm">
+                  <div className="bg-kart border border-cizgi rounded-2xl py-16 text-center text-gray-600 text-sm">
                     Bu tarih aralığında kurye verisi bulunamadı.
                   </div>
                 ) : (
@@ -743,11 +749,11 @@ ${isletmeOzeti}`,
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                       {[
                         { label: "Paket Ücreti", value: roadrunnerStats.toplamPaketUcreti, color: "#60A5FA" },
-                        { label: "POS Komisyonu (%5)", value: roadrunnerStats.posKomisyonu, color: "#F97316" },
+                        { label: "POS Komisyonu (%5, RR POS'u)", value: roadrunnerStats.posKomisyonu, color: "#F97316" },
                         { label: "Toplam Borç (Roadrunner'a)", value: roadrunnerStats.toplamBorc, color: "#F87171" },
-                        { label: "Toplam Tahsilat (Nakit+POS)", value: roadrunnerStats.toplamTahsilat, color: "#34D399" },
+                        { label: "Roadrunner'da Kalan Tahsilat", value: roadrunnerStats.toplamTahsilat, color: "#34D399" },
                       ].map(k => (
-                        <div key={k.label} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
+                        <div key={k.label} className="bg-kart border border-cizgi rounded-2xl p-4">
                           <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">{k.label}</p>
                           <p className="text-lg font-black" style={{ color: k.color }}>₺{fmt(k.value)}</p>
                         </div>
@@ -757,77 +763,84 @@ ${isletmeOzeti}`,
                     {/* Net mutabakat */}
                     <div className={`rounded-2xl border p-5 flex items-center justify-between ${roadrunnerStats.mutabakatFarki >= 0 ? "border-emerald-500/30 bg-emerald-500/5" : "border-red-500/30 bg-red-500/5"}`}>
                       <div className="flex items-center gap-2.5">
-                        {roadrunnerStats.mutabakatFarki >= 0 ? <CheckCircle2 size={18} className="text-emerald-600" /> : <AlertTriangle size={18} className="text-red-600" />}
+                        {roadrunnerStats.mutabakatFarki >= 0 ? <CheckCircle2 size={18} className="text-emerald-400" /> : <AlertTriangle size={18} className="text-red-400" />}
                         <div>
-                          <p className={`text-xs font-bold uppercase tracking-widest ${roadrunnerStats.mutabakatFarki >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                          <p className={`text-xs font-bold uppercase tracking-widest ${roadrunnerStats.mutabakatFarki >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                             {roadrunnerStats.mutabakatFarki >= 0 ? "Roadrunner'dan Alacaklıyız" : "Roadrunner'a Borçluyuz"}
                           </p>
-                          <p className="text-[11px] text-gray-500 mt-0.5">Tahsilat − (Paket Ücreti + POS Komisyonu)</p>
+                          <p className="text-[11px] text-gray-500 mt-0.5">Roadrunner&apos;da kalan tahsilat − (Paket Ücreti + POS Komisyonu)</p>
+                          {roadrunnerStats.kasayaTeslim > 0 && (
+                            <p className="text-[11px] text-gray-500">Kurye 1-2&apos;nin kasaya / POS&apos;a teslim ettiği ₺{fmt(roadrunnerStats.kasayaTeslim)} borçtan düşülmez (ciroda var).</p>
+                          )}
                         </div>
                       </div>
-                      <p className={`text-2xl font-black ${roadrunnerStats.mutabakatFarki >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                      <p className={`text-2xl font-black ${roadrunnerStats.mutabakatFarki >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                         ₺{fmt(Math.abs(roadrunnerStats.mutabakatFarki))}
                       </p>
                     </div>
 
                     {/* Paket dağılımı */}
-                    <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
+                    <div className="bg-kart border border-cizgi rounded-2xl p-5">
                       <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-4 flex items-center gap-1.5"><Percent size={12} /> Paket Dağılımı</p>
                       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
-                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">Normal (1x)</p><p className="text-base font-black text-[#1a1f2e]">{fmt(roadrunnerStats.toplamNormal)}</p></div>
-                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">Uzak (1.5x)</p><p className="text-base font-black text-orange-600">{fmt(roadrunnerStats.toplamUzak)}</p></div>
-                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">9km+ (2x)</p><p className="text-base font-black text-red-600">{fmt(roadrunnerStats.toplamKm9)}</p></div>
-                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">Garanti Farkı</p><p className="text-base font-black text-amber-600">{fmt(roadrunnerStats.toplamGarantiFarki)}</p></div>
-                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">Ödemeye Esas Toplam</p><p className="text-base font-black text-blue-600">{fmt(roadrunnerStats.toplamUygulanan)}</p></div>
+                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">Normal (1x)</p><p className="text-base font-black text-yazi">{fmt(roadrunnerStats.toplamNormal)}</p></div>
+                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">Uzak (1.5x)</p><p className="text-base font-black text-orange-400">{fmt(roadrunnerStats.toplamUzak)}</p></div>
+                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">9km+ (2x)</p><p className="text-base font-black text-red-400">{fmt(roadrunnerStats.toplamKm9)}</p></div>
+                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">Garanti Farkı</p><p className="text-base font-black text-amber-400">{fmt(roadrunnerStats.toplamGarantiFarki)}</p></div>
+                        <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">Ödemeye Esas Toplam</p><p className="text-base font-black text-blue-400">{fmt(roadrunnerStats.toplamUygulanan)}</p></div>
                       </div>
                       <p className="text-[10px] text-gray-500 mt-3">Gerçek teslim edilen toplam paket: <span className="font-bold text-gray-700">{fmt(roadrunnerStats.toplamGercek)}</span></p>
                     </div>
 
                     {/* Kurye bazında tablo */}
-                    <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
-                      <div className="px-5 py-3 border-b border-[#e2e5eb]">
+                    <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
+                      <div className="px-5 py-3 border-b border-cizgi">
                         <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold flex items-center gap-1.5"><Truck size={11} /> Kurye Bazında Mutabakat</p>
                       </div>
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs">
                           <thead>
-                            <tr className="border-b border-[#e2e5eb]">
-                              {["Kurye", "Tip", "Normal", "Uzak", "9km+", "Garanti Farkı", "Esas Paket", "Paket Ücreti", "Nakit", "POS"].map(h => (
+                            <tr className="border-b border-cizgi">
+                              {["Kurye", "Tip", "Normal", "Uzak", "9km+", "Garanti Farkı", "Esas Paket", "Paket Ücreti", "Nakit", "POS", "Borçtan Düşen"].map(h => (
                                 <th key={h} className="text-left px-4 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold whitespace-nowrap">{h}</th>
                               ))}
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-[#0f1624]">
+                          <tbody className="divide-y divide-cizgi">
                             {roadrunnerStats.kuryeListesi.map(k => (
-                              <tr key={`${k.isim}__${k.tip}`} className="hover:bg-black/[0.03] transition-colors">
-                                <td className="px-4 py-3 font-bold text-[#1a1f2e] whitespace-nowrap">{k.isim}</td>
+                              <tr key={`${k.isim}__${k.tip}`} className="hover:bg-white/[0.03] transition-colors">
+                                <td className="px-4 py-3 font-bold text-yazi whitespace-nowrap">{k.isim}</td>
                                 <td className="px-4 py-3 whitespace-nowrap">
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${k.tip === "sabit" ? "bg-amber-500/10 text-amber-700" : "bg-black/[0.05] text-gray-500"}`}>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${k.tip === "sabit" ? "bg-amber-500/10 text-amber-300" : "bg-white/[0.05] text-gray-500"}`}>
                                     {k.tip === "sabit" ? "Sabit (Roadrunner)" : "Havuz"}
                                   </span>
                                 </td>
                                 <td className="px-4 py-3">{fmt(k.normal)}</td>
-                                <td className="px-4 py-3 text-orange-600 font-bold">{fmt(k.uzak)}</td>
-                                <td className="px-4 py-3 text-red-600 font-bold">{fmt(k.km9)}</td>
-                                <td className="px-4 py-3 text-amber-600 font-bold">{fmt(k.garantiFarki)}</td>
-                                <td className="px-4 py-3 font-black text-blue-600">{fmt(k.uygulanan)}</td>
+                                <td className="px-4 py-3 text-orange-400 font-bold">{fmt(k.uzak)}</td>
+                                <td className="px-4 py-3 text-red-400 font-bold">{fmt(k.km9)}</td>
+                                <td className="px-4 py-3 text-amber-400 font-bold">{fmt(k.garantiFarki)}</td>
+                                <td className="px-4 py-3 font-black text-blue-400">{fmt(k.uygulanan)}</td>
                                 <td className="px-4 py-3 font-black">₺{fmt(k.ucret)}</td>
-                                <td className="px-4 py-3 text-emerald-600">₺{fmt(k.nakit)}</td>
-                                <td className="px-4 py-3 text-blue-600">₺{fmt(k.pos)}</td>
+                                <td className="px-4 py-3 text-emerald-400">₺{fmt(k.nakit)}</td>
+                                <td className="px-4 py-3 text-blue-400">₺{fmt(k.pos)}</td>
+                                <td className="px-4 py-3 font-bold text-purple-300" title={k.rrNakit + k.rrPos === 0 ? "Kasaya teslim edildi" : undefined}>
+                                  {k.rrNakit + k.rrPos === 0 ? <span className="text-gray-400 font-normal">Kasada</span> : `₺${fmt(k.rrNakit + k.rrPos)}`}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
                           <tfoot>
-                            <tr className="border-t border-[#e2e5eb] bg-[#f7f8fa]">
+                            <tr className="border-t border-cizgi bg-alan">
                               <td className="px-4 py-3 text-[10px] text-gray-600 uppercase font-bold" colSpan={2}>TOPLAM</td>
                               <td className="px-4 py-3 font-black">{fmt(roadrunnerStats.toplamNormal)}</td>
-                              <td className="px-4 py-3 text-orange-600 font-black">{fmt(roadrunnerStats.toplamUzak)}</td>
-                              <td className="px-4 py-3 text-red-600 font-black">{fmt(roadrunnerStats.toplamKm9)}</td>
-                              <td className="px-4 py-3 text-amber-600 font-black">{fmt(roadrunnerStats.toplamGarantiFarki)}</td>
-                              <td className="px-4 py-3 font-black text-blue-600">{fmt(roadrunnerStats.toplamUygulanan)}</td>
+                              <td className="px-4 py-3 text-orange-400 font-black">{fmt(roadrunnerStats.toplamUzak)}</td>
+                              <td className="px-4 py-3 text-red-400 font-black">{fmt(roadrunnerStats.toplamKm9)}</td>
+                              <td className="px-4 py-3 text-amber-400 font-black">{fmt(roadrunnerStats.toplamGarantiFarki)}</td>
+                              <td className="px-4 py-3 font-black text-blue-400">{fmt(roadrunnerStats.toplamUygulanan)}</td>
                               <td className="px-4 py-3 font-black">₺{fmt(roadrunnerStats.toplamPaketUcreti)}</td>
-                              <td className="px-4 py-3 text-emerald-600 font-black">₺{fmt(roadrunnerStats.toplamNakit)}</td>
-                              <td className="px-4 py-3 text-blue-600 font-black">₺{fmt(roadrunnerStats.toplamPos)}</td>
+                              <td className="px-4 py-3 text-emerald-400 font-black">₺{fmt(roadrunnerStats.toplamNakit)}</td>
+                              <td className="px-4 py-3 text-blue-400 font-black">₺{fmt(roadrunnerStats.toplamPos)}</td>
+                              <td className="px-4 py-3 text-purple-300 font-black">₺{fmt(roadrunnerStats.toplamTahsilat)}</td>
                             </tr>
                           </tfoot>
                         </table>
@@ -844,11 +857,11 @@ ${isletmeOzeti}`,
                 <PosMutabakat raporlar={raporlar} baslangic={baslangic} bitis={bitis} />
 
                 {/* MagicPay karşılaştırma — işlevi aynen korunuyor */}
-                <p className="pt-2 text-[11px] font-black text-[#1a1f2e] uppercase tracking-widest flex items-center gap-1.5">
-                  <RefreshCw size={12} className="text-blue-600" /> MagicPay Karşılaştırma
+                <p className="pt-2 text-[11px] font-black text-yazi uppercase tracking-widest flex items-center gap-1.5">
+                  <RefreshCw size={12} className="text-blue-400" /> MagicPay Karşılaştırma
                 </p>
                 <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-4 text-[11px] text-gray-700 leading-relaxed flex items-start gap-2.5">
-                  <RefreshCw size={15} className="text-blue-600 shrink-0 mt-0.5" />
+                  <RefreshCw size={15} className="text-blue-400 shrink-0 mt-0.5" />
                   <div>
                     <p>MagicPay (kebo-admin-ui) POS/online sipariş sisteminden çekilen rakamlar, buraya elle girilen günlük raporla karşılaştırılır. Hiçbir veri otomatik değiştirilmez veya kaydedilmez.</p>
                     <p className="mt-1.5 text-gray-500">
@@ -860,32 +873,32 @@ ${isletmeOzeti}`,
                 </div>
 
                 <button onClick={magicpayKarsilastir} disabled={mpYukleniyor}
-                  className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 px-4 py-2.5 rounded-xl transition-colors">
+                  className="flex items-center gap-2 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 disabled:opacity-40 px-4 py-2.5 rounded-xl transition-colors">
                   {mpYukleniyor ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
                   {mpVeri ? "Yenile" : "MagicPay ile Karşılaştır"}
                 </button>
 
                 {mpHata && (
-                  <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 text-xs text-red-700 flex items-start gap-2">
+                  <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 text-xs text-red-300 flex items-start gap-2">
                     <AlertTriangle size={14} className="shrink-0 mt-0.5" /> {mpHata}
                   </div>
                 )}
 
                 {mpVeri && (
-                  <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
-                    <div className="px-5 py-3 border-b border-[#e2e5eb]">
+                  <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
+                    <div className="px-5 py-3 border-b border-cizgi">
                       <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold">Gün Gün Karşılaştırma</p>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
                         <thead>
-                          <tr className="border-b border-[#e2e5eb]">
+                          <tr className="border-b border-cizgi">
                             {["Tarih", "Kebo Brüt", "MP Brüt", "Kebo Net", "MP Net", "Kebo İndirim", "MP İndirim", "Fark", "Kebo İade", "MP İade", "Fark", "Kebo Nakit", "MP Nakit", "Fark"].map(h => (
                               <th key={h} className="text-left px-3 py-3 text-[10px] text-gray-600 uppercase tracking-widest font-semibold whitespace-nowrap">{h}</th>
                             ))}
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#0f1624]">
+                        <tbody className="divide-y divide-cizgi">
                           {mpVeri.gunler.map(g => {
                             const kr = raporlar.find(r => r.tarih === g.tarih);
                             const keboIndirim = kr ? indirimToplam(kr) : null;
@@ -896,25 +909,25 @@ ${isletmeOzeti}`,
                             const keboNakit = kr ? (kr.kasa_nakit || 0) : null;
                             const farkli = (a: number | null, b: number, tol = 1) => a !== null && Math.abs(a - b) > tol;
                             return (
-                              <tr key={g.tarih} className="hover:bg-black/[0.03] transition-colors">
+                              <tr key={g.tarih} className="hover:bg-white/[0.03] transition-colors">
                                 <td className="px-3 py-3 font-medium text-gray-700 whitespace-nowrap">{fmtTarih(g.tarih)}</td>
                                 <td className="px-3 py-3">{kr ? `₺${fmt(keboBrut as number)}` : "—"}</td>
-                                <td className="px-3 py-3 text-blue-600">₺{fmt(g.brutMP)}</td>
+                                <td className="px-3 py-3 text-blue-400">₺{fmt(g.brutMP)}</td>
                                 <td className="px-3 py-3">{kr ? `₺${fmt(keboNet as number)}` : "—"}</td>
-                                <td className="px-3 py-3 text-blue-600">₺{fmt(g.netMP)}</td>
+                                <td className="px-3 py-3 text-blue-400">₺{fmt(g.netMP)}</td>
                                 <td className="px-3 py-3">{kr ? `₺${fmt(keboIndirim as number)}` : "—"}</td>
-                                <td className="px-3 py-3 text-orange-600">₺{fmt(g.indirimMP)}</td>
-                                <td className={`px-3 py-3 font-bold ${kr && farkli(keboIndirim, g.indirimMP) ? "text-red-600" : "text-emerald-600"}`}>
+                                <td className="px-3 py-3 text-orange-400">₺{fmt(g.indirimMP)}</td>
+                                <td className={`px-3 py-3 font-bold ${kr && farkli(keboIndirim, g.indirimMP) ? "text-red-400" : "text-emerald-400"}`}>
                                   {kr ? (farkli(keboIndirim, g.indirimMP) ? `₺${fmt(Math.abs((keboIndirim as number) - g.indirimMP))}` : "✓") : "—"}
                                 </td>
                                 <td className="px-3 py-3">{kr ? `₺${fmt(keboIade as number)}` : "—"}</td>
-                                <td className="px-3 py-3 text-orange-600">₺{fmt(g.iadeMP)}</td>
-                                <td className={`px-3 py-3 font-bold ${kr && farkli(keboIade, g.iadeMP) ? "text-red-600" : "text-emerald-600"}`}>
+                                <td className="px-3 py-3 text-orange-400">₺{fmt(g.iadeMP)}</td>
+                                <td className={`px-3 py-3 font-bold ${kr && farkli(keboIade, g.iadeMP) ? "text-red-400" : "text-emerald-400"}`}>
                                   {kr ? (farkli(keboIade, g.iadeMP) ? `₺${fmt(Math.abs((keboIade as number) - g.iadeMP))}` : "✓") : "—"}
                                 </td>
                                 <td className="px-3 py-3">{kr ? `₺${fmt(keboNakit as number)}` : "—"}</td>
-                                <td className="px-3 py-3 text-orange-600">₺{fmt(g.nakitMP)}</td>
-                                <td className={`px-3 py-3 font-bold ${kr && farkli(keboNakit, g.nakitMP) ? "text-red-600" : "text-emerald-600"}`}>
+                                <td className="px-3 py-3 text-orange-400">₺{fmt(g.nakitMP)}</td>
+                                <td className={`px-3 py-3 font-bold ${kr && farkli(keboNakit, g.nakitMP) ? "text-red-400" : "text-emerald-400"}`}>
                                   {kr ? (farkli(keboNakit, g.nakitMP) ? `₺${fmt(Math.abs((keboNakit as number) - g.nakitMP))}` : "✓") : "—"}
                                 </td>
                               </tr>
@@ -924,21 +937,21 @@ ${isletmeOzeti}`,
                       </table>
                     </div>
                     {mpVeri.gunler.some(g => !raporlar.find(r => r.tarih === g.tarih)) && (
-                      <p className="px-5 py-3 text-[10px] text-gray-500 border-t border-[#e2e5eb]">&quot;—&quot; gösterilen günler için Kebo Panel&apos;de bu tarihte kaydedilmiş bir rapor bulunamadı.</p>
+                      <p className="px-5 py-3 text-[10px] text-gray-500 border-t border-cizgi">&quot;—&quot; gösterilen günler için Kebo Panel&apos;de bu tarihte kaydedilmiş bir rapor bulunamadı.</p>
                     )}
                   </div>
                 )}
 
                 {mpVeri?.kurye && (
-                  <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-5">
+                  <div className="bg-kart border border-cizgi rounded-2xl p-5">
                     <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-3 flex items-center gap-1.5"><Truck size={12} /> MagicPay Kurye Teslimat (seçili gün)</p>
                     <div className="space-y-2">
                       {mpVeri.kurye.kuryeler.map((k: any) => (
-                        <div key={k.isim} className="flex flex-wrap items-center justify-between gap-2 bg-[#f7f8fa] rounded-xl border border-[#e2e5eb] px-4 py-2.5">
-                          <span className="font-bold text-[#1a1f2e]">{k.isim}</span>
+                        <div key={k.isim} className="flex flex-wrap items-center justify-between gap-2 bg-alan rounded-xl border border-cizgi px-4 py-2.5">
+                          <span className="font-bold text-yazi">{k.isim}</span>
                           <span className="text-gray-500">{k.teslimat} teslimat</span>
-                          <span className="text-emerald-600 font-bold">₺{fmt(k.tahsilat)} tahsilat</span>
-                          {k.iadeGerekenTutar > 0 && <span className="text-red-600 font-bold">₺{fmt(k.iadeGerekenTutar)} Kebo&apos;ya iade gerekiyor</span>}
+                          <span className="text-emerald-400 font-bold">₺{fmt(k.tahsilat)} tahsilat</span>
+                          {k.iadeGerekenTutar > 0 && <span className="text-red-400 font-bold">₺{fmt(k.iadeGerekenTutar)} Kebo&apos;ya iade gerekiyor</span>}
                         </div>
                       ))}
                     </div>
@@ -950,23 +963,23 @@ ${isletmeOzeti}`,
             {/* ════════════════════════════════════════════════════════ */}
             {/* AI İŞ ANALİZ BÖLÜMÜ                                    */}
             {/* ════════════════════════════════════════════════════════ */}
-            <div className="bg-[#ffffff] border border-blue-500/20 rounded-2xl overflow-hidden">
+            <div className="bg-kart border border-blue-500/20 rounded-2xl overflow-hidden">
               {/* Sekme başlıkları */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e5eb]">
-                <div className="flex gap-1 bg-black/[0.04] rounded-xl p-1">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-cizgi">
+                <div className="flex gap-1 bg-white/[0.04] rounded-xl p-1">
                   <button onClick={() => setAktifAiSekme("analiz")}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${aktifAiSekme === "analiz" ? "bg-blue-600 text-white" : "text-gray-500 hover:text-[#1a1f2e]"}`}>
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${aktifAiSekme === "analiz" ? "kebo-btn-altin text-[#1a1408]" : "text-gray-500 hover:text-yazi"}`}>
                     <Sparkles size={12} /> AI Rapor
                   </button>
                   <button onClick={() => setAktifAiSekme("chat")}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${aktifAiSekme === "chat" ? "bg-blue-600 text-white" : "text-gray-500 hover:text-[#1a1f2e]"}`}>
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${aktifAiSekme === "chat" ? "kebo-btn-altin text-[#1a1408]" : "text-gray-500 hover:text-yazi"}`}>
                     <MessageSquare size={12} /> Danışman
                     {mesajlar.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"/>}
                   </button>
                 </div>
                 {aktifAiSekme === "analiz" && (
                   <button onClick={analizYap} disabled={analizYukleniyor}
-                    className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors">
+                    className="flex items-center gap-2 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors">
                     {analizYukleniyor ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
                     {otomatikAnaliz ? "Yenile" : "Analiz Et"}
                   </button>
@@ -997,13 +1010,13 @@ ${isletmeOzeti}`,
                         {/* Başarılar */}
                         {otomatikAnaliz.basarilar.length > 0 && (
                           <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4">
-                            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                            <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                               <TrendingUp size={11} /> Güçlü Yönler
                             </p>
                             <ul className="space-y-2">
                               {otomatikAnaliz.basarilar.map((b, i) => (
                                 <li key={i} className="flex items-start gap-2 text-xs text-gray-700 leading-relaxed">
-                                  <ChevronRight size={12} className="text-emerald-600 shrink-0 mt-0.5"/>
+                                  <ChevronRight size={12} className="text-emerald-400 shrink-0 mt-0.5"/>
                                   {b}
                                 </li>
                               ))}
@@ -1014,13 +1027,13 @@ ${isletmeOzeti}`,
                         {/* Riskler */}
                         {otomatikAnaliz.riskler.length > 0 && (
                           <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
-                            <p className="text-[10px] font-bold text-red-600 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                            <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                               <TrendingDown size={11} /> Dikkat Edilmesi Gerekenler
                             </p>
                             <ul className="space-y-2">
                               {otomatikAnaliz.riskler.map((r, i) => (
                                 <li key={i} className="flex items-start gap-2 text-xs text-gray-700 leading-relaxed">
-                                  <ChevronRight size={12} className="text-red-600 shrink-0 mt-0.5"/>
+                                  <ChevronRight size={12} className="text-red-400 shrink-0 mt-0.5"/>
                                   {r}
                                 </li>
                               ))}
@@ -1032,13 +1045,13 @@ ${isletmeOzeti}`,
                       {/* Öneriler */}
                       {otomatikAnaliz.oneriler.length > 0 && (
                         <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4">
-                          <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                          <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                             <Sparkles size={11} /> Aksiyon Önerileri
                           </p>
                           <div className="space-y-2">
                             {otomatikAnaliz.oneriler.map((o, i) => (
                               <div key={i} className="flex items-start gap-3 bg-white/3 rounded-lg px-3 py-2.5">
-                                <span className="text-[10px] font-black text-blue-700 bg-blue-500/10 rounded-md w-5 h-5 flex items-center justify-center shrink-0">{i+1}</span>
+                                <span className="text-[10px] font-black text-blue-300 bg-blue-500/10 rounded-md w-5 h-5 flex items-center justify-center shrink-0">{i+1}</span>
                                 <p className="text-xs text-gray-700 leading-relaxed">{o}</p>
                               </div>
                             ))}
@@ -1052,7 +1065,7 @@ ${isletmeOzeti}`,
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={otomatikAnaliz.chartData}>
                               <XAxis dataKey="name" stroke="#666" fontSize={10} tickLine={false} axisLine={false} />
-                              <Tooltip contentStyle={{ backgroundColor: "#0c0f1a", borderColor: "#1a2236", color: "#fff" }} itemStyle={{ color: "#3b82f6" }} cursor={{ fill: "#1a2236" }} />
+                              <Tooltip contentStyle={{ backgroundColor: "#18181b", borderColor: "rgba(255,255,255,0.1)", borderRadius: 12, color: "#fff" }} itemStyle={{ color: "#3b82f6" }} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
                               <Bar dataKey="deger" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                             </BarChart>
                           </ResponsiveContainer>
@@ -1062,7 +1075,7 @@ ${isletmeOzeti}`,
                       {/* Hedef */}
                       {otomatikAnaliz.hedef && (
                         <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl px-5 py-4 flex items-center gap-3">
-                          <Zap size={16} className="text-blue-600 shrink-0"/>
+                          <Zap size={16} className="text-blue-400 shrink-0"/>
                           <p className="text-sm font-semibold text-gray-800">{otomatikAnaliz.hedef}</p>
                         </div>
                       )}
@@ -1070,16 +1083,16 @@ ${isletmeOzeti}`,
                   ) : (
                     <div className="flex flex-col items-center justify-center py-12 text-center gap-4">
                       <div className="w-14 h-14 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center">
-                        <Bot size={24} className="text-blue-600"/>
+                        <Bot size={24} className="text-blue-400"/>
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-[#1a1f2e] mb-1">AI İş Analistiniz Hazır</p>
+                        <p className="text-sm font-bold text-yazi mb-1">AI İş Analistiniz Hazır</p>
                         <p className="text-xs text-gray-500 max-w-xs">
                           Verilerinizi analiz edeyim. Ciro trendleri, platform performansı, gider optimizasyonu ve büyüme önerileri için &quot;Analiz Et&quot;e tıklayın.
                         </p>
                       </div>
                       <button onClick={analizYap}
-                        className="flex items-center gap-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl transition-colors shadow-lg shadow-blue-900/30">
+                        className="flex items-center gap-2 text-sm font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 px-6 py-3 rounded-xl transition-colors shadow-lg shadow-altin/20">
                         <Zap size={14}/> Analizi Başlat
                       </button>
                     </div>
@@ -1100,7 +1113,7 @@ ${isletmeOzeti}`,
                         <div className="space-y-2">
                           {HAZIR_SORULAR.map(s => (
                             <button key={s} onClick={() => chatGonder(s)}
-                              className="block w-full text-left text-[11px] text-blue-600/80 hover:text-blue-600 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/10 px-3 py-2 rounded-xl transition-colors leading-relaxed">
+                              className="block w-full text-left text-[11px] text-blue-600/80 hover:text-blue-400 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/10 px-3 py-2 rounded-xl transition-colors leading-relaxed">
                               {s}
                             </button>
                           ))}
@@ -1111,13 +1124,13 @@ ${isletmeOzeti}`,
                         <div key={i} className={`flex ${m.rol === "user" ? "justify-end" : "justify-start"}`}>
                           {m.rol === "assistant" && (
                             <div className="w-6 h-6 rounded-lg bg-blue-600/20 flex items-center justify-center mr-2 shrink-0 mt-0.5">
-                              <Bot size={12} className="text-blue-600"/>
+                              <Bot size={12} className="text-blue-400"/>
                             </div>
                           )}
                           <div className={`max-w-[85%] text-xs rounded-2xl px-4 py-3 leading-relaxed whitespace-pre-wrap ${
                             m.rol === "user"
-                              ? "bg-blue-600 text-white rounded-tr-sm"
-                              : "bg-[#f7f8fa] border border-[#e2e5eb] text-gray-700 rounded-tl-sm"
+                              ? "kebo-btn-altin text-[#1a1408] rounded-tr-sm"
+                              : "bg-alan border border-cizgi text-gray-700 rounded-tl-sm"
                           }`}>
                             {m.icerik}
                           </div>
@@ -1127,9 +1140,9 @@ ${isletmeOzeti}`,
                     {aiYukleniyor && (
                       <div className="flex justify-start">
                         <div className="w-6 h-6 rounded-lg bg-blue-600/20 flex items-center justify-center mr-2 shrink-0">
-                          <Bot size={12} className="text-blue-600"/>
+                          <Bot size={12} className="text-blue-400"/>
                         </div>
-                        <div className="bg-[#f7f8fa] border border-[#e2e5eb] rounded-2xl rounded-tl-sm px-4 py-3">
+                        <div className="bg-alan border border-cizgi rounded-2xl rounded-tl-sm px-4 py-3">
                           <div className="flex gap-1">
                             <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" style={{animationDelay:"0ms"}}/>
                             <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" style={{animationDelay:"150ms"}}/>
@@ -1140,16 +1153,16 @@ ${isletmeOzeti}`,
                     )}
                     <div ref={chatSonRef}/>
                   </div>
-                  <div className="p-3 border-t border-[#e2e5eb] flex gap-2">
+                  <div className="p-3 border-t border-cizgi flex gap-2">
                     {mesajlar.length > 0 && (
-                      <button onClick={() => setMesajlar([])} className="p-2.5 text-gray-700 hover:text-gray-400 border border-[#e2e5eb] rounded-xl transition-colors">
+                      <button onClick={() => setMesajlar([])} className="p-2.5 text-gray-700 hover:text-gray-400 border border-cizgi rounded-xl transition-colors">
                         <X size={13}/>
                       </button>
                     )}
                     <input value={soru} onChange={e => setSoru(e.target.value)}
                       onKeyDown={e => e.key === "Enter" && !e.shiftKey && chatGonder()}
                       placeholder="İşletmeniz hakkında bir şey sorun..."
-                      className="flex-1 bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-10 px-3 rounded-xl outline-none focus:border-blue-500/40 placeholder:text-gray-700" />
+                      className="flex-1 bg-alan border border-cizgi text-yazi text-xs h-10 px-3 rounded-xl outline-none focus:border-altin/50 placeholder:text-gray-700" />
                     <button onClick={() => chatGonder()} disabled={aiYukleniyor || !soru.trim()}
                       className="w-10 h-10 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-xl flex items-center justify-center transition-colors">
                       <Send size={13} className="text-white" />

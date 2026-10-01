@@ -1,5 +1,6 @@
 "use client";
 
+import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
@@ -31,8 +32,8 @@ interface Fatura { fatura_tarihi: string; toplam_tutar: number | null; }
 
 type Sekme = "recete" | "tuketim" | "foodcost" | "yukle";
 
-const inputCls = "w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none";
-const kutu = "bg-[#ffffff] border border-[#e2e5eb] rounded-xl";
+const inputCls = "w-full bg-alan border border-cizgi text-yazi text-xs h-9 px-3 rounded-xl outline-none";
+const kutu = "bg-kart border border-cizgi rounded-xl";
 const sayi = (v: number, d = 2) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: d }).format(v || 0);
 const yuzde = (v: number | null, d = 1) => (v === null ? "—" : `%${sayi(v, d)}`);
 
@@ -262,10 +263,10 @@ export default function ReceteMaliyetPage() {
 
   // ─── GÖRÜNÜM ──────────────────────────────────────────────────────────────
   if (yetki.yukleniyor || (izinli && yukleniyor)) return (
-    <div className="h-screen bg-[#f4f5f7] flex items-center justify-center"><Loader2 className="animate-spin text-emerald-600"/></div>
+    <div className="h-screen bg-zemin flex items-center justify-center"><Loader2 className="animate-spin text-emerald-400"/></div>
   );
   if (!izinli) return (
-    <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center p-6 text-sm text-gray-600">Bu sayfayı görme yetkiniz yok.</div>
+    <div className="min-h-screen bg-zemin flex items-center justify-center p-6 text-sm text-gray-600">Bu sayfayı görme yetkiniz yok.</div>
   );
 
   const SEKMELER: { k: Sekme; l: string; i: React.ReactNode }[] = [
@@ -276,33 +277,33 @@ export default function ReceteMaliyetPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased pb-20">
-      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
+    <div className="min-h-screen bg-zemin text-yazi font-sans antialiased pb-20">
+      <div className="sticky top-0 z-40 border-b border-cizgi bg-zemin/95 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
-            <Link href="/stok" className="p-2 border border-[#e2e5eb] rounded-xl text-gray-600 hover:text-[#1a1f2e]"><ArrowLeft size={14}/></Link>
-            <div className="w-8 h-8 rounded-xl bg-emerald-600 flex items-center justify-center"><ChefHat className="h-4 w-4 text-white"/></div>
+            <Link href="/stok" className="p-2 border border-cizgi rounded-xl text-gray-600 hover:text-yazi"><ArrowLeft size={14}/></Link>
+            <SayfaSimgesi />
             <div>
               <h1 className="text-sm font-black tracking-tight leading-none">Reçete & Maliyet</h1>
               <p className="text-[10px] text-gray-600 leading-none mt-0.5">{menuler.length} menü ürünü · {recetesizSayisi} reçetesiz satılan</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex rounded-xl border border-[#e2e5eb] overflow-hidden bg-white">
+            <div className="flex rounded-xl border border-cizgi overflow-hidden bg-kart">
               {SEKMELER.map(s => (
                 <button key={s.k} onClick={() => setSekme(s.k)}
-                  className={`flex items-center gap-1.5 px-3 h-9 text-[11px] font-bold ${sekme === s.k ? "bg-emerald-600 text-white" : "text-gray-600 hover:text-[#1a1f2e]"}`}>
+                  className={`flex items-center gap-1.5 px-3 h-9 text-[11px] font-bold ${sekme === s.k ? "bg-emerald-600 text-white" : "text-gray-600 hover:text-yazi"}`}>
                   {s.i}<span className="hidden sm:inline">{s.l}</span>
                 </button>
               ))}
             </div>
-            <button onClick={() => { temelVeri(); setAralikYenile(x => x + 1); }} className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-xl"><RefreshCw size={14}/></button>
+            <button onClick={() => { temelVeri(); setAralikYenile(x => x + 1); }} className="p-2 text-gray-600 hover:text-yazi border border-cizgi rounded-xl"><RefreshCw size={14}/></button>
           </div>
         </div>
       </div>
 
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-4 space-y-4">
-        {hata && <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">Veri alınamadı: {hata}</div>}
+        {hata && <div className="text-xs text-red-300 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2">Veri alınamadı: {hata}</div>}
 
         {sekme === "yukle" && <UrunSatisYukle onKaydedildi={() => { temelVeri(); setAralikYenile(x => x + 1); }}/>}
 
@@ -315,7 +316,7 @@ export default function ReceteMaliyetPage() {
                   <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
                   <input value={menuArama} onChange={e => setMenuArama(e.target.value)} placeholder="Menü ürünü ara" className={`${inputCls} pl-8`}/>
                 </div>
-                <button onClick={menuEkle} className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 border border-emerald-500/30 bg-emerald-500/10 px-2.5 h-9 rounded-xl whitespace-nowrap">
+                <button onClick={menuEkle} className="flex items-center gap-1 text-[11px] font-bold text-emerald-300 border border-emerald-500/30 bg-emerald-500/10 px-2.5 h-9 rounded-xl whitespace-nowrap">
                   <Plus size={13}/> Menü ürünü ekle
                 </button>
               </div>
@@ -326,7 +327,7 @@ export default function ReceteMaliyetPage() {
               <div className="space-y-1">
                 {gorunenMenuler.map(m => (
                   <button key={m.anahtar} onClick={() => setSeciliMenu(m.anahtar)}
-                    className={`w-full text-left px-3 py-2 rounded-xl border text-xs flex items-center justify-between gap-2 ${seciliMenu === m.anahtar ? "border-emerald-500 bg-emerald-50" : "border-transparent hover:bg-[#f7f8fa]"}`}>
+                    className={`w-full text-left px-3 py-2 rounded-xl border text-xs flex items-center justify-between gap-2 ${seciliMenu === m.anahtar ? "border-emerald-500 bg-emerald-500/10" : "border-transparent hover:bg-alan"}`}>
                     <span className="min-w-0">
                       <span className="block font-semibold truncate">{m.ad}</span>
                       <span className="block text-[10px] text-gray-500">
@@ -334,7 +335,7 @@ export default function ReceteMaliyetPage() {
                         {m.recete.length > 0 && <> · maliyet ₺{fmt2(m.maliyet)}{m.oran !== null && <> · {yuzde(m.oran)}</>}</>}
                       </span>
                     </span>
-                    {!m.recete.length && <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full whitespace-nowrap">reçete yok</span>}
+                    {!m.recete.length && <span className="text-[10px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full whitespace-nowrap">reçete yok</span>}
                   </button>
                 ))}
               </div>
@@ -351,22 +352,22 @@ export default function ReceteMaliyetPage() {
                       <p className="text-[11px] text-gray-500">Miktarlar stok ürününün biriminde (ör. tavuk kg ise 0,18).</p>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className="bg-[#f7f8fa] border border-[#e2e5eb] rounded-xl px-3 py-2">
+                      <div className="bg-alan border border-cizgi rounded-xl px-3 py-2">
                         <div className="text-[10px] text-gray-500">Porsiyon maliyeti</div>
                         <div className="text-sm font-black">₺{fmt2(secili.maliyet)}</div>
                       </div>
-                      <div className="bg-[#f7f8fa] border border-[#e2e5eb] rounded-xl px-3 py-2">
+                      <div className="bg-alan border border-cizgi rounded-xl px-3 py-2">
                         <div className="text-[10px] text-gray-500">Ort. satış fiyatı (90 gün)</div>
                         <div className="text-sm font-black">{secili.satisFiyati === null ? "—" : `₺${fmt2(secili.satisFiyati)}`}</div>
                       </div>
-                      <div className="bg-[#f7f8fa] border border-[#e2e5eb] rounded-xl px-3 py-2">
+                      <div className="bg-alan border border-cizgi rounded-xl px-3 py-2">
                         <div className="text-[10px] text-gray-500">Maliyet oranı</div>
                         <div className="text-sm font-black">{yuzde(secili.oran)}</div>
                       </div>
                     </div>
                   </div>
                   {secili.fiyatsiz > 0 && (
-                    <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                    <div className="text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2 flex items-center gap-2">
                       <AlertTriangle size={13}/> {secili.fiyatsiz} malzemenin son alış fiyatı yok; maliyete katılmadı.
                     </div>
                   )}
@@ -374,7 +375,7 @@ export default function ReceteMaliyetPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-[#e2e5eb]">
+                        <tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-cizgi">
                           <th className="py-2 pr-2">Malzeme</th><th className="py-2 px-2 w-32">Miktar</th>
                           <th className="py-2 px-2 text-right">Son fiyat</th><th className="py-2 px-2 text-right">Tutar</th><th className="w-8"/>
                         </tr>
@@ -384,7 +385,7 @@ export default function ReceteMaliyetPage() {
                           const u = urunMap.get(r.stok_urun_id);
                           const f = Number(u?.son_fiyat || 0);
                           return (
-                            <tr key={r.id} className="border-b border-[#eef0f3]">
+                            <tr key={r.id} className="border-b border-cizgi">
                               <td className="py-2 pr-2 font-semibold">{u?.urun_adi || "(silinmiş ürün)"}</td>
                               <td className="py-2 px-2">
                                 <div className="flex items-center gap-1">
@@ -398,7 +399,7 @@ export default function ReceteMaliyetPage() {
                               <td className="py-2 px-2 text-right text-gray-600">{f ? `₺${fmt2(f)}/${u?.birim}` : "—"}</td>
                               <td className="py-2 px-2 text-right font-semibold">{f ? `₺${fmt2(r.miktar * f)}` : "—"}</td>
                               <td className="py-2 text-right">
-                                <button onClick={() => satirSil(r)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={13}/></button>
+                                <button onClick={() => satirSil(r)} className="p-1.5 text-gray-400 hover:text-red-400"><Trash2 size={13}/></button>
                               </td>
                             </tr>
                           );
@@ -410,14 +411,14 @@ export default function ReceteMaliyetPage() {
                     </table>
                   </div>
 
-                  <div className="bg-[#f7f8fa] border border-[#e2e5eb] rounded-xl p-3 grid grid-cols-1 sm:grid-cols-[1fr_1.4fr_120px_auto] gap-2 items-end">
+                  <div className="bg-alan border border-cizgi rounded-xl p-3 grid grid-cols-1 sm:grid-cols-[1fr_1.4fr_120px_auto] gap-2 items-end">
                     <label className="text-[11px] font-semibold text-gray-600 space-y-1">
                       <span className="block">Malzeme ara</span>
-                      <input value={malzemeArama} onChange={e => { setMalzemeArama(e.target.value); setYeniUrunId(""); }} placeholder="ör. tavuk" className={`${inputCls} bg-white`}/>
+                      <input value={malzemeArama} onChange={e => { setMalzemeArama(e.target.value); setYeniUrunId(""); }} placeholder="ör. tavuk" className={`${inputCls} bg-kart`}/>
                     </label>
                     <label className="text-[11px] font-semibold text-gray-600 space-y-1">
                       <span className="block">Stok ürünü ({malzemeSecenekleri.length})</span>
-                      <select value={yeniUrunId} onChange={e => setYeniUrunId(e.target.value)} className={`${inputCls} bg-white`}>
+                      <select value={yeniUrunId} onChange={e => setYeniUrunId(e.target.value)} className={`${inputCls} bg-kart`}>
                         <option value="">— seçin —</option>
                         {malzemeSecenekleri.map(u => <option key={u.id} value={u.id}>{u.urun_adi} ({u.birim})</option>)}
                       </select>
@@ -425,7 +426,7 @@ export default function ReceteMaliyetPage() {
                     <label className="text-[11px] font-semibold text-gray-600 space-y-1">
                       <span className="block">Miktar {yeniUrunId && `(${urunMap.get(yeniUrunId)?.birim})`}</span>
                       <input value={yeniMiktar} onChange={e => setYeniMiktar(e.target.value)} inputMode="decimal" placeholder="0,18"
-                        onKeyDown={e => { if (e.key === "Enter") satirEkle(); }} className={`${inputCls} bg-white text-right`}/>
+                        onKeyDown={e => { if (e.key === "Enter") satirEkle(); }} className={`${inputCls} bg-kart text-right`}/>
                     </label>
                     <button onClick={satirEkle} disabled={islem || !yeniUrunId || !yeniMiktar}
                       className="flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 h-9 rounded-xl">
@@ -472,12 +473,12 @@ export default function ReceteMaliyetPage() {
             {tuketim.satirlar.length > 0 && (
               <>
                 {tuketim.toplamFarkTL > 0 && (
-                  <div className="text-xs">Teorikten fazla kullanımın toplam değeri: <b className="text-red-600">₺{fmtTL(tuketim.toplamFarkTL)}</b></div>
+                  <div className="text-xs">Teorikten fazla kullanımın toplam değeri: <b className="text-red-400">₺{fmtTL(tuketim.toplamFarkTL)}</b></div>
                 )}
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-[#e2e5eb]">
+                      <tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-cizgi">
                         <th className="py-2 pr-2">Stok ürünü</th><th className="py-2 px-2 text-right">Teorik</th><th className="py-2 px-2 text-right">Gerçek</th>
                         <th className="py-2 px-2 text-right">Fark</th><th className="py-2 px-2 text-right">Fark %</th><th className="py-2 px-2 text-right">Fark ₺</th>
                         <th className="py-2 pl-2">Kapsam</th>
@@ -488,16 +489,16 @@ export default function ReceteMaliyetPage() {
                         const u = urunMap.get(s.stok_urun_id);
                         const k = tuketim.kapsam.get(s.stok_urun_id);
                         return (
-                          <tr key={s.stok_urun_id} className={`border-b border-[#eef0f3] ${s.supheli ? "bg-red-50" : ""}`}>
+                          <tr key={s.stok_urun_id} className={`border-b border-cizgi ${s.supheli ? "bg-red-500/10" : ""}`}>
                             <td className="py-2 pr-2">
                               <span className="font-semibold">{u?.urun_adi || "?"}</span>
-                              {s.supheli && <span className="ml-2 text-[10px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded-full">fire / kaçak şüphesi</span>}
+                              {s.supheli && <span className="ml-2 text-[10px] font-bold text-red-300 bg-red-500/15 px-1.5 py-0.5 rounded-full">fire / kaçak şüphesi</span>}
                               {!tuketim.receteliUrunler.has(s.stok_urun_id) && <span className="ml-2 text-[10px] text-gray-500">reçetede yok</span>}
                             </td>
                             <td className="py-2 px-2 text-right">{sayi(s.teorik)} {u?.birim}</td>
-                            <td className="py-2 px-2 text-right">{s.gercek === null ? <span className="text-amber-700">sayım yok</span> : `${sayi(s.gercek)} ${u?.birim}`}</td>
-                            <td className={`py-2 px-2 text-right font-semibold ${s.fark !== null && s.fark > 0 ? "text-red-600" : ""}`}>{s.fark === null ? "—" : `${s.fark > 0 ? "+" : ""}${sayi(s.fark)}`}</td>
-                            <td className={`py-2 px-2 text-right font-semibold ${s.supheli ? "text-red-600" : ""}`}>{s.farkYuzde === null ? "—" : `${s.farkYuzde > 0 ? "+" : ""}${yuzde(s.farkYuzde)}`}</td>
+                            <td className="py-2 px-2 text-right">{s.gercek === null ? <span className="text-amber-300">sayım yok</span> : `${sayi(s.gercek)} ${u?.birim}`}</td>
+                            <td className={`py-2 px-2 text-right font-semibold ${s.fark !== null && s.fark > 0 ? "text-red-400" : ""}`}>{s.fark === null ? "—" : `${s.fark > 0 ? "+" : ""}${sayi(s.fark)}`}</td>
+                            <td className={`py-2 px-2 text-right font-semibold ${s.supheli ? "text-red-400" : ""}`}>{s.farkYuzde === null ? "—" : `${s.farkYuzde > 0 ? "+" : ""}${yuzde(s.farkYuzde)}`}</td>
                             <td className="py-2 px-2 text-right">{s.farkTutar === null ? "—" : `${s.farkTutar > 0 ? "+" : ""}₺${fmtTL(s.farkTutar)}`}</td>
                             <td className="py-2 pl-2 text-[10px] text-gray-500 whitespace-nowrap">
                               {k && k.gun > 0 ? `${k.gun}/${tuketim.satisGunu} gün${k.tahminiGun ? ` (${k.tahminiGun} tahmini)` : ""}` : "—"}
@@ -526,7 +527,7 @@ export default function ReceteMaliyetPage() {
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={foodCost.map(f => ({ ad: ayEtiketi(f.ay), oran: f.oran === null ? null : Number(f.oran.toFixed(1)) }))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eef0f3"/>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)"/>
                     <XAxis dataKey="ad" tick={{ fontSize: 10 }}/>
                     <YAxis tick={{ fontSize: 10 }} unit="%" width={40}/>
                     <Tooltip formatter={(v) => [`%${sayi(Number(v), 1)}`, "Food cost"]}/>
@@ -537,19 +538,19 @@ export default function ReceteMaliyetPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-[#e2e5eb]">
+                    <tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-cizgi">
                       <th className="py-2 pr-2">Ay</th><th className="py-2 px-2 text-right">Mal alışı</th><th className="py-2 px-2 text-right">Net ciro</th>
                       <th className="py-2 px-2 text-right">Food cost</th><th className="py-2 pl-2 text-right">Değişim</th>
                     </tr>
                   </thead>
                   <tbody>
                     {foodCost.map(f => (
-                      <tr key={f.ay} className="border-b border-[#eef0f3]">
+                      <tr key={f.ay} className="border-b border-cizgi">
                         <td className="py-2 pr-2 font-semibold">{ayEtiketi(f.ay)}{f.devam && <span className="text-[10px] text-gray-500 font-normal"> (devam ediyor)</span>}</td>
                         <td className="py-2 px-2 text-right">₺{fmtTL(f.alis)}</td>
                         <td className="py-2 px-2 text-right">{f.gun ? `₺${fmtTL(f.net)}` : <span className="text-gray-400">rapor yok</span>}</td>
                         <td className="py-2 px-2 text-right font-bold">{yuzde(f.oran)}</td>
-                        <td className={`py-2 pl-2 text-right ${f.degisim === null ? "" : f.degisim > 0 ? "text-red-600" : "text-emerald-700"}`}>
+                        <td className={`py-2 pl-2 text-right ${f.degisim === null ? "" : f.degisim > 0 ? "text-red-400" : "text-emerald-300"}`}>
                           {f.degisim === null ? "—" : `${f.degisim > 0 ? "+" : ""}${sayi(f.degisim, 1)} puan`}
                         </td>
                       </tr>
@@ -576,7 +577,7 @@ export default function ReceteMaliyetPage() {
                   <div className="h-48">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={paketTrend.map(p => ({ ad: ayEtiketi(p.ay), oran: p.oran === null ? null : Number(p.oran.toFixed(4)) }))}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#eef0f3"/>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)"/>
                         <XAxis dataKey="ad" tick={{ fontSize: 10 }}/>
                         <YAxis tick={{ fontSize: 10 }} width={48}/>
                         <Tooltip formatter={(v) => [`${sayi(Number(v), 3)} ${paketUrun.birim} / paket`, paketUrun.urun_adi]}/>
@@ -587,14 +588,14 @@ export default function ReceteMaliyetPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-[#e2e5eb]">
+                        <tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-cizgi">
                           <th className="py-2 pr-2">Ay</th><th className="py-2 px-2 text-right">Kullanım</th><th className="py-2 px-2 text-right">Paket</th>
                           <th className="py-2 px-2 text-right">{paketUrun.birim} / paket</th><th className="py-2 pl-2 text-right">Veri günü</th>
                         </tr>
                       </thead>
                       <tbody>
                         {paketTrend.map(p => (
-                          <tr key={p.ay} className="border-b border-[#eef0f3]">
+                          <tr key={p.ay} className="border-b border-cizgi">
                             <td className="py-2 pr-2 font-semibold">{ayEtiketi(p.ay)}</td>
                             <td className="py-2 px-2 text-right">{p.gun ? `${sayi(p.kullanim)} ${paketUrun.birim}` : <span className="text-gray-400">sayım yok</span>}</td>
                             <td className="py-2 px-2 text-right">{p.gun ? sayi(p.paket, 0) : "—"}</td>
@@ -619,7 +620,7 @@ export default function ReceteMaliyetPage() {
 
 function Uyari({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-start gap-2">
+    <div className="text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2 flex items-start gap-2">
       <AlertTriangle size={13} className="mt-0.5 shrink-0"/><span>{children}</span>
     </div>
   );

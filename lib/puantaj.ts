@@ -23,12 +23,12 @@ export const DURUM_KISA: Record<PuantajDurum, string> = {
 
 /** Rozet renkleri (Tailwind sınıfları). */
 export const DURUM_RENK: Record<PuantajDurum, string> = {
-  calisti: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  izin: "bg-sky-50 text-sky-700 border-sky-200",
-  rapor: "bg-violet-50 text-violet-700 border-violet-200",
-  gelmedi: "bg-red-50 text-red-700 border-red-200",
-  ucretsiz_izin: "bg-amber-50 text-amber-700 border-amber-200",
-  hafta_tatili: "bg-slate-100 text-slate-600 border-slate-200",
+  calisti: "bg-emerald-500/10 text-emerald-300 border-emerald-500/25",
+  izin: "bg-sky-500/10 text-sky-300 border-sky-500/25",
+  rapor: "bg-violet-500/10 text-violet-300 border-violet-500/25",
+  gelmedi: "bg-red-500/10 text-red-300 border-red-500/25",
+  ucretsiz_izin: "bg-amber-500/10 text-amber-300 border-amber-500/25",
+  hafta_tatili: "bg-slate-500/15 text-slate-400 border-slate-500/25",
 };
 
 export function durumGecerliMi(x: unknown): x is PuantajDurum {

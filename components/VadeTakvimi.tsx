@@ -12,11 +12,11 @@ import { CalendarClock, ChevronDown, ChevronUp, Wallet, Loader2 } from "lucide-r
 // ödemeler carinin en erken vadeli faturalarından düşülür (Toplam Borç ile tutarlı).
 
 const RENK: Record<VadeGrubu, { yazi: string; kenar: string; zemin: string }> = {
-  gecikmis: { yazi: "text-red-600", kenar: "border-red-500/25", zemin: "bg-red-500/5" },
-  bu_hafta: { yazi: "text-amber-600", kenar: "border-amber-500/25", zemin: "bg-amber-500/5" },
-  gelecek_hafta: { yazi: "text-blue-600", kenar: "border-blue-500/20", zemin: "bg-blue-500/5" },
-  bu_ay: { yazi: "text-indigo-600", kenar: "border-indigo-500/20", zemin: "bg-indigo-500/5" },
-  sonra: { yazi: "text-gray-600", kenar: "border-[#e2e5eb]", zemin: "bg-[#f7f8fa]" },
+  gecikmis: { yazi: "text-red-400", kenar: "border-red-500/25", zemin: "bg-red-500/5" },
+  bu_hafta: { yazi: "text-amber-400", kenar: "border-amber-500/25", zemin: "bg-amber-500/5" },
+  gelecek_hafta: { yazi: "text-blue-400", kenar: "border-blue-500/20", zemin: "bg-blue-500/5" },
+  bu_ay: { yazi: "text-indigo-400", kenar: "border-indigo-500/20", zemin: "bg-indigo-500/5" },
+  sonra: { yazi: "text-gray-600", kenar: "border-cizgi", zemin: "bg-alan" },
 };
 
 export default function VadeTakvimi({ yenile, onOde }: {
@@ -57,13 +57,13 @@ export default function VadeTakvimi({ yenile, onOde }: {
   const degistir = (g: VadeGrubu) => setAcik(p => { const s = new Set(p); if (s.has(g)) s.delete(g); else s.add(g); return s; });
 
   return (
-    <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
+    <div className="bg-kart border border-cizgi rounded-2xl p-4">
       <div className="flex items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
-          <CalendarClock size={15} className="text-blue-600" />
+          <CalendarClock size={15} className="text-blue-400" />
           <h2 className="text-xs font-black text-gray-700 uppercase tracking-widest">Vade Takvimi</h2>
         </div>
-        <p className="text-[11px] text-gray-500">Açık borç <span className="font-black text-[#1a1f2e]">₺{fmt2(genelToplam)}</span></p>
+        <p className="text-[11px] text-gray-500">Açık borç <span className="font-black text-yazi">₺{fmt2(genelToplam)}</span></p>
       </div>
 
       {yukleniyor ? (
@@ -74,7 +74,7 @@ export default function VadeTakvimi({ yenile, onOde }: {
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {gruplar.map(g => (
               <button key={g.anahtar} onClick={() => degistir(g.anahtar)}
-                className={`text-left rounded-xl border px-3 py-2.5 transition-colors ${RENK[g.anahtar].kenar} ${acik.has(g.anahtar) ? RENK[g.anahtar].zemin : "hover:bg-black/[0.02]"}`}>
+                className={`text-left rounded-xl border px-3 py-2.5 transition-colors ${RENK[g.anahtar].kenar} ${acik.has(g.anahtar) ? RENK[g.anahtar].zemin : "hover:bg-white/[0.02]"}`}>
                 <p className="text-[10px] text-gray-500 uppercase tracking-widest">{g.etiket}</p>
                 <p className={`text-sm font-black ${g.toplam > 0 ? RENK[g.anahtar].yazi : "text-gray-400"}`}>₺{fmt2(g.toplam)}</p>
                 <p className="text-[10px] text-gray-500">{g.cariler.length} cari · {g.faturaSayisi} fatura</p>
@@ -93,13 +93,13 @@ export default function VadeTakvimi({ yenile, onOde }: {
                     {acik.has(g.anahtar) ? <ChevronUp size={13} className="text-gray-500" /> : <ChevronDown size={13} className="text-gray-500" />}
                   </span>
                 </button>
-                <div className="divide-y divide-[#eef0f3]">
+                <div className="divide-y divide-cizgi">
                   {g.cariler.map(c => (
                     <button key={c.cari_id} onClick={() => onOde(c.cari_id, c.faturalar.map(f => f.id))}
                       title="Bu carinin ödeme penceresini aç"
-                      className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-black/[0.03] transition-colors">
+                      className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-white/[0.03] transition-colors">
                       <div className="min-w-0">
-                        <p className="text-xs font-bold text-[#1a1f2e] truncate">{c.cari_unvan}</p>
+                        <p className="text-xs font-bold text-yazi truncate">{c.cari_unvan}</p>
                         <p className="text-[10px] text-gray-500">
                           {c.faturalar.length} fatura · vade {c.enErkenVade ? fmtTarih(c.enErkenVade) : "belirsiz"}
                           {c.faturalar.length > 1 && c.faturalar[c.faturalar.length - 1].vade !== c.enErkenVade && c.faturalar[c.faturalar.length - 1].vade
@@ -107,7 +107,7 @@ export default function VadeTakvimi({ yenile, onOde }: {
                         </p>
                       </div>
                       <span className="flex items-center gap-2 shrink-0">
-                        <span className="text-sm font-black text-[#1a1f2e]">₺{fmt2(c.toplam)}</span>
+                        <span className="text-sm font-black text-yazi">₺{fmt2(c.toplam)}</span>
                         <span className="flex items-center gap-1 text-[10px] font-bold text-white bg-emerald-600 px-2 py-1 rounded-lg"><Wallet size={11} /> Öde</span>
                       </span>
                     </button>

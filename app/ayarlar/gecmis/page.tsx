@@ -23,9 +23,9 @@ interface Satir {
 }
 
 const ISLEM_RENK: Record<string, string> = {
-  ekleme: "bg-green-50 text-green-700 border-green-200",
-  guncelleme: "bg-blue-50 text-blue-700 border-blue-200",
-  silme: "bg-red-50 text-red-700 border-red-200",
+  ekleme: "bg-green-500/10 text-green-300 border-green-500/25",
+  guncelleme: "bg-blue-500/10 text-blue-300 border-blue-500/25",
+  silme: "bg-red-500/10 text-red-300 border-red-500/25",
 };
 
 export default function IslemGecmisiPage() {
@@ -74,12 +74,12 @@ export default function IslemGecmisiPage() {
   if (!yonetimIzni) return <main className="p-5 text-sm text-gray-500">Bu sayfa için yönetim (işlem geçmişi &amp; bildirimler) yetkisi gerekir.</main>;
 
   const sayfaSayisi = Math.max(1, Math.ceil(toplam / SAYFA_BOYU));
-  const girdi = "rounded-xl border border-[#e2e5eb] bg-[#ffffff] px-3 py-2 text-[13px] outline-none focus:border-blue-400";
+  const girdi = "rounded-xl border border-cizgi bg-kart px-3 py-2 text-[13px] outline-none focus:border-blue-400";
 
   return (
-    <main className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] p-4 sm:p-5">
+    <main className="min-h-screen bg-zemin text-yazi p-4 sm:p-5">
       <div className="pt-5 mb-5 flex items-center gap-3">
-        <Link href="/ayarlar" className="p-2 rounded-xl border border-[#e2e5eb] bg-[#ffffff] text-gray-500 hover:text-[#1a1f2e]">
+        <Link href="/ayarlar" className="p-2 rounded-xl border border-cizgi bg-kart text-gray-500 hover:text-yazi">
           <ArrowLeft size={16} />
         </Link>
         <div>
@@ -88,7 +88,7 @@ export default function IslemGecmisiPage() {
         </div>
       </div>
 
-      <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4 mb-4 grid grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+      <div className="bg-kart border border-cizgi rounded-2xl p-4 mb-4 grid grid-cols-2 lg:grid-cols-5 gap-3 items-end">
         <label className="flex flex-col gap-1 text-[12px] text-gray-500 col-span-2 lg:col-span-1">
           Tablo
           <select value={tablo} onChange={e => filtre(setTablo)(e.target.value)} className={girdi}>
@@ -110,16 +110,16 @@ export default function IslemGecmisiPage() {
         </label>
         <div className="flex gap-2 col-span-2 lg:col-span-1">
           <button onClick={() => { setTablo(""); setKullanici(""); setBas(""); setBit(""); setSayfa(0); }}
-            className="flex-1 rounded-xl border border-[#e2e5eb] px-3 py-2 text-[13px] text-gray-600 hover:bg-black/[0.03]">Temizle</button>
+            className="flex-1 rounded-xl border border-cizgi px-3 py-2 text-[13px] text-gray-600 hover:bg-white/[0.03]">Temizle</button>
           <button onClick={yukle} title="Yenile"
-            className="rounded-xl border border-[#e2e5eb] px-3 py-2 text-gray-600 hover:bg-black/[0.03]"><RefreshCw size={15} /></button>
+            className="rounded-xl border border-cizgi px-3 py-2 text-gray-600 hover:bg-white/[0.03]"><RefreshCw size={15} /></button>
         </div>
       </div>
 
-      {hata && <p className="text-[13px] text-red-600 mb-3">{hata}</p>}
+      {hata && <p className="text-[13px] text-red-400 mb-3">{hata}</p>}
 
-      <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
-        <div className="hidden md:grid grid-cols-[140px_110px_150px_100px_1fr] gap-3 px-4 py-2.5 border-b border-[#e2e5eb] text-[11px] font-bold uppercase tracking-wider text-gray-400">
+      <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
+        <div className="hidden md:grid grid-cols-[140px_110px_150px_100px_1fr] gap-3 px-4 py-2.5 border-b border-cizgi text-[11px] font-bold uppercase tracking-wider text-gray-400">
           <span>Zaman</span><span>Kullanıcı</span><span>Tablo</span><span>İşlem</span><span>Özet</span>
         </div>
         {yukleniyor && !satirlar.length ? (
@@ -127,10 +127,10 @@ export default function IslemGecmisiPage() {
         ) : !satirlar.length ? (
           <p className="p-5 text-[13px] text-gray-500">Kayıt bulunamadı.</p>
         ) : satirlar.map(s => (
-          <div key={s.id} className="border-b border-[#e2e5eb] last:border-b-0">
+          <div key={s.id} className="border-b border-cizgi last:border-b-0">
             <button onClick={() => setAcikId(acikId === s.id ? null : s.id)}
-              className={cn("w-full text-left px-4 py-3 grid grid-cols-2 md:grid-cols-[140px_110px_150px_100px_1fr] gap-x-3 gap-y-1 text-[13px] hover:bg-black/[0.02]",
-                acikId === s.id && "bg-blue-50/40")}>
+              className={cn("w-full text-left px-4 py-3 grid grid-cols-2 md:grid-cols-[140px_110px_150px_100px_1fr] gap-x-3 gap-y-1 text-[13px] hover:bg-white/[0.02]",
+                acikId === s.id && "bg-blue-500/10")}>
               <span className="text-gray-600 tabular-nums">{zamanMetni(s.zaman)}</span>
               <span className="font-medium truncate text-right md:text-left">{s.kullanici || "—"}</span>
               <span className="truncate">{tabloAdi(s.tablo)}</span>
@@ -146,7 +146,7 @@ export default function IslemGecmisiPage() {
                 {(["eski", "yeni"] as const).map(k => (
                   <div key={k}>
                     <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">{k === "eski" ? "Eski" : "Yeni"}</p>
-                    <pre className="text-[11px] bg-[#f4f5f7] border border-[#e2e5eb] rounded-xl p-3 overflow-auto max-h-80 whitespace-pre-wrap break-all">
+                    <pre className="text-[11px] bg-zemin border border-cizgi rounded-xl p-3 overflow-auto max-h-80 whitespace-pre-wrap break-all">
                       {s[k] ? JSON.stringify(hassasMaskele(s[k]), null, 2) : "—"}
                     </pre>
                   </div>
@@ -162,10 +162,10 @@ export default function IslemGecmisiPage() {
         <span>{toplam} kayıt</span>
         <div className="flex items-center gap-2">
           <button disabled={sayfa === 0} onClick={() => setSayfa(sayfa - 1)}
-            className="p-2 rounded-xl border border-[#e2e5eb] bg-[#ffffff] disabled:opacity-40"><ChevronLeft size={15} /></button>
+            className="p-2 rounded-xl border border-cizgi bg-kart disabled:opacity-40"><ChevronLeft size={15} /></button>
           <span className="tabular-nums">{sayfa + 1} / {sayfaSayisi}</span>
           <button disabled={sayfa + 1 >= sayfaSayisi} onClick={() => setSayfa(sayfa + 1)}
-            className="p-2 rounded-xl border border-[#e2e5eb] bg-[#ffffff] disabled:opacity-40"><ChevronRight size={15} /></button>
+            className="p-2 rounded-xl border border-cizgi bg-kart disabled:opacity-40"><ChevronRight size={15} /></button>
         </div>
       </div>
     </main>

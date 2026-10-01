@@ -1,5 +1,6 @@
 "use client";
 
+import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -149,31 +150,29 @@ export default function PuantajPage() {
   };
 
   if (!yetkiYukleniyor && !gorebilir) {
-    return <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center text-sm text-gray-500">Bu sayfayı görme yetkiniz yok.</div>;
+    return <div className="min-h-screen bg-zemin flex items-center justify-center text-sm text-gray-500">Bu sayfayı görme yetkiniz yok.</div>;
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased pb-10">
+    <div className="min-h-screen bg-zemin text-yazi font-sans antialiased pb-10">
       {/* HEADER */}
-      <div className="sticky top-0 z-30 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-30 border-b border-cizgi bg-zemin/95 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center">
-              <ClipboardList className="h-4 w-4 text-white" />
-            </div>
+            <SayfaSimgesi />
             <div>
               <h1 className="text-sm font-black tracking-tight leading-none">Puantaj</h1>
               <p className="text-[11px] text-gray-500 leading-none mt-1">{satirlar.length} personel · {AY_ADLARI[ayNo - 1]} {yil}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center bg-white border border-[#e2e5eb] rounded-xl">
-              <button onClick={() => setAy(ayKaydir(ay, -1))} className="p-2 text-gray-500 hover:text-[#1a1f2e]" aria-label="Önceki ay"><ChevronLeft size={15} /></button>
+            <div className="flex items-center bg-kart border border-cizgi rounded-xl">
+              <button onClick={() => setAy(ayKaydir(ay, -1))} className="p-2 text-gray-500 hover:text-yazi" aria-label="Önceki ay"><ChevronLeft size={15} /></button>
               <input type="month" value={ay} onChange={e => e.target.value && setAy(e.target.value)}
                 className="bg-transparent text-[13px] font-semibold outline-none h-8 px-1" />
-              <button onClick={() => setAy(ayKaydir(ay, 1))} className="p-2 text-gray-500 hover:text-[#1a1f2e]" aria-label="Sonraki ay"><ChevronRight size={15} /></button>
+              <button onClick={() => setAy(ayKaydir(ay, 1))} className="p-2 text-gray-500 hover:text-yazi" aria-label="Sonraki ay"><ChevronRight size={15} /></button>
             </div>
-            <button onClick={veriCek} className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] bg-white rounded-xl" aria-label="Yenile">
+            <button onClick={veriCek} className="p-2 text-gray-600 hover:text-yazi border border-cizgi bg-kart rounded-xl" aria-label="Yenile">
               <RefreshCw size={14} />
             </button>
             <button onClick={csvIndir} disabled={loading || satirlar.length === 0}
@@ -185,7 +184,7 @@ export default function PuantajPage() {
       </div>
 
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-5 space-y-4">
-        <div className="flex items-start gap-2 text-[12px] text-blue-800 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5">
+        <div className="flex items-start gap-2 text-[12px] text-blue-200 bg-blue-500/10 border border-blue-500/25 rounded-xl px-3 py-2.5">
           <Info size={14} className="shrink-0 mt-0.5" />
           <span>Maaş hesabı yakında; bu tablo maaş hesabının temelidir. Günlük puantaj, günlük rapordaki &quot;Bugün Çalışanlar&quot; kartından girilir.
             {duzenleyebilir ? " Bir hücreye tıklayarak düzeltebilirsiniz." : " Düzeltme için puantaj düzenleme yetkisi gerekir."}</span>
@@ -199,24 +198,24 @@ export default function PuantajPage() {
           <span className="text-[11px] text-gray-500 px-2 py-0.5">Küçük sayı = fazla mesai (saat) · boş = girilmemiş</span>
         </div>
 
-        {hata && <div className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{hata}</div>}
+        {hata && <div className="text-[12px] text-red-300 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2">{hata}</div>}
 
         {loading ? (
-          <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-blue-600" /></div>
+          <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-blue-400" /></div>
         ) : satirlar.length === 0 ? (
-          <div className="bg-white border border-[#e2e5eb] rounded-2xl py-12 text-center text-gray-500 text-sm">Bu ay için personel yok.</div>
+          <div className="bg-kart border border-cizgi rounded-2xl py-12 text-center text-gray-500 text-sm">Bu ay için personel yok.</div>
         ) : (
           <>
             {/* ── GÜNLÜK TABLO ── */}
-            <div className="bg-white border border-[#e2e5eb] rounded-2xl overflow-x-auto">
+            <div className="bg-kart border border-cizgi rounded-2xl overflow-x-auto">
               <table className="text-[11px] border-collapse">
                 <thead>
-                  <tr className="bg-[#f7f8fa]">
-                    <th className="sticky left-0 z-10 bg-[#f7f8fa] text-left font-semibold text-gray-600 px-3 py-2 border-b border-r border-[#e2e5eb] min-w-[140px]">Personel</th>
+                  <tr className="bg-alan">
+                    <th className="sticky left-0 z-10 bg-alan text-left font-semibold text-gray-600 px-3 py-2 border-b border-r border-cizgi min-w-[140px]">Personel</th>
                     {gunler.map(g => {
                       const hg = haftaGunu(g);
                       return (
-                        <th key={g} className={`px-0.5 py-1.5 border-b border-[#e2e5eb] font-semibold text-center min-w-[30px] ${hg === 0 ? "text-red-500" : hg === 6 ? "text-orange-500" : "text-gray-600"} ${g === bugunStr ? "bg-blue-50" : ""}`}>
+                        <th key={g} className={`px-0.5 py-1.5 border-b border-cizgi font-semibold text-center min-w-[30px] ${hg === 0 ? "text-red-500" : hg === 6 ? "text-orange-500" : "text-gray-600"} ${g === bugunStr ? "bg-blue-500/10" : ""}`}>
                           <div>{Number(g.slice(8, 10))}</div>
                           <div className="text-[9px] font-normal opacity-70">{GUN_KISA[hg]}</div>
                         </th>
@@ -228,9 +227,9 @@ export default function PuantajPage() {
                   {satirlar.map(p => {
                     const pid = String(p.id);
                     return (
-                      <tr key={p.id} className="border-b border-[#f0f1f4] last:border-b-0">
-                        <td className="sticky left-0 z-10 bg-white px-3 py-1.5 border-r border-[#e2e5eb] whitespace-nowrap">
-                          <Link href={`/personel/${p.id}`} className="font-semibold text-[#1a1f2e] hover:text-blue-600">{p.isim}</Link>
+                      <tr key={p.id} className="border-b border-cizgi last:border-b-0">
+                        <td className="sticky left-0 z-10 bg-kart px-3 py-1.5 border-r border-cizgi whitespace-nowrap">
+                          <Link href={`/personel/${p.id}`} className="font-semibold text-yazi hover:text-blue-400">{p.isim}</Link>
                           <div className="text-[10px] text-gray-500">{p.departman || "—"}{p.durum === "ayrildi" ? " · ayrıldı" : ""}</div>
                         </td>
                         {gunler.map(g => {
@@ -240,7 +239,7 @@ export default function PuantajPage() {
                           const aralikta = calismaAraligindaMi(g, p.ise_giris_tarihi, p.isten_cikis_tarihi);
                           const eksik = !d && aralikta && g <= bugunStr;
                           return (
-                            <td key={g} className={`px-0.5 py-1 text-center ${g === bugunStr ? "bg-blue-50/60" : ""} ${!aralikta && !d ? "bg-[#f7f8fa]" : ""}`}>
+                            <td key={g} className={`px-0.5 py-1 text-center ${g === bugunStr ? "bg-blue-500/10" : ""} ${!aralikta && !d ? "bg-alan" : ""}`}>
                               <button type="button" onClick={() => hucreAc(p, g)} disabled={!duzenleyebilir}
                                 title={d ? `${DURUM_ETIKET[d]}${fm ? ` · ${fm} sa fazla mesai` : ""}${k?.aciklama ? ` · ${k.aciklama}` : ""}` : eksik ? "Girilmemiş" : ""}
                                 className={`relative w-7 h-7 rounded-md border text-[11px] font-bold inline-flex items-center justify-center ${duzenleyebilir ? "cursor-pointer hover:ring-1 hover:ring-blue-400" : "cursor-default"} ${
@@ -259,11 +258,11 @@ export default function PuantajPage() {
             </div>
 
             {/* ── AYLIK TOPLAMLAR ── */}
-            <div className="bg-white border border-[#e2e5eb] rounded-2xl overflow-x-auto">
-              <div className="px-4 py-3 border-b border-[#e2e5eb] text-[13px] font-bold">Aylık toplamlar</div>
+            <div className="bg-kart border border-cizgi rounded-2xl overflow-x-auto">
+              <div className="px-4 py-3 border-b border-cizgi text-[13px] font-bold">Aylık toplamlar</div>
               <table className="w-full text-[12px] border-collapse">
                 <thead>
-                  <tr className="bg-[#f7f8fa] text-gray-600">
+                  <tr className="bg-alan text-gray-600">
                     <th className="text-left font-semibold px-3 py-2">Personel</th>
                     {["Çalıştı", "İzin", "Rapor", "Gelmedi", "Ücretsiz izin", "Hafta tatili", "Fazla mesai (sa)", "Girilmemiş", "Avans", "Kesinti"].map(b => (
                       <th key={b} className="font-semibold px-2 py-2 text-right whitespace-nowrap">{b}</th>
@@ -275,22 +274,22 @@ export default function PuantajPage() {
                     const pid = String(p.id);
                     const o = ozetler[pid];
                     return (
-                      <tr key={p.id} className="border-t border-[#f0f1f4]">
+                      <tr key={p.id} className="border-t border-cizgi">
                         <td className="px-3 py-1.5 font-semibold whitespace-nowrap">{p.isim}</td>
-                        <td className="px-2 py-1.5 text-right text-emerald-700 font-semibold">{o.calisti}</td>
+                        <td className="px-2 py-1.5 text-right text-emerald-300 font-semibold">{o.calisti}</td>
                         <td className="px-2 py-1.5 text-right">{o.izin || ""}</td>
                         <td className="px-2 py-1.5 text-right">{o.rapor || ""}</td>
-                        <td className="px-2 py-1.5 text-right text-red-700">{o.gelmedi || ""}</td>
+                        <td className="px-2 py-1.5 text-right text-red-300">{o.gelmedi || ""}</td>
                         <td className="px-2 py-1.5 text-right">{o.ucretsiz_izin || ""}</td>
                         <td className="px-2 py-1.5 text-right">{o.hafta_tatili || ""}</td>
-                        <td className="px-2 py-1.5 text-right text-amber-700">{o.fazlaMesai ? fmtEsnek(o.fazlaMesai) : ""}</td>
+                        <td className="px-2 py-1.5 text-right text-amber-300">{o.fazlaMesai ? fmtEsnek(o.fazlaMesai) : ""}</td>
                         <td className={`px-2 py-1.5 text-right ${o.girilmemis ? "text-gray-500" : "text-gray-300"}`}>{o.girilmemis}</td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{avansToplam[pid] ? `₺${fmt(avansToplam[pid])}` : ""}</td>
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">{kesintiToplam[pid] ? `₺${fmt(kesintiToplam[pid])}` : ""}</td>
                       </tr>
                     );
                   })}
-                  <tr className="border-t-2 border-[#e2e5eb] bg-[#f7f8fa] font-bold">
+                  <tr className="border-t-2 border-cizgi bg-alan font-bold">
                     <td className="px-3 py-2">Toplam</td>
                     <td className="px-2 py-2 text-right">{genel.calisti}</td>
                     <td className="px-2 py-2 text-right">{genel.izin}</td>
@@ -313,18 +312,18 @@ export default function PuantajPage() {
       {/* ── HÜCRE DÜZENLE (puantaj_duzenle) ── */}
       {duzen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !kaydediliyor && setDuzen(null)}>
-          <div className="bg-white border border-[#e2e5eb] rounded-2xl p-5 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-kart border border-cizgi rounded-2xl p-5 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-4">
               <div>
                 <p className="text-sm font-bold">{duzen.personel.isim}</p>
                 <p className="text-[12px] text-gray-500">{fmtTarih(duzen.gun)} · {GUN_KISA[haftaGunu(duzen.gun)]}</p>
               </div>
-              <button onClick={() => setDuzen(null)} className="text-gray-500 hover:text-[#1a1f2e]" aria-label="Kapat"><X size={16} /></button>
+              <button onClick={() => setDuzen(null)} className="text-gray-500 hover:text-yazi" aria-label="Kapat"><X size={16} /></button>
             </div>
             <div className="grid grid-cols-2 gap-1.5 mb-3">
               {PUANTAJ_DURUMLARI.map(d => (
                 <button key={d} type="button" onClick={() => setDuzen({ ...duzen, durum: d })}
-                  className={`text-[12px] font-semibold h-9 rounded-lg border ${duzen.durum === d ? DURUM_RENK[d] : "bg-white text-gray-600 border-[#e2e5eb] hover:border-[#c9ced8]"}`}>
+                  className={`text-[12px] font-semibold h-9 rounded-lg border ${duzen.durum === d ? DURUM_RENK[d] : "bg-kart text-gray-600 border-cizgi hover:border-cizgi-guclu"}`}>
                   {DURUM_KISA[d]} · {DURUM_ETIKET[d]}
                 </button>
               ))}
@@ -333,21 +332,21 @@ export default function PuantajPage() {
               <label className="text-[12px] text-gray-600">Fazla mesai (sa)</label>
               <input type="text" inputMode="decimal" value={duzen.fazla} placeholder="0"
                 onChange={e => setDuzen({ ...duzen, fazla: e.target.value.replace(/[^0-9,.]/g, "").slice(0, 5) })}
-                className="h-9 bg-[#f7f8fa] border border-[#e2e5eb] rounded-lg px-2 text-[13px] outline-none focus:border-blue-500/40" />
+                className="h-9 bg-alan border border-cizgi rounded-lg px-2 text-[13px] outline-none focus:border-altin/50" />
               <label className="text-[12px] text-gray-600">Açıklama</label>
               <input type="text" value={duzen.aciklama} placeholder="Opsiyonel"
                 onChange={e => setDuzen({ ...duzen, aciklama: e.target.value })}
-                className="h-9 bg-[#f7f8fa] border border-[#e2e5eb] rounded-lg px-2 text-[13px] outline-none focus:border-blue-500/40" />
+                className="h-9 bg-alan border border-cizgi rounded-lg px-2 text-[13px] outline-none focus:border-altin/50" />
             </div>
             <div className="flex gap-2">
               {harita[String(duzen.personel.id)]?.[duzen.gun] && (
-                <button onClick={hucreSil} disabled={kaydediliyor} className="flex items-center gap-1 text-[12px] font-semibold text-red-600 border border-red-200 px-3 rounded-lg hover:bg-red-50">
+                <button onClick={hucreSil} disabled={kaydediliyor} className="flex items-center gap-1 text-[12px] font-semibold text-red-400 border border-red-500/25 px-3 rounded-lg hover:bg-red-500/10">
                   <Trash2 size={13} /> Sil
                 </button>
               )}
-              <button onClick={() => setDuzen(null)} className="flex-1 text-[12px] font-semibold text-gray-600 border border-[#e2e5eb] h-9 rounded-lg">İptal</button>
+              <button onClick={() => setDuzen(null)} className="flex-1 text-[12px] font-semibold text-gray-600 border border-cizgi h-9 rounded-lg">İptal</button>
               <button onClick={hucreKaydet} disabled={kaydediliyor || !duzen.durum}
-                className="flex-1 flex items-center justify-center gap-1.5 text-[12px] font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 h-9 rounded-lg">
+                className="flex-1 flex items-center justify-center gap-1.5 text-[12px] font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 disabled:opacity-40 h-9 rounded-lg">
                 {kaydediliyor && <Loader2 size={13} className="animate-spin" />} Kaydet
               </button>
             </div>

@@ -14,7 +14,7 @@ import { FileSpreadsheet, Loader2, Save, X, AlertTriangle, Upload } from "lucide
 // Adisyon programından alınan "ürün satış raporu" (Excel ya da CSV) okunur, kolonlar
 // eşlenir, önizleme gösterilir ve urun_satislari tablosuna (tarih + ürün adına göre) yazılır.
 
-const inputCls = "w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 px-3 rounded-xl outline-none";
+const inputCls = "w-full bg-alan border border-cizgi text-yazi text-xs h-9 px-3 rounded-xl outline-none";
 const fmt = (v: number, d = 2) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: d }).format(v || 0);
 
 interface Dosya { ad: string; sayfalar: Record<string, unknown[][]>; }
@@ -131,10 +131,10 @@ export default function UrunSatisYukle({ onKaydedildi }: { onKaydedildi?: () => 
   };
 
   return (
-    <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-xl p-4 space-y-4">
+    <div className="bg-kart border border-cizgi rounded-xl p-4 space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="text-sm font-bold text-[#1a1f2e] flex items-center gap-2"><FileSpreadsheet size={15} className="text-emerald-600"/> Ürün satış raporu yükle</h2>
+          <h2 className="text-sm font-bold text-yazi flex items-center gap-2"><FileSpreadsheet size={15} className="text-emerald-400"/> Ürün satış raporu yükle</h2>
           <p className="text-[11px] text-gray-500 mt-0.5">Adisyon programının ürün satış raporu (Excel .xlsx/.xls ya da CSV). Aynı ürün birden çok satırda varsa toplanır, “Toplam” satırları atlanır.</p>
         </div>
         <label className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl cursor-pointer">
@@ -145,14 +145,14 @@ export default function UrunSatisYukle({ onKaydedildi }: { onKaydedildi?: () => 
       </div>
 
       {mesaj && (
-        <div className={`text-xs px-3 py-2 rounded-xl border ${mesaj.startsWith("Kaydedilemedi") || mesaj.startsWith("Dosya okunamadı") ? "bg-red-50 border-red-200 text-red-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}>{mesaj}</div>
+        <div className={`text-xs px-3 py-2 rounded-xl border ${mesaj.startsWith("Kaydedilemedi") || mesaj.startsWith("Dosya okunamadı") ? "bg-red-500/10 border-red-500/25 text-red-300" : "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"}`}>{mesaj}</div>
       )}
 
       {dosya && (
         <>
-          <div className="flex items-center justify-between gap-2 text-xs bg-[#f7f8fa] border border-[#e2e5eb] rounded-xl px-3 py-2">
+          <div className="flex items-center justify-between gap-2 text-xs bg-alan border border-cizgi rounded-xl px-3 py-2">
             <span className="font-semibold truncate">{dosya.ad}</span>
-            <button onClick={() => { setDosya(null); if (inputRef.current) inputRef.current.value = ""; }} className="text-gray-500 hover:text-red-600"><X size={14}/></button>
+            <button onClick={() => { setDosya(null); if (inputRef.current) inputRef.current.value = ""; }} className="text-gray-500 hover:text-red-400"><X size={14}/></button>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -176,7 +176,7 @@ export default function UrunSatisYukle({ onKaydedildi }: { onKaydedildi?: () => 
               <label key={a.k} className="text-[11px] font-semibold text-gray-600 space-y-1">
                 <span>{a.l}{a.zorunlu ? " *" : " (isteğe bağlı)"}</span>
                 <select value={eslesme[a.k]} onChange={e => setEslesme({ ...eslesme, [a.k]: Number(e.target.value) })}
-                  className={`${inputCls} ${a.zorunlu && eslesme[a.k] < 0 ? "border-red-300" : ""}`}>
+                  className={`${inputCls} ${a.zorunlu && eslesme[a.k] < 0 ? "border-red-500/25" : ""}`}>
                   <option value={-1}>{a.zorunlu ? "— seçin —" : "— yok —"}</option>
                   {baslik.map((b, i) => <option key={i} value={i}>{b}</option>)}
                 </select>
@@ -185,13 +185,13 @@ export default function UrunSatisYukle({ onKaydedildi }: { onKaydedildi?: () => 
           </div>
 
           {eslesme.tarih < 0 && (
-            <div className="flex flex-wrap items-end gap-3 bg-[#f7f8fa] border border-[#e2e5eb] rounded-xl p-3">
+            <div className="flex flex-wrap items-end gap-3 bg-alan border border-cizgi rounded-xl p-3">
               <div className="text-[11px] font-semibold text-gray-600 space-y-1">
                 <span className="block">Dosyada tarih yok — satışlar hangi güne ait?</span>
-                <div className="flex rounded-xl border border-[#e2e5eb] overflow-hidden w-fit">
+                <div className="flex rounded-xl border border-cizgi overflow-hidden w-fit">
                   {(["tek", "aralik"] as const).map(m => (
                     <button key={m} onClick={() => setTarihModu(m)}
-                      className={`px-3 h-9 text-xs font-bold ${tarihModu === m ? "bg-emerald-600 text-white" : "bg-white text-gray-600"}`}>
+                      className={`px-3 h-9 text-xs font-bold ${tarihModu === m ? "bg-emerald-600 text-white" : "bg-kart text-gray-600"}`}>
                       {m === "tek" ? "Tek gün" : "Tarih aralığı"}
                     </button>
                   ))}
@@ -219,7 +219,7 @@ export default function UrunSatisYukle({ onKaydedildi }: { onKaydedildi?: () => 
           )}
 
           {!eslemeTamam && (
-            <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2 flex items-center gap-2">
+            <div className="text-xs text-red-300 bg-red-500/10 border border-red-500/25 rounded-xl px-3 py-2 flex items-center gap-2">
               <AlertTriangle size={13}/> Ürün adı ve adet kolonlarını (farklı kolonlar) seçin.
             </div>
           )}
@@ -227,18 +227,18 @@ export default function UrunSatisYukle({ onKaydedildi }: { onKaydedildi?: () => 
           {sonuc && (
             <div className="space-y-2">
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-600">
-                <span><b className="text-[#1a1f2e]">{sonuc.urunSayisi}</b> ürün</span>
-                <span>toplam <b className="text-[#1a1f2e]">{fmt(sonuc.toplamAdet)}</b> adet</span>
-                {sonuc.toplamTutar > 0 && <span>toplam <b className="text-[#1a1f2e]">₺{fmt(sonuc.toplamTutar)}</b></span>}
+                <span><b className="text-yazi">{sonuc.urunSayisi}</b> ürün</span>
+                <span>toplam <b className="text-yazi">{fmt(sonuc.toplamAdet)}</b> adet</span>
+                {sonuc.toplamTutar > 0 && <span>toplam <b className="text-yazi">₺{fmt(sonuc.toplamTutar)}</b></span>}
                 {tarihler && <span>{tarihler.bas === tarihler.bit ? fmtTarih(tarihler.bas) : `${fmtTarih(tarihler.bas)} – ${fmtTarih(tarihler.bit)} (${tarihler.gun} gün)`}</span>}
                 <span>{sonuc.satirlar.length} kayıt yazılacak</span>
-                {sonuc.atlanan > 0 && <span className="text-amber-700">{sonuc.atlanan} satır atlandı (toplam satırı / boş / okunamayan)</span>}
+                {sonuc.atlanan > 0 && <span className="text-amber-300">{sonuc.atlanan} satır atlandı (toplam satırı / boş / okunamayan)</span>}
               </div>
-              {sonuc.uyarilar.map((u, i) => <div key={i} className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">{u}</div>)}
+              {sonuc.uyarilar.map((u, i) => <div key={i} className="text-xs text-amber-200 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2">{u}</div>)}
               {onizleme.length > 0 && (
-                <div className="max-h-72 overflow-auto border border-[#e2e5eb] rounded-xl">
+                <div className="max-h-72 overflow-auto border border-cizgi rounded-xl">
                   <table className="w-full text-xs">
-                    <thead className="bg-[#f7f8fa] sticky top-0">
+                    <thead className="bg-alan sticky top-0">
                       <tr className="text-left text-[10px] uppercase tracking-wider text-gray-500">
                         <th className="px-3 py-2">Ürün</th><th className="px-3 py-2 text-right">Adet</th>
                         <th className="px-3 py-2 text-right">Tutar</th><th className="px-3 py-2 text-right">Gün</th>
@@ -246,7 +246,7 @@ export default function UrunSatisYukle({ onKaydedildi }: { onKaydedildi?: () => 
                     </thead>
                     <tbody>
                       {onizleme.map(o => (
-                        <tr key={o.ad} className="border-t border-[#eef0f3]">
+                        <tr key={o.ad} className="border-t border-cizgi">
                           <td className="px-3 py-1.5">{o.ad}</td>
                           <td className="px-3 py-1.5 text-right font-semibold">{fmt(o.adet)}</td>
                           <td className="px-3 py-1.5 text-right">{o.tutarVar ? `₺${fmt(o.tutar)}` : "—"}</td>

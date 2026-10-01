@@ -15,7 +15,8 @@
 // • Mal alışı faturalardan gelir; "Cari Ödeme" (ve kaynak='cari_odeme') kayıtları
 //   o faturaların ödemesidir → kâr/zarara girmez, nakit akışında gösterilir.
 // • POS / yemek kartı / platform tahsilatları satıştır (zaten cirodadır) → gelir sayılmaz.
-// • Ortak sermaye, kredi girişi, kredi taksidi, transferler, nakit kasa açılışı → nakit akışı.
+// • Ortak sermaye, kredi girişi, kredi taksidi, transferler, nakit kasa açılışı ve hesap
+//   açılış bakiyeleri → nakit akışı.
 
 import {
   donemOzeti, roadrunnerKuryesiMi, roadrunnerKuryeUcreti, type RaporVerisi,
@@ -33,8 +34,16 @@ export const TUM_KASA_GIDER_KATEGORILERI = KASA_GIDER_KATEGORILERI.flatMap(g => 
 
 /** "POS / Kart Tahsilatı", "Platform Hakedişi", "Yemek Kartı Tahsilatı": günlük rapordaki satışın bankaya geçmesi. */
 export const KASA_GELIR_KATEGORILERI = [
-  "POS / Kart Tahsilatı", "Platform Hakedişi", "Yemek Kartı Tahsilatı", "Ortak Sermaye", "Kredi", "Diğer Gelir",
+  "POS / Kart Tahsilatı", "Platform Hakedişi", "Yemek Kartı Tahsilatı", "Ortak Sermaye", "Kredi", "Diğer Gelir", "Açılış bakiyesi",
 ];
+
+/**
+ * Programın kullanıma alındığı gün hesapta olan para (banka/kasa açılış bakiyesi).
+ * "Nakit kasa açılış" gibi bakiyeyi düzeltir; gelir değildir, kâr/zarara girmez.
+ */
+export const ACILIS_KATEGORISI = "Açılış bakiyesi";
+/** Bakiyeyi düzelten, kâr/zarara girmeyen açılış kategorileri */
+export const ACILIS_KATS = new Set(["Nakit kasa açılış", ACILIS_KATEGORISI]);
 
 export const TRANSFER_KATEGORISI = "Hesaplar arası transfer";
 
@@ -169,7 +178,7 @@ export function karZararHesapla(g: KarZararGirdi): KarZararSonuc {
     const kaynak = i.kaynak || "";
 
     if (i.tip === "transfer" || kat === TRANSFER_KATEGORISI) { na.transfer += t; continue; }
-    if (kat === "Nakit kasa açılış") { na.kasaAcilis += i.tip === "gider" ? -t : t; continue; }
+    if (ACILIS_KATS.has(kat)) { na.kasaAcilis += i.tip === "gider" ? -t : t; continue; }
     if (kat === "Kasa sayım farkı") { kasaFarki += i.tip === "gider" ? -t : t; continue; }
 
     if (i.tip === "gider") {

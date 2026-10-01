@@ -4,6 +4,7 @@
 // Hesap mantığı lib/karZarar.ts'de (karZararHesapla). Bu sayfa sadece veriyi
 // çeker ve gösterir. Kâr / Zarar (kar_zarar) yetkisi ister.
 
+import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -32,16 +33,16 @@ function Kalem({ ad, aciklama, tutar, taban, isaret, detay, vurgu, soluk }: {
 }) {
   const detaylar = Object.entries(detay || {}).filter(([, v]) => v !== 0).sort((a, b) => b[1] - a[1]);
   return (
-    <div className={`px-4 sm:px-5 py-3 ${vurgu ? "bg-[#f7f8fa]" : ""}`}>
+    <div className={`px-4 sm:px-5 py-3 ${vurgu ? "bg-alan" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className={`text-[13px] ${vurgu ? "font-black text-[#1a1f2e]" : soluk ? "text-gray-500" : "font-semibold text-[#1a1f2e]"}`}>
+          <p className={`text-[13px] ${vurgu ? "font-black text-yazi" : soluk ? "text-gray-500" : "font-semibold text-yazi"}`}>
             {isaret && <span className="inline-block w-4 text-gray-400 font-bold">{isaret}</span>}{ad}
           </p>
           {aciklama && <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">{aciklama}</p>}
         </div>
         <div className="text-right shrink-0">
-          <p className={`text-[14px] tabular-nums ${vurgu ? "font-black" : "font-bold"} ${soluk ? "text-gray-500" : "text-[#1a1f2e]"}`}>{tl(tutar)}</p>
+          <p className={`text-[14px] tabular-nums ${vurgu ? "font-black" : "font-bold"} ${soluk ? "text-gray-500" : "text-yazi"}`}>{tl(tutar)}</p>
           <p className="text-[10px] text-gray-500 tabular-nums">{yuzde(tutar, taban)}</p>
         </div>
       </div>
@@ -114,9 +115,9 @@ export default function KarZararPage() {
     "Net ciro": x.netCiro, "Toplam gider": x.toplamGider, "İşletme kârı": x.isletmeKari,
   }));
 
-  if (yetki.yukleniyor) return <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center"><Loader2 className="animate-spin text-gray-400" /></div>;
+  if (yetki.yukleniyor) return <div className="min-h-screen bg-zemin flex items-center justify-center"><Loader2 className="animate-spin text-gray-400" /></div>;
   if (!karZararIzni) return (
-    <div className="min-h-screen bg-[#f4f5f7] flex flex-col items-center justify-center gap-2 text-gray-600">
+    <div className="min-h-screen bg-zemin flex flex-col items-center justify-center gap-2 text-gray-600">
       <Lock size={22} /><p className="text-sm">Bu sayfa için Kâr / Zarar yetkisi gerekir.</p>
     </div>
   );
@@ -125,39 +126,39 @@ export default function KarZararPage() {
   const taban = s?.netCiro || 0;
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased">
+    <div className="min-h-screen bg-zemin text-yazi font-sans antialiased">
       {/* ── HEADER ── */}
-      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-cizgi bg-zemin/95 backdrop-blur-xl">
         <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center"><Scale className="h-4 w-4 text-white" /></div>
+            <SayfaSimgesi />
             <div>
               <h1 className="text-sm font-black leading-none">Aylık Kâr / Zarar</h1>
               <p className="text-[10px] text-gray-600 mt-0.5 leading-none">Ciro · giderler · işletme kârı</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-700 bg-white border border-[#e2e5eb] px-3 py-2 rounded-xl cursor-pointer select-none">
+            <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-700 bg-kart border border-cizgi px-3 py-2 rounded-xl cursor-pointer select-none">
               <input type="checkbox" checked={krediGider} onChange={e => setKrediGider(e.target.checked)} />
               Kredi taksidini gider say
             </label>
-            <select value={ay} onChange={e => setAy(e.target.value)} className="bg-white border border-[#e2e5eb] text-[12px] font-bold px-3 py-2 rounded-xl outline-none">
+            <select value={ay} onChange={e => setAy(e.target.value)} className="bg-kart border border-cizgi text-[12px] font-bold px-3 py-2 rounded-xl outline-none">
               {secenekler.map(a => <option key={a} value={a}>{ayEtiketi(a)}</option>)}
             </select>
-            <button onClick={yukle} title="Yenile" className="p-2 text-gray-600 border border-[#e2e5eb] bg-white rounded-xl"><RefreshCw size={14} /></button>
+            <button onClick={yukle} title="Yenile" className="p-2 text-gray-600 border border-cizgi bg-kart rounded-xl"><RefreshCw size={14} /></button>
           </div>
         </div>
       </div>
 
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-5 space-y-5">
-        {hata && <p className="text-[12px] text-red-700 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">Veri okunamadı: {hata}</p>}
+        {hata && <p className="text-[12px] text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">Veri okunamadı: {hata}</p>}
 
         {yukleniyor || !s ? (
           <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-gray-400" /></div>
         ) : (
           <>
             {s.eksikGun > 0 && (
-              <div className="flex items-start gap-2 rounded-xl bg-amber-500/10 border border-amber-500/25 px-4 py-3 text-[12px] text-amber-900">
+              <div className="flex items-start gap-2 rounded-xl bg-amber-500/10 border border-amber-500/25 px-4 py-3 text-[12px] text-amber-100">
                 <AlertTriangle size={15} className="shrink-0 mt-0.5" />
                 <p><b>{AY_ADLARI[Number(ay.slice(5, 7)) - 1]}: {s.eksikGun} gün rapor eksik</b> — ciro eksik olduğu için kâr olduğundan düşük görünür. ({s.raporGunSayisi} gün rapor girildi.)</p>
               </div>
@@ -165,27 +166,27 @@ export default function KarZararPage() {
 
             {/* ── ÖZET ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-1 bg-white border border-[#e2e5eb] rounded-2xl p-5">
+              <div className="lg:col-span-1 bg-kart border border-cizgi rounded-2xl p-5">
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold">{ayAdi} · İşletme kârı</p>
-                <p className={`text-4xl font-black tracking-tight mt-2 tabular-nums ${s.isletmeKari >= 0 ? "text-emerald-700" : "text-red-700"}`}>{tl(s.isletmeKari)}</p>
-                <p className="text-[13px] text-gray-600 mt-1">Kâr marjı <b className="text-[#1a1f2e]">%{s.karMarji.toLocaleString("tr-TR")}</b> <span className="text-gray-500">(net ciroya göre)</span></p>
-                <div className="mt-4 pt-4 border-t border-[#e2e5eb] grid grid-cols-2 gap-3">
+                <p className={`text-4xl font-black tracking-tight mt-2 tabular-nums ${s.isletmeKari >= 0 ? "text-emerald-300" : "text-red-300"}`}>{tl(s.isletmeKari)}</p>
+                <p className="text-[13px] text-gray-600 mt-1">Kâr marjı <b className="text-yazi">%{s.karMarji.toLocaleString("tr-TR")}</b> <span className="text-gray-500">(net ciroya göre)</span></p>
+                <div className="mt-4 pt-4 border-t border-cizgi grid grid-cols-2 gap-3">
                   <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">Net ciro</p><p className="text-[15px] font-black tabular-nums">{tl(s.netCiro)}</p></div>
                   <div><p className="text-[10px] text-gray-500 uppercase tracking-widest">Toplam gider</p><p className="text-[15px] font-black tabular-nums">{tl(s.toplamGider)}</p></div>
                 </div>
               </div>
 
-              <div className="lg:col-span-2 bg-white border border-[#e2e5eb] rounded-2xl p-5">
+              <div className="lg:col-span-2 bg-kart border border-cizgi rounded-2xl p-5">
                 <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-3">Son 6 ay</p>
                 <div className="h-[230px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={grafik} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barGap={2}>
-                      <CartesianGrid stroke="#eef0f3" vertical={false} />
+                      <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
                       <XAxis dataKey="ay" tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 10, fill: "#6b7280" }} axisLine={false} tickLine={false} width={48} tickFormatter={v => fmtK(Number(v))} />
                       <Tooltip formatter={(v) => tl(Number(v))} contentStyle={{ fontSize: 12, borderRadius: 10, border: "1px solid #e2e5eb" }} cursor={{ fill: "rgba(0,0,0,0.03)" }} />
                       <Legend wrapperStyle={{ fontSize: 11 }} iconSize={9} />
-                      <ReferenceLine y={0} stroke="#cbd0d8" />
+                      <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
                       <Bar dataKey="Net ciro" fill={RENK.ciro} radius={[4, 4, 0, 0]} maxBarSize={28} />
                       <Bar dataKey="Toplam gider" fill={RENK.gider} radius={[4, 4, 0, 0]} maxBarSize={28} />
                       <Line dataKey="İşletme kârı" stroke={RENK.kar} strokeWidth={2} dot={{ r: 4, fill: RENK.kar, stroke: "#fff", strokeWidth: 2 }} />
@@ -197,12 +198,12 @@ export default function KarZararPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
               {/* ── KALEM TABLOSU ── */}
-              <div className="lg:col-span-2 bg-white border border-[#e2e5eb] rounded-2xl overflow-hidden">
-                <div className="px-5 py-3 border-b border-[#e2e5eb] flex justify-between items-center">
+              <div className="lg:col-span-2 bg-kart border border-cizgi rounded-2xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-cizgi flex justify-between items-center">
                   <p className="text-sm font-semibold text-gray-800">{ayAdi} kâr/zarar tablosu</p>
                   <p className="text-[10px] text-gray-500">tutar · net ciroya oranı</p>
                 </div>
-                <div className="divide-y divide-[#eef0f3]">
+                <div className="divide-y divide-cizgi">
                   <Kalem ad="Brüt ciro" tutar={s.brut} taban={taban} aciklama={`${s.raporGunSayisi} günlük rapor: online + kasa (nakit, POS, yemek kartı) + gün içi giderler (+ Roadrunner döneminde kapıda ödeme).`} />
                   <Kalem ad="Kasadan ödenen günlük giderler" isaret="−" tutar={s.gunlukGider} taban={taban} soluk
                     aciklama="Raporlara girilen gün içi nakit giderler (rapordan verilen avanslar ve cari ödemeler dahil). Net cirodan zaten düşülür, aşağıda tekrar düşülmez." />
@@ -236,12 +237,12 @@ export default function KarZararPage() {
               </div>
 
               {/* ── NAKİT AKIŞI ── */}
-              <div className="bg-white border border-[#e2e5eb] rounded-2xl overflow-hidden">
-                <div className="px-5 py-3 border-b border-[#e2e5eb] flex items-center gap-2">
+              <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-cizgi flex items-center gap-2">
                   <ArrowLeftRight size={14} className="text-gray-500" />
                   <p className="text-sm font-semibold text-gray-800">Nakit akışı <span className="text-[11px] font-normal text-gray-500">(kâr/zarar dışı)</span></p>
                 </div>
-                <div className="divide-y divide-[#eef0f3] text-[13px]">
+                <div className="divide-y divide-cizgi text-[13px]">
                   {[
                     { l: "Ortak sermaye girişi", v: s.nakitAkisi.ortakSermaye, a: "Ortakların koyduğu para — gelir değildir." },
                     { l: "Kredi girişi", v: s.nakitAkisi.krediGirisi },
@@ -257,24 +258,24 @@ export default function KarZararPage() {
                     </div>
                   ))}
                 </div>
-                <div className="px-5 py-3 border-t border-[#e2e5eb] text-[11px] text-gray-500">
-                  Giderleri eksiksiz görmek için banka ekstrelerini <Link href="/kasa" className="font-semibold text-blue-600">Kasa → Ekstre yükle</Link> ile aktarın.
+                <div className="px-5 py-3 border-t border-cizgi text-[11px] text-gray-500">
+                  Giderleri eksiksiz görmek için banka ekstrelerini <Link href="/kasa" className="font-semibold text-blue-400">Kasa → Ekstre yükle</Link> ile aktarın.
                 </div>
               </div>
             </div>
 
             {/* ── SON 6 AY TABLOSU ── */}
-            <div className="bg-white border border-[#e2e5eb] rounded-2xl overflow-hidden">
-              <div className="px-5 py-3 border-b border-[#e2e5eb]"><p className="text-sm font-semibold text-gray-800">Son 6 ay karşılaştırma</p></div>
+            <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-cizgi"><p className="text-sm font-semibold text-gray-800">Son 6 ay karşılaştırma</p></div>
               <div className="overflow-x-auto">
                 <table className="w-full text-[12px]">
                   <thead>
-                    <tr className="bg-[#f7f8fa] border-b border-[#e2e5eb] text-[10px] uppercase tracking-widest text-gray-600">
+                    <tr className="bg-alan border-b border-cizgi text-[10px] uppercase tracking-widest text-gray-600">
                       <th className="px-4 py-2.5 text-left">Kalem</th>
-                      {sonuclar.map(x => <th key={x.ay} className={`px-3 py-2.5 text-right whitespace-nowrap ${x.ay === ay ? "text-[#1a1f2e]" : ""}`}>{ayEtiketi(x.ay)}</th>)}
+                      {sonuclar.map(x => <th key={x.ay} className={`px-3 py-2.5 text-right whitespace-nowrap ${x.ay === ay ? "text-yazi" : ""}`}>{ayEtiketi(x.ay)}</th>)}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#eef0f3]">
+                  <tbody className="divide-y divide-cizgi">
                     {([
                       ["Net ciro", (x: KarZararSonuc) => x.netCiro],
                       ["Mal alışı", (x: KarZararSonuc) => x.malAlisi],
@@ -291,13 +292,13 @@ export default function KarZararPage() {
                     ] as const).map(([ad, f]) => {
                       const kar = ad === "İşletme kârı";
                       return (
-                        <tr key={ad} className={kar ? "bg-[#f7f8fa] font-black" : ""}>
+                        <tr key={ad} className={kar ? "bg-alan font-black" : ""}>
                           <td className="px-4 py-2.5 whitespace-nowrap text-gray-700">{ad}</td>
                           {sonuclar.map(x => {
                             const v = f(x);
                             const metin = ad === "Kâr marjı" ? `%${v.toLocaleString("tr-TR")}` : ad === "Rapor eksik gün" ? (v ? `${v} gün` : "—") : tl(v);
                             return (
-                              <td key={x.ay} className={`px-3 py-2.5 text-right tabular-nums whitespace-nowrap ${kar ? (v >= 0 ? "text-emerald-700" : "text-red-700") : ""} ${ad === "Rapor eksik gün" && v ? "text-amber-700" : ""}`}>{metin}</td>
+                              <td key={x.ay} className={`px-3 py-2.5 text-right tabular-nums whitespace-nowrap ${kar ? (v >= 0 ? "text-emerald-300" : "text-red-300") : ""} ${ad === "Rapor eksik gün" && v ? "text-amber-300" : ""}`}>{metin}</td>
                             );
                           })}
                         </tr>

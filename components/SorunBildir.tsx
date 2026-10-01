@@ -71,28 +71,28 @@ export default function SorunBildir() {
         onClick={() => setAcik(true)}
         title="Sorun bildir"
         aria-label="Sorun bildir"
-        className="fixed right-4 bottom-20 lg:bottom-5 lg:right-5 z-40 w-10 h-10 rounded-full bg-[#ffffff] border border-[#e2e5eb] shadow-md text-gray-500 hover:text-blue-600 hover:border-blue-300 flex items-center justify-center transition-colors print:hidden"
+        className="fixed right-4 bottom-20 lg:bottom-5 lg:right-5 z-40 w-10 h-10 rounded-full bg-kart border border-cizgi shadow-md text-gray-500 hover:text-blue-400 hover:border-blue-500/25 flex items-center justify-center transition-colors print:hidden"
       >
         <HelpCircle size={18} />
       </button>
 
       {acik && (
         <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={kapat}>
-          <div className="w-full sm:max-w-md bg-[#ffffff] rounded-t-2xl sm:rounded-2xl border border-[#e2e5eb] p-5 text-[#1a1f2e]"
+          <div className="w-full sm:max-w-md bg-kart rounded-t-2xl sm:rounded-2xl border border-cizgi p-5 text-yazi"
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-bold">Sorun bildir</h2>
-              <button onClick={kapat} className="p-1.5 text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-lg">
+              <button onClick={kapat} className="p-1.5 text-gray-500 hover:text-yazi border border-cizgi rounded-lg">
                 <X size={14} />
               </button>
             </div>
 
             {gonderildi ? (
               <div className="text-center py-6">
-                <CheckCircle2 className="mx-auto text-green-600 mb-3" size={36} />
+                <CheckCircle2 className="mx-auto text-green-400 mb-3" size={36} />
                 <p className="font-semibold">Gönderildi, teşekkürler.</p>
                 <p className="text-[13px] text-gray-500 mt-1">En kısa sürede incelenecek.</p>
-                <button onClick={kapat} className="mt-5 px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold">Kapat</button>
+                <button onClick={kapat} className="mt-5 px-4 py-2 rounded-xl kebo-btn-altin text-[#1a1408] text-sm font-semibold">Kapat</button>
               </div>
             ) : (
               <div className="space-y-3">
@@ -103,17 +103,17 @@ export default function SorunBildir() {
                   rows={5}
                   autoFocus
                   placeholder="Ne oldu? Ne yapmak istiyordunuz?"
-                  className="w-full rounded-xl border border-[#e2e5eb] bg-[#ffffff] p-3 text-[14px] outline-none focus:border-blue-400"
+                  className="w-full rounded-xl border border-cizgi bg-kart p-3 text-[14px] outline-none focus:border-blue-400"
                 />
-                <label className="flex items-center gap-2 text-[13px] text-gray-600 cursor-pointer border border-dashed border-[#e2e5eb] rounded-xl px-3 py-2.5 hover:border-blue-300">
+                <label className="flex items-center gap-2 text-[13px] text-gray-600 cursor-pointer border border-dashed border-cizgi rounded-xl px-3 py-2.5 hover:border-blue-500/25">
                   <ImagePlus size={16} className="text-gray-500 shrink-0" />
                   <span className="truncate">{dosya ? dosya.name : "Ekran görüntüsü ekle (isteğe bağlı)"}</span>
                   <input type="file" accept="image/*" className="hidden"
                     onChange={e => setDosya(e.target.files?.[0] || null)} />
                 </label>
-                {hata && <p className="text-[13px] text-red-600">{hata}</p>}
+                {hata && <p className="text-[13px] text-red-400">{hata}</p>}
                 <button onClick={gonder} disabled={gonderiliyor}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2.5 text-sm font-semibold">
+                  className="w-full flex items-center justify-center gap-2 rounded-xl kebo-btn-altin hover:brightness-110 disabled:opacity-60 text-[#1a1408] py-2.5 text-sm font-semibold">
                   <Send size={15} /> {gonderiliyor ? "Gönderiliyor..." : "Gönder"}
                 </button>
               </div>

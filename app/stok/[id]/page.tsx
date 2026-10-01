@@ -36,13 +36,13 @@ const fmt = (v: number, d = 1) => new Intl.NumberFormat("tr-TR", { maximumFracti
 
 // Tailwind dinamik sınıf üretmediği için renk sınıfları açıkça yazılı.
 const TIP_KONFIG = {
-  sayim:    { label: "Sayım",    rozet: "bg-blue-500/10 text-blue-600",     yazi: "text-blue-600",   icon: ClipboardCheck },
-  giris:    { label: "Giriş",    rozet: "bg-amber-500/10 text-amber-600",   yazi: "text-amber-600",  icon: Truck },
-  cikis:    { label: "Çıkış",    rozet: "bg-red-500/10 text-red-600",       yazi: "text-red-600",    icon: TrendingDown },
-  duzeltme: { label: "Düzeltme", rozet: "bg-purple-500/10 text-purple-600", yazi: "text-purple-600", icon: Edit3 },
+  sayim:    { label: "Sayım",    rozet: "bg-blue-500/10 text-blue-400",     yazi: "text-blue-400",   icon: ClipboardCheck },
+  giris:    { label: "Giriş",    rozet: "bg-amber-500/10 text-amber-400",   yazi: "text-amber-400",  icon: Truck },
+  cikis:    { label: "Çıkış",    rozet: "bg-red-500/10 text-red-400",       yazi: "text-red-400",    icon: TrendingDown },
+  duzeltme: { label: "Düzeltme", rozet: "bg-purple-500/10 text-purple-400", yazi: "text-purple-400", icon: Edit3 },
 };
 
-const inputCls = "w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-sm h-9 px-3 rounded-xl outline-none";
+const inputCls = "w-full bg-alan border border-cizgi text-yazi text-sm h-9 px-3 rounded-xl outline-none";
 
 export default function StokDetayPage() {
   const params = useParams();
@@ -146,15 +146,15 @@ export default function StokDetayPage() {
   };
 
   if (loading) return (
-    <div className="h-screen bg-[#f4f5f7] flex items-center justify-center">
+    <div className="h-screen bg-zemin flex items-center justify-center">
       <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"/>
     </div>
   );
 
   if (!urun) return (
-    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] flex flex-col items-center justify-center gap-4">
+    <div className="min-h-screen bg-zemin text-yazi flex flex-col items-center justify-center gap-4">
       <p className="text-gray-500">Ürün bulunamadı</p>
-      <Link href="/stok" className="text-blue-600 text-xs">← Stok Listesine Dön</Link>
+      <Link href="/stok" className="text-blue-400 text-xs">← Stok Listesine Dön</Link>
     </div>
   );
 
@@ -163,29 +163,29 @@ export default function StokDetayPage() {
   const sonTutarsiz = analiz.tutarsizAraliklar[analiz.tutarsizAraliklar.length - 1];
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased">
+    <div className="min-h-screen bg-zemin text-yazi font-sans antialiased">
       {/* HEADER */}
-      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-cizgi bg-zemin/95 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Link href="/stok" className="p-2 text-gray-500 hover:text-[#1a1f2e] border border-[#e2e5eb] rounded-xl">
+            <Link href="/stok" className="p-2 text-gray-500 hover:text-yazi border border-cizgi rounded-xl">
               <ArrowLeft size={14}/>
             </Link>
             <div>
-              <h1 className="text-sm font-black tracking-tight text-[#1a1f2e] leading-none">{urun.urun_adi}</h1>
+              <h1 className="text-sm font-black tracking-tight text-yazi leading-none">{urun.urun_adi}</h1>
               <p className="text-[10px] text-gray-600 leading-none mt-0.5">
-                {urun.kategori || "Kategorisiz"} · {urun.birim} · <span className="text-blue-600">{urun.sayim_periyodu === "haftalik" ? "Haftalık" : urun.sayim_periyodu === "aylik" ? "Aylık" : "Günlük"} sayım</span>
+                {urun.kategori || "Kategorisiz"} · {urun.birim} · <span className="text-blue-400">{urun.sayim_periyodu === "haftalik" ? "Haftalık" : urun.sayim_periyodu === "aylik" ? "Aylık" : "Günlük"} sayım</span>
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => modalAc("giris")} className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 border border-amber-500/30 bg-amber-500/5 px-3 py-2 rounded-xl">
+            <button onClick={() => modalAc("giris")} className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-300 border border-amber-500/30 bg-amber-500/5 px-3 py-2 rounded-xl">
               <Truck size={13}/> Mal Geldi
             </button>
-            <button onClick={() => modalAc("cikis")} className="flex items-center gap-1.5 text-[11px] font-semibold text-red-700 border border-red-500/30 bg-red-500/5 px-3 py-2 rounded-xl">
+            <button onClick={() => modalAc("cikis")} className="flex items-center gap-1.5 text-[11px] font-semibold text-red-300 border border-red-500/30 bg-red-500/5 px-3 py-2 rounded-xl">
               <PackageMinus size={13}/> Çıkış / Fire
             </button>
-            <button onClick={() => modalAc("sayim")} className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl shadow-lg shadow-blue-900/30">
+            <button onClick={() => modalAc("sayim")} className="flex items-center gap-2 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 px-4 py-2 rounded-xl shadow-lg shadow-altin/20">
               <ClipboardCheck size={14}/> Sayım Gir
             </button>
           </div>
@@ -195,7 +195,7 @@ export default function StokDetayPage() {
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
         {sonTutarsiz && (
-          <div className="rounded-xl border border-purple-500/25 bg-purple-500/5 p-3 text-xs flex items-center gap-2 text-purple-700">
+          <div className="rounded-xl border border-purple-500/25 bg-purple-500/5 p-3 text-xs flex items-center gap-2 text-purple-300">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <p>{fmtTarih(sonTutarsiz.bas)} → {fmtTarih(sonTutarsiz.bit)} arası stok {fmt(sonTutarsiz.fark)} {urun.birim} arttı ama mal girişi yok. Giriş unutulmuş ya da sayım hatalı olabilir; bu aralık ortalamaya katılmadı.</p>
           </div>
@@ -203,9 +203,9 @@ export default function StokDetayPage() {
 
         {/* KPI ÖZET */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className={`bg-[#ffffff] border rounded-2xl p-4 ${tukenmis ? "border-red-500/30" : kritik ? "border-amber-500/30" : "border-emerald-500/20"}`}>
+          <div className={`bg-kart border rounded-2xl p-4 ${tukenmis ? "border-red-500/30" : kritik ? "border-amber-500/30" : "border-emerald-500/20"}`}>
             <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Tahmini Stok (şu an)</p>
-            <p className={`text-2xl font-black ${tukenmis ? "text-red-600" : kritik ? "text-amber-600" : "text-emerald-600"}`}>
+            <p className={`text-2xl font-black ${tukenmis ? "text-red-400" : kritik ? "text-amber-400" : "text-emerald-400"}`}>
               ~{fmt(durum.tahminiMevcut)} <span className="text-sm text-gray-500">{urun.birim}</span>
             </p>
             <p className="text-[10px] text-gray-600 mt-1">
@@ -215,33 +215,33 @@ export default function StokDetayPage() {
               {urun.min_stok > 0 && <> · Min {fmt(urun.min_stok)}</>}
             </p>
           </div>
-          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
+          <div className="bg-kart border border-cizgi rounded-2xl p-4">
             <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Günlük Kullanım (son 7 gün)</p>
-            <p className="text-2xl font-black text-purple-600">
+            <p className="text-2xl font-black text-purple-400">
               {durum.ort7.ortalama > 0 ? fmt(durum.ort7.ortalama, 2) : "—"} <span className="text-sm text-gray-500">{urun.birim}/gün</span>
             </p>
             <p className="text-[10px] text-gray-600 mt-1">{durum.ort7.veriGunu ? `${durum.ort7.veriGunu} günlük veri${durum.ort7.pencere > 7 ? " (son 7 günde veri yok, son 30 gün)" : ""}` : "En az iki sayım gerekli"}</p>
           </div>
-          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
+          <div className="bg-kart border border-cizgi rounded-2xl p-4">
             <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Stok Ne Kadar Yeter</p>
-            <p className="text-2xl font-black text-blue-600">
+            <p className="text-2xl font-black text-blue-400">
               {durum.kalanGun !== null ? durum.kalanGun : "—"} <span className="text-sm text-gray-500">gün</span>
             </p>
             <p className="text-[10px] text-gray-600 mt-1">{durum.kalanGun !== null ? `~${fmtTarih(gunEkle(bugun(), durum.kalanGun))} tarihine kadar` : "Veri yetersiz"}</p>
           </div>
-          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4">
+          <div className="bg-kart border border-cizgi rounded-2xl p-4">
             <p className="text-[10px] text-gray-600 uppercase tracking-widest font-semibold mb-2">Son Alış Fiyatı</p>
-            <p className="text-2xl font-black text-amber-600">{urun.son_fiyat ? `₺${fmt(urun.son_fiyat, 2)}` : "—"}</p>
+            <p className="text-2xl font-black text-amber-400">{urun.son_fiyat ? `₺${fmt(urun.son_fiyat, 2)}` : "—"}</p>
             <p className="text-[10px] text-gray-600 mt-1">Birim başına · fire değeri bununla hesaplanır</p>
           </div>
         </div>
 
         {/* DÖNEM ANALİZİ */}
-        <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#e2e5eb] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="rounded-2xl border border-cizgi bg-kart overflow-hidden">
+          <div className="px-5 py-4 border-b border-cizgi flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                <Activity className="h-3.5 w-3.5 text-purple-600"/>
+                <Activity className="h-3.5 w-3.5 text-purple-400"/>
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-gray-800">Dönem Analizi</h3>
@@ -249,34 +249,34 @@ export default function StokDetayPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <input type="date" value={donemBaslangic} onChange={e => setDonemBaslangic(e.target.value)} className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-8 px-2 rounded-lg outline-none"/>
+              <input type="date" value={donemBaslangic} onChange={e => setDonemBaslangic(e.target.value)} className="bg-alan border border-cizgi text-yazi text-xs h-8 px-2 rounded-lg outline-none"/>
               <span className="text-gray-600 text-xs">→</span>
-              <input type="date" value={donemBitis} onChange={e => setDonemBitis(e.target.value)} className="bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-8 px-2 rounded-lg outline-none"/>
+              <input type="date" value={donemBitis} onChange={e => setDonemBitis(e.target.value)} className="bg-alan border border-cizgi text-yazi text-xs h-8 px-2 rounded-lg outline-none"/>
             </div>
           </div>
           <div className="p-5 grid grid-cols-2 lg:grid-cols-5 gap-3">
-            <div className="bg-[#f7f8fa] rounded-xl p-3 border border-purple-500/20">
-              <p className="text-[9px] text-purple-600 uppercase tracking-widest font-bold">Toplam Kullanım</p>
-              <p className="text-sm font-black text-purple-600 mt-1">{fmt(donem.toplam)} {urun.birim}</p>
+            <div className="bg-alan rounded-xl p-3 border border-purple-500/20">
+              <p className="text-[9px] text-purple-400 uppercase tracking-widest font-bold">Toplam Kullanım</p>
+              <p className="text-sm font-black text-purple-400 mt-1">{fmt(donem.toplam)} {urun.birim}</p>
               <p className="text-[9px] text-gray-600 mt-0.5">{donem.gun} gün{donem.tahminiGun ? ` (${donem.tahminiGun}'i tahmini)` : ""}</p>
             </div>
-            <div className="bg-[#f7f8fa] rounded-xl p-3 border border-[#e2e5eb]">
+            <div className="bg-alan rounded-xl p-3 border border-cizgi">
               <p className="text-[9px] text-gray-600 uppercase tracking-widest">Günlük Ortalama</p>
               <p className="text-sm font-black text-gray-800 mt-1">{fmt(donem.ortalama, 2)} {urun.birim}/gün</p>
             </div>
-            <div className="bg-[#f7f8fa] rounded-xl p-3 border border-[#e2e5eb]">
+            <div className="bg-alan rounded-xl p-3 border border-cizgi">
               <p className="text-[9px] text-gray-600 uppercase tracking-widest">Gelen Mal</p>
-              <p className="text-sm font-black text-amber-600 mt-1">+{fmt(donem.gelen)} {urun.birim}</p>
+              <p className="text-sm font-black text-amber-400 mt-1">+{fmt(donem.gelen)} {urun.birim}</p>
             </div>
-            <div className="bg-[#f7f8fa] rounded-xl p-3 border border-red-500/20">
-              <p className="text-[9px] text-red-600 uppercase tracking-widest font-bold">Fire (SKT/bozuk/diğer)</p>
-              <p className="text-sm font-black text-red-600 mt-1">{fmt(donem.cikis.fire)} {urun.birim}</p>
+            <div className="bg-alan rounded-xl p-3 border border-red-500/20">
+              <p className="text-[9px] text-red-400 uppercase tracking-widest font-bold">Fire (SKT/bozuk/diğer)</p>
+              <p className="text-sm font-black text-red-400 mt-1">{fmt(donem.cikis.fire)} {urun.birim}</p>
               <p className="text-[9px] text-gray-600 mt-0.5">
                 {donem.cikis.fireTutar ? `~₺${fmt(donem.cikis.fireTutar, 0)}` : ""}
                 {donem.toplam > 0 && donem.cikis.fire > 0 ? ` · kullanımın %${fmt(donem.cikis.fire / donem.toplam * 100, 1)}'i` : ""}
               </p>
             </div>
-            <div className="bg-[#f7f8fa] rounded-xl p-3 border border-[#e2e5eb]">
+            <div className="bg-alan rounded-xl p-3 border border-cizgi">
               <p className="text-[9px] text-gray-600 uppercase tracking-widest">Tedarikçiye İade</p>
               <p className="text-sm font-black text-gray-800 mt-1">{fmt(donem.cikis.iade)} {urun.birim}</p>
             </div>
@@ -284,17 +284,17 @@ export default function StokDetayPage() {
           {Object.keys(donem.cikis.nedenler).length > 0 && (
             <div className="px-5 pb-4 flex flex-wrap gap-2 text-[11px]">
               {Object.entries(donem.cikis.nedenler).map(([n, m]) => (
-                <span key={n} className="bg-red-500/5 border border-red-500/15 text-red-700 px-2 py-1 rounded-lg">{nedenEtiketi(n)}: {fmt(m)} {urun.birim}</span>
+                <span key={n} className="bg-red-500/5 border border-red-500/15 text-red-300 px-2 py-1 rounded-lg">{nedenEtiketi(n)}: {fmt(m)} {urun.birim}</span>
               ))}
             </div>
           )}
         </div>
 
         {/* HAFTANIN GÜNLERİNE GÖRE KULLANIM */}
-        <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] p-5">
+        <div className="rounded-2xl border border-cizgi bg-kart p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-800">Haftanın Günlerine Göre Kullanım <span className="text-[10px] text-gray-500 font-normal">(son 4 hafta)</span></h3>
-            <span className="text-[11px] text-gray-600">Son 7 gün ort.: <strong className="text-purple-700">{fmt(durum.ort7.ortalama, 1)} {urun.birim}</strong></span>
+            <span className="text-[11px] text-gray-600">Son 7 gün ort.: <strong className="text-purple-300">{fmt(durum.ort7.ortalama, 1)} {urun.birim}</strong></span>
           </div>
           <div className="grid grid-cols-7 gap-1.5">
             {[1, 2, 3, 4, 5, 6, 0].map(i => {
@@ -302,7 +302,7 @@ export default function StokDetayPage() {
               const enBuyuk = Math.max(...durum.tahmin.haftaGunleri.map(x => x || 0), 1);
               return (
                 <div key={i} className="text-center">
-                  <div className="h-16 flex items-end justify-center bg-[#f7f8fa] rounded-lg overflow-hidden">
+                  <div className="h-16 flex items-end justify-center bg-alan rounded-lg overflow-hidden">
                     <div className="w-full bg-purple-500/70" style={{ height: `${v ? (v / enBuyuk) * 100 : 0}%` }}/>
                   </div>
                   <p className="text-[10px] text-gray-600 mt-1">{GUN_ADLARI[i].slice(0, 3)}</p>
@@ -316,9 +316,9 @@ export default function StokDetayPage() {
 
         {/* GRAFİKLER */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] p-5">
+          <div className="rounded-2xl border border-cizgi bg-kart p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-purple-600"/> Günlük Kullanım</h3>
+              <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-purple-400"/> Günlük Kullanım</h3>
               <div className="flex items-center gap-3 text-[10px] text-gray-600">
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-purple-500 inline-block"/>Sayımlı gün</span>
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-purple-300 inline-block"/>Tahmini (sayılmadı)</span>
@@ -343,8 +343,8 @@ export default function StokDetayPage() {
               </div>
             )}
           </div>
-          <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] p-5">
-            <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2 mb-4"><BarChart3 className="h-4 w-4 text-emerald-600"/> Sayılan Stok</h3>
+          <div className="rounded-2xl border border-cizgi bg-kart p-5">
+            <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2 mb-4"><BarChart3 className="h-4 w-4 text-emerald-400"/> Sayılan Stok</h3>
             {sayimGrafik.length === 0 ? (
               <p className="text-xs text-gray-600 py-16 text-center">Bu dönemde sayım yok.</p>
             ) : (
@@ -365,25 +365,25 @@ export default function StokDetayPage() {
         </div>
 
         {/* HAREKETLER */}
-        <div className="rounded-2xl border border-[#e2e5eb] bg-[#ffffff] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#e2e5eb]">
+        <div className="rounded-2xl border border-cizgi bg-kart overflow-hidden">
+          <div className="px-5 py-4 border-b border-cizgi">
             <h3 className="text-sm font-semibold text-gray-800">Hareketler ({hareketler.length})</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-[#e2e5eb] bg-[#f7f8fa]">
+                <tr className="border-b border-cizgi bg-alan">
                   {["Tarih", "Tür", "Miktar", "Fiyat", "Açıklama", "Kullanıcı", ""].map((h, i) => (
                     <th key={i} className="px-4 py-3 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-widest">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e2e5eb]">
+              <tbody className="divide-y divide-cizgi">
                 {hareketler.map(h => {
                   const konfig = TIP_KONFIG[h.tip] || TIP_KONFIG.duzeltme;
                   const Icon = konfig.icon;
                   return (
-                    <tr key={h.id} className="hover:bg-black/[0.03] group">
+                    <tr key={h.id} className="hover:bg-white/[0.03] group">
                       <td className="px-4 py-3 text-gray-700 font-semibold">{fmtTarih(h.tarih)}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full ${konfig.rozet}`}>
@@ -398,7 +398,7 @@ export default function StokDetayPage() {
                       <td className="px-4 py-3 text-gray-600 text-[10px]">{h.kullanici || "—"}</td>
                       <td className="px-4 py-3">
                         {isAdmin && (
-                          <button onClick={() => hareketSil(h)} title="Sil" className="p-1 text-gray-400 hover:text-red-600">
+                          <button onClick={() => hareketSil(h)} title="Sil" className="p-1 text-gray-400 hover:text-red-400">
                             <Trash2 size={12}/>
                           </button>
                         )}
@@ -415,19 +415,19 @@ export default function StokDetayPage() {
       {/* SAYIM / GİRİŞ / ÇIKIŞ MODAL */}
       {modal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl w-full max-w-sm">
-            <div className="px-5 py-4 border-b border-[#e2e5eb] flex items-center justify-between">
-              <h3 className="text-sm font-bold text-[#1a1f2e] flex items-center gap-2">
-                {modal === "sayim" ? <><ClipboardCheck size={14} className="text-blue-600"/> Sayım Gir</>
-                  : modal === "giris" ? <><Truck size={14} className="text-amber-600"/> Mal Girişi</>
-                  : <><PackageMinus size={14} className="text-red-600"/> Stok Çıkışı / Fire</>}
+          <div className="bg-kart border border-cizgi rounded-2xl w-full max-w-sm">
+            <div className="px-5 py-4 border-b border-cizgi flex items-center justify-between">
+              <h3 className="text-sm font-bold text-yazi flex items-center gap-2">
+                {modal === "sayim" ? <><ClipboardCheck size={14} className="text-blue-400"/> Sayım Gir</>
+                  : modal === "giris" ? <><Truck size={14} className="text-amber-400"/> Mal Girişi</>
+                  : <><PackageMinus size={14} className="text-red-400"/> Stok Çıkışı / Fire</>}
               </h3>
               <button onClick={() => setModal(null)} className="text-gray-600"><X size={16}/></button>
             </div>
             <div className="p-5 space-y-3">
               {modal === "sayim" && (
                 <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl px-3 py-2 text-xs">
-                  Tahmini olması gereken: <strong className="text-[#1a1f2e]">~{fmt(durum.tahminiMevcut)} {urun.birim}</strong>
+                  Tahmini olması gereken: <strong className="text-yazi">~{fmt(durum.tahminiMevcut)} {urun.birim}</strong>
                   <p className="text-[10px] text-gray-500 mt-0.5">Akşam sayımı ile ertesi sabahın sayımı aynı an kabul edilir; arada kullanım hesaplanmaz.</p>
                 </div>
               )}
@@ -438,7 +438,7 @@ export default function StokDetayPage() {
                   <div className="grid grid-cols-2 gap-1.5">
                     {CIKIS_NEDENLERI.map(n => (
                       <button key={n.v} type="button" onClick={() => setNeden(n.v)}
-                        className={`text-xs font-semibold py-2 rounded-lg border ${neden === n.v ? "bg-red-600 text-white border-red-600" : "bg-[#f7f8fa] border-[#e2e5eb] text-gray-600"}`}>
+                        className={`text-xs font-semibold py-2 rounded-lg border ${neden === n.v ? "bg-red-600 text-white border-red-600" : "bg-alan border-cizgi text-gray-600"}`}>
                         {n.l}
                       </button>
                     ))}
@@ -468,12 +468,12 @@ export default function StokDetayPage() {
                 <input type="text" value={not} onChange={e => setNot(e.target.value)} placeholder="Opsiyonel" className={`${inputCls} text-xs`}/>
               </div>
               {modal === "cikis" && urun.son_fiyat && miktarOku(miktar) > 0 && (
-                <p className="text-[11px] text-red-700">Yaklaşık değer: ₺{fmt(miktarOku(miktar) * urun.son_fiyat, 0)}</p>
+                <p className="text-[11px] text-red-300">Yaklaşık değer: ₺{fmt(miktarOku(miktar) * urun.son_fiyat, 0)}</p>
               )}
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setModal(null)} className="text-xs font-semibold text-gray-500 border border-[#e2e5eb] px-4 py-2 rounded-xl">İptal</button>
+                <button onClick={() => setModal(null)} className="text-xs font-semibold text-gray-500 border border-cizgi px-4 py-2 rounded-xl">İptal</button>
                 <button onClick={kaydet} disabled={saving || !miktar}
-                  className={`text-xs font-bold text-white px-6 py-2 rounded-xl flex items-center gap-2 disabled:opacity-40 ${modal === "sayim" ? "bg-blue-600 hover:bg-blue-700" : modal === "giris" ? "bg-amber-600 hover:bg-amber-700" : "bg-red-600 hover:bg-red-700"}`}>
+                  className={`text-xs font-bold px-6 py-2 rounded-xl flex items-center gap-2 disabled:opacity-40 ${modal === "sayim" ? "kebo-btn-altin text-[#1a1408] hover:brightness-110" : modal === "giris" ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-red-600 hover:bg-red-700 text-white"}`}>
                   {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>} Kaydet
                 </button>
               </div>

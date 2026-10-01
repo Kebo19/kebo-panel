@@ -28,9 +28,9 @@ interface HataKaydi {
 }
 
 const DURUMLAR = [
-  { deger: "yeni", ad: "Yeni", renk: "bg-amber-50 text-amber-700 border-amber-200" },
-  { deger: "inceleniyor", ad: "İnceleniyor", renk: "bg-blue-50 text-blue-700 border-blue-200" },
-  { deger: "cozuldu", ad: "Çözüldü", renk: "bg-green-50 text-green-700 border-green-200" },
+  { deger: "yeni", ad: "Yeni", renk: "bg-amber-500/10 text-amber-300 border-amber-500/25" },
+  { deger: "inceleniyor", ad: "İnceleniyor", renk: "bg-blue-500/10 text-blue-300 border-blue-500/25" },
+  { deger: "cozuldu", ad: "Çözüldü", renk: "bg-green-500/10 text-green-300 border-green-500/25" },
 ];
 
 export default function BildirimlerPage() {
@@ -84,16 +84,16 @@ export default function BildirimlerPage() {
   const yeniSayisi = bildirimler.filter(b => b.durum === "yeni").length;
 
   return (
-    <main className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] p-4 sm:p-5">
+    <main className="min-h-screen bg-zemin text-yazi p-4 sm:p-5">
       <div className="pt-5 mb-5 flex items-center gap-3">
-        <Link href="/ayarlar" className="p-2 rounded-xl border border-[#e2e5eb] bg-[#ffffff] text-gray-500 hover:text-[#1a1f2e]">
+        <Link href="/ayarlar" className="p-2 rounded-xl border border-cizgi bg-kart text-gray-500 hover:text-yazi">
           <ArrowLeft size={16} />
         </Link>
         <div className="flex-1">
           <h1 className="text-2xl font-black">Sorun bildirimleri</h1>
           <p className="text-[13px] text-gray-500">Kullanıcı bildirimleri ve sistem hata kayıtları</p>
         </div>
-        <button onClick={yukle} title="Yenile" className="p-2 rounded-xl border border-[#e2e5eb] bg-[#ffffff] text-gray-500">
+        <button onClick={yukle} title="Yenile" className="p-2 rounded-xl border border-cizgi bg-kart text-gray-500">
           <RefreshCw size={16} className={yukleniyor ? "animate-spin" : ""} />
         </button>
       </div>
@@ -102,13 +102,13 @@ export default function BildirimlerPage() {
         {([["bildirim", `Bildirimler${yeniSayisi ? ` (${yeniSayisi} yeni)` : ""}`], ["hata", `Hata kayıtları (${hatalar.length})`]] as const).map(([k, ad]) => (
           <button key={k} onClick={() => setSekme(k)}
             className={cn("px-4 py-2 rounded-xl text-[13px] font-semibold border",
-              sekme === k ? "bg-blue-600 text-white border-blue-600" : "bg-[#ffffff] text-gray-600 border-[#e2e5eb]")}>
+              sekme === k ? "kebo-btn-altin text-[#1a1408] border-blue-600" : "bg-kart text-gray-600 border-cizgi")}>
             {ad}
           </button>
         ))}
       </div>
 
-      {hata && <p className="text-[13px] text-red-600 mb-3">{hata}</p>}
+      {hata && <p className="text-[13px] text-red-400 mb-3">{hata}</p>}
 
       {sekme === "bildirim" ? (
         <div className="space-y-3 max-w-3xl">
@@ -117,12 +117,12 @@ export default function BildirimlerPage() {
             const d = DURUMLAR.find(x => x.deger === b.durum) || DURUMLAR[0];
             const resim = b.ekran_goruntusu ? resimler[b.ekran_goruntusu] : null;
             return (
-              <div key={b.id} className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl p-4 flex gap-4">
+              <div key={b.id} className="bg-kart border border-cizgi rounded-2xl p-4 flex gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 text-[12px] text-gray-500 mb-2">
                     <span className="tabular-nums">{zamanMetni(b.created_at)}</span>
                     <span>·</span>
-                    <span className="font-semibold text-[#1a1f2e]">{b.kullanici || "—"}</span>
+                    <span className="font-semibold text-yazi">{b.kullanici || "—"}</span>
                     <span>·</span>
                     <span className="font-mono truncate">{b.sayfa || "—"}</span>
                   </div>
@@ -136,32 +136,32 @@ export default function BildirimlerPage() {
                   resim ? (
                     <a href={resim} target="_blank" rel="noreferrer" className="shrink-0">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={resim} alt="Ekran görüntüsü" className="w-24 h-24 object-cover rounded-xl border border-[#e2e5eb]" />
+                      <img src={resim} alt="Ekran görüntüsü" className="w-24 h-24 object-cover rounded-xl border border-cizgi" />
                     </a>
-                  ) : <div className="w-24 h-24 shrink-0 rounded-xl border border-[#e2e5eb] bg-[#f4f5f7] text-[11px] text-gray-400 flex items-center justify-center text-center p-2">Görsel açılamadı</div>
+                  ) : <div className="w-24 h-24 shrink-0 rounded-xl border border-cizgi bg-zemin text-[11px] text-gray-400 flex items-center justify-center text-center p-2">Görsel açılamadı</div>
                 )}
               </div>
             );
           })}
         </div>
       ) : (
-        <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl overflow-hidden">
+        <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
           {!hatalar.length && !yukleniyor && <p className="p-5 text-[13px] text-gray-500">Hata kaydı yok.</p>}
           {hatalar.map(h => (
-            <div key={h.id} className="border-b border-[#e2e5eb] last:border-b-0">
+            <div key={h.id} className="border-b border-cizgi last:border-b-0">
               <button onClick={() => setAcikHata(acikHata === h.id ? null : h.id)}
-                className="w-full text-left px-4 py-3 text-[13px] hover:bg-black/[0.02]">
+                className="w-full text-left px-4 py-3 text-[13px] hover:bg-white/[0.02]">
                 <div className="flex flex-wrap gap-2 text-[12px] text-gray-500 mb-1">
                   <span className="tabular-nums">{zamanMetni(h.created_at)}</span>
                   <span>·</span>
-                  <span className="font-semibold text-[#1a1f2e]">{h.kullanici || "—"}</span>
+                  <span className="font-semibold text-yazi">{h.kullanici || "—"}</span>
                   <span>·</span>
                   <span className="font-mono truncate">{h.sayfa || "—"}</span>
                 </div>
-                <p className="text-red-700 break-words">{h.mesaj}</p>
+                <p className="text-red-300 break-words">{h.mesaj}</p>
               </button>
               {acikHata === h.id && h.detay && (
-                <pre className="mx-4 mb-4 text-[11px] bg-[#f4f5f7] border border-[#e2e5eb] rounded-xl p-3 overflow-auto max-h-80 whitespace-pre-wrap break-all">
+                <pre className="mx-4 mb-4 text-[11px] bg-zemin border border-cizgi rounded-xl p-3 overflow-auto max-h-80 whitespace-pre-wrap break-all">
                   {JSON.stringify(h.detay, null, 2)}
                 </pre>
               )}

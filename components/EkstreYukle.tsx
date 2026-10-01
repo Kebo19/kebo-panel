@@ -19,7 +19,7 @@ import { gunEkle } from "@/lib/tarih";
 import { TUM_KASA_GIDER_KATEGORILERI, KASA_GELIR_KATEGORILERI, TRANSFER_KATEGORISI } from "@/lib/karZarar";
 import { FileUp, X, Loader2, AlertTriangle, Upload } from "lucide-react";
 
-const inputCls = "w-full bg-[#f7f8fa] border border-[#e2e5eb] text-[#1a1f2e] text-[12px] h-9 px-2 rounded-lg outline-none";
+const inputCls = "w-full bg-alan border border-cizgi text-yazi text-[12px] h-9 px-2 rounded-lg outline-none";
 const KOLONLAR: { alan: keyof KolonEslesme; ad: string }[] = [
   { alan: "tarih", ad: "Tarih *" }, { alan: "aciklama", ad: "Açıklama" }, { alan: "tutar", ad: "Tutar (±)" },
   { alan: "borc", ad: "Borç / Çıkış" }, { alan: "alacak", ad: "Alacak / Giriş" },
@@ -200,16 +200,16 @@ export default function EkstreYukle({ onKaydedildi }: { onKaydedildi?: () => voi
   return (
     <>
       <button onClick={() => setAcik(true)}
-        className="flex items-center gap-2 text-xs font-bold text-[#1a1f2e] bg-white border border-[#d8dde5] hover:bg-gray-50 px-3 py-2 rounded-xl transition-colors">
+        className="flex items-center gap-2 text-xs font-bold text-yazi bg-kart border border-cizgi-guclu hover:bg-gray-50 px-3 py-2 rounded-xl transition-colors">
         <FileUp size={13} /> <span className="hidden sm:inline">Ekstre yükle</span><span className="sm:hidden">Ekstre</span>
       </button>
 
       {acik && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white border border-[#e2e5eb] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-5xl max-h-[94vh] flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e5eb]">
+          <div className="bg-kart border border-cizgi rounded-t-2xl sm:rounded-2xl w-full sm:max-w-5xl max-h-[94vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-cizgi">
               <div>
-                <p className="text-sm font-black text-[#1a1f2e]">Banka ekstresi yükle</p>
+                <p className="text-sm font-black text-yazi">Banka ekstresi yükle</p>
                 <p className="text-[11px] text-gray-500">Excel (.xlsx/.xls) veya CSV. Daha önce yüklenen satırlar tekrar eklenmez.</p>
               </div>
               <button onClick={kapat} className="text-gray-600"><X size={16} /></button>
@@ -225,14 +225,14 @@ export default function EkstreYukle({ onKaydedildi }: { onKaydedildi?: () => voi
                 <label className="block text-[11px] font-semibold text-gray-600 sm:col-span-2">Dosya
                   <div className="mt-1 flex items-center gap-2">
                     <input ref={dosyaRef} type="file" accept=".xlsx,.xls,.csv,.txt" onChange={e => dosyaSecildi(e.target.files?.[0])}
-                      className="block w-full text-[12px] file:mr-3 file:border-0 file:bg-[#1a1f2e] file:text-white file:text-[11px] file:font-bold file:px-3 file:py-2 file:rounded-lg" />
+                      className="block w-full text-[12px] file:mr-3 file:border-0 file:bg-altin file:text-[#1a1408] file:text-[11px] file:font-bold file:px-3 file:py-2 file:rounded-lg" />
                     {okunuyor && <Loader2 size={16} className="animate-spin text-gray-400" />}
                   </div>
                 </label>
               </div>
 
               {dosyaAdi && (
-                <div className="rounded-xl border border-[#e2e5eb] bg-[#f7f8fa] p-3 space-y-2">
+                <div className="rounded-xl border border-cizgi bg-alan p-3 space-y-2">
                   <p className="text-[11px] text-gray-600">
                     <b>{dosyaAdi}</b> · {ham.length} satır okundu. Kolon eşlemesi yanlışsa düzeltin:
                   </p>
@@ -253,7 +253,7 @@ export default function EkstreYukle({ onKaydedildi }: { onKaydedildi?: () => voi
                     ))}
                   </div>
                   {!eslesmeGecerli(eslesme) && (
-                    <p className="text-[11px] text-red-600 font-semibold">Tarih kolonu ve tutar (ya da borç/alacak) kolonu seçilmeli.</p>
+                    <p className="text-[11px] text-red-400 font-semibold">Tarih kolonu ve tutar (ya da borç/alacak) kolonu seçilmeli.</p>
                   )}
                   <p className="text-[10px] text-gray-500">Borç/Alacak kolonları varsa tutar onlardan hesaplanır (Borç = hesaptan çıkış).</p>
                 </div>
@@ -264,31 +264,31 @@ export default function EkstreYukle({ onKaydedildi }: { onKaydedildi?: () => voi
                   <div className="flex flex-wrap items-center justify-between gap-2 text-[12px]">
                     <p className="text-gray-600">
                       <b>{secililer.length}</b> / {satirBilgi.length} satır seçili
-                      {giris > 0 && <> · <span className="text-emerald-700 font-semibold">+₺{fmt2(giris)}</span></>}
-                      {cikis > 0 && <> · <span className="text-red-700 font-semibold">−₺{fmt2(cikis)}</span></>}
+                      {giris > 0 && <> · <span className="text-emerald-300 font-semibold">+₺{fmt2(giris)}</span></>}
+                      {cikis > 0 && <> · <span className="text-red-300 font-semibold">−₺{fmt2(cikis)}</span></>}
                       {mevcutRefler.size > 0 && <> · <span className="text-gray-500">{satirBilgi.filter(s => s.mevcut).length} satır zaten kayıtlı</span></>}
                     </p>
                     <div className="flex gap-2">
-                      <button onClick={() => tumunuSec(true)} className="text-[11px] font-semibold text-blue-700">Tümünü seç</button>
+                      <button onClick={() => tumunuSec(true)} className="text-[11px] font-semibold text-blue-300">Tümünü seç</button>
                       <button onClick={() => tumunuSec(false)} className="text-[11px] font-semibold text-gray-500">Hiçbiri</button>
                     </div>
                   </div>
                   {satirBilgi.some(s => s.eslesen) && (
-                    <div className="flex gap-2 items-start rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-[11px] text-amber-800">
+                    <div className="flex gap-2 items-start rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-[11px] text-amber-200">
                       <AlertTriangle size={13} className="shrink-0 mt-0.5" />
                       <p>{satirBilgi.filter(s => s.eslesen).length} satır Kasa&apos;da elle girilmiş bir kayıtla (aynı hesap, aynı yön, ±1 TL, ±2 gün) eşleşiyor; çift sayılmasın diye varsayılan olarak seçilmedi. Farklı bir hareketse işaretleyebilirsiniz.</p>
                     </div>
                   )}
                   {satirBilgi.some(s => s.transfer) && (
-                    <div className="flex gap-2 items-start rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-[11px] text-amber-800">
+                    <div className="flex gap-2 items-start rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-[11px] text-amber-200">
                       <AlertTriangle size={13} className="shrink-0 mt-0.5" />
                       <p>&quot;Hesaplar arası transfer&quot; satırları kendi hesaplarımız arasındaki para hareketi olabilir; varsayılan olarak seçilmedi. Seçerseniz gelir/gider olarak kaydedilir (kâr/zarara girmez).</p>
                     </div>
                   )}
-                  <div className="rounded-xl border border-[#e2e5eb] overflow-x-auto">
+                  <div className="rounded-xl border border-cizgi overflow-x-auto">
                     <table className="w-full text-[12px]">
                       <thead>
-                        <tr className="bg-[#f7f8fa] border-b border-[#e2e5eb] text-[10px] uppercase tracking-widest text-gray-600">
+                        <tr className="bg-alan border-b border-cizgi text-[10px] uppercase tracking-widest text-gray-600">
                           <th className="px-2 py-2 w-8" />
                           <th className="px-2 py-2 text-left">Tarih</th>
                           <th className="px-2 py-2 text-left">Açıklama</th>
@@ -296,9 +296,9 @@ export default function EkstreYukle({ onKaydedildi }: { onKaydedildi?: () => voi
                           <th className="px-2 py-2 text-left">Kategori</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[#eef0f3]">
+                      <tbody className="divide-y divide-cizgi">
                         {satirBilgi.map((s, i) => (
-                          <tr key={s.ref} className={s.mevcut ? "opacity-40" : s.secili ? "" : "bg-[#fafafa] text-gray-500"}>
+                          <tr key={s.ref} className={s.mevcut ? "opacity-40" : s.secili ? "" : "bg-alan text-gray-500"}>
                             <td className="px-2 py-1.5 text-center">
                               <input type="checkbox" disabled={s.mevcut} checked={s.secili} onChange={e => duzelt(i, { secili: e.target.checked })} />
                             </td>
@@ -307,12 +307,12 @@ export default function EkstreYukle({ onKaydedildi }: { onKaydedildi?: () => voi
                               <span className="line-clamp-2 break-words">{s.aciklama || "—"}</span>
                               {s.mevcut && <span className="text-[10px] font-semibold text-gray-600">zaten kayıtlı</span>}
                               {s.eslesen && (
-                                <span className="block text-[10px] font-semibold text-amber-700">
+                                <span className="block text-[10px] font-semibold text-amber-300">
                                   Muhtemelen zaten girilmiş: {s.eslesen.aciklama || s.eslesen.kategori || (s.eslesen.tip === "transfer" ? "Transfer" : "Kasa kaydı")}, {fmtTarih(String(s.eslesen.islem_tarihi).slice(0, 10))}
                                 </span>
                               )}
                             </td>
-                            <td className={`px-2 py-1.5 text-right font-bold whitespace-nowrap ${s.tutar >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                            <td className={`px-2 py-1.5 text-right font-bold whitespace-nowrap ${s.tutar >= 0 ? "text-emerald-300" : "text-red-300"}`}>
                               {s.tutar >= 0 ? "+" : "−"}₺{fmt2(Math.abs(s.tutar))}
                             </td>
                             <td className="px-2 py-1.5 min-w-[170px]">
@@ -335,11 +335,11 @@ export default function EkstreYukle({ onKaydedildi }: { onKaydedildi?: () => voi
               {dosyaAdi && eslesmeGecerli(eslesme) && satirBilgi.length === 0 && (
                 <p className="text-[12px] text-gray-500">Bu eşlemeyle tarih ve tutarı okunabilen satır bulunamadı. Başlık satırını ve kolonları kontrol edin.</p>
               )}
-              {sonuc && <p className="text-[13px] font-bold text-emerald-700">✓ {sonuc}</p>}
+              {sonuc && <p className="text-[13px] font-bold text-emerald-300">✓ {sonuc}</p>}
             </div>
 
-            <div className="px-5 py-3 border-t border-[#e2e5eb] flex gap-2">
-              <button onClick={kapat} className="flex-1 sm:flex-none sm:px-6 text-xs font-semibold text-gray-500 border border-[#e2e5eb] py-2.5 rounded-xl">Kapat</button>
+            <div className="px-5 py-3 border-t border-cizgi flex gap-2">
+              <button onClick={kapat} className="flex-1 sm:flex-none sm:px-6 text-xs font-semibold text-gray-500 border border-cizgi py-2.5 rounded-xl">Kapat</button>
               <button onClick={kaydet} disabled={kaydediliyor || !secililer.length}
                 className="flex-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 py-2.5 rounded-xl flex items-center justify-center gap-2">
                 {kaydediliyor ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} {secililer.length} satırı {hesap} hesabına kaydet

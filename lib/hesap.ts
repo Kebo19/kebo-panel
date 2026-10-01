@@ -13,6 +13,9 @@ import { tv } from "./para";
 //       kasa sayımına giriyordu → kasanın İÇİNDE, brüte ayrıca eklenmez.
 //     - 13.08.2026 ve sonrası (Roadrunner): para Roadrunner'da kalır, haftalık
 //       mutabakatla mahsup edilir → kasada YOK, brüte ayrıca eklenir.
+//     - 28.09.2026 ve sonrası: kapıda ödemenin tamamı yine brüte eklenir. Sabit
+//       kuryeler (Kurye 1, 2) parayı gün sonu kasaya / POS'a teslim eder; havuz
+//       kuryelerinin topladığı Roadrunner'da kalır, ona olan borçtan düşülür.
 // • Eski raporlar tek platform alanlarıyla (os_yemeksepeti...) girildi. Yeni
 //   raporlarda marka bazlı alanlar (os_kebo_ys, os_cnf_ys...) var. Yeni yapıda
 //   eski alanlar platform başına Kebo+CNF toplamıyla doldurulduğu için
@@ -84,13 +87,36 @@ export function yeniYapiMi(r: RaporVerisi): boolean {
 export const kapidaKasadaMi = (tarih: string): boolean =>
   !!tarih && tarih < ROADRUNNER_GECIS_GUNU;
 
-/** 28.09.2026 ve sonrası kuryelerin kapıda topladığı nakit bizim kasamıza, POS'u bizim POS'umuza girer. */
+/** 28.09.2026 ve sonrası kurye tahsilatı dönemi (kapıda ödeme yine brüt ciroya eklenir). */
 export const kuryeTahsilatiBizdeMi = (tarih: string): boolean => !!tarih && tarih >= KENDI_POS_GECIS_GUNU;
 
-/** Kuryelerin o gün kapıda topladığı nakit ve POS (sadece kendi POS dönemi; öncesinde 0). */
+/**
+ * Bu kuryenin kapıda topladığı para gün sonu bize (kasaya / kendi POS'umuza) mı teslim edilir?
+ * 28.09.2026'dan itibaren sabit kuryeler (Kurye 1, Kurye 2) ve kendi kuryelerimiz teslim eder.
+ * Havuz kuryeleri teslim etmez: para Roadrunner'da toplanır, ona olan borcumuzdan düşülür.
+ */
+export const kuryeKasayaTeslimEderMi = (tarih: string, k: Pick<KuryeSatiri, "tip">): boolean =>
+  kuryeTahsilatiBizdeMi(tarih) && k.tip !== "havuz";
+
+/**
+ * Kapıda tahsilatı Roadrunner'da kalan (borcumuzdan mahsup edilen) kurye mi?
+ * 13.08–27.09.2026: bütün Roadrunner kuryeleri. 28.09.2026'dan itibaren: sadece havuz.
+ */
+export const tahsilatRoadrunnerdaMi = (tarih: string, k: Pick<KuryeSatiri, "tip">): boolean =>
+  roadrunnerKuryesiMi(tarih, k) && !kuryeKasayaTeslimEderMi(tarih, k);
+
+/** Kuryelerin o gün kasaya / kendi POS'umuza teslim ettiği nakit ve POS (havuz hariç; 28.09 öncesi 0). */
 export function kuryeTahsilati(r: Pick<RaporVerisi, "tarih" | "kurye_raporlari">): { nakit: number; pos: number } {
-  if (!kuryeTahsilatiBizdeMi(r.tarih)) return { nakit: 0, pos: 0 };
-  return (r.kurye_raporlari || []).reduce<{ nakit: number; pos: number }>((t, k) => ({ nakit: t.nakit + tv(k.nakit), pos: t.pos + tv(k.pos) }), { nakit: 0, pos: 0 });
+  return (r.kurye_raporlari || []).reduce<{ nakit: number; pos: number }>((t, k) =>
+    kuryeKasayaTeslimEderMi(r.tarih, k) ? { nakit: t.nakit + tv(k.nakit), pos: t.pos + tv(k.pos) } : t,
+    { nakit: 0, pos: 0 });
+}
+
+/** Kuryelerin o gün Roadrunner'da bıraktığı (borçtan düşülecek) kapıda nakit ve POS. */
+export function roadrunnerTahsilati(r: Pick<RaporVerisi, "tarih" | "kurye_raporlari">): { nakit: number; pos: number } {
+  return (r.kurye_raporlari || []).reduce<{ nakit: number; pos: number }>((t, k) =>
+    tahsilatRoadrunnerdaMi(r.tarih, k) ? { nakit: t.nakit + tv(k.nakit), pos: t.pos + tv(k.pos) } : t,
+    { nakit: 0, pos: 0 });
 }
 
 export interface PlatformKirilimi {
@@ -233,7 +259,7 @@ export const RR_POS_KOMISYON_ORANI = 0.05;
  * Sadece 13.08.2026 ve sonrasındaki "sabit" ve "havuz" kuryeler. Kendi
  * personel kuryelerimiz ("kendi" ya da tipi olmayan eski satırlar) hariç.
  */
-export function roadrunnerKuryesiMi(tarih: string, k: KuryeSatiri): boolean {
+export function roadrunnerKuryesiMi(tarih: string, k: Pick<KuryeSatiri, "tip">): boolean {
   return tarih >= ROADRUNNER_GECIS_GUNU && (k.tip === "sabit" || k.tip === "havuz");
 }
 

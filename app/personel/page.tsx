@@ -1,5 +1,6 @@
 "use client";
 
+import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -27,11 +28,11 @@ interface Personel {
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
 const DEPARTMANLAR = [
-  { key: "Mutfak",   label: "Mutfak",   icon: ChefHat,    color: "text-orange-600", bg: "bg-orange-500/10", border: "border-orange-500/20" },
-  { key: "Banko",    label: "Banko",    icon: Store,      color: "text-blue-600",   bg: "bg-blue-500/10",   border: "border-blue-500/20"   },
-  { key: "Kurye",    label: "Kurye",    icon: Bike,       color: "text-emerald-600",bg: "bg-emerald-500/10",border: "border-emerald-500/20" },
-  { key: "Temizlik", label: "Temizlik", icon: Sparkles,   color: "text-purple-600", bg: "bg-purple-500/10", border: "border-purple-500/20"  },
-  { key: "Yönetim",  label: "Yönetim",  icon: ShieldCheck,color: "text-amber-600",  bg: "bg-amber-500/10",  border: "border-amber-500/20"   },
+  { key: "Mutfak",   label: "Mutfak",   icon: ChefHat,    color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
+  { key: "Banko",    label: "Banko",    icon: Store,      color: "text-blue-400",   bg: "bg-blue-500/10",   border: "border-blue-500/20"   },
+  { key: "Kurye",    label: "Kurye",    icon: Bike,       color: "text-emerald-400",bg: "bg-emerald-500/10",border: "border-emerald-500/20" },
+  { key: "Temizlik", label: "Temizlik", icon: Sparkles,   color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20"  },
+  { key: "Yönetim",  label: "Yönetim",  icon: ShieldCheck,color: "text-amber-400",  bg: "bg-amber-500/10",  border: "border-amber-500/20"   },
   { key: "Diğer",    label: "Diğer",    icon: Users,      color: "text-gray-400",   bg: "bg-gray-500/10",   border: "border-gray-500/20"    },
 ];
 
@@ -54,13 +55,13 @@ const calismaSuresi = (t?: string) => {
 function PersonelKart({ personel }: { personel: Personel }) {
   return (
     <Link href={`/personel/${personel.id}`}>
-      <div className="bg-[#f7f8fa] border border-[#e2e5eb] hover:border-[#d8dde5] rounded-xl p-4 flex items-center justify-between gap-3 transition-colors group cursor-pointer">
+      <div className="bg-alan border border-cizgi hover:border-cizgi-guclu rounded-xl p-4 flex items-center justify-between gap-3 transition-colors group cursor-pointer">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 text-xs font-bold text-blue-600">
+          <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 text-xs font-bold text-blue-400">
             {personel.isim.split(" ").map(n => n[0]).slice(0, 2).join("")}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-[#1a1f2e] group-hover:text-blue-600 transition-colors truncate">
+            <p className="text-sm font-bold text-yazi group-hover:text-blue-400 transition-colors truncate">
               {personel.isim}
             </p>
             <div className="flex items-center gap-3 mt-0.5 flex-wrap">
@@ -84,12 +85,12 @@ function PersonelKart({ personel }: { personel: Personel }) {
         </div>
         <div className="text-right shrink-0">
           {personel.maas ? (
-            <p className="text-xs font-bold text-emerald-600">₺{fmt(personel.maas)}</p>
+            <p className="text-xs font-bold text-emerald-400">₺{fmt(personel.maas)}</p>
           ) : null}
           <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-lg ${
             personel.durum === "aktif"
-              ? "bg-emerald-500/10 text-emerald-600"
-              : "bg-red-500/10 text-red-600"
+              ? "bg-emerald-500/10 text-emerald-400"
+              : "bg-red-500/10 text-red-400"
           }`}>
             {personel.durum === "aktif" ? "Aktif" : "Ayrıldı"}
           </span>
@@ -111,9 +112,9 @@ function DepartmanBolum({
 }) {
   const Icon = dept.icon;
   return (
-    <div className={`rounded-2xl border overflow-hidden ${dept.border} bg-[#ffffff]`}>
+    <div className={`rounded-2xl border overflow-hidden ${dept.border} bg-kart`}>
       <button onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-black/[0.03] transition-colors">
+        className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.03] transition-colors">
         <div className="flex items-center gap-3">
           <div className={`w-8 h-8 rounded-xl ${dept.bg} flex items-center justify-center`}>
             <Icon size={15} className={dept.color} />
@@ -121,7 +122,7 @@ function DepartmanBolum({
           <div className="text-left">
             <p className={`text-xs font-bold ${dept.color} uppercase tracking-wider`}>{dept.label}</p>
           </div>
-          <span className="text-[11px] text-gray-600 bg-black/[0.04] border border-white/10 px-2 py-0.5 rounded-full">
+          <span className="text-[11px] text-gray-600 bg-white/[0.04] border border-white/10 px-2 py-0.5 rounded-full">
             {personeller.length} kişi
           </span>
         </div>
@@ -129,7 +130,7 @@ function DepartmanBolum({
       </button>
 
       {acik && (
-        <div className="px-4 pb-4 space-y-2 border-t border-[#e2e5eb]">
+        <div className="px-4 pb-4 space-y-2 border-t border-cizgi">
           {personeller.length === 0 ? (
             <div className="py-6 text-center text-gray-600 text-xs uppercase tracking-widest">
               Bu departmanda personel yok
@@ -199,23 +200,21 @@ function PersonellerPageInner() {
   const ayrilanSayisi = personeller.filter(p => p.durum === "ayrildi").length;
 
   if (loading) return (
-    <div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center">
+    <div className="min-h-screen bg-zemin flex items-center justify-center">
       <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1f2e] font-sans antialiased">
+    <div className="min-h-screen bg-zemin text-yazi font-sans antialiased">
 
       {/* ── HEADER ── */}
-      <div className="sticky top-0 z-40 border-b border-[#e2e5eb] bg-[#f4f5f7]/95 backdrop-blur-xl">
+      <div className="sticky top-0 z-40 border-b border-cizgi bg-zemin/95 backdrop-blur-xl">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/40">
-              <Users className="h-4 w-4 text-white" />
-            </div>
+            <SayfaSimgesi />
             <div>
-              <h1 className="text-sm font-black tracking-tight text-[#1a1f2e] leading-none">Personeller</h1>
+              <h1 className="text-sm font-black tracking-tight text-yazi leading-none">Personeller</h1>
               <p className="text-[10px] text-gray-600 leading-none mt-0.5">
                 {aktifSayisi} aktif · {ayrilanSayisi} ayrılan
               </p>
@@ -223,11 +222,11 @@ function PersonellerPageInner() {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={veriCek}
-              className="p-2 text-gray-600 hover:text-[#1a1f2e] border border-[#e2e5eb] hover:border-[#d8dde5] rounded-xl transition-colors">
+              className="p-2 text-gray-600 hover:text-yazi border border-cizgi hover:border-cizgi-guclu rounded-xl transition-colors">
               <RefreshCw size={14} />
             </button>
             <Link href="/personel/yeni"
-              className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-colors shadow-lg shadow-blue-900/20">
+              className="flex items-center gap-2 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 px-4 py-2 rounded-xl transition-colors shadow-lg shadow-altin/20">
               <Plus size={14} /> Personel Ekle
             </Link>
           </div>
@@ -238,7 +237,7 @@ function PersonellerPageInner() {
 
         {/* ── TAB + ARAMA ── */}
         <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex gap-1 bg-[#ffffff] border border-[#e2e5eb] rounded-xl p-1">
+          <div className="flex gap-1 bg-kart border border-cizgi rounded-xl p-1">
             <button onClick={() => setTab("aktif")}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
                 tab === "aktif"
@@ -247,7 +246,7 @@ function PersonellerPageInner() {
               }`}>
               <UserCheck size={13} />
               Aktif
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tab === "aktif" ? "bg-white/20" : "bg-black/[0.04]"}`}>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tab === "aktif" ? "bg-white/20" : "bg-white/[0.04]"}`}>
                 {aktifSayisi}
               </span>
             </button>
@@ -259,7 +258,7 @@ function PersonellerPageInner() {
               }`}>
               <UserX size={13} />
               Ayrılanlar
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tab === "ayrildi" ? "bg-white/20" : "bg-black/[0.04]"}`}>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${tab === "ayrildi" ? "bg-white/20" : "bg-white/[0.04]"}`}>
                 {ayrilanSayisi}
               </span>
             </button>
@@ -269,7 +268,7 @@ function PersonellerPageInner() {
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
             <input value={aramaMetni} onChange={e => setAramaMetni(e.target.value)}
               placeholder="İsim, departman veya telefon ara..."
-              className="w-full bg-[#ffffff] border border-[#e2e5eb] text-[#1a1f2e] text-xs h-9 pl-9 pr-3 rounded-xl outline-none focus:border-blue-500/40 placeholder:text-gray-700" />
+              className="w-full bg-kart border border-cizgi text-yazi text-xs h-9 pl-9 pr-3 rounded-xl outline-none focus:border-altin/50 placeholder:text-gray-700" />
           </div>
         </div>
 
@@ -280,7 +279,7 @@ function PersonellerPageInner() {
               {filtreliPersoneller.length} sonuç
             </p>
             {filtreliPersoneller.length === 0 ? (
-              <div className="bg-[#ffffff] border border-[#e2e5eb] rounded-2xl py-10 text-center text-gray-600 text-xs uppercase tracking-widest">
+              <div className="bg-kart border border-cizgi rounded-2xl py-10 text-center text-gray-600 text-xs uppercase tracking-widest">
                 Personel bulunamadı
               </div>
             ) : (
@@ -314,7 +313,7 @@ function PersonellerPageInner() {
 
 export default function PersonellerPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#f4f5f7] flex items-center justify-center"><div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"/></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-zemin flex items-center justify-center"><div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"/></div>}>
       <PersonellerPageInner />
     </Suspense>
   );
