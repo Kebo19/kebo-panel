@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Boxes, ChevronDown, RefreshCw, AlertTriangle, Search } from "lucide-react";
+import { Boxes, ChevronDown, RefreshCw, AlertTriangle, Search, Bot, Tags } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useYetki } from "@/lib/useYetki";
 import { stokDegerGorebilirMi, stokDegerOzeti, type StokDegerSatiri } from "@/lib/stokDeger";
@@ -18,6 +18,12 @@ const saatYaz = (t: string | null) => {
   return d.toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 };
 
+/** public.stok_fiyat_bot_son() — Mikro fiyat botunun son çalışması */
+interface BotCalismasi {
+  basladi: string; bitti: string | null; durum: "calisiyor" | "basarili" | "hata";
+  okunan_fatura: number; guncellenen: number; kontrol_gereken: number; mesaj: string | null;
+}
+
 const KAT_RENK = ["#34d399", "#f0a94b", "#60a5fa", "#c084fc", "#f472b6", "#facc15", "#22d3ee", "#fb7185", "#a3e635"];
 
 /** Depodaki malın TL değeri. Sadece STOK_DEGER_GORENLER görür; diğerlerine hiçbir şey çizilmez. */
@@ -30,12 +36,19 @@ export default function StokDegerPaneli() {
   const [acik, setAcik] = useState(false);
   const [kategori, setKategori] = useState<string>("Tümü");
   const [arama, setArama] = useState("");
+  const [bot, setBot] = useState<BotCalismasi | null>(null);
 
   const cek = useCallback(async () => {
     setYenileniyor(true);
-    const { data, error } = await createClient().rpc("stok_deger_raporu");
+    const supabase = createClient();
+    const [{ data, error }, botSonuc] = await Promise.all([
+      supabase.rpc("stok_deger_raporu"),
+      supabase.rpc("stok_fiyat_bot_son"),
+    ]);
     if (error) setHata(error.code === "42501" ? "Bu raporu görme yetkiniz yok." : "Stok değeri yüklenemedi. Sayfayı yenileyin.");
     else { setHata(null); setSatirlar((data ?? []) as StokDegerSatiri[]); }
+    // Bot kaydı yoksa ya da fonksiyon henüz kurulmadıysa satır gizlenir
+    setBot(!botSonuc.error && Array.isArray(botSonuc.data) && botSonuc.data[0] ? botSonuc.data[0] as BotCalismasi : null);
     setYenileniyor(false);
   }, []);
 
@@ -80,7 +93,7 @@ export default function StokDegerPaneli() {
         <div className="flex-1 min-w-0">
           <h2 className="text-[15px] font-bold">Stok Değeri</h2>
           <p className="text-[11px] text-gray-500">
-            Stok sayımı × Mikro faturalarındaki son birim fiyat · fiyatlar {saatYaz(ozet?.sonFiyatGuncelleme ?? null)} güncellendi
+            Stok sayımı × Mikro faturalarındaki son alış fiyatı · fiyatlar {saatYaz(ozet?.sonFiyatGuncelleme ?? null)} güncellendi
           </p>
         </div>
         <div className="flex items-center gap-4 text-right">
@@ -92,6 +105,10 @@ export default function StokDegerPaneli() {
             <p className="text-[10px] text-gray-500 uppercase tracking-wider">KDV dahil</p>
             <p className="text-sm font-bold tabular-nums">{ozet ? `₺${fmt2(ozet.toplamKdvli)}` : "—"}</p>
           </div>
+          <Link href="/fiyatlar" title="Fiyat listesi ve Mikro'dan güncelleme"
+            className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-altin border border-cizgi px-2.5 py-2 rounded-xl transition-colors">
+            <Tags size={13} /> Fiyatlar
+          </Link>
           <button onClick={cek} title="Yenile" aria-label="Stok değerini yenile"
             className="p-2 text-gray-600 hover:text-yazi border border-cizgi rounded-xl transition-colors">
             <RefreshCw size={13} className={yenileniyor ? "animate-spin" : ""} />
@@ -100,6 +117,17 @@ export default function StokDegerPaneli() {
       </div>
 
       {hata && <p className="text-[12px] text-red-300">{hata}</p>}
+
+      {/* Son fiyat aktarımı (Fiyat Listesi → "Mikro'dan güncelle") */}
+      {bot && (
+        <p className={`mb-3 flex items-start gap-2 text-[11px] ${bot.durum === "hata" ? "text-red-300" : "text-gray-500"}`}>
+          <Bot size={12} className="shrink-0 mt-0.5" />
+          <span>
+            Son fiyat güncellemesi {saatYaz(bot.basladi)}:{" "}
+            {bot.durum === "calisiyor" ? "çalışıyor…" : bot.mesaj ?? (bot.durum === "basarili" ? "tamamlandı." : "hata.")}
+          </span>
+        </p>
+      )}
 
       {ozet && (
         <>

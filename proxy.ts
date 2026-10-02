@@ -3,6 +3,8 @@ import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { rolCoz, yetkilerCoz, sayfaErisimi, anaSayfaBul, TAM_YETKILI, MUDUR } from '@/lib/yetki'
 import { magicpayGorebilirMi, MAGICPAY_SAYFASI } from '@/lib/magicpay'
+import { stokDegerGorebilirMi } from '@/lib/stokDeger'
+import { FIYAT_SAYFASI } from '@/lib/fiyatListesi'
 
 // Next 16'da `middleware.ts` dosyası `proxy.ts` olarak yeniden adlandırıldı.
 //
@@ -113,6 +115,11 @@ export async function proxy(request: NextRequest) {
     return yonlendir(anaSayfa)
   }
 
+  // Fiyat Listesi: sadece stok değerini görenler (lib/stokDeger.ts).
+  if ((yol === FIYAT_SAYFASI || yol.startsWith(FIYAT_SAYFASI + '/')) && !stokDegerGorebilirMi(user.id)) {
+    return yonlendir(anaSayfa)
+  }
+
   return supabaseResponse
 }
 
@@ -120,6 +127,7 @@ export const config = {
   matcher: [
     // Statik dosyalar, görseller ve api/ hariç her sayfa. API route'ları kendi
     // oturum kontrolünü yapar (bkz. lib/supabase/server.ts → oturumKontrol).
-    '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|webmanifest)$).*)',
+    // kebo-aktar.js: Mikro sayfasında yer iminden yüklenir (oturum çerezi gelmez), herkese açık statik dosya.
+    '/((?!_next/static|_next/image|favicon.ico|api/|kebo-aktar\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|webmanifest)$).*)',
   ],
 }
