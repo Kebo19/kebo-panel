@@ -34,7 +34,7 @@ export const MENU: { ust: MenuOgesi[]; finans: MenuOgesi[]; alt: MenuOgesi[]; ay
     { name: "Reçete & Maliyet", icon: ChefHat, href: "/stok/recete", izin: "recete", renk: "#fb923c", aciklama: "Ürün maliyetleri", anahtar: "reçete maliyet" },
     { name: "Personel", icon: Users, href: "/personel", izin: "personel", renk: "#c084fc", aciklama: "Kadro ve belgeler", anahtar: "personel çalışan kadro" },
     { name: "Puantaj", icon: CalendarCheck, href: "/puantaj", izin: "puantaj", renk: "#2dd4bf", aciklama: "Devam takibi", anahtar: "puantaj mesai izin" },
-    // Sadece Murat görür (lib/magicpay.ts). Listenin sonunda: anasayfa kısayolları MENU.ust sırasına bağlı.
+    // Sadece Murat ve Bülent görür (lib/magicpay.ts). Listenin sonunda: anasayfa kısayolları MENU.ust sırasına bağlı.
     { name: "MagicPay Kontrol", icon: ScanSearch, href: "/magicpay", izin: "ozel_magicpay", renk: "#22d3ee", aciklama: "Kasa raporu ↔ MagicPay", anahtar: "magicpay adisyon karşılaştırma kontrol paket kasa" },
   ],
   finans: [

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { oturumKontrol } from "@/lib/supabase/server";
-import { magicpayGorebilirMi, mpGunCoz } from "@/lib/magicpay";
+import { magicpayGorebilirMi, mpGunCoz, mpIndirimAlanlari } from "@/lib/magicpay";
+import { izinVar } from "@/lib/yetki";
 
 // MagicPay (kebo-admin-ui.magicpay.ai) köprüsü — SALT OKUNUR.
 //
@@ -8,8 +9,10 @@ import { magicpayGorebilirMi, mpGunCoz } from "@/lib/magicpay";
 // paket kanalları ve ödeme dağılımını çeker; /magicpay sayfası bunu Kasa
 // Raporu ile karşılaştırır. Hiçbir veriyi kaydetmez veya değiştirmez.
 //
-// ERİŞİM: sadece lib/magicpay.ts → MAGICPAY_GORENLER listesindeki kullanıcı(lar).
-// Tam Yetkili olmak yetmez.
+// ERİŞİM:
+//   • Tam karşılaştırma verisi: sadece lib/magicpay.ts → MAGICPAY_GORENLER (Murat, Bülent).
+//   • `kapsam=indirim`: Kasa Raporu girebilen herkes; sadece günlük platform
+//     indirimleri döner (rapor formundaki indirim hücreleri otomatik dolar).
 //
 // Kimlik bilgileri Vercel ortam değişkeni olarak tanımlanır, sadece burada
 // (sunucu tarafında) kullanılır, tarayıcıya hiç gitmez:
@@ -64,11 +67,14 @@ const TARIH_DESENI = /^\d{4}-\d{2}-\d{2}$/;
 export async function GET(req: Request) {
   const oturum = await oturumKontrol();
   if (!oturum.ok) return oturum.yanit;
-  if (!magicpayGorebilirMi(oturum.userId)) {
+  const { searchParams } = new URL(req.url);
+  const sadeceIndirim = searchParams.get("kapsam") === "indirim";
+  const tamGorur = magicpayGorebilirMi(oturum.userId);
+  const raporGirer = izinVar(oturum.rol, oturum.yetkiler, "rapor_gir") || izinVar(oturum.rol, oturum.yetkiler, "rapor_duzenle");
+  if (sadeceIndirim ? !(tamGorur || raporGirer) : !tamGorur) {
     return NextResponse.json({ error: "Bu işlem için yetkiniz yok." }, { status: 403 });
   }
 
-  const { searchParams } = new URL(req.url);
   const start = searchParams.get("start") || "";
   const end = searchParams.get("end") || "";
   if (!TARIH_DESENI.test(start) || !TARIH_DESENI.test(end) || start > end) {
@@ -83,6 +89,11 @@ export async function GET(req: Request) {
       `/reports/turnover/daily?start=${start}&end=${end}&branch_ids=${encodeURIComponent(MAGICPAY_BRANCH_ID)}`);
     const sube = Array.isArray(turnover) ? turnover[0] : null;
     const gunler = ((sube?.rows as Record<string, unknown>[]) || []).map(mpGunCoz);
+    if (sadeceIndirim) {
+      return NextResponse.json(
+        { gunler: gunler.map(g => ({ tarih: g.tarih, indirimler: mpIndirimAlanlari(g) })) },
+        { headers: { "Cache-Control": "no-store" } });
+    }
     return NextResponse.json(
       { sube: sube?.branch_name ?? null, gunler },
       { headers: { "Cache-Control": "no-store" } });

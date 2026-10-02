@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { izinVar, sayfaIzni, sayfaErisimi, anaSayfaBul, rolCoz, yetkilerCoz, yeniKullaniciDogrula,YETKILER, YETKI_SABLONLARI, YETKI_ANAHTARLARI } from "@/lib/yetki";
+import { izinVar, sayfaIzni, sayfaErisimi, anaSayfaBul, rolCoz, yetkilerCoz, yeniKullaniciDogrula,YETKILER, YETKI_SABLONLARI, YETKI_ANAHTARLARI, raporOnaycisiMi } from "@/lib/yetki";
 
 describe("rolCoz / yetkilerCoz", () => {
   it("rolleri tanır", () => {
@@ -106,5 +106,14 @@ describe("tanımlar", () => {
   });
   it("anahtarlar tekil", () => {
     expect(new Set(YETKILER.map(y => y.anahtar)).size).toBe(YETKILER.length);
+  });
+});
+
+describe("rapor onaycıları", () => {
+  it("sadece Murat ve Bülent", () => {
+    expect(raporOnaycisiMi("c4d199e9-e0b7-4d33-8ad8-556f7d488bac")).toBe(true);
+    expect(raporOnaycisiMi("e75d458f-1c36-405a-bd56-3c590c28cd54")).toBe(true);
+    expect(raporOnaycisiMi("08e2388a-f033-4255-aebc-f976d6eac338")).toBe(false); // Bekir (rapor_duzenle var)
+    expect(raporOnaycisiMi(null)).toBe(false);
   });
 });

@@ -164,7 +164,7 @@ export function RaporMagicpayPaneli({ rapor }: { rapor: PanelRaporu }) {
           <div className="min-w-0">
             <p className="text-[13px] font-bold text-yazi leading-none">MagicPay karşılaştırması</p>
             <p className="text-[10px] text-gray-500 mt-1 leading-none flex items-center gap-1">
-              Kayıtlı rapora göre <span className="inline-flex items-center gap-0.5 text-cyan-400/80"><EyeOff size={9} /> sadece sana görünür</span>
+              Kayıtlı rapora göre <span className="inline-flex items-center gap-0.5 text-cyan-400/80"><EyeOff size={9} /> sadece Murat &amp; Bülent görür</span>
             </p>
           </div>
         </div>

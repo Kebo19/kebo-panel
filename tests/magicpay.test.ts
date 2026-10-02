@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   mpGunCoz, kanalBul, masaOdemeKalemi, paketOdemeTuru, gunuKarsilastir, magicpayGorebilirMi,
+  mpIndirimAlanlari, indirimFarkliAlanlar,
   type PanelRaporu,
 } from "@/lib/magicpay";
 import { menuGorunurMu, MENU } from "@/lib/menu";
@@ -49,7 +50,7 @@ const satirBul = (k: ReturnType<typeof gunuKarsilastir>, bolum: string, ad: stri
 describe("MagicPay erişimi", () => {
   it("sadece Murat görebilir", () => {
     expect(magicpayGorebilirMi("c4d199e9-e0b7-4d33-8ad8-556f7d488bac")).toBe(true);
-    expect(magicpayGorebilirMi("e75d458f-1c36-405a-bd56-3c590c28cd54")).toBe(false); // Bülent (Tam Yetkili)
+    expect(magicpayGorebilirMi("e75d458f-1c36-405a-bd56-3c590c28cd54")).toBe(true); // Bülent
     expect(magicpayGorebilirMi("08e2388a-f033-4255-aebc-f976d6eac338")).toBe(false); // Bekir (Tam Yetkili)
     expect(magicpayGorebilirMi("")).toBe(false);
     expect(magicpayGorebilirMi(null)).toBe(false);
@@ -57,7 +58,8 @@ describe("MagicPay erişimi", () => {
   it("menü öğesi Tam Yetkili'ye bile görünmez", () => {
     const oge = MENU.ust.find(m => m.href === "/magicpay")!;
     const tamYetkili = { tamYetkili: true, izin: () => true };
-    expect(menuGorunurMu(oge, { ...tamYetkili, userId: "e75d458f-1c36-405a-bd56-3c590c28cd54" })).toBe(false);
+    expect(menuGorunurMu(oge, { ...tamYetkili, userId: "e75d458f-1c36-405a-bd56-3c590c28cd54" })).toBe(true); // Bülent
+    expect(menuGorunurMu(oge, { ...tamYetkili, userId: "08e2388a-f033-4255-aebc-f976d6eac338" })).toBe(false); // Bekir
     expect(menuGorunurMu(oge, { ...tamYetkili, userId: "c4d199e9-e0b7-4d33-8ad8-556f7d488bac" })).toBe(true);
   });
   it("anasayfa kısayolları kaymadı", () => {
@@ -142,5 +144,27 @@ describe("tanımsız yemek kartı", () => {
     expect(satirBul(k, "Kasa", "Edenred (Ticket)").durum).toBe("bilgi");
     expect(satirBul(k, "Kasa", "Yemek kartları toplamı").durum).toBe("ok");
     expect(k.farkSayisi).toBe(0);
+  });
+});
+
+describe("MagicPay indirimleri → Kasa Raporu", () => {
+  it("kanal indirimlerini panel alanlarına yazar", () => {
+    const m = mpIndirimAlanlari(MP);
+    expect(m.os_kebo_ys_indirim).toBe(1006.1);
+    expect(m.os_cnf_ys_indirim).toBe(866.85);
+    expect(m.os_kebo_trendyol_indirim).toBe(4701);
+    expect(m.os_cnf_trendyol_indirim).toBe(0);
+    expect(m.os_kebo_alo_indirim).toBe(0);
+    expect(Object.keys(m)).toHaveLength(7);
+  });
+  it("veri yoksa hepsi 0", () => {
+    expect(Object.values(mpIndirimAlanlari(null)).every(v => v === 0)).toBe(true);
+  });
+  it("elle değiştirilen alanları bulur, kuruş farkını yok sayar", () => {
+    const m = mpIndirimAlanlari(MP);
+    expect(indirimFarkliAlanlar(m, { ...m })).toEqual([]);
+    expect(indirimFarkliAlanlar(m, { ...m, os_kebo_ys_indirim: 1006.105 })).toEqual([]);
+    expect(indirimFarkliAlanlar(m, { ...m, os_kebo_ys_indirim: 900 })).toEqual(["os_kebo_ys_indirim"]);
+    expect(indirimFarkliAlanlar(m, { ...m, ko_cnf_ys_indirim: 50 })).toEqual(["ko_cnf_ys_indirim"]);
   });
 });

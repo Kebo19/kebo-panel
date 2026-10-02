@@ -21,7 +21,8 @@ import {
   ROADRUNNER_GECIS_GUNU, KENDI_POS_GECIS_GUNU, kuryeTahsilati, roadrunnerTahsilati, KURYE_GARANTI_PAKET, YEMEK_KARTLARI, type YemekKartiAlani,
 } from "@/lib/hesap";
 import { useYetki } from "@/lib/useYetki";
-import { magicpayGorebilirMi, type PanelRaporu } from "@/lib/magicpay";
+import { magicpayGorebilirMi, indirimFarkliAlanlar, INDIRIM_ALAN_ADLARI, ESKI_KAPIDA_INDIRIM_ALANLARI, type PanelRaporu } from "@/lib/magicpay";
+import { raporOnaycisiMi, RAPOR_ONAYCI_ADLARI } from "@/lib/yetki";
 import { RaporMagicpayPaneli } from "@/components/MagicpayKarsilastirma";
 import { alanEtiketi } from "@/lib/tarama";
 import { yuklemeIcinHazirla, jsonCevap } from "@/lib/gorsel";
@@ -136,9 +137,11 @@ interface Cari {
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
-// Yetkiler profiles tablosundan gelir (lib/useYetki). "rapor_duzenle" yetkisi olan
-// raporları doğrudan düzenler/siler ve talepleri onaylar; sadece "rapor_gir" olan
-// yeni rapor girer, mevcut rapordaki değişikliği onaya gönderir.
+// Yetkiler profiles tablosundan gelir (lib/useYetki). Raporu doğrudan düzenleyip
+// silebilen ve değişiklik taleplerini onaylayan sadece lib/yetki.ts → RAPOR_ONAYCILARI
+// (Murat, Bülent). Diğer herkesin mevcut rapordaki değişikliği onaya gider.
+// Platform indirimleri MagicPay'den otomatik dolar; yeni raporda elle değiştirilirse
+// rapor MagicPay değerleriyle kaydedilir, elle girilen indirim onaya gider.
 interface PersonelKisa { id: string; isim: string; }
 /** Puantaj listesi için personel (ayrılanlar dahil; tarihe göre süzülür). */
 interface PuantajPersoneli extends PersonelKisa { durum: string | null; ise_giris_tarihi: string | null; isten_cikis_tarihi: string | null; }
@@ -791,6 +794,8 @@ export default function RaporlarPage() {
   const userEmail = yetki.email;
   // Rapor açılınca yanında MagicPay karşılaştırması — sadece lib/magicpay.ts → MAGICPAY_GORENLER.
   const magicpayGorur = magicpayGorebilirMi(yetki.userId);
+  // Rapor düzenlemelerini onaylayan / raporu doğrudan düzenleyip silen: sadece Murat ve Bülent.
+  const onayci = raporOnaycisiMi(yetki.userId);
 
   // ── Auth & Data ──
   const [loading, setLoading] = useState(true);
@@ -898,6 +903,13 @@ export default function RaporlarPage() {
   const [farkOnay, setFarkOnay] = useState(false);
   // Yeni raporda önce tarih seçilip onaylanır, sonra form (ve tarama) açılır.
   const [tarihOnaylandi, setTarihOnaylandi] = useState(false);
+  // ── MagicPay platform indirimleri: herkeste otomatik dolar ──
+  // "hazir": o günün indirimleri alındı · "yok": MagicPay'de o gün satış yok · "hata": alınamadı
+  const [mpIndirim, setMpIndirim] = useState<Record<string, number> | null>(null);
+  const [mpIndirimDurum, setMpIndirimDurum] = useState<"bos" | "yukleniyor" | "hazir" | "yok" | "hata">("bos");
+  const [mpIndirimHata, setMpIndirimHata] = useState("");
+  // Hangi tarih için MagicPay indirimleri forma yazıldı (geç gelen cevap kullanıcının girdiğini ezmesin)
+  const mpDolduruldu = useRef("");
   const formAlaniRef = useRef<HTMLDivElement>(null);
   const dosyaInputRef = useRef<HTMLInputElement>(null);
   const ekDosyaInputRef = useRef<HTMLInputElement>(null);
@@ -909,7 +921,7 @@ export default function RaporlarPage() {
   const veriCek = useCallback(async () => {
     if (yetki.yukleniyor) return;
     setLoading(true);
-    if (isAdmin) {
+    if (onayci) {
       const { data: talepler } = await supabase.from("rapor_degisiklik_talepleri")
         .select("*").order("talep_tarihi", { ascending: false });
       if (talepler) {
@@ -958,7 +970,7 @@ export default function RaporlarPage() {
       setGiderOnerileri([...gecmisGiderler]);
     }
     setLoading(false);
-  }, [secilenAy, secilenYil, supabase, yetki.yukleniyor, isAdmin]);
+  }, [secilenAy, secilenYil, supabase, yetki.yukleniyor, onayci]);
 
   useEffect(()=>{veriCek();},[veriCek]);
 
@@ -977,6 +989,71 @@ export default function RaporlarPage() {
     })();
     return () => { iptal = true; };
   }, [tarih, supabase]);
+
+  // ── MagicPay platform indirimleri ──
+  /** Formdaki indirim hücreleri (alan adı → setter). */
+  const indirimSetleri: Record<string, (v: string) => void> = {
+    os_kebo_ys_indirim: setOsKeboYsIndirim, os_kebo_trendyol_indirim: setOsKeboTrendyolIndirim,
+    os_kebo_migros_indirim: setOsKeboMigrosIndirim, os_kebo_alo_indirim: setOsKeboAloIndirim,
+    os_cnf_ys_indirim: setOsCnfYsIndirim, os_cnf_trendyol_indirim: setOsCnfTrendyolIndirim,
+    os_cnf_migros_yemek_indirim: setOsCnfMigrosIndirim,
+    ko_kebo_ys_indirim: setKoKeboYsIndirim, ko_kebo_trendyol_indirim: setKoKeboTrendyolIndirim,
+    ko_cnf_ys_indirim: setKoCnfYsIndirim, ko_cnf_trendyol_indirim: setKoCnfTrendyolIndirim,
+  };
+  /** Formdaki indirimler (alan adı → tutar). */
+  const formIndirimleri: Record<string, number> = {
+    os_kebo_ys_indirim: tv(osKeboYsIndirim), os_kebo_trendyol_indirim: tv(osKeboTrendyolIndirim),
+    os_kebo_migros_indirim: tv(osKeboMigrosIndirim), os_kebo_alo_indirim: tv(osKeboAloIndirim),
+    os_cnf_ys_indirim: tv(osCnfYsIndirim), os_cnf_trendyol_indirim: tv(osCnfTrendyolIndirim),
+    os_cnf_migros_yemek_indirim: tv(osCnfMigrosIndirim),
+    ko_kebo_ys_indirim: tv(koKeboYsIndirim), ko_kebo_trendyol_indirim: tv(koKeboTrendyolIndirim),
+    ko_cnf_ys_indirim: tv(koCnfYsIndirim), ko_cnf_trendyol_indirim: tv(koCnfTrendyolIndirim),
+  };
+  /** MagicPay değerleri, formdaki tüm indirim alanları için (eski kapıda indirimleri 0). */
+  const mpTumIndirimler = (m: Record<string, number>): Record<string, number> => ({
+    ...Object.fromEntries(ESKI_KAPIDA_INDIRIM_ALANLARI.map(a => [a, 0])), ...m,
+  });
+  const indirimleriMagicleDoldur = (m: Record<string, number>) => {
+    const tum = mpTumIndirimler(m);
+    for (const [alan, set] of Object.entries(indirimSetleri)) set(paraYaz(tum[alan] || 0));
+  };
+  const mpIndirimHazir = mpIndirimDurum === "hazir" && !!mpIndirim;
+  /** Elle değiştirilmiş (MagicPay'den farklı) indirim alanları. */
+  const indirimFarklari: string[] = mpIndirimHazir ? indirimFarkliAlanlar(mpIndirim!, formIndirimleri) : [];
+  const indirimAlanAdi = (a: string) => INDIRIM_ALAN_ADLARI[a] || ({
+    ko_kebo_ys_indirim: "Kebo · Yemeksepeti kapıda indirim (eski)", ko_kebo_trendyol_indirim: "Kebo · Trendyol kapıda indirim (eski)",
+    ko_cnf_ys_indirim: "CNF · Yemeksepeti kapıda indirim (eski)", ko_cnf_trendyol_indirim: "CNF · Trendyol kapıda indirim (eski)",
+  } as Record<string, string>)[a] || a;
+
+  // Form açık ve tarih seçiliyken o günün indirimleri MagicPay'den alınır. Yeni raporda
+  // forma otomatik yazılır; düzenlemede sadece karşılaştırma için kullanılır.
+  const yeniRaporFormu = !selectedRapor;
+  useEffect(() => {
+    if (!formAcik || !/^\d{4}-\d{2}-\d{2}$/.test(tarih) || tarih > bugun()) {
+      setMpIndirim(null); setMpIndirimDurum("bos"); setMpIndirimHata(""); return;
+    }
+    let iptal = false;
+    setMpIndirim(null); setMpIndirimDurum("yukleniyor"); setMpIndirimHata("");
+    (async () => {
+      try {
+        const res = await fetch(`/api/magicpay-karsilastirma?kapsam=indirim&start=${tarih}&end=${tarih}`, { cache: "no-store" });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d?.error || `HTTP ${res.status}`);
+        const gun = ((d.gunler || []) as { tarih: string; indirimler: Record<string, number> }[]).find(g => g.tarih === tarih);
+        if (iptal) return;
+        if (!gun) { setMpIndirimDurum("yok"); return; }
+        setMpIndirim(gun.indirimler); setMpIndirimDurum("hazir");
+        if (yeniRaporFormu && mpDolduruldu.current !== tarih) {
+          mpDolduruldu.current = tarih;
+          indirimleriMagicleDoldur(gun.indirimler);
+        }
+      } catch (e) {
+        if (!iptal) { setMpIndirimDurum("hata"); setMpIndirimHata(e instanceof Error ? e.message : "Bilinmeyen hata."); }
+      }
+    })();
+    return () => { iptal = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formAcik, tarih, yeniRaporFormu]);
 
   // ── Helpers ──
   const siradakiTarih = (): string|null => enSonRaporTarihi ? gunEkle(enSonRaporTarihi, 1) : null;
@@ -1030,6 +1107,7 @@ export default function RaporlarPage() {
     setNotlar("");setSelectedRapor(null);setIsEditMode(false);
     setTaramaHata(""); setTaramaBelirsizAlanlar([]);
     setTaramaIleDoldu(false); setTaramaTarihNotu(""); setKontrolOnay(false); setTarihOnaylandi(false); setTaramaKontrol({}); setFarkOnay(false);
+    mpDolduruldu.current = "";
   };
 
   /** Yeni rapor: formu temizler, tarih adımını sıradaki günle hazır açar. */
@@ -1060,7 +1138,7 @@ export default function RaporlarPage() {
 
   // ── Onay Bekleyen Değişiklik: Onayla / Reddet ──
   const handleTalepOnayla = async (talep: DegisiklikTalebi) => {
-    if (!isAdmin) return;
+    if (!onayci) return;
     if (!confirm(`${fmtTarih(talep.rapor_tarihi)} tarihli rapor için ${talep.talep_eden} tarafından yapılan değişikliği onaylıyor musunuz?`)) return;
     setOnayIslemId(talep.id);
     try {
@@ -1080,7 +1158,7 @@ export default function RaporlarPage() {
   };
 
   const handleTalepReddet = async (talep: DegisiklikTalebi) => {
-    if (!isAdmin) return;
+    if (!onayci) return;
     const sebep = prompt("Reddetme sebebi (opsiyonel):");
     if (sebep === null) return;
     setOnayIslemId(talep.id);
@@ -1098,6 +1176,10 @@ export default function RaporlarPage() {
   // İki rapor kaydı arasındaki farklı alanları okunabilir şekilde listeler
   const talepFarklari = (eski: Record<string, unknown> | null, yeni: Record<string, unknown> | null) => {
     const ALAN_ETIKET: Record<string,string> = {
+      os_kebo_ys_indirim:"Kebo · Yemeksepeti İndirim", os_kebo_trendyol_indirim:"Kebo · Trendyol İndirim",
+      os_cnf_ys_indirim:"CNF · Yemeksepeti İndirim", os_cnf_trendyol_indirim:"CNF · Trendyol İndirim",
+      ko_kebo_ys_indirim:"Kebo · Yemeksepeti İndirim (Kapıda, eski)", ko_kebo_trendyol_indirim:"Kebo · Trendyol İndirim (Kapıda, eski)",
+      ko_cnf_ys_indirim:"CNF · Yemeksepeti İndirim (Kapıda, eski)", ko_cnf_trendyol_indirim:"CNF · Trendyol İndirim (Kapıda, eski)",
       os_kebo_ys:"Kebo · Yemeksepeti (Online)", os_kebo_trendyol:"Kebo · Trendyol (Online)", os_kebo_migros:"Kebo · Migros (Online)", os_kebo_migros_indirim:"Kebo · Migros İndirim", os_kebo_alo:"Kebo · Alo Paket (Online)", os_kebo_alo_indirim:"Kebo · Alo İndirim", os_cnf_migros_yemek_indirim:"CNF · Migros İndirim",
       os_cnf_ys:"CNF · Yemeksepeti (Online)", os_cnf_trendyol:"CNF · Trendyol (Online)", os_cnf_migros_yemek:"CNF · Migros Yemek (Online)",
       ko_kebo_ys:"Kebo · Yemeksepeti (Kapıda)", ko_kebo_trendyol:"Kebo · Trendyol (Kapıda)", ko_kebo_migros_yemek:"Kebo · Migros Yemek (Kapıda)", ko_kebo_alo:"Kebo · Alo Paket",
@@ -1404,6 +1486,8 @@ export default function RaporlarPage() {
       if (veri.notlar) setNotlar(onceki => ekle && onceki ? `${onceki}\n${veri.notlar}` : veri.notlar);
       setTaramaBelirsizAlanlar(onceki => ekle ? [...new Set([...onceki, ...(veri.belirsiz_alanlar || [])])] : (veri.belirsiz_alanlar || []));
       setTaramaIleDoldu(true); setKontrolOnay(false);
+      // İndirimler kağıttan değil MagicPay'den gelir (alınabildiyse).
+      if (!selectedRapor && mpIndirimHazir) indirimleriMagicleDoldur(mpIndirim!);
       const kontrol = Object.fromEntries(Object.entries(veri.kontrol || {}).filter(([, v]) => Number(v) > 0)) as Record<string, number>;
       setTaramaKontrol(onceki => ekle ? { ...onceki, ...kontrol } : kontrol);
       setTimeout(() => formAlaniRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
@@ -1519,9 +1603,9 @@ export default function RaporlarPage() {
           })) } : {}),
         },
       };
-      // rapor_duzenle yetkisi yoksa: rapor doğrudan güncellenmez, onaya (değişiklik talebi) gider.
-      if (selectedRapor && !isAdmin) {
-        if (!isOnayliDuzenleyici) { alert("Bu raporu düzenleme yetkiniz yok."); return; }
+      // Murat / Bülent dışında: mevcut rapor doğrudan güncellenmez, onaya (değişiklik talebi) gider.
+      if (selectedRapor && !onayci) {
+        if (!isOnayliDuzenleyici && !isAdmin) { alert("Bu raporu düzenleme yetkiniz yok."); return; }
         const { error: talepError } = await supabase.from("rapor_degisiklik_talepleri").insert([{
           rapor_id: selectedRapor.id,
           rapor_tarihi: selectedRapor.tarih,
@@ -1531,14 +1615,36 @@ export default function RaporlarPage() {
           durum: "bekliyor",
         }]);
         if (talepError) { alert("Talep gönderilirken hata: "+talepError.message); return; }
-        alert(`${fmtTarih(selectedRapor.tarih)} tarihli rapor için değişiklik talebiniz onaya gönderildi. Tam yetkili bir kullanıcı onayladığında rapor güncellenecek.`);
+        alert(`${fmtTarih(selectedRapor.tarih)} tarihli rapor için değişiklik talebiniz onaya gönderildi. ${RAPOR_ONAYCI_ADLARI} onayladığında rapor güncellenecek.`);
         formuTemizle(); setFormAcik(false); veriCek();
         return;
       }
-      const { error } = await supabase.rpc("rapor_kaydet", { p_veri: raporData, p_rapor_id: selectedRapor?.id ?? null });
+      // Yeni raporda MagicPay indirimleri elle değiştirildiyse (Murat / Bülent hariç): rapor
+      // MagicPay indirimleriyle kaydedilir, elle girilen indirimler onaya (değişiklik talebi) gider.
+      const indirimOnayaGider = !selectedRapor && !onayci && mpIndirimHazir && indirimFarklari.length > 0;
+      const mpDegerleri = mpIndirimHazir ? mpTumIndirimler(mpIndirim!) : {};
+      if (indirimOnayaGider && !confirm(
+        `Platform indirimlerini MagicPay'den farklı girdiniz:\n• ${indirimFarklari.map(a => `${indirimAlanAdi(a)}: MagicPay ₺${fmt(mpDegerleri[a] || 0)} → girilen ₺${fmt(formIndirimleri[a] || 0)}`).join("\n• ")}\n\n` +
+        `Rapor MagicPay indirimleriyle kaydedilecek; sizin girdiğiniz indirimler ${RAPOR_ONAYCI_ADLARI} onayına gönderilecek. Devam edilsin mi?`)) return;
+      const kayitVerisi = indirimOnayaGider ? { ...raporData, ...mpDegerleri } : raporData;
+      const { data: kayitId, error } = await supabase.rpc("rapor_kaydet", { p_veri: kayitVerisi, p_rapor_id: selectedRapor?.id ?? null });
       if (error) {
         if (error.code === "23505") { alert(`${fmtTarih(tarih)} tarihli rapor zaten mevcut.`); setDuplikaTarihHata(true); return; }
         alert("Kaydedilemedi: "+error.message); return;
+      }
+      if (indirimOnayaGider && kayitId) {
+        const indirimAlanlari = Object.keys(indirimSetleri);
+        const { error: talepError } = await supabase.from("rapor_degisiklik_talepleri").insert([{
+          rapor_id: kayitId as string,
+          rapor_tarihi: tarih,
+          talep_eden: userEmail,
+          eski_veri: { tarih, ...Object.fromEntries(indirimAlanlari.map(a => [a, mpDegerleri[a] || 0])) },
+          yeni_veri: { tarih, ...Object.fromEntries(indirimAlanlari.map(a => [a, formIndirimleri[a] || 0])) },
+          durum: "bekliyor",
+        }]);
+        alert(talepError
+          ? "Rapor MagicPay indirimleriyle kaydedildi ancak indirim değişikliği onaya gönderilemedi: " + talepError.message
+          : `Rapor MagicPay indirimleriyle kaydedildi. Elle girdiğiniz indirimler ${RAPOR_ONAYCI_ADLARI} onayına gönderildi.`);
       }
       // Tarih değiştirildiyse eski günde bu rapora bağlı kalan puantaj kayıtları silinir (puantaj yeni güne taşındı).
       if (selectedRapor && selectedRapor.tarih !== tarih) {
@@ -1613,7 +1719,7 @@ export default function RaporlarPage() {
                 className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-3 py-1.5 rounded-lg hover:bg-amber-400/15 transition-colors">
                 <Edit3 size={12}/> Düzenle
               </button>
-              {isAdmin && (
+              {onayci && (
               <button type="button" onClick={()=>selectedRapor && handleRaporSil(selectedRapor)}
                 className="flex items-center gap-1.5 text-xs font-semibold text-red-400 bg-red-400/10 border border-red-400/20 px-3 py-1.5 rounded-lg hover:bg-red-400/15 transition-colors">
                 <Trash2 size={12}/> Sil
@@ -1830,6 +1936,39 @@ export default function RaporlarPage() {
                 {(tv(koCnfAlo.tutar)+tv(koKeboYsIndirim)+tv(koKeboTrendyolIndirim)+tv(koCnfYsIndirim)+tv(koCnfTrendyolIndirim)) > 0 && (
                   <p className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
                     Bu raporda eski formdan kalan Chick&apos;n Fride Alo Paket / kapıda indirim tutarı var (₺{fmt(tv(koCnfAlo.tutar))} Alo, ₺{fmt(tv(koKeboYsIndirim)+tv(koKeboTrendyolIndirim)+tv(koCnfYsIndirim)+tv(koCnfTrendyolIndirim))} indirim). Hesaplara dahil.
+                  </p>
+                )}
+                {/* MagicPay platform indirimleri: otomatik dolar, elle değişiklik onaya gider */}
+                {!isReadOnly && mpIndirimDurum === "yukleniyor" && (
+                  <p className="text-[11px] text-gray-500 flex items-center gap-1.5 px-1"><Loader2 size={11} className="animate-spin"/> Platform indirimleri MagicPay&apos;den alınıyor…</p>
+                )}
+                {!isReadOnly && mpIndirimHazir && indirimFarklari.length === 0 && (
+                  <p className="text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-3 py-2">
+                    ✓ Platform indirimleri MagicPay&apos;den otomatik girildi. Elle değiştirirseniz {onayci ? "doğrudan kaydedilir." : `değişiklik ${RAPOR_ONAYCI_ADLARI} onayına gider.`}
+                  </p>
+                )}
+                {!isReadOnly && mpIndirimHazir && indirimFarklari.length > 0 && (
+                  <div className="text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 space-y-1.5">
+                    <p className="font-bold">İndirimler MagicPay&apos;den farklı:</p>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                      {indirimFarklari.map(a => (
+                        <li key={a}>{indirimAlanAdi(a)}: MagicPay ₺{fmt(mpTumIndirimler(mpIndirim!)[a] || 0)} → girilen ₺{fmt(formIndirimleri[a] || 0)}</li>
+                      ))}
+                    </ul>
+                    <p>
+                      {onayci ? "Rapor sizin girdiğiniz değerlerle kaydedilir."
+                        : selectedRapor ? `Düzenlemeniz ${RAPOR_ONAYCI_ADLARI} onayına gider.`
+                        : `Rapor MagicPay indirimleriyle kaydedilir; sizin girdiğiniz indirimler ${RAPOR_ONAYCI_ADLARI} onayına gider.`}
+                    </p>
+                    <button type="button" onClick={() => indirimleriMagicleDoldur(mpIndirim!)}
+                      className="text-[11px] font-semibold text-amber-100 border border-amber-400/40 rounded-md px-2 py-1 hover:bg-amber-500/15">
+                      MagicPay değerlerine geri al
+                    </button>
+                  </div>
+                )}
+                {!isReadOnly && mpIndirimDurum === "hata" && (
+                  <p className="text-[11px] text-red-300 bg-red-500/10 border border-red-500/25 rounded-lg px-3 py-2">
+                    Platform indirimleri MagicPay&apos;den alınamadı ({mpIndirimHata}). İndirimleri elle girin.
                   </p>
                 )}
                 {(() => {
@@ -2486,7 +2625,7 @@ export default function RaporlarPage() {
               className="p-2 text-gray-600 hover:text-yazi border border-cizgi hover:border-cizgi-guclu rounded-xl transition-colors">
               <RefreshCw size={14}/>
             </button>
-            {isAdmin && (
+            {onayci && (
               <button onClick={()=>{setOnayModalTab("bekleyen");setOnayModalAcik(true);}}
                 className={`relative flex items-center gap-1.5 text-[11px] font-semibold border px-3 py-2 rounded-xl transition-colors ${
                   onayBekleyenler.length>0 ? "text-amber-300 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/15" : "text-gray-500 hover:text-yazi border-cizgi hover:border-cizgi-guclu"

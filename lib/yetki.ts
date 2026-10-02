@@ -48,7 +48,7 @@ export interface YetkiTanimi {
 export const YETKILER: YetkiTanimi[] = [
   { anahtar: "anasayfa", etiket: "Anasayfa özeti", aciklama: "Ciro, kasa ve fatura özet kartları", grup: "Günlük işler", sayfalar: ["/"] },
   { anahtar: "rapor_gir", etiket: "Kasa Raporu girme", aciklama: "Günlük kasa raporu girme", grup: "Günlük işler", sayfalar: ["/raporlar"] },
-  { anahtar: "rapor_duzenle", etiket: "Rapor düzenleme / onay", aciklama: "Girilmiş raporu doğrudan düzenleme, silme ve değişiklik taleplerini onaylama", grup: "Günlük işler", sayfalar: [] },
+  { anahtar: "rapor_duzenle", etiket: "Rapor düzenleme", aciklama: "Girilmiş raporu düzenleme (onaya gider), tarih ve toplam uyarılarını geçme. Onay ve silme sadece Murat ile Bülent'te", grup: "Günlük işler", sayfalar: [] },
   { anahtar: "rapor_analiz", etiket: "Rapor Analizi", aciklama: "Dönemsel satış ve platform analizleri", grup: "Günlük işler", sayfalar: ["/rapor-analiz"] },
   { anahtar: "kasa", etiket: "Kasa", aciklama: "Kasa hareketleri, sabit giderler, banka ekstresi", grup: "Finans", sayfalar: ["/kasa"] },
   { anahtar: "cari", etiket: "Cariler & Faturalar", aciklama: "Tedarikçiler, faturalar, ödemeler; irsaliyeden fatura oluşturma", grup: "Finans", sayfalar: ["/cariler", "/faturalar"] },
@@ -61,6 +61,20 @@ export const YETKILER: YetkiTanimi[] = [
   { anahtar: "puantaj_duzenle", etiket: "Puantaj düzenleme", aciklama: "Puantaj tablosunda hücre düzeltme", grup: "Personel", sayfalar: [] },
   { anahtar: "yonetim", etiket: "İşlem geçmişi & bildirimler", aciklama: "İşlem geçmişi, sorun bildirimleri, hata kayıtları", grup: "Yönetim", sayfalar: ["/ayarlar/gecmis", "/ayarlar/bildirimler"] },
 ];
+
+/**
+ * Kasa Raporu düzenlemelerini onaylayabilen / raporu doğrudan düzenleyip silebilen
+ * kişiler (auth kullanıcı id'leri): Murat Can Çömüz ve Bülent Çöphüseyinoğlu.
+ * Diğer herkesin düzenlemesi (ve elle değiştirilen MagicPay indirimleri) onaya gider.
+ * Veritabanında aynı liste: public.kebo_rapor_onaycisi().
+ */
+export const RAPOR_ONAYCILARI: readonly string[] = [
+  "c4d199e9-e0b7-4d33-8ad8-556f7d488bac", // murat@kebo.com
+  "e75d458f-1c36-405a-bd56-3c590c28cd54", // bulent@kebo.com
+];
+export const RAPOR_ONAYCI_ADLARI = "Murat veya Bülent";
+export const raporOnaycisiMi = (userId?: string | null): boolean =>
+  !!userId && RAPOR_ONAYCILARI.includes(userId);
 
 export const YETKI_ANAHTARLARI: YetkiAnahtari[] = YETKILER.map(y => y.anahtar);
 

@@ -11,6 +11,7 @@ import { hepsiniCek } from "@/lib/hepsiniCek";
 import SabitGiderler from "@/components/SabitGiderler";
 import EkstreYukle from "@/components/EkstreYukle";
 import { KrediKartlariPaneli, KartAyarPenceresi, YemekKartiPaneli } from "@/components/KasaKartlari";
+import StokDegerPaneli from "@/components/StokDegerPaneli";
 import { krediKartiDurumu, yemekKartiAlacaklari, VARSAYILAN_KARTLAR, type KrediKarti } from "@/lib/kasaHesaplari";
 import { YEMEK_KARTLARI } from "@/lib/hesap";
 import { YEMEK_KARTI_KATEGORI, yemekKartiBul } from "@/lib/mutabakat";
@@ -515,6 +516,9 @@ export default function KasaPage() {
         {/* ── YEMEK KARTI ALACAKLARI ── */}
         <YemekKartiPaneli kartlar={yemekKartlari.kartlar} belirsizYatan={yemekKartlari.belirsizYatan}
           toplamBekleyen={yemekKartlari.toplamBekleyen} baslangic={KART_BASLANGIC} ayAdi={AYLAR.find(m=>m.v===secilenAy)?.l || ""}/>
+
+        {/* ── STOK DEĞERİ (sadece Murat ve Bülent görür) ── */}
+        <StokDegerPaneli/>
 
         {/* ── SEKME NAVİGASYONU ── */}
         <div className="flex gap-1 bg-kart border border-cizgi rounded-2xl p-1">

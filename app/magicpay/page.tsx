@@ -88,7 +88,7 @@ export default function MagicpayKontrolPage() {
             <div>
               <h1 className="text-sm font-black leading-none">MagicPay Kontrol</h1>
               <p className="text-[10px] text-gray-600 mt-0.5 leading-none flex items-center gap-1">
-                Kasa Raporu ↔ adisyon programı <span className="inline-flex items-center gap-0.5 text-cyan-400/80"><EyeOff size={10} /> sadece sana görünür</span>
+                Kasa Raporu ↔ adisyon programı <span className="inline-flex items-center gap-0.5 text-cyan-400/80"><EyeOff size={10} /> sadece Murat &amp; Bülent görür</span>
               </p>
             </div>
           </div>

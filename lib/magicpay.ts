@@ -3,8 +3,10 @@
 // rakamlarını elle girilen Kasa Raporu ile karşılaştırır. Hiçbir şey
 // kaydetmez/değiştirmez; sadece "nerede fark var" sorusunu cevaplar.
 //
-// Ekranı SADECE `MAGICPAY_GORENLER` listesindeki kullanıcılar görür
-// (proxy.ts sayfayı, /api/magicpay-karsilastirma veriyi korur).
+// Karşılaştırma ekranını SADECE `MAGICPAY_GORENLER` listesindeki kullanıcılar
+// görür (proxy.ts sayfayı, /api/magicpay-karsilastirma veriyi korur). Diğer
+// kullanıcılar API'den sadece platform indirimlerini alır (`kapsam=indirim`):
+// Kasa Raporu'ndaki indirim hücreleri bununla otomatik doldurulur.
 //
 // MagicPay'deki adlar → panel alanları:
 //   • Paket kanalları (online_source_breakdown): marka adında "chick/chikn" geçen
@@ -19,8 +21,15 @@
 //     içerir ("KREDİ KARTI", "kart", "Pos", "NAKİT"...). Kapıda tahsil edilenler
 //     panelde kurye satırlarındaki nakit/POS ile karşılaştırılır.
 
-/** MagicPay'i görebilen tek kişi: Murat Can Çömüz (murat@kebo.com). Auth kullanıcı id'si. */
-export const MAGICPAY_GORENLER: readonly string[] = ["c4d199e9-e0b7-4d33-8ad8-556f7d488bac"];
+/**
+ * MagicPay karşılaştırmasını görebilenler (auth kullanıcı id'leri):
+ * Murat Can Çömüz (murat@kebo.com) ve Bülent Çöphüseyinoğlu (bulent@kebo.com).
+ * Diğer kullanıcılar MagicPay'den sadece platform indirimlerini çeker (Kasa Raporu'na otomatik yazılır).
+ */
+export const MAGICPAY_GORENLER: readonly string[] = [
+  "c4d199e9-e0b7-4d33-8ad8-556f7d488bac", // murat@kebo.com
+  "e75d458f-1c36-405a-bd56-3c590c28cd54", // bulent@kebo.com
+];
 export const MAGICPAY_SAYFASI = "/magicpay";
 export const magicpayGorebilirMi = (userId?: string | null): boolean =>
   !!userId && MAGICPAY_GORENLER.includes(userId);
@@ -330,4 +339,52 @@ export function gunuKarsilastir(mp: MpGun, rapor: PanelRaporu | null): GunKarsil
 
   const farkSayisi = bolumler.reduce((t, b) => t + b.satirlar.filter(s => s.durum === "fark").length, 0);
   return { tarih: mp.tarih, raporVar: !!rapor, bolumler, farkSayisi };
+}
+
+// ─── Platform indirimleri → Kasa Raporu (otomatik doldurma) ─────────────────
+
+/**
+ * Her paket kanalının indirimi panelde hangi alana yazılır. Formda kanal başına
+ * tek indirim hücresi var (online sütunu), MagicPay de online/kapıda ayırmıyor;
+ * kanalın tüm indirimi bu alana yazılır, eski `ko_*_indirim` alanları 0 olur.
+ */
+export const INDIRIM_ALANLARI: Record<Exclude<Kanal, "diger">, string> = {
+  kebo_ys: "os_kebo_ys_indirim",
+  kebo_trendyol: "os_kebo_trendyol_indirim",
+  kebo_migros: "os_kebo_migros_indirim",
+  cnf_ys: "os_cnf_ys_indirim",
+  cnf_trendyol: "os_cnf_trendyol_indirim",
+  cnf_migros: "os_cnf_migros_yemek_indirim",
+  alo: "os_kebo_alo_indirim",
+};
+
+/** Formda gösterilmeyen eski kapıda indirim alanları (MagicPay ile doldurulunca 0). */
+export const ESKI_KAPIDA_INDIRIM_ALANLARI = ["ko_kebo_ys_indirim", "ko_kebo_trendyol_indirim", "ko_cnf_ys_indirim", "ko_cnf_trendyol_indirim"] as const;
+
+/** Bir indirim alanının okunur adı (onay ekranı ve uyarılar için). */
+export const INDIRIM_ALAN_ADLARI: Record<string, string> = Object.fromEntries(
+  KANALLAR.map(k => [INDIRIM_ALANLARI[k.kanal], `${k.ad} indirim`]));
+
+const kurus = (x: number) => Math.round(x * 100) / 100;
+
+/** MagicPay gününden Kasa Raporu indirim alanları: { os_kebo_ys_indirim: 123.45, ... } (eşleşmeyen kanallar hariç). */
+export function mpIndirimAlanlari(gun: MpGun | null | undefined): Record<string, number> {
+  const sonuc: Record<string, number> = Object.fromEntries(Object.values(INDIRIM_ALANLARI).map(a => [a, 0]));
+  for (const k of gun?.kaynaklar || []) {
+    const kanal = kanalBul(k);
+    if (kanal === "diger") continue;
+    sonuc[INDIRIM_ALANLARI[kanal]] += k.indirim;
+  }
+  for (const a of Object.keys(sonuc)) sonuc[a] = kurus(sonuc[a]);
+  return sonuc;
+}
+
+/**
+ * Formdaki indirimler MagicPay'den farklı mı? Farklı olan alanların adlarını döner.
+ * `form`: alan → tutar (formda olmayan alan 0 sayılır). Eski kapıda indirim alanları
+ * MagicPay'de 0 kabul edilir. Kuruş farkı (≤ ₺0,01) yok sayılır.
+ */
+export function indirimFarkliAlanlar(magic: Record<string, number>, form: Record<string, number>): string[] {
+  const alanlar = [...Object.values(INDIRIM_ALANLARI), ...ESKI_KAPIDA_INDIRIM_ALANLARI];
+  return alanlar.filter(a => Math.abs((form[a] || 0) - (magic[a] || 0)) > 0.01);
 }
