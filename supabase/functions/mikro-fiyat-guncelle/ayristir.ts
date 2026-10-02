@@ -25,7 +25,18 @@ export function adTemizle(ham: string): string {
   return s.replace(/\s+/g, " ").trim().toLocaleUpperCase("tr-TR");
 }
 
-type El = { textContent: string | null; querySelectorAll(sel: string): ArrayLike<El> };
+type El = { textContent: string | null; querySelectorAll(sel: string): ArrayLike<El>; getAttribute?(ad: string): string | null };
+
+/** Birleşik hücreleri (colspan) açarak hücre metinleri: başlık ve satır indeksleri hizalı kalsın. */
+function hucreler(tr: El, sec: string): string[] {
+  const sonuc: string[] = [];
+  for (const c of Array.from(tr.querySelectorAll(sec))) {
+    const n = Math.max(1, Math.min(10, parseInt(c.getAttribute?.("colspan") ?? "1", 10) || 1));
+    sonuc.push(c.textContent ?? "");
+    for (let i = 1; i < n; i++) sonuc.push("");
+  }
+  return sonuc;
+}
 
 const AD_BASLIK = /^(mal\s*\/\s*hizmet|mal hizmet|malzeme\s*\/\s*hizmet açıklaması|ürün adı)$/i;
 
@@ -43,7 +54,7 @@ export function kalemleriOku(doc: { querySelectorAll(sel: string): ArrayLike<El>
   if (bas < 0) return [];
   const satirlar = tum.slice(bas);
   if (satirlar.length < 2) return [];
-  const baslik = Array.from(satirlar[0].querySelectorAll("th,td")).map(h => (h.textContent ?? "").replace(/\s+/g, " ").trim());
+  const baslik = hucreler(satirlar[0], "th,td").map(h => h.replace(/\s+/g, " ").trim());
   const iAd = baslik.findIndex(h => AD_BASLIK.test(h));
   const iMiktar = baslik.findIndex(h => /^Miktar/i.test(h));
   const iFiyat = baslik.findIndex(h => /Birim Fiyat/i.test(h));
@@ -52,7 +63,7 @@ export function kalemleriOku(doc: { querySelectorAll(sel: string): ArrayLike<El>
 
   const kalemler: Kalem[] = [];
   for (const tr of satirlar.slice(1)) {
-    const h = Array.from(tr.querySelectorAll("td")).map(c => c.textContent ?? "");
+    const h = hucreler(tr, "td");
     if (h.length <= Math.max(iAd, iFiyat)) continue;
     const ad = adTemizle(h[iAd]);
     const birimFiyat = trSayi(h[iFiyat]);

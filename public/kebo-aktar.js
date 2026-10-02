@@ -81,7 +81,17 @@
     if (bas < 0) return [];
     var satirlar = tumSatirlar.slice(bas);
     if (satirlar.length < 2) return [];
-    var baslik = Array.prototype.map.call(satirlar[0].querySelectorAll("th,td"), function (h) { return (h.textContent || "").replace(/\s+/g, " ").trim(); });
+    // Birleşik hücreleri (colspan) açarak say: ör. "İskonto" başlığı oran+tutar diye iki sütunu kapsayabilir.
+    function hucreler(tr, sec) {
+      var sonuc = [];
+      Array.prototype.forEach.call(tr.querySelectorAll(sec), function (c) {
+        var n = Math.max(1, Math.min(10, parseInt(c.getAttribute("colspan") || "1", 10) || 1));
+        sonuc.push(c.textContent || "");
+        for (var i = 1; i < n; i++) sonuc.push("");
+      });
+      return sonuc;
+    }
+    var baslik = hucreler(satirlar[0], "th,td").map(function (h) { return h.replace(/\s+/g, " ").trim(); });
     var bul = function (re) { for (var i = 0; i < baslik.length; i++) if (re.test(baslik[i])) return i; return -1; };
     var iAd = bul(AD), iMiktar = bul(/^Miktar/i), iFiyat = bul(/Birim Fiyat/i), iKdv = bul(/KDV Oran/i),
         iIsk = bul(/İskonto Oran/i), iTutar = bul(/(Mal Hizmet|Malzeme \/ Hizmet) Tutarı|^Tutar$/i),
@@ -89,7 +99,7 @@
     if (iAd < 0 || iFiyat < 0) return [];
     var kalemler = [];
     for (var r = 1; r < satirlar.length; r++) {
-      var h = Array.prototype.map.call(satirlar[r].querySelectorAll("td"), function (c) { return c.textContent || ""; });
+      var h = hucreler(satirlar[r], "td");
       if (h.length <= Math.max(iAd, iFiyat)) continue;
       var ad = adTemizle(h[iAd]), fiyat = trSayi(h[iFiyat]);
       if (!ad || fiyat == null) continue;

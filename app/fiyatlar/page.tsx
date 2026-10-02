@@ -15,7 +15,7 @@ import { sadelestir } from "@/lib/menu";
 import { stokDegerGorebilirMi } from "@/lib/stokDeger";
 import {
   MIKRO_GELEN_URL, MIKRO_ORIGIN, yerImiKodu, fiyatKalemleri, aramaEslesir, mikroMesajiMi, parcala,
-  type FiyatSatiri, type AktarimFaturasi,
+  type FiyatSatiri, type AktarimFaturasi, type BirimFiyatlari,
 } from "@/lib/fiyatListesi";
 import {
   Lock, Search, RefreshCw, Loader2, ArrowUpRight, ArrowDownRight, Bookmark, ChevronDown, X, Check, AlertTriangle, Boxes,
@@ -26,9 +26,24 @@ const fmtF = (v: number) => new Intl.NumberFormat("tr-TR", { minimumFractionDigi
 const fmtM = (v: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(v);
 const tarihYaz = (t: string | null) => (t ? `${t.slice(8, 10)}.${t.slice(5, 7)}.${t.slice(0, 4)}` : "—");
 
+/** Koli/paket içinden adet, kg ve litre fiyatları (KDV hariç; altında KDV dahil) */
+function BirimFiyat({ f, kdv }: { f: BirimFiyatlari; kdv: number }) {
+  const satirlar = ([["adet", f.adet], ["kg", f.kg], ["lt", f.lt]] as const).filter(([, v]) => v !== null);
+  if (!satirlar.length) return <span className="text-gray-600">—</span>;
+  const [ilkAd, ilk] = satirlar[0];
+  return (
+    <>
+      {satirlar.map(([ad, v]) => (
+        <span key={ad} className="block"><span className="font-semibold">₺{fmt2(v as number)}</span><span className="text-[10px] text-gray-500"> /{ad}</span></span>
+      ))}
+      <span className="block text-[10px] text-gray-600">KDV dahil ₺{fmt2((ilk as number) * (1 + kdv / 100))} /{ilkAd}{f.adetSayisi ? ` · ${f.adetSayisi}'li` : ""}</span>
+    </>
+  );
+}
+
 type Siralama = "tarih" | "ad" | "degisim";
 
-interface GecmisSatiri { tarih: string; gib_no: string; miktar: number | string | null; birim: string | null; birim_fiyat: number | string; kdv_orani: number | string; iskonto_orani: number | string | null; tutar: number | string | null }
+interface GecmisSatiri { tarih: string; gib_no: string; miktar: number | string | null; birim: string | null; liste_fiyat: number | string; net_fiyat: number | string; iskonto: number | string | null; kdv_orani: number | string; tutar: number | string | null }
 interface KontrolKalemi { urun_id: string; urun: string; eski: number; yeni: number; oran: number; fatura: string; tarih: string }
 
 type Aktarim =
@@ -59,7 +74,7 @@ export default function FiyatListesiPage() {
   const yerImi = useRef<HTMLAnchorElement | null>(null);
 
   const cek = useCallback(async () => {
-    const { data, error } = await supabase.rpc("fiyat_listesi");
+    const { data, error } = await supabase.rpc("fiyat_listesi_v2");
     if (error) setHata(error.code === "42501" ? "Bu sayfayı görme yetkiniz yok." : "Fiyat listesi yüklenemedi. Sayfayı yenileyin.");
     else { setHata(""); setSatirlar((data ?? []) as FiyatSatiri[]); setGecmis({}); }
   }, [supabase]);
@@ -132,7 +147,7 @@ export default function FiyatListesiPage() {
     setAcik(anahtar);
     if (gecmis[anahtar]) return;
     setGecmis(g => ({ ...g, [anahtar]: "yukleniyor" }));
-    const { data } = await supabase.rpc("fiyat_gecmisi", { p_urun_adi: ad, p_vkn: vkn });
+    const { data } = await supabase.rpc("fiyat_gecmisi_v2", { p_urun_adi: ad, p_vkn: vkn });
     setGecmis(g => ({ ...g, [anahtar]: (data ?? []) as GecmisSatiri[] }));
   };
 
@@ -170,7 +185,7 @@ export default function FiyatListesiPage() {
             <div>
               <h1 className="text-sm font-black text-yazi leading-none">Fiyat Listesi</h1>
               <p className="text-[10px] text-gray-600 mt-0.5 leading-none">
-                Mikro faturalarından son alış fiyatları · {kalemler.length} ürün{sonAktarim ? ` · en yeni fatura ${tarihYaz(sonAktarim)}` : ""}
+                Mikro faturalarından iskontolu son alış fiyatları · {kalemler.length} ürün{sonAktarim ? ` · en yeni fatura ${tarihYaz(sonAktarim)}` : ""}
               </p>
             </div>
           </div>
@@ -291,11 +306,12 @@ export default function FiyatListesiPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-xs min-w-[760px]">
+              <table className="w-full text-xs min-w-[900px]">
                 <thead>
                   <tr className="text-[10px] text-gray-500 uppercase tracking-wider border-b border-cizgi">
                     <th className="text-left font-semibold px-4 py-2.5">Ürün</th>
-                    <th className="text-right font-semibold px-3 py-2.5">Son fiyat <span className="normal-case tracking-normal">(KDV hariç)</span></th>
+                    <th className="text-right font-semibold px-3 py-2.5">Net fiyat <span className="normal-case tracking-normal">(iskontolu, KDV hariç)</span></th>
+                    <th className="text-right font-semibold px-3 py-2.5">Adet / kg / lt</th>
                     <th className="text-right font-semibold px-3 py-2.5">Önceki alım</th>
                     <th className="text-right font-semibold px-3 py-2.5">En düşük – en yüksek</th>
                     <th className="text-left font-semibold px-3 py-2.5">Son alış</th>
@@ -314,8 +330,17 @@ export default function FiyatListesiPage() {
                             <span className="block text-[10px] text-gray-500">{k.tedarikci}{k.birim ? ` · ${k.birim}` : ""}</span>
                           </td>
                           <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
-                            <span className="font-bold text-[13px]">₺{fmtF(k.fiyat)}</span>
+                            <span className="font-bold text-[13px]">₺{fmtF(k.fiyat)}</span>{k.birim ? <span className="text-[10px] text-gray-500"> /{k.birim.toLocaleLowerCase("tr-TR")}</span> : null}
+                            {k.iskonto > 0 && (
+                              <span className="block text-[10px]">
+                                <span className="text-gray-600 line-through">₺{fmtF(k.listeFiyat)}</span>{" "}
+                                <span className="font-bold text-emerald-400">%{fmtM(k.iskonto)} iskonto</span>
+                              </span>
+                            )}
                             <span className="block text-[10px] text-gray-500">KDV dahil ₺{fmt2(k.fiyatKdvli)} · %{fmtM(k.kdv)}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
+                            <BirimFiyat f={k.birimFiyatlar} kdv={k.kdv} />
                           </td>
                           <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
                             {k.onceki === null ? <span className="text-gray-600">—</span> : (
@@ -336,18 +361,20 @@ export default function FiyatListesiPage() {
                         </tr>
                         {acik === k.anahtar && (
                           <tr className="border-b border-cizgi/60 bg-white/[0.015]">
-                            <td colSpan={6} className="px-4 py-3">
+                            <td colSpan={7} className="px-4 py-3">
                               {g === undefined || g === "yukleniyor" ? <Loader2 size={14} className="animate-spin text-gray-600" /> : (
                                 <div className="grid gap-1 text-[11px] max-w-2xl">
-                                  <div className="grid grid-cols-[90px_1fr_110px_110px_110px] gap-3 text-[10px] uppercase tracking-wider text-gray-600">
-                                    <span>Tarih</span><span>Fatura</span><span className="text-right">Miktar</span><span className="text-right">Birim fiyat</span><span className="text-right">Tutar</span>
+                                  <div className="grid grid-cols-[90px_1fr_100px_100px_70px_110px_110px] gap-3 text-[10px] uppercase tracking-wider text-gray-600">
+                                    <span>Tarih</span><span>Fatura</span><span className="text-right">Miktar</span><span className="text-right">Liste fiyatı</span><span className="text-right">İskonto</span><span className="text-right">Net fiyat</span><span className="text-right">Tutar</span>
                                   </div>
                                   {g.map((s, i) => (
-                                    <div key={`${s.gib_no}-${i}`} className="grid grid-cols-[90px_1fr_110px_110px_110px] gap-3 tabular-nums">
+                                    <div key={`${s.gib_no}-${i}`} className="grid grid-cols-[90px_1fr_100px_100px_70px_110px_110px] gap-3 tabular-nums">
                                       <span className="text-gray-500">{tarihYaz(s.tarih)}</span>
                                       <span className="text-gray-600 truncate">{s.gib_no}</span>
                                       <span className="text-right">{s.miktar == null ? "—" : `${fmtM(Number(s.miktar))} ${s.birim ?? ""}`}</span>
-                                      <span className="text-right font-semibold">₺{fmtF(Number(s.birim_fiyat))}</span>
+                                      <span className="text-right text-gray-500">₺{fmtF(Number(s.liste_fiyat))}</span>
+                                      <span className="text-right text-emerald-400">{Number(s.iskonto) > 0 ? `%${fmtM(Number(s.iskonto))}` : "—"}</span>
+                                      <span className="text-right font-semibold">₺{fmtF(Number(s.net_fiyat))}</span>
                                       <span className="text-right text-gray-500">{s.tutar == null ? "—" : `₺${fmt2(Number(s.tutar))}`}</span>
                                     </div>
                                   ))}
