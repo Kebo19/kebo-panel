@@ -136,6 +136,16 @@ export default function KeboEkstreYukle({ cari, faturalar, odemeler, onKapat, on
       }
       // 4) Bakiye eşitleme: durumlar
       const acik = new Set(plan.acikKalacak.map(id => yeniIdler.get(id) ?? id));
+      // Açık kalan faturalara ekstredeki vade tarihini yaz (Kebo: fatura + 15 gün; vade kartı bunu kullanır)
+      const vadeNo = new Map(ekstre.satirlar.filter(s => s.grup === "fatura" && s.vade).map(s => [s.evrakNo.trim().toUpperCase(), s.vade as string]));
+      for (const f of faturalar) {
+        if (!acik.has(f.id)) continue;
+        const vade = vadeNo.get(f.fatura_no.trim().toUpperCase());
+        if (vade && vade !== (f as { vade_tarihi?: string | null }).vade_tarihi) {
+          const { error } = await supabase.from("faturalar").update({ vade_tarihi: vade }).eq("id", f.id);
+          if (error) throw new Error(`${f.fatura_no} vadesi yazılamadı: ` + error.message);
+        }
+      }
       const kapat = [...plan.kapanacak, ...[...yeniIdler.values()].filter(id => !acik.has(id))];
       if (kapat.length) {
         const { error } = await supabase.from("faturalar").update({ durum: "odendi", islendi: true }).in("id", kapat);

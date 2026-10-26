@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ekstreAyristir, mutabakatPlani, varsayilanOdemeBaslangici, trSayi, DUZELTME_ACIKLAMA, type PdfParca } from "@/lib/keboEkstre";
+import { ekstreAyristir, mutabakatPlani, varsayilanOdemeBaslangici, trSayi, DUZELTME_ACIKLAMA, keboVade, sonrakiCuma, keboVadeOzeti, type PdfParca } from "@/lib/keboEkstre";
 
 // Kebo PDF'indeki kolon düzenini taklit eden sahte sayfa: sayılar sağa yaslı (x + w = kolon sağ kenarı)
 const BASLIK: PdfParca[] = [
@@ -75,10 +75,37 @@ describe("Kebo mutabakat planı", () => {
       { id: "o2", tarih: "2026-01-08", tutar: 50, aciklama: "Kebo ekstre · Cari Virman Fişi · 2026-01-08|0000000238|50.00", fatura_idleri: null },
       { id: "o3", tarih: "2026-01-08", tutar: 550, aciklama: DUZELTME_ACIKLAMA, fatura_idleri: [] },
     ];
-    expect(varsayilanOdemeBaslangici(odemeler)).toBe("2026-01-07");
+    expect(varsayilanOdemeBaslangici(odemeler)).toBe("2026-01-08"); // ekstreden gelen ilk tahsilat → sabit başlangıç
+    expect(varsayilanOdemeBaslangici([odemeler[0]])).toBe("2026-01-07");
     const p = mutabakatPlani(ekstre, faturalar, odemeler);
     expect(p.yeniOdemeler).toEqual([]);
     expect(p.atlananOdemeler.map(s => s.alacak)).toEqual([600]);
     expect(p.hedefBakiye).toBe(750); // önceki düzeltme serbest ödeme sayılmaz
+  });
+});
+
+describe("Kebo vade", () => {
+  it("vade yoksa fatura tarihi + 15 gün", () => {
+    expect(keboVade({ fatura_tarihi: "2026-10-12" })).toBe("2026-10-27");
+    expect(keboVade({ fatura_tarihi: "2026-10-12", vade_tarihi: "2026-10-20" })).toBe("2026-10-20");
+  });
+  it("sonraki cuma", () => {
+    expect(sonrakiCuma("2026-10-26")).toBe("2026-10-30");
+    expect(sonrakiCuma("2026-10-30")).toBe("2026-10-30");
+    expect(sonrakiCuma("2026-10-31")).toBe("2026-11-06");
+  });
+  it("serbest ödemeyi en eski açık faturadan düşer ve vadesi gelenleri toplar", () => {
+    const f = [
+      { id: "1", fatura_no: "A", fatura_tarihi: "2026-10-12", toplam_tutar: 1000, durum: "bekliyor" },
+      { id: "2", fatura_no: "B", fatura_tarihi: "2026-10-14", toplam_tutar: 500, durum: "bekliyor" },
+      { id: "3", fatura_no: "C", fatura_tarihi: "2026-10-16", toplam_tutar: 300, durum: "bekliyor" },
+      { id: "4", fatura_no: "D", fatura_tarihi: "2026-10-01", toplam_tutar: 900, durum: "odendi" },
+    ];
+    const o = [{ id: "x", tarih: "2026-10-20", tutar: 200, aciklama: DUZELTME_ACIKLAMA, fatura_idleri: [] }];
+    const v = keboVadeOzeti(f, o, "2026-10-30", "2026-10-28");
+    expect(v.kalemler.map(k => [k.fatura_no, k.kalan])).toEqual([["A", 800], ["B", 500]]);
+    expect(v.toplam).toBe(1300);
+    expect(v.gecikmis).toBe(800); // A'nın vadesi 27.10
+    expect(v.sonraki).toBe(300);
   });
 });

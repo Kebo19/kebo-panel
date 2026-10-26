@@ -213,10 +213,15 @@ export interface MutabakatPlani {
 /**
  * Ekstredeki tahsilatların hangi tarihten itibaren tek tek ekleneceği.
  * Ekstre yüklemeden önce girilmiş ödemeler çoğunlukla toplu ("43 fatura için ödeme") olduğundan satır satır
- * eşleşmez; onlardan önceki tahsilatları eklemek ödemeyi iki kez saydırır. Varsayılan: ekstre dışı en son
- * ödemenin ertesi günü. (Ekstreden gelen kayıtlar zaten anahtarla tanınır.)
+ * eşleşmez; onlardan önceki tahsilatları eklemek ödemeyi iki kez saydırır.
+ * Daha önce ekstre işlendiyse başlangıç sabittir: ekstreden gelen ilk tahsilatın tarihi (sonradan elle girilen
+ * cuma ödemeleri tarihi ileri kaydırıp geç işlenen virmanları atlatmasın). İlk yüklemede: ekstre dışı en son
+ * ödemenin ertesi günü. (Sonraki satırlar anahtarla ya da aynı gün + aynı tutarla tanınır.)
  */
 export function varsayilanOdemeBaslangici(odemeler: SistemOdeme[]): string {
+  const ekstredenIlk = odemeler.filter(o => (o.aciklama || "").startsWith(EKSTRE_ONEK) && o.aciklama !== DUZELTME_ACIKLAMA)
+    .map(o => o.tarih).sort()[0];
+  if (ekstredenIlk) return ekstredenIlk;
   const son = odemeler.filter(o => !(o.aciklama || "").startsWith(EKSTRE_ONEK)).map(o => o.tarih).sort().at(-1);
   if (!son) return "0000-00-00";
   const d = new Date(son + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + 1);
@@ -282,5 +287,58 @@ export function mutabakatPlani(ekstre: EkstreSonuc, faturalar: SistemFatura[], o
   return {
     yeniFaturalar, tutarFarklari, ekstredeOlmayan, yeniOdemeler, atlananOdemeler,
     acikKalacak, kapanacak, acilacak, duzeltme: yuvarla(Math.max(0, kum - hedefBakiye)), hedefBakiye,
+  };
+}
+
+// ─── VADE (sadece Kebo) ─────────────────────────────────────────────────────────
+// Kebo'da her faturanın ödemesi kesildiği günden itibaren 15 gün içinde yapılır.
+export const KEBO_VADE_GUN = 15;
+export const keboCariMi = (unvan?: string | null) => /kebo/i.test(unvan || "");
+
+export function gunEkle(tarih: string, gun: number): string {
+  const d = new Date(tarih + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + gun);
+  return d.toISOString().slice(0, 10);
+}
+/** Faturanın vadesi: ekstreden gelen vade_tarihi, yoksa fatura tarihi + 15 gün */
+export const keboVade = (f: { fatura_tarihi: string; vade_tarihi?: string | null }) => f.vade_tarihi || gunEkle(f.fatura_tarihi, KEBO_VADE_GUN);
+
+/** Bugünden itibaren ilk cuma (bugün cumaysa bugün) — Kebo ekstresi ve ödemesi cuma günü */
+export function sonrakiCuma(bugunStr: string): string {
+  const d = new Date(bugunStr + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + ((5 - d.getUTCDay() + 7) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+export interface VadeKalemi { id: string; fatura_no: string; fatura_tarihi: string; vade: string; kalan: number }
+export interface VadeOzeti {
+  kalemler: VadeKalemi[];          // vadesi tarihe kadar dolan açık faturalar (kalan tutarlarıyla)
+  toplam: number;                  // tarihe kadar ödenmesi gereken
+  gecikmis: number;                // bugünden önce vadesi geçmiş kısım
+  sonraki: number;                 // vadesi tarihten sonra olan açık bakiye
+}
+
+/**
+ * Vadesi verilen tarihe kadar dolan Kebo borcu. Faturaya bağlı olmayan (serbest) ödemeler — ekstre bakiye
+ * düzeltmesi dahil — en eski açık faturadan düşülür (FIFO), kalan tutarlar vadeye göre toplanır.
+ */
+export function keboVadeOzeti(
+  faturalar: (SistemFatura & { vade_tarihi?: string | null })[], odemeler: SistemOdeme[], tarih: string, bugunStr: string,
+): VadeOzeti {
+  let serbest = odemeler.filter(o => Array.isArray(o.fatura_idleri) && o.fatura_idleri.length === 0)
+    .reduce((t, o) => t + (Number(o.tutar) || 0), 0);
+  const acik = faturalar.filter(f => f.durum !== "odendi" && !f.hatir_faturasi)
+    .sort((a, b) => a.fatura_tarihi.localeCompare(b.fatura_tarihi) || a.fatura_no.localeCompare(b.fatura_no));
+  const tumu: VadeKalemi[] = [];
+  for (const f of acik) {
+    let kalan = Number(f.toplam_tutar) || 0;
+    const dus = Math.min(kalan, serbest); kalan -= dus; serbest -= dus;
+    if (kalan > 0.005) tumu.push({ id: f.id, fatura_no: f.fatura_no, fatura_tarihi: f.fatura_tarihi, vade: keboVade(f), kalan: yuvarla(kalan) });
+  }
+  const kalemler = tumu.filter(k => k.vade <= tarih).sort((a, b) => a.vade.localeCompare(b.vade));
+  return {
+    kalemler,
+    toplam: yuvarla(kalemler.reduce((t, k) => t + k.kalan, 0)),
+    gecikmis: yuvarla(tumu.filter(k => k.vade < bugunStr).reduce((t, k) => t + k.kalan, 0)),
+    sonraki: yuvarla(tumu.filter(k => k.vade > tarih).reduce((t, k) => t + k.kalan, 0)),
   };
 }

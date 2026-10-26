@@ -12,6 +12,7 @@ import {
 import VadeTakvimi from "@/components/VadeTakvimi";
 import CariEkstre from "@/components/CariEkstre";
 import KeboEkstreYukle from "@/components/KeboEkstreYukle";
+import { keboCariMi, keboVadeOzeti, sonrakiCuma } from "@/lib/keboEkstre";
 
 import { buAyinOdemeDonemi, faturaDurumHesapla, GIDER_HESAPLARI, HESAP_ETIKET, kartMi } from "@/lib/cari";
 import { tv, fmt2, paraGirdisi } from "@/lib/para";
@@ -42,6 +43,7 @@ const BOS_FORM = { cari_kodu: "", unvan: "", vergi_no: "", vergi_dairesi: "", te
 interface Fatura {
   id: string; fatura_no: string; fatura_tarihi: string;
   toplam_tutar: number; durum: string; aciklama: string; cari_id?: string; cari_unvan?: string;
+  vade_tarihi?: string | null; hatir_faturasi?: boolean | null;
 }
 interface Odeme {
   id: string; tutar: number; tarih: string; aciklama: string; odeme_yontemi: string;
@@ -83,6 +85,8 @@ export default function CarilerPage() {
   const [duzenlenenCariId, setDuzenlenenCariId] = useState<string | null>(null);
   const [ekstreCari, setEkstreCari] = useState<Cari | null>(null);
   const [keboEkstreAcik, setKeboEkstreAcik] = useState(false);
+  // Kebo: her cuma, o cumaya kadar vadesi (fatura + 15 gün) dolan faturalar ödenir
+  const [keboOdemeTarihi, setKeboOdemeTarihi] = useState(() => sonrakiCuma(bugun()));
   // Cari detayından yeni fatura ekleme
   const [faturaModalAcik, setFaturaModalAcik] = useState(false);
   const [faturaForm, setFaturaForm] = useState({ fatura_no: "", fatura_tarihi: bugun(), vade_tarihi: "", tutar: "", kdv: "20", kdvDahil: false, aciklama: "" });
@@ -450,6 +454,15 @@ export default function CarilerPage() {
     (localDurumlar.get(f.id) || f.durum) !== "odendi" &&
     f.fatura_tarihi <= donem.donemBit
   ).reduce((s, f) => s + (f.toplam_tutar || 0), 0) - serbestOdemeToplam, 0);
+  const keboVade = useMemo(() => seciliCari && keboCariMi(seciliCari.unvan)
+    ? keboVadeOzeti(cariFaturalar.map(f => ({ ...f, durum: localDurumlar.get(f.id) || f.durum })), cariOdemeler, keboOdemeTarihi, bugun())
+    : null, [seciliCari, cariFaturalar, cariOdemeler, localDurumlar, keboOdemeTarihi]);
+  const keboVadeOde = () => {
+    if (!keboVade || keboVade.toplam <= 0) return;
+    odemeAc();
+    setManuelTutar(paraGirdisi(String(keboVade.toplam).replace(".", ",")));
+    setOdemeAciklama(`Kebo ${fmtTarih(keboOdemeTarihi)} vadeli ödeme (${keboVade.kalemler.length} fatura)`);
+  };
   const duzenliSayisi = cariler.filter(c => c.kategori === "duzenli").length;
   const digerSayisi = cariler.filter(c => c.kategori !== "duzenli").length;
   const odenmemisFaturalar = cariFaturalar.filter(f => {
@@ -506,7 +519,7 @@ export default function CarilerPage() {
           <div className="flex items-center gap-2">
             {seciliCari ? (
               <>
-                {/kebo/i.test(seciliCari.unvan) && (
+                {keboCariMi(seciliCari.unvan) && (
                   <button onClick={() => setKeboEkstreAcik(true)} title="Kebo'nun haftalık cari ekstresi PDF'ini yükle"
                     className="flex items-center gap-2 text-xs font-bold text-amber-300 border border-amber-500/30 hover:bg-amber-500/10 px-3 py-2 rounded-xl transition-colors">
                     <FileUp size={14} /> <span className="hidden sm:inline">Ekstre PDF</span>
@@ -769,12 +782,56 @@ export default function CarilerPage() {
               <p className={`text-2xl font-black ${toplamBorc > 0 ? "text-red-400" : "text-emerald-400"}`}>₺{fmt(toplamBorc)}</p>
               <p className="text-[10px] text-gray-600 mt-1">{serbestOdemeToplam > 0 ? `açık faturalar − ₺${fmt(serbestOdemeToplam)} faturasız ödeme` : "ödenmemiş faturalar"}</p>
             </div>
-            <div className="bg-kart border border-amber-500/20 rounded-2xl p-4">
-              <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">Bu Ay Ödenecek</p>
-              <p className="text-2xl font-black text-amber-400">₺{fmt(buAyOdenecek)}</p>
-              <p className="text-[10px] text-gray-600 mt-1">{fmtTarih(donem.donemBas)} – {fmtTarih(donem.donemBit)}</p>
-            </div>
+            {keboVade ? (
+              <div className="bg-kart border border-amber-500/20 rounded-2xl p-4">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className="text-xs text-gray-500 uppercase tracking-widest">Vadesi Gelen</p>
+                  <input type="date" value={keboOdemeTarihi} onChange={e => e.target.value && setKeboOdemeTarihi(e.target.value)}
+                    title="Ödeme günü (her cuma) — bu tarihe kadar 15 günlük vadesi dolan faturalar"
+                    className="bg-alan border border-cizgi text-yazi text-[10px] h-6 px-1.5 rounded-md outline-none" />
+                </div>
+                <p className="text-2xl font-black text-amber-400">₺{fmt(keboVade.toplam)}</p>
+                <p className="text-[10px] text-gray-600 mt-1">
+                  {fmtTarih(keboOdemeTarihi)}&apos;e kadar · {keboVade.kalemler.length} fatura
+                  {keboVade.gecikmis > 0 && <span className="text-red-400"> · ₺{fmt(keboVade.gecikmis)} gecikmiş</span>}
+                </p>
+              </div>
+            ) : (
+              <div className="bg-kart border border-amber-500/20 rounded-2xl p-4">
+                <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">Bu Ay Ödenecek</p>
+                <p className="text-2xl font-black text-amber-400">₺{fmt(buAyOdenecek)}</p>
+                <p className="text-[10px] text-gray-600 mt-1">{fmtTarih(donem.donemBas)} – {fmtTarih(donem.donemBit)}</p>
+              </div>
+            )}
           </div>
+
+          {/* Kebo: bu cuma ödenecek faturalar (fatura + 15 gün vade) */}
+          {keboVade && (
+            <div className="bg-kart border border-amber-500/20 rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-bold text-yazi">{fmtTarih(keboOdemeTarihi)} ödemesi — vadesi gelen faturalar</p>
+                  <p className="text-[10px] text-gray-500">Kebo&apos;da her fatura 15 gün vadeli; kısmi ödenmiş kısım en eski faturadan düşülür. Sonraki vadelere kalan: ₺{fmt(keboVade.sonraki)}</p>
+                </div>
+                <button onClick={keboVadeOde} disabled={keboVade.toplam <= 0}
+                  className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors">
+                  <Wallet size={14} /> ₺{fmt(keboVade.toplam)} Öde
+                </button>
+              </div>
+              {keboVade.kalemler.length === 0 ? (
+                <p className="px-4 py-4 text-xs text-gray-600">Bu tarihe kadar vadesi dolan fatura yok.</p>
+              ) : (
+                <div className="divide-y divide-cizgi">
+                  {keboVade.kalemler.map(k => (
+                    <div key={k.id} className="px-4 py-2 flex items-center justify-between text-xs">
+                      <span className="text-gray-400"><b className="text-blue-400">{k.fatura_no}</b> · {fmtTarih(k.fatura_tarihi)} · vade <span className={k.vade < bugun() ? "text-red-400 font-bold" : "text-yazi"}>{fmtTarih(k.vade)}</span></span>
+                      <span className="font-black text-yazi">₺{fmt(k.kalan)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Birleşik tablo */}
           <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
