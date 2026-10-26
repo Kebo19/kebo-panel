@@ -7,10 +7,11 @@ import { createClient } from "@/lib/supabase/client";
 import {
   Plus, Search, Building2, Trash2, X, Loader2, CheckCircle2,
   AlertTriangle, Wallet, ArrowLeft, Phone, Hash,
-  Calendar, Check, Square, CheckSquare, ChevronDown, ChevronUp, Edit2, ScrollText, FilePlus
+  Calendar, Check, Square, CheckSquare, ChevronDown, ChevronUp, Edit2, ScrollText, FilePlus, FileUp
 } from "lucide-react";
 import VadeTakvimi from "@/components/VadeTakvimi";
 import CariEkstre from "@/components/CariEkstre";
+import KeboEkstreYukle from "@/components/KeboEkstreYukle";
 
 import { buAyinOdemeDonemi, faturaDurumHesapla, GIDER_HESAPLARI, HESAP_ETIKET, kartMi } from "@/lib/cari";
 import { tv, fmt2, paraGirdisi } from "@/lib/para";
@@ -81,6 +82,7 @@ export default function CarilerPage() {
   const [form, setForm] = useState(BOS_FORM);
   const [duzenlenenCariId, setDuzenlenenCariId] = useState<string | null>(null);
   const [ekstreCari, setEkstreCari] = useState<Cari | null>(null);
+  const [keboEkstreAcik, setKeboEkstreAcik] = useState(false);
   // Cari detayından yeni fatura ekleme
   const [faturaModalAcik, setFaturaModalAcik] = useState(false);
   const [faturaForm, setFaturaForm] = useState({ fatura_no: "", fatura_tarihi: bugun(), vade_tarihi: "", tutar: "", kdv: "20", kdvDahil: false, aciklama: "" });
@@ -504,6 +506,12 @@ export default function CarilerPage() {
           <div className="flex items-center gap-2">
             {seciliCari ? (
               <>
+                {/kebo/i.test(seciliCari.unvan) && (
+                  <button onClick={() => setKeboEkstreAcik(true)} title="Kebo'nun haftalık cari ekstresi PDF'ini yükle"
+                    className="flex items-center gap-2 text-xs font-bold text-amber-300 border border-amber-500/30 hover:bg-amber-500/10 px-3 py-2 rounded-xl transition-colors">
+                    <FileUp size={14} /> <span className="hidden sm:inline">Ekstre PDF</span>
+                  </button>
+                )}
                 <button onClick={() => setEkstreCari(seciliCari)} className="flex items-center gap-2 text-xs font-bold text-gray-700 border border-cizgi hover:bg-white/[0.03] px-3 py-2 rounded-xl transition-colors">
                   <ScrollText size={14} /> <span className="hidden sm:inline">Ekstre</span>
                 </button>
@@ -1134,6 +1142,12 @@ export default function CarilerPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {keboEkstreAcik && seciliCari && (
+        <KeboEkstreYukle cari={seciliCari} faturalar={cariFaturalar} odemeler={cariOdemeler}
+          onKapat={() => setKeboEkstreAcik(false)}
+          onTamam={mesaj => { setKeboEkstreAcik(false); showToast("basari", mesaj); cariDetayAc(seciliCari); veriCek(); }} />
       )}
 
       {ekstreCari && <CariEkstre cari={ekstreCari} onKapat={() => setEkstreCari(null)} />}
