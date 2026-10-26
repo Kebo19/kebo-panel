@@ -2,6 +2,7 @@
 
 import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { aramaKelimeleri, faturaEslesir } from "@/lib/faturaArama";
 import { createClient } from "@/lib/supabase/client";
 import { bugun, ayBasi, gunEkle } from "@/lib/tarih";
 import {
@@ -354,6 +355,7 @@ export default function FaturalarPage() {
     veriCek();
   };
 
+  const kelimeler = useMemo(() => aramaKelimeleri(aramaMetni), [aramaMetni]);
   const filtreliFaturalar = useMemo(() => {
     return faturalar.filter(f => {
       if (durumFiltre !== "hepsi" && f.durum !== durumFiltre) return false;
@@ -362,13 +364,9 @@ export default function FaturalarPage() {
         if (baslangic && f.fatura_tarihi < baslangic) return false;
         if (bitis && f.fatura_tarihi > bitis) return false;
       }
-      if (aramaMetni) {
-        const q = aramaMetni.toLowerCase();
-        return f.cari_unvan?.toLowerCase().includes(q) || f.fatura_no?.toLowerCase().includes(q);
-      }
-      return true;
+      return faturaEslesir(f, kelimeler);
     });
-  }, [faturalar, durumFiltre, cariFiltre, gorunumModu, baslangic, bitis, aramaMetni]);
+  }, [faturalar, durumFiltre, cariFiltre, gorunumModu, baslangic, bitis, kelimeler]);
 
   const aylikGruplar = useMemo(() => {
     const map = new Map<string, Fatura[]>();
@@ -578,9 +576,18 @@ export default function FaturalarPage() {
 
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
-            <input value={aramaMetni} onChange={e => setAramaMetni(e.target.value)} placeholder="Cari veya fatura no ara..."
-              className="w-full bg-alan border border-cizgi text-yazi text-xs h-9 pl-9 pr-3 rounded-xl outline-none focus:border-altin/50 placeholder:text-gray-700" />
+            <input value={aramaMetni} onChange={e => setAramaMetni(e.target.value)} placeholder="Fatura ara — fatura no, cari, açıklama, tutar (113.790,04) veya tarih (12.10.2026)…"
+              className="w-full bg-alan border border-cizgi text-yazi text-xs h-9 pl-9 pr-9 rounded-xl outline-none focus:border-altin/50 placeholder:text-gray-700" />
+            {aramaMetni && (
+              <button onClick={() => setAramaMetni("")} title="Aramayı temizle" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-600 hover:text-yazi"><X size={13} /></button>
+            )}
           </div>
+          {kelimeler && (
+            <p className="text-[11px] text-gray-500">
+              &quot;{aramaMetni.trim()}&quot; için <b className="text-yazi">{filtreliFaturalar.length}</b> fatura · toplam <b className="text-yazi">₺{fmt(filtreliFaturalar.reduce((t, f) => t + (Number(f.toplam_tutar) || 0), 0))}</b>
+              {(durumFiltre !== "hepsi" || cariFiltre !== "hepsi" || gorunumModu === "tarih") && <> · diğer filtreler de uygulanıyor</>}
+            </p>
+          )}
         </div>
 
         {yukleniyor ? (
@@ -607,10 +614,10 @@ export default function FaturalarPage() {
                       </div>
                       <div className="flex items-center gap-4">
                         <span className="text-sm font-black text-emerald-400">₺{fmt(liste.reduce((s, f) => s + (f.toplam_tutar || 0), 0))}</span>
-                        {acikAylar.has(key) ? <ChevronUp size={14} className="text-gray-600" /> : <ChevronDown size={14} className="text-gray-600" />}
+                        {(acikAylar.has(key) || !!kelimeler) ? <ChevronUp size={14} className="text-gray-600" /> : <ChevronDown size={14} className="text-gray-600" />}
                       </div>
                     </button>
-                    {acikAylar.has(key) && <div className="border-t border-cizgi overflow-x-auto">{faturaTablosu(liste)}</div>}
+                    {(acikAylar.has(key) || !!kelimeler) && <div className="border-t border-cizgi overflow-x-auto">{faturaTablosu(liste)}</div>}
                   </div>
                 ))}
               </div>

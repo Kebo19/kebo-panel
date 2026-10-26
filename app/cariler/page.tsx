@@ -13,6 +13,7 @@ import VadeTakvimi from "@/components/VadeTakvimi";
 import CariEkstre from "@/components/CariEkstre";
 import KeboEkstreYukle from "@/components/KeboEkstreYukle";
 import { keboCariMi, keboVadeOzeti, sonrakiCuma } from "@/lib/keboEkstre";
+import { aramaKelimeleri, faturaEslesir } from "@/lib/faturaArama";
 
 import { buAyinOdemeDonemi, faturaDurumHesapla, GIDER_HESAPLARI, HESAP_ETIKET, kartMi } from "@/lib/cari";
 import { tv, fmt2, paraGirdisi } from "@/lib/para";
@@ -85,6 +86,7 @@ export default function CarilerPage() {
   const [duzenlenenCariId, setDuzenlenenCariId] = useState<string | null>(null);
   const [ekstreCari, setEkstreCari] = useState<Cari | null>(null);
   const [keboEkstreAcik, setKeboEkstreAcik] = useState(false);
+  const [detayArama, setDetayArama] = useState("");
   // Kebo: her cuma, o cumaya kadar vadesi (fatura + 15 gün) dolan faturalar ödenir
   const [keboOdemeTarihi, setKeboOdemeTarihi] = useState(() => sonrakiCuma(bugun()));
   // Cari detayından yeni fatura ekleme
@@ -170,6 +172,7 @@ export default function CarilerPage() {
   useEffect(() => { if (aktifTab === "buay") buAyVeriCek(); }, [aktifTab, buAyVeriCek]);
 
   const cariDetayAc = async (cari: Cari) => {
+    if (seciliCari?.id !== cari.id) setDetayArama("");
     setSeciliCari(cari);
     setSeciliFaturalar(new Set());
     setLocalDurumlar(new Map());
@@ -283,11 +286,13 @@ export default function CarilerPage() {
   };
 
   const hepsiniSec = () => {
-    const hepsi = cariFaturalar.every(f => seciliFaturalar.has(f.id));
+    // Arama yapılmışsa sadece bulunan faturalar seçilir
+    const hedef = detayKelimeler ? cariFaturalar.filter(f => faturaEslesir(f, detayKelimeler)) : cariFaturalar;
+    const hepsi = hedef.length > 0 && hedef.every(f => seciliFaturalar.has(f.id));
     if (hepsi) {
       setSeciliFaturalar(new Set());
     } else {
-      setSeciliFaturalar(new Set(cariFaturalar.map(f => f.id)));
+      setSeciliFaturalar(new Set(hedef.map(f => f.id)));
     }
   };
 
@@ -482,6 +487,13 @@ export default function CarilerPage() {
     })),
     ...cariOdemeler.map(o => ({ tip: "odeme" as const, tarih: o.tarih, veri: o })),
   ].sort((a, b) => b.tarih.localeCompare(a.tarih)), [cariFaturalar, cariOdemeler, localDurumlar]);
+  // Cari detayında arama: faturalar no/açıklama/tutar/tarih, ödemeler açıklama/yöntem/tutar/tarih ile
+  const detayKelimeler = useMemo(() => aramaKelimeleri(detayArama), [detayArama]);
+  const gorunenListe = useMemo(() => !detayKelimeler ? birlesikListe : birlesikListe.filter(item =>
+    item.tip === "fatura"
+      ? faturaEslesir(item.veri, detayKelimeler)
+      : faturaEslesir({ fatura_no: item.veri.odeme_yontemi, aciklama: item.veri.aciklama, fatura_tarihi: item.veri.tarih, toplam_tutar: item.veri.tutar }, detayKelimeler)
+  ), [birlesikListe, detayKelimeler]);
 
   const durumRenk = (d: string) =>
     d === "odendi" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
@@ -833,6 +845,23 @@ export default function CarilerPage() {
             </div>
           )}
 
+          {/* Arama */}
+          <div className="space-y-1.5">
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
+              <input value={detayArama} onChange={e => setDetayArama(e.target.value)} placeholder="Bu caride ara — fatura no, açıklama, tutar veya tarih…"
+                className="w-full bg-kart border border-cizgi text-yazi text-xs h-10 pl-9 pr-9 rounded-xl outline-none focus:border-altin/50 placeholder:text-gray-700" />
+              {detayArama && (
+                <button onClick={() => setDetayArama("")} title="Aramayı temizle" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-600 hover:text-yazi"><X size={13} /></button>
+              )}
+            </div>
+            {detayKelimeler && (
+              <p className="text-[11px] text-gray-500 px-1">
+                {gorunenListe.filter(i => i.tip === "fatura").length} fatura · {gorunenListe.filter(i => i.tip === "odeme").length} ödeme bulundu
+              </p>
+            )}
+          </div>
+
           {/* Birleşik tablo */}
           <div className="bg-kart border border-cizgi rounded-2xl overflow-hidden">
             <table className="w-full">
@@ -852,9 +881,9 @@ export default function CarilerPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-cizgi">
-                {birlesikListe.length === 0 ? (
-                  <tr><td colSpan={7} className="py-16 text-center text-gray-500 text-sm">Kayıt bulunamadı</td></tr>
-                ) : birlesikListe.map((item) => {
+                {gorunenListe.length === 0 ? (
+                  <tr><td colSpan={7} className="py-16 text-center text-gray-500 text-sm">{detayKelimeler ? "Aramaya uyan kayıt yok" : "Kayıt bulunamadı"}</td></tr>
+                ) : gorunenListe.map((item) => {
                   if (item.tip === "fatura") {
                     const f = item.veri as Fatura & { gercekDurum: string };
                     const secili = seciliFaturalar.has(f.id);
