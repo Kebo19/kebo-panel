@@ -203,9 +203,9 @@ export interface MutabakatPlani {
   yeniOdemeler: EkstreSatir[];
   /** Başlangıç tarihinden önceki, sistemde karşılığı bulunamayan tahsilatlar (sistemde toplu girilmiş sayılır, eklenmez) */
   atlananOdemeler: EkstreSatir[];
-  /** Bakiye eşitleme: hangi faturalar açık kalacak, hangileri kapanacak */
-  acikKalacak: string[]; kapanacak: string[]; acilacak: string[];
-  /** Açık faturalar toplamı ile ekstre bakiyesi arasındaki küsurat (serbest düzeltme kaydı) */
+  /** Sistemdeki borç (faturalar − ödemeler) şu an ve eklemelerden sonra (düzeltme hariç) */
+  mevcutBorc: number; eklemeSonrasiBorc: number;
+  /** Borcu ekstre bakiyesine eşitleyen düzeltme kaydı tutarı (+ borcu azaltır, − artırır); her yüklemede yenilenir */
   duzeltme: number;
   hedefBakiye: number;
 }
@@ -264,29 +264,18 @@ export function mutabakatPlani(ekstre: EkstreSonuc, faturalar: SistemFatura[], o
     else yeniOdemeler.push(s);
   }
 
-  // Bakiye eşitleme (yeni faturalar dahil, hatır faturaları hariç). Serbest ödemeler borçtan düşüldüğü için
-  // hedef = ekstre bakiyesi + (önceki düzeltme hariç) serbest ödemeler.
-  const serbest = odemeler.filter(o => Array.isArray(o.fatura_idleri) && o.fatura_idleri.length === 0 && o.aciklama !== DUZELTME_ACIKLAMA)
-    .reduce((t, o) => t + (Number(o.tutar) || 0), 0);
-  const hedefBakiye = yuvarla(ekstre.sonBakiye + serbest);
-  type Kalem = { id: string; tarih: string; tutar: number; durum: string; no: string };
-  const kalemler: Kalem[] = [
-    ...faturalar.filter(f => !f.hatir_faturasi).map(f => ({ id: f.id, tarih: f.fatura_tarihi, tutar: Number(f.toplam_tutar) || 0, durum: f.durum, no: f.fatura_no })),
-    ...yeniFaturalar.map(s => ({ id: `yeni:${s.evrakNo}`, tarih: s.tarih, tutar: s.borc, durum: "yeni", no: s.evrakNo })),
-  ].sort((a, b) => b.tarih.localeCompare(a.tarih) || b.no.localeCompare(a.no));
-  // Tutar farkı olan faturalarda ekstredeki tutarı esas al
-  const duzeltilmisTutar = new Map(tutarFarklari.map(t => [t.fatura.id, t.satir.borc]));
-  const acikKalacak: string[] = []; let kum = 0;
-  for (const k of kalemler) {
-    if (kum >= hedefBakiye - 0.005) break;
-    acikKalacak.push(k.id); kum += duzeltilmisTutar.get(k.id) ?? k.tutar;
-  }
-  const acikSet = new Set(acikKalacak);
-  const kapanacak = faturalar.filter(f => !f.hatir_faturasi && !acikSet.has(f.id) && f.durum !== "odendi").map(f => f.id);
-  const acilacak = faturalar.filter(f => acikSet.has(f.id) && f.durum === "odendi").map(f => f.id);
+  // Bakiye eşitleme: cari bakiye = faturalar − ödemeler (fatura durumları veritabanında bu bakiyeden otomatik
+  // hesaplanır). Eklemelerden sonra kalan fark, tek bir "bakiye düzeltmesi" kaydıyla ekstre bakiyesine eşitlenir.
+  const fToplam = faturalar.reduce((t, f) => t + (Number(f.toplam_tutar) || 0), 0);
+  const oToplam = odemeler.reduce((t, o) => t + (Number(o.tutar) || 0), 0);
+  const eskiDuzeltme = odemeler.filter(o => o.aciklama === DUZELTME_ACIKLAMA).reduce((t, o) => t + (Number(o.tutar) || 0), 0);
+  const tutarFarki = tutarFarklari.reduce((t, x) => t + x.satir.borc - (Number(x.fatura.toplam_tutar) || 0), 0);
+  const eklemeSonrasiBorc = yuvarla(fToplam + tutarFarki + yeniFaturalar.reduce((t, s) => t + s.borc, 0)
+    - (oToplam - eskiDuzeltme) - yeniOdemeler.reduce((t, s) => t + s.alacak, 0));
   return {
     yeniFaturalar, tutarFarklari, ekstredeOlmayan, yeniOdemeler, atlananOdemeler,
-    acikKalacak, kapanacak, acilacak, duzeltme: yuvarla(Math.max(0, kum - hedefBakiye)), hedefBakiye,
+    mevcutBorc: yuvarla(fToplam - oToplam), eklemeSonrasiBorc,
+    duzeltme: yuvarla(eklemeSonrasiBorc - ekstre.sonBakiye), hedefBakiye: ekstre.sonBakiye,
   };
 }
 
@@ -318,16 +307,15 @@ export interface VadeOzeti {
 }
 
 /**
- * Vadesi verilen tarihe kadar dolan Kebo borcu. Faturaya bağlı olmayan (serbest) ödemeler — ekstre bakiye
- * düzeltmesi dahil — en eski açık faturadan düşülür (FIFO), kalan tutarlar vadeye göre toplanır.
+ * Vadesi verilen tarihe kadar dolan Kebo borcu. Açık faturalar (veritabanı bakiyeden hesaplar) borçtan fazlaysa
+ * aradaki fark en eski açık faturanın ödenmiş kısmıdır (FIFO) ve ondan düşülür; kalanlar vadeye göre toplanır.
  */
 export function keboVadeOzeti(
-  faturalar: (SistemFatura & { vade_tarihi?: string | null })[], odemeler: SistemOdeme[], tarih: string, bugunStr: string,
+  faturalar: (SistemFatura & { vade_tarihi?: string | null })[], borc: number, tarih: string, bugunStr: string,
 ): VadeOzeti {
-  let serbest = odemeler.filter(o => Array.isArray(o.fatura_idleri) && o.fatura_idleri.length === 0)
-    .reduce((t, o) => t + (Number(o.tutar) || 0), 0);
-  const acik = faturalar.filter(f => f.durum !== "odendi" && !f.hatir_faturasi)
+  const acik = faturalar.filter(f => f.durum !== "odendi")
     .sort((a, b) => a.fatura_tarihi.localeCompare(b.fatura_tarihi) || a.fatura_no.localeCompare(b.fatura_no));
+  let serbest = Math.max(0, acik.reduce((t, f) => t + (Number(f.toplam_tutar) || 0), 0) - Math.max(0, borc));
   const tumu: VadeKalemi[] = [];
   for (const f of acik) {
     let kalan = Number(f.toplam_tutar) || 0;

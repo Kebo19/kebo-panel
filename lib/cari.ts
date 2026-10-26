@@ -76,3 +76,50 @@ export const KART_HESAPLARI = ["TEB Kredi Kartı", "Enpara Kredi Kartı"] as con
 /** Gider / ödeme yapılabilecek bütün hesaplar */
 export const GIDER_HESAPLARI = [...ODEME_HESAPLARI, ...KART_HESAPLARI] as const;
 export const kartMi = (h: string) => (KART_HESAPLARI as readonly string[]).includes(h);
+
+// ─── CARİ ÖDEME YÖNTEMLERİ ──────────────────────────────────────────────────
+// Hesaplardan (Nakit/TEB/VakıfBank/Enpara/kredi kartları) biri seçilirse ödeme Kasa'ya otomatik gider
+// hareketi olarak yazılır (veritabanı trigger'ı; ödeme güncellenince/silinince kasa hareketi de güncellenir).
+// Kasaya yansımadan fatura kapatma yöntemleri (hesap boş kaydedilir → kasa hareketi oluşmaz):
+//  • Hakedişten Mahsup: Yemeksepeti / Getir / Migros / Trendyol gibi platform faturaları online hakedişten kesilir.
+//  • Hatır Faturası: KDV için kesilen, karşılığında ödeme yapılmayan faturalar (kâr/zarara da girmez).
+export const HAKEDIS_MAHSUP = "Hakedişten Mahsup";
+export const HATIR_FATURASI = "Hatır Faturası (ödemesiz)";
+export const KASASIZ_YONTEMLER = [HAKEDIS_MAHSUP, HATIR_FATURASI] as const;
+export const kasasizMi = (y: string) => (KASASIZ_YONTEMLER as readonly string[]).includes(y);
+export const ODEME_SECENEKLERI = [...GIDER_HESAPLARI, ...KASASIZ_YONTEMLER, "Çek", "Diğer"] as const;
+
+/** Seçilen ödeme yönteminden cari_odemeler kaydının `odeme_yontemi` ve `hesap` alanları */
+export function odemeKaydiAlanlari(yontem: string): { odeme_yontemi: string; hesap: string | null } {
+  const hesap = !kasasizMi(yontem) && (GIDER_HESAPLARI as readonly string[]).includes(yontem) ? yontem : null;
+  return {
+    odeme_yontemi: hesap && kartMi(hesap) ? `Kredi Kartı (${hesap})` : hesap && hesap !== "Nakit" ? `Banka (${hesap})` : yontem,
+    hesap,
+  };
+}
+
+// ─── CARİ BAKİYE ────────────────────────────────────────────────────────────
+// Borç = carinin tüm faturaları − tüm ödemeleri (cari hesap). Fatura durumları (ödendi/bekliyor) veritabanında
+// bu bakiyeden otomatik hesaplanır (cari_durum_esitle): bir ödemeye bağlı faturalar ödendi, diğerlerinde
+// ödemeler en eski faturayı kapatır. Açık faturaların toplamı borçtan fazlaysa fark, en eski açık faturanın
+// ödenmiş kısmıdır.
+export interface BakiyeFatura { fatura_tarihi: string; fatura_no?: string | null; toplam_tutar: number | string | null; durum: string }
+const yuv = (n: number) => Math.round(n * 100) / 100;
+
+export function cariBorcu(faturalar: { toplam_tutar: number | string | null }[], odemeler: { tutar: number | string | null }[]): number {
+  return yuv(faturalar.reduce((t, f) => t + (Number(f.toplam_tutar) || 0), 0) - odemeler.reduce((t, o) => t + (Number(o.tutar) || 0), 0));
+}
+
+/** Verilen tarihe kadar kesilmiş açık faturalardan ödenmesi gereken (kısmi ödenmiş kısım en eskiden düşülür) */
+export function tariheKadarOdenecek(faturalar: BakiyeFatura[], borc: number, sonTarih: string): number {
+  const acik = faturalar.filter(f => f.durum !== "odendi")
+    .sort((a, b) => a.fatura_tarihi.localeCompare(b.fatura_tarihi) || String(a.fatura_no || "").localeCompare(String(b.fatura_no || "")));
+  let odenmis = Math.max(0, acik.reduce((t, f) => t + (Number(f.toplam_tutar) || 0), 0) - Math.max(0, borc));
+  let toplam = 0;
+  for (const f of acik) {
+    let kalan = Number(f.toplam_tutar) || 0;
+    const d = Math.min(kalan, odenmis); kalan -= d; odenmis -= d;
+    if (f.fatura_tarihi <= sonTarih) toplam += kalan;
+  }
+  return yuv(Math.max(0, toplam));
+}

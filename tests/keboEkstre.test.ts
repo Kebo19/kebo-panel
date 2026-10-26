@@ -59,14 +59,25 @@ describe("Kebo mutabakat planı", () => {
     { id: "a", fatura_no: "KBE2026000000016", fatura_tarihi: "2026-01-05", toplam_tutar: 1000, durum: "bekliyor" },
   ];
 
-  it("eksik faturayı ve yeni tahsilatları bulur, bakiyeyi FIFO eşitler", () => {
+  it("eksik faturayı ve yeni tahsilatları bulur, borcu ekstre bakiyesine eşitleyen düzeltmeyi hesaplar", () => {
     const p = mutabakatPlani(ekstre, faturalar, [], "0000-00-00");
     expect(p.yeniFaturalar.map(s => s.evrakNo)).toEqual(["KBE2026000000020"]);
     expect(p.yeniOdemeler.map(s => s.alacak)).toEqual([600, 50]);
-    // Bakiye 750: en yeni fatura (300) + eski faturanın 450'si açık → eski fatura açık kalır, 550 düzeltme
-    expect(p.acikKalacak).toEqual(["yeni:KBE2026000000020", "a"]);
-    expect(p.duzeltme).toBe(550);
-    expect(p.kapanacak).toEqual([]);
+    // Sistem: 1000 fatura. Eklemelerle 1000 + 300 − 650 = 650; ekstre 750 (açılış 100 sistemde yok) → düzeltme −100
+    expect(p.mevcutBorc).toBe(1000);
+    expect(p.eklemeSonrasiBorc).toBe(650);
+    expect(p.duzeltme).toBe(-100);
+  });
+  it("aynı ekstre tekrar yüklenince değişiklik çıkmaz (önceki düzeltme hesaba katılır)", () => {
+    const odemeler = [
+      { id: "1", tarih: "2026-01-06", tutar: 600, aciklama: "Kebo ekstre · Gelen Havale · 2026-01-06|0000000001|600.00", fatura_idleri: null },
+      { id: "2", tarih: "2026-01-08", tutar: 50, aciklama: "Kebo ekstre · Cari Virman Fişi · 2026-01-08|0000000238|50.00", fatura_idleri: null },
+      { id: "3", tarih: "2026-01-08", tutar: -100, aciklama: DUZELTME_ACIKLAMA, fatura_idleri: [] },
+    ];
+    const f2 = [...faturalar, { id: "b", fatura_no: "KBE2026000000020", fatura_tarihi: "2026-01-07", toplam_tutar: 300, durum: "bekliyor" }];
+    const p = mutabakatPlani(ekstre, f2, odemeler);
+    expect(p.yeniFaturalar).toEqual([]); expect(p.yeniOdemeler).toEqual([]);
+    expect(p.mevcutBorc).toBe(750); expect(p.duzeltme).toBe(-100);
   });
 
   it("başlangıç tarihinden önceki tahsilatları atlar, ekstre kayıtlarını tekrar eklemez", () => {
@@ -80,7 +91,7 @@ describe("Kebo mutabakat planı", () => {
     const p = mutabakatPlani(ekstre, faturalar, odemeler);
     expect(p.yeniOdemeler).toEqual([]);
     expect(p.atlananOdemeler.map(s => s.alacak)).toEqual([600]);
-    expect(p.hedefBakiye).toBe(750); // önceki düzeltme serbest ödeme sayılmaz
+    expect(p.hedefBakiye).toBe(750);
   });
 });
 
@@ -94,15 +105,14 @@ describe("Kebo vade", () => {
     expect(sonrakiCuma("2026-10-30")).toBe("2026-10-30");
     expect(sonrakiCuma("2026-10-31")).toBe("2026-11-06");
   });
-  it("serbest ödemeyi en eski açık faturadan düşer ve vadesi gelenleri toplar", () => {
+  it("açık faturalar borçtan fazlaysa farkı en eski açık faturadan düşer ve vadesi gelenleri toplar", () => {
     const f = [
       { id: "1", fatura_no: "A", fatura_tarihi: "2026-10-12", toplam_tutar: 1000, durum: "bekliyor" },
       { id: "2", fatura_no: "B", fatura_tarihi: "2026-10-14", toplam_tutar: 500, durum: "bekliyor" },
       { id: "3", fatura_no: "C", fatura_tarihi: "2026-10-16", toplam_tutar: 300, durum: "bekliyor" },
       { id: "4", fatura_no: "D", fatura_tarihi: "2026-10-01", toplam_tutar: 900, durum: "odendi" },
     ];
-    const o = [{ id: "x", tarih: "2026-10-20", tutar: 200, aciklama: DUZELTME_ACIKLAMA, fatura_idleri: [] }];
-    const v = keboVadeOzeti(f, o, "2026-10-30", "2026-10-28");
+    const v = keboVadeOzeti(f, 1600, "2026-10-30", "2026-10-28"); // açık 1800, borç 1600 → A'nın 200'ü ödenmiş
     expect(v.kalemler.map(k => [k.fatura_no, k.kalan])).toEqual([["A", 800], ["B", 500]]);
     expect(v.toplam).toBe(1300);
     expect(v.gecikmis).toBe(800); // A'nın vadesi 27.10

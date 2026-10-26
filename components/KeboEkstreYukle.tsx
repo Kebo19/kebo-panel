@@ -11,7 +11,7 @@ import { useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { X, Loader2, FileUp, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
 import {
-  mutabakatPlani, varsayilanOdemeBaslangici, odemeYontemiAdi, ekstreAnahtar,
+  mutabakatPlani, varsayilanOdemeBaslangici, odemeYontemiAdi, ekstreAnahtar, gunEkle,
   EKSTRE_ONEK, DUZELTME_ACIKLAMA, type EkstreSonuc, type EkstreSatir, type SistemFatura, type SistemOdeme,
 } from "@/lib/keboEkstre";
 import { GIDER_HESAPLARI, HESAP_ETIKET, kartMi } from "@/lib/cari";
@@ -75,7 +75,6 @@ export default function KeboEkstreYukle({ cari, faturalar, odemeler, onKapat, on
 
   const plan = useMemo(() => ekstre ? mutabakatPlani(ekstre, faturalar, odemeler, baslangic) : null, [ekstre, faturalar, odemeler, baslangic]);
   const toplam = (a: EkstreSatir[], k: "borc" | "alacak") => a.reduce((t, s) => t + s[k], 0);
-  const faturaNo = useMemo(() => new Map(faturalar.map(f => [f.id, f])), [faturalar]);
 
   const dosyaSec = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const dosya = e.target.files?.[0];
@@ -134,38 +133,29 @@ export default function KeboEkstreYukle({ cari, faturalar, odemeler, onKapat, on
         }));
         if (error) throw new Error("Tahsilatlar eklenemedi: " + error.message);
       }
-      // 4) Bakiye eşitleme: durumlar
-      const acik = new Set(plan.acikKalacak.map(id => yeniIdler.get(id) ?? id));
-      // Açık kalan faturalara ekstredeki vade tarihini yaz (Kebo: fatura + 15 gün; vade kartı bunu kullanır)
+      // 4) Son 60 günün faturalarına ekstredeki vade tarihini yaz (Kebo: fatura + 15 gün; vade kartı bunu kullanır)
+      const sinir = gunEkle(ekstre.satirlar.at(-1)?.tarih ?? "0000-00-00", -60);
       const vadeNo = new Map(ekstre.satirlar.filter(s => s.grup === "fatura" && s.vade).map(s => [s.evrakNo.trim().toUpperCase(), s.vade as string]));
       for (const f of faturalar) {
-        if (!acik.has(f.id)) continue;
+        if (f.fatura_tarihi < sinir) continue;
         const vade = vadeNo.get(f.fatura_no.trim().toUpperCase());
         if (vade && vade !== (f as { vade_tarihi?: string | null }).vade_tarihi) {
           const { error } = await supabase.from("faturalar").update({ vade_tarihi: vade }).eq("id", f.id);
           if (error) throw new Error(`${f.fatura_no} vadesi yazılamadı: ` + error.message);
         }
       }
-      const kapat = [...plan.kapanacak, ...[...yeniIdler.values()].filter(id => !acik.has(id))];
-      if (kapat.length) {
-        const { error } = await supabase.from("faturalar").update({ durum: "odendi", islendi: true }).in("id", kapat);
-        if (error) throw new Error("Fatura durumları güncellenemedi: " + error.message);
-      }
-      if (plan.acilacak.length) {
-        const { error } = await supabase.from("faturalar").update({ durum: "bekliyor", islendi: false }).in("id", plan.acilacak);
-        if (error) throw new Error("Fatura durumları güncellenemedi: " + error.message);
-      }
-      // 5) Küsurat düzeltmesi (en eski açık faturanın ödenmiş kısmı) — tek kayıt, her yüklemede yenilenir
+      // 5) Bakiye düzeltmesi: sistem borcunu ekstre bakiyesine eşitleyen tek kayıt, her yüklemede yenilenir.
+      //    Fatura durumları (ödendi/bekliyor) veritabanında bakiyeden otomatik hesaplanır.
       if (duzeltmeDegisti) {
         const { error: silHata } = await supabase.from("cari_odemeler").delete().eq("cari_id", cari.id).eq("aciklama", DUZELTME_ACIKLAMA);
         if (silHata) throw new Error("Eski bakiye düzeltmesi silinemedi: " + silHata.message);
-      }
-      if (duzeltmeDegisti && plan.duzeltme > 0.01) {
-        const { error } = await supabase.from("cari_odemeler").insert([{
-          cari_id: cari.id, cari_unvan: cari.unvan, tutar: plan.duzeltme, tarih: ekstre.satirlar.at(-1)?.tarih,
-          odeme_yontemi: "Diğer", hesap: null, fatura_idleri: [], aciklama: DUZELTME_ACIKLAMA,
-        }]);
-        if (error) throw new Error("Bakiye düzeltmesi yazılamadı: " + error.message);
+        if (Math.abs(plan.duzeltme) > 0.01) {
+          const { error } = await supabase.from("cari_odemeler").insert([{
+            cari_id: cari.id, cari_unvan: cari.unvan, tutar: plan.duzeltme, tarih: ekstre.satirlar.at(-1)?.tarih,
+            odeme_yontemi: "Diğer", hesap: null, fatura_idleri: [], aciklama: DUZELTME_ACIKLAMA,
+          }]);
+          if (error) throw new Error("Bakiye düzeltmesi yazılamadı: " + error.message);
+        }
       }
       onTamam(`Kebo ekstresi işlendi: ${plan.yeniFaturalar.length} fatura, ${plan.yeniOdemeler.length} tahsilat eklendi. Borç ₺${fmt(ekstre.sonBakiye)} ile eşitlendi.`);
     } catch (err) {
@@ -177,8 +167,7 @@ export default function KeboEkstreYukle({ cari, faturalar, odemeler, onKapat, on
 
   const mevcutDuzeltme = odemeler.find(o => o.aciklama === DUZELTME_ACIKLAMA);
   const duzeltmeDegisti = !!plan && Math.abs((Number(mevcutDuzeltme?.tutar) || 0) - plan.duzeltme) > 0.01;
-  const degisiklikVar = !!plan && (plan.yeniFaturalar.length + plan.tutarFarklari.length + plan.yeniOdemeler.length
-    + plan.kapanacak.length + plan.acilacak.length > 0 || duzeltmeDegisti);
+  const degisiklikVar = !!plan && (plan.yeniFaturalar.length + plan.tutarFarklari.length + plan.yeniOdemeler.length > 0 || duzeltmeDegisti);
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -270,14 +259,12 @@ export default function KeboEkstreYukle({ cari, faturalar, odemeler, onKapat, on
               <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 space-y-1.5">
                 <p className="text-sm font-bold text-amber-300">Bakiye eşitleme</p>
                 <p className="text-xs text-gray-400">
-                  Kebo hesabı tek bakiyeyle yürür: ödemeler en eski faturaları kapatır. En yeni <b className="text-yazi">{plan.acikKalacak.length}</b> fatura açık kalacak,
-                  {" "}<b className="text-yazi">{plan.kapanacak.length}</b> fatura &quot;ödendi&quot; olacak{plan.acilacak.length > 0 && <>, <b className="text-yazi">{plan.acilacak.length}</b> fatura yeniden açılacak</>}.
-                  {plan.duzeltme > 0.01 && <> En eski açık faturanın ödenmiş kısmı için ₺{fmt(plan.duzeltme)} düzeltme kaydı yazılır.</>}
+                  Sistemdeki borç şu an <b className="text-yazi">₺{fmt(plan.mevcutBorc)}</b>; eklemelerden sonra <b className="text-yazi">₺{fmt(plan.eklemeSonrasiBorc)}</b> olur.
+                  {Math.abs(plan.duzeltme) > 0.01
+                    ? <> Kebo bakiyesiyle aradaki <b className="text-yazi">₺{fmt(Math.abs(plan.duzeltme))}</b> fark tek bir &quot;bakiye düzeltmesi&quot; kaydıyla kapatılır (kasaya yansımaz).</>
+                    : <> Kebo bakiyesiyle birebir tutuyor, düzeltme gerekmiyor.</>}
                 </p>
-                <p className="text-xs text-gray-400">İşlemden sonra cari ekranındaki <b className="text-yazi">Toplam Borç = ₺{fmt(ekstre.sonBakiye)}</b> olur.</p>
-                {plan.acikKalacak.length > 0 && (
-                  <p className="text-[10px] text-gray-600 truncate">Açık kalacaklar: {plan.acikKalacak.map(id => id.startsWith("yeni:") ? id.slice(5) : faturaNo.get(id)?.fatura_no).join(", ")}</p>
-                )}
+                <p className="text-xs text-gray-400">İşlemden sonra cari ekranındaki <b className="text-yazi">Toplam Borç = ₺{fmt(ekstre.sonBakiye)}</b> olur; ödemeler en eski faturaları kapatır, fatura durumları kendiliğinden güncellenir.</p>
               </div>
 
               {plan.ekstredeOlmayan.length > 0 && (

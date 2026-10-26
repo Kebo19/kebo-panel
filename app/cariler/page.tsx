@@ -12,24 +12,17 @@ import {
 import VadeTakvimi from "@/components/VadeTakvimi";
 import CariEkstre from "@/components/CariEkstre";
 import KeboEkstreYukle from "@/components/KeboEkstreYukle";
+import OdemeDetay from "@/components/OdemeDetay";
+import FaturaDuzenle from "@/components/FaturaDuzenle";
 import { keboCariMi, keboVadeOzeti, sonrakiCuma } from "@/lib/keboEkstre";
 import { aramaKelimeleri, faturaEslesir } from "@/lib/faturaArama";
 
-import { buAyinOdemeDonemi, faturaDurumHesapla, GIDER_HESAPLARI, HESAP_ETIKET, kartMi } from "@/lib/cari";
+import {
+  buAyinOdemeDonemi, faturaDurumHesapla, GIDER_HESAPLARI, HESAP_ETIKET, kartMi,
+  HAKEDIS_MAHSUP, HATIR_FATURASI, kasasizMi, ODEME_SECENEKLERI, odemeKaydiAlanlari, cariBorcu, tariheKadarOdenecek,
+} from "@/lib/cari";
 import { tv, fmt2, paraGirdisi } from "@/lib/para";
 import { bugun, fmtTarih as fmtTarihOrtak } from "@/lib/tarih";
-
-// Ödeme yöntemleri: ilk dördü Kasa & Finans'taki hesaplardır — seçilirse ödeme Kasa'ya
-// otomatik gider hareketi olarak yazılır (veritabanı trigger'ı). Diğerleri kasaya yansımaz.
-// Kasaya yansımadan fatura kapatma yöntemleri (hesap boş kaydedilir → kasa hareketi oluşmaz):
-//  • Hakedişten Mahsup: Yemeksepeti / Getir / Migros / Trendyol gibi platform faturaları online hakedişten kesilir,
-//    kalan bankaya "Platform Hakedişi" olarak yatar. Kasadan ayrıca ödeme çıkmaz.
-//  • Hatır Faturası: KDV için kesilen, karşılığında ödeme yapılmayan faturalar.
-const HAKEDIS_MAHSUP = "Hakedişten Mahsup";
-const HATIR_FATURASI = "Hatır Faturası (ödemesiz)";
-const KASASIZ_YONTEMLER = [HAKEDIS_MAHSUP, HATIR_FATURASI] as const;
-const kasasizMi = (y: string) => (KASASIZ_YONTEMLER as readonly string[]).includes(y);
-const ODEME_SECENEKLERI = [...GIDER_HESAPLARI, ...KASASIZ_YONTEMLER, "Çek", "Diğer"] as const;
 
 interface Cari {
   id: string; cari_kodu: string; unvan: string; vergi_no: string;
@@ -44,7 +37,7 @@ const BOS_FORM = { cari_kodu: "", unvan: "", vergi_no: "", vergi_dairesi: "", te
 interface Fatura {
   id: string; fatura_no: string; fatura_tarihi: string;
   toplam_tutar: number; durum: string; aciklama: string; cari_id?: string; cari_unvan?: string;
-  vade_tarihi?: string | null; hatir_faturasi?: boolean | null;
+  vade_tarihi?: string | null; hatir_faturasi?: boolean | null; tutar?: number | null; kdv?: number | null;
 }
 interface Odeme {
   id: string; tutar: number; tarih: string; aciklama: string; odeme_yontemi: string;
@@ -87,6 +80,9 @@ export default function CarilerPage() {
   const [ekstreCari, setEkstreCari] = useState<Cari | null>(null);
   const [keboEkstreAcik, setKeboEkstreAcik] = useState(false);
   const [detayArama, setDetayArama] = useState("");
+  const detayKelimeler = useMemo(() => aramaKelimeleri(detayArama), [detayArama]);
+  const [odemeDetay, setOdemeDetay] = useState<Odeme | null>(null);
+  const [faturaDuzenle, setFaturaDuzenle] = useState<Fatura | null>(null);
   // Kebo: her cuma, o cumaya kadar vadesi (fatura + 15 gün) dolan faturalar ödenir
   const [keboOdemeTarihi, setKeboOdemeTarihi] = useState(() => sonrakiCuma(bugun()));
   // Cari detayından yeni fatura ekleme
@@ -111,7 +107,7 @@ export default function CarilerPage() {
 
   const donem = useMemo(() => buAyinOdemeDonemi(), []);
 
-  // Borç = ödenmemiş faturalar − faturaya bağlanmamış (manuel) ödemeler.
+  // Borç = carinin tüm faturaları − tüm ödemeleri (cari hesap); fatura durumları veritabanında bundan hesaplanır.
   // Map anahtarı cari id'si (ünvan değişse de bağlantı kopmasın).
   const veriCek = useCallback(async () => {
     setYukleniyor(true);
@@ -133,21 +129,12 @@ export default function CarilerPage() {
     }
     setCariler(c);
     const map = new Map<string, { buAy: number; toplam: number }>();
-    const al = (id: string) => { if (!map.has(id)) map.set(id, { buAy: 0, toplam: 0 }); return map.get(id)!; };
-    (f || []).forEach(fatura => {
-      if (!fatura.cari_id) return;
-      const gercekDurum = faturaDurumHesapla(fatura.fatura_tarihi, fatura.durum, donem);
-      if (gercekDurum !== "odendi") {
-        const item = al(fatura.cari_id);
-        item.toplam += Number(fatura.toplam_tutar) || 0;
-        if (fatura.fatura_tarihi <= donem.donemBit) item.buAy += Number(fatura.toplam_tutar) || 0;
-      }
-    });
-    (o || []).forEach(odeme => {
-      if (!odeme.cari_id || !serbestOdemeMi(odeme)) return;
-      const item = al(odeme.cari_id);
-      item.toplam -= Number(odeme.tutar) || 0;
-      item.buAy = Math.max(item.buAy - (Number(odeme.tutar) || 0), 0);
+    const fGrup = new Map<string, typeof f>(); const oGrup = new Map<string, typeof o>();
+    (f || []).forEach(x => { if (x.cari_id) { if (!fGrup.has(x.cari_id)) fGrup.set(x.cari_id, []); fGrup.get(x.cari_id)!.push(x); } });
+    (o || []).forEach(x => { if (x.cari_id) { if (!oGrup.has(x.cari_id)) oGrup.set(x.cari_id, []); oGrup.get(x.cari_id)!.push(x); } });
+    fGrup.forEach((fl, id) => {
+      const borc = cariBorcu(fl, oGrup.get(id) || []);
+      map.set(id, { toplam: borc, buAy: tariheKadarOdenecek(fl, borc, donem.donemBit) });
     });
     setCariTutarMap(map);
     setTakvimYenile(n => n + 1);
@@ -306,6 +293,11 @@ export default function CarilerPage() {
     if (seciliFaturalar.size === 0) return;
     // "Ödendi" artık sadece bir ödeme kaydıyla yapılır; böylece ödeme geçmişi ve Kasa eksik kalmaz.
     if (durum === "odendi") { odemeAc(true); return; }
+    // Ödendi/bekliyor bakiyeden hesaplanır: ödenmiş fatura ancak ödemesi silinir/düzenlenirse açılır
+    if (cariFaturalar.some(f => seciliFaturalar.has(f.id) && (localDurumlar.get(f.id) || f.durum) === "odendi")) {
+      showToast("hata", "Ödenmiş fatura elle açılamaz — durum cari bakiyesinden hesaplanıyor. İlgili ödemeye tıklayıp düzenleyin ya da silin.");
+      return;
+    }
     // Anında UI güncelle
     const yeniDurumlar = new Map(localDurumlar);
     seciliFaturalar.forEach(id => yeniDurumlar.set(id, durum));
@@ -338,12 +330,11 @@ export default function CarilerPage() {
     if (!tutar || tutar <= 0) { showToast("hata", "Tutar giriniz veya fatura seçiniz."); return; }
     setFormSaving(true);
     // Kasasız yöntemlerde hesap boş kalır → veritabanı tetikleyicisi kasa hareketi oluşturmaz
-    const hesap = !kasasizMi(odemeYontemi) && (GIDER_HESAPLARI as readonly string[]).includes(odemeYontemi) ? odemeYontemi : null;
+    const { odeme_yontemi, hesap } = odemeKaydiAlanlari(odemeYontemi);
     const { error } = await supabase.from("cari_odemeler").insert([{
       cari_id: seciliCari.id, cari_unvan: seciliCari.unvan,
       tutar, tarih: odemeTarih,
-      odeme_yontemi: hesap && kartMi(hesap) ? `Kredi Kartı (${hesap})` : hesap && hesap !== "Nakit" ? `Banka (${hesap})` : odemeYontemi,
-      hesap, fatura_idleri: faturaIdleri,
+      odeme_yontemi, hesap, fatura_idleri: faturaIdleri,
       aciklama: odemeAciklama || (kasasizMi(odemeYontemi)
         ? `${odemeYontemi}${faturaIdleri.length > 0 ? ` — ${faturaIdleri.length} fatura kapatıldı` : ""}`
         : `${faturaIdleri.length > 0 ? faturaIdleri.length + " fatura için ödeme" : "Manuel ödeme"}`),
@@ -448,20 +439,14 @@ export default function CarilerPage() {
   // Toplam hesaplar (detay sayfası)
   const toplamFatura = cariFaturalar.reduce((s, f) => s + (f.toplam_tutar || 0), 0);
   const toplamOdeme = cariOdemeler.reduce((s, o) => s + (o.tutar || 0), 0);
-  const serbestOdemeToplam = cariOdemeler.filter(serbestOdemeMi).reduce((s, o) => s + (Number(o.tutar) || 0), 0);
-  const acikFaturaToplam = cariFaturalar.filter(f => {
-    const gercek = localDurumlar.get(f.id) || faturaDurumHesapla(f.fatura_tarihi, f.durum, donem);
-    return gercek !== "odendi";
-  }).reduce((s, f) => s + (f.toplam_tutar || 0), 0);
-  // Borç = açık faturalar − faturaya bağlanmamış ödemeler (negatifse cari bize borçlu / avans verilmiş)
-  const toplamBorc = acikFaturaToplam - serbestOdemeToplam;
-  const buAyOdenecek = Math.max(cariFaturalar.filter(f =>
-    (localDurumlar.get(f.id) || f.durum) !== "odendi" &&
-    f.fatura_tarihi <= donem.donemBit
-  ).reduce((s, f) => s + (f.toplam_tutar || 0), 0) - serbestOdemeToplam, 0);
-  const keboVade = useMemo(() => seciliCari && keboCariMi(seciliCari.unvan)
-    ? keboVadeOzeti(cariFaturalar.map(f => ({ ...f, durum: localDurumlar.get(f.id) || f.durum })), cariOdemeler, keboOdemeTarihi, bugun())
-    : null, [seciliCari, cariFaturalar, cariOdemeler, localDurumlar, keboOdemeTarihi]);
+  // Borç = tüm faturalar − tüm ödemeler (negatifse fazla ödenmiş / avans). Fatura tutarı ya da ödeme
+  // değişince borç hemen değişir; ödendi/bekliyor durumları veritabanında bu bakiyeden hesaplanır.
+  const toplamBorc = useMemo(() => cariBorcu(cariFaturalar, cariOdemeler), [cariFaturalar, cariOdemeler]);
+  const gosterilenFaturalar = useMemo(() => cariFaturalar.map(f => ({ ...f, durum: localDurumlar.get(f.id) || f.durum })), [cariFaturalar, localDurumlar]);
+  const buAyOdenecek = tariheKadarOdenecek(gosterilenFaturalar, toplamBorc, donem.donemBit);
+  const keboMu = !!seciliCari && keboCariMi(seciliCari.unvan);
+  const keboVade = useMemo(() => keboMu ? keboVadeOzeti(gosterilenFaturalar, toplamBorc, keboOdemeTarihi, bugun()) : null,
+    [keboMu, gosterilenFaturalar, toplamBorc, keboOdemeTarihi]);
   const keboVadeOde = () => {
     if (!keboVade || keboVade.toplam <= 0) return;
     odemeAc();
@@ -488,7 +473,6 @@ export default function CarilerPage() {
     ...cariOdemeler.map(o => ({ tip: "odeme" as const, tarih: o.tarih, veri: o })),
   ].sort((a, b) => b.tarih.localeCompare(a.tarih)), [cariFaturalar, cariOdemeler, localDurumlar]);
   // Cari detayında arama: faturalar no/açıklama/tutar/tarih, ödemeler açıklama/yöntem/tutar/tarih ile
-  const detayKelimeler = useMemo(() => aramaKelimeleri(detayArama), [detayArama]);
   const gorunenListe = useMemo(() => !detayKelimeler ? birlesikListe : birlesikListe.filter(item =>
     item.tip === "fatura"
       ? faturaEslesir(item.veri, detayKelimeler)
@@ -792,7 +776,7 @@ export default function CarilerPage() {
             <div className={`bg-kart border rounded-2xl p-4 ${toplamBorc > 0 ? "border-red-500/20" : "border-emerald-500/20"}`}>
               <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">Toplam Borç</p>
               <p className={`text-2xl font-black ${toplamBorc > 0 ? "text-red-400" : "text-emerald-400"}`}>₺{fmt(toplamBorc)}</p>
-              <p className="text-[10px] text-gray-600 mt-1">{serbestOdemeToplam > 0 ? `açık faturalar − ₺${fmt(serbestOdemeToplam)} faturasız ödeme` : "ödenmemiş faturalar"}</p>
+              <p className="text-[10px] text-gray-600 mt-1">{toplamBorc < 0 ? "fazla ödenmiş (avans)" : "toplam fatura − toplam ödeme"}</p>
             </div>
             {keboVade ? (
               <div className="bg-kart border border-amber-500/20 rounded-2xl p-4">
@@ -903,16 +887,21 @@ export default function CarilerPage() {
                         <td className="px-4 py-4 text-right text-base font-black text-red-400">₺{fmt(f.toplam_tutar)}</td>
                         <td className="px-4 py-4 text-right text-gray-700">—</td>
                         <td className="px-4 py-4">
-                          <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${durumRenk(f.gercekDurum)}`}>
-                            {durumEtiket(f.gercekDurum)}
-                          </span>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${durumRenk(f.gercekDurum)}`}>
+                              {durumEtiket(f.gercekDurum)}
+                            </span>
+                            <button onClick={e => { e.stopPropagation(); setFaturaDuzenle(f); }} title="Faturayı düzenle (no, tarih, tutar)"
+                              className="text-gray-400 hover:text-blue-400 transition-colors"><Edit2 size={13} /></button>
+                          </div>
                         </td>
                       </tr>
                     );
                   } else {
                     const o = item.veri as Odeme;
                     return (
-                      <tr key={`o-${o.id}`} className="bg-emerald-500/10 hover:bg-emerald-500/10 transition-colors">
+                      <tr key={`o-${o.id}`} onClick={() => setOdemeDetay(o)} title="Hangi faturalara ait olduğunu gör / düzenle"
+                        className="bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors cursor-pointer">
                         <td className="px-4 py-4 text-gray-700">—</td>
                         <td className="px-4 py-4">
                           <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Ödeme</span>
@@ -923,9 +912,9 @@ export default function CarilerPage() {
                         <td className="px-4 py-4 text-right text-base font-black text-emerald-400">₺{fmt(o.tutar)}</td>
                         <td className="px-4 py-4 text-sm text-gray-500">
                           <div className="flex items-center justify-between gap-2">
-                            <span>{o.odeme_yontemi}{serbestOdemeMi(o) ? " · faturasız" : ""}</span>
+                            <span>{o.odeme_yontemi}{serbestOdemeMi(o) ? " · faturasız" : o.fatura_idleri?.length ? ` · ${o.fatura_idleri.length} fatura` : ""}</span>
                             {!o.rapor_id && (
-                              <button onClick={() => odemeSil(o)} title="Ödemeyi sil" className="text-gray-400 hover:text-red-400 transition-colors"><Trash2 size={13} /></button>
+                              <button onClick={e => { e.stopPropagation(); odemeSil(o); }} title="Ödemeyi sil" className="text-gray-400 hover:text-red-400 transition-colors"><Trash2 size={13} /></button>
                             )}
                           </div>
                         </td>
@@ -1228,6 +1217,18 @@ export default function CarilerPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {odemeDetay && seciliCari && (
+        <OdemeDetay key={odemeDetay.id} odeme={odemeDetay} faturalar={cariFaturalar} odemeler={cariOdemeler}
+          onKapat={() => setOdemeDetay(null)}
+          onKaydedildi={mesaj => { setOdemeDetay(null); showToast("basari", mesaj); cariDetayAc(seciliCari); veriCek(); }} />
+      )}
+      {faturaDuzenle && seciliCari && (
+        <FaturaDuzenle key={faturaDuzenle.id} fatura={faturaDuzenle} odemeler={cariOdemeler}
+          onKapat={() => setFaturaDuzenle(null)}
+          onOdemeAc={o => { setFaturaDuzenle(null); setOdemeDetay(o as Odeme); }}
+          onKaydedildi={mesaj => { setFaturaDuzenle(null); showToast("basari", mesaj); cariDetayAc(seciliCari); veriCek(); }} />
       )}
 
       {keboEkstreAcik && seciliCari && (
