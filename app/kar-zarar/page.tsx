@@ -83,7 +83,7 @@ export default function KarZararPage() {
     );
     const [r, f, k, c] = await Promise.all([
       guvenli(hepsiniCek<RaporVerisi>((a, b) => supabase.from("gunluk_raporlar").select("*").gte("tarih", bas).lte("tarih", bit).order("tarih").order("id").range(a, b))),
-      guvenli(hepsiniCek<FaturaKZ>((a, b) => supabase.from("faturalar").select("fatura_tarihi,toplam_tutar").gte("fatura_tarihi", bas).lte("fatura_tarihi", bit).order("fatura_tarihi").order("id").range(a, b))),
+      guvenli(hepsiniCek<FaturaKZ>((a, b) => supabase.from("faturalar").select("fatura_tarihi,toplam_tutar").eq("hatir_faturasi", false).gte("fatura_tarihi", bas).lte("fatura_tarihi", bit).order("fatura_tarihi").order("id").range(a, b))),
       guvenli(hepsiniCek<KasaIslemiKZ>((a, b) => supabase.from("kasa_manuel_islemler").select("tip,kategori,tutar,islem_tarihi,kaynak").gte("islem_tarihi", bas).lte("islem_tarihi", bit).order("islem_tarihi").order("id").range(a, b))),
       guvenli(hepsiniCek<CariOdemeKZ>((a, b) => supabase.from("cari_odemeler").select("tarih,tutar,rapor_id").gte("tarih", bas).lte("tarih", bit).order("tarih").order("id").range(a, b))),
     ]);

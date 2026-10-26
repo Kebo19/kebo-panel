@@ -66,7 +66,7 @@ export default function AyDevri({ ay, raporlar, kasaIslemleri, krediTaksidiGider
       try {
         const [{ data: devreden, error }, faturalar, odemeler] = await Promise.all([
           supabase.rpc("cari_borc_bakiyesi", { p_tarih: bas }),
-          hepsiniCek<FaturaKZ>((a, b) => supabase.from("faturalar").select("fatura_tarihi,toplam_tutar").gte("fatura_tarihi", bas).lte("fatura_tarihi", bit).order("id").range(a, b)),
+          hepsiniCek<FaturaKZ>((a, b) => supabase.from("faturalar").select("fatura_tarihi,toplam_tutar").eq("hatir_faturasi", false).gte("fatura_tarihi", bas).lte("fatura_tarihi", bit).order("id").range(a, b)),
           hepsiniCek<CariOdemeKZ>((a, b) => supabase.from("cari_odemeler").select("tarih,tutar,rapor_id").gte("tarih", bas).lte("tarih", bit).order("id").range(a, b)),
         ]);
         if (error || devreden === null || devreden === undefined) bitir(null);

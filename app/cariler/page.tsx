@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   Plus, Search, Building2, Trash2, X, Loader2, CheckCircle2,
   AlertTriangle, Wallet, ArrowLeft, Phone, Hash,
-  Calendar, Check, Square, CheckSquare, ChevronDown, ChevronUp, Edit2, ScrollText
+  Calendar, Check, Square, CheckSquare, ChevronDown, ChevronUp, Edit2, ScrollText, FilePlus
 } from "lucide-react";
 import VadeTakvimi from "@/components/VadeTakvimi";
 import CariEkstre from "@/components/CariEkstre";
@@ -18,14 +18,26 @@ import { bugun, fmtTarih as fmtTarihOrtak } from "@/lib/tarih";
 
 // Ödeme yöntemleri: ilk dördü Kasa & Finans'taki hesaplardır — seçilirse ödeme Kasa'ya
 // otomatik gider hareketi olarak yazılır (veritabanı trigger'ı). Diğerleri kasaya yansımaz.
-const ODEME_SECENEKLERI = [...GIDER_HESAPLARI, "Çek", "Diğer"] as const;
+// Kasaya yansımadan fatura kapatma yöntemleri (hesap boş kaydedilir → kasa hareketi oluşmaz):
+//  • Hakedişten Mahsup: Yemeksepeti / Getir / Migros / Trendyol gibi platform faturaları online hakedişten kesilir,
+//    kalan bankaya "Platform Hakedişi" olarak yatar. Kasadan ayrıca ödeme çıkmaz.
+//  • Hatır Faturası: KDV için kesilen, karşılığında ödeme yapılmayan faturalar.
+const HAKEDIS_MAHSUP = "Hakedişten Mahsup";
+const HATIR_FATURASI = "Hatır Faturası (ödemesiz)";
+const KASASIZ_YONTEMLER = [HAKEDIS_MAHSUP, HATIR_FATURASI] as const;
+const kasasizMi = (y: string) => (KASASIZ_YONTEMLER as readonly string[]).includes(y);
+const ODEME_SECENEKLERI = [...GIDER_HESAPLARI, ...KASASIZ_YONTEMLER, "Çek", "Diğer"] as const;
 
 interface Cari {
   id: string; cari_kodu: string; unvan: string; vergi_no: string;
   vergi_dairesi: string; telefon: string; adres: string; tip: string; kategori: string;
   varsayilan_kdv?: number | null;
+  hakedisten_mahsup?: boolean | null;
 }
-const BOS_FORM = { cari_kodu: "", unvan: "", vergi_no: "", vergi_dairesi: "", telefon: "", adres: "", tip: "tedarikci", kategori: "duzenli", varsayilan_kdv: "" };
+/** Faturaları platform hakedişinden kesilen cari mi? (bayrak ya da bilinen platform adı) */
+const platformCariMi = (c?: Pick<Cari, "unvan" | "hakedisten_mahsup"> | null) =>
+  !!c && (!!c.hakedisten_mahsup || /(yemek ?sepeti|getir|migros|trendyol)/i.test(c.unvan || ""));
+const BOS_FORM = { cari_kodu: "", unvan: "", vergi_no: "", vergi_dairesi: "", telefon: "", adres: "", tip: "tedarikci", kategori: "duzenli", varsayilan_kdv: "", hakedisten_mahsup: false };
 interface Fatura {
   id: string; fatura_no: string; fatura_tarihi: string;
   toplam_tutar: number; durum: string; aciklama: string; cari_id?: string; cari_unvan?: string;
@@ -69,6 +81,9 @@ export default function CarilerPage() {
   const [form, setForm] = useState(BOS_FORM);
   const [duzenlenenCariId, setDuzenlenenCariId] = useState<string | null>(null);
   const [ekstreCari, setEkstreCari] = useState<Cari | null>(null);
+  // Cari detayından yeni fatura ekleme
+  const [faturaModalAcik, setFaturaModalAcik] = useState(false);
+  const [faturaForm, setFaturaForm] = useState({ fatura_no: "", fatura_tarihi: bugun(), vade_tarihi: "", tutar: "", kdv: "20", kdvDahil: false, aciklama: "" });
   const [takvimYenile, setTakvimYenile] = useState(0);
 
   // Bu Ay Ödenecekler state
@@ -167,6 +182,7 @@ export default function CarilerPage() {
       cari_kodu: c.cari_kodu || "", unvan: c.unvan || "", vergi_no: c.vergi_no || "", vergi_dairesi: c.vergi_dairesi || "",
       telefon: c.telefon || "", adres: c.adres || "", tip: c.tip || "tedarikci", kategori: c.kategori || "diger",
       varsayilan_kdv: c.varsayilan_kdv === null || c.varsayilan_kdv === undefined ? "" : String(Number(c.varsayilan_kdv)),
+      hakedisten_mahsup: !!c.hakedisten_mahsup,
     });
     setModalAcik(true);
   };
@@ -188,12 +204,47 @@ export default function CarilerPage() {
     veriCek();
   };
 
+  const faturaEkleAc = () => {
+    const kdv = seciliCari?.varsayilan_kdv;
+    setFaturaForm({ fatura_no: "", fatura_tarihi: bugun(), vade_tarihi: "", tutar: "",
+      kdv: kdv === null || kdv === undefined ? "20" : String(Number(kdv)), kdvDahil: false, aciklama: "" });
+    setFaturaModalAcik(true);
+  };
+
+  // Girilen tutar ve KDV oranından matrah / KDV / toplam (kdv sütunu TUTAR tutar, oran değil)
+  const faturaHesap = useMemo(() => {
+    const girilen = tv(faturaForm.tutar);
+    const oran = parseFloat(faturaForm.kdv) || 0;
+    const matrah = faturaForm.kdvDahil ? Math.round((girilen / (1 + oran / 100)) * 100) / 100 : girilen;
+    const toplam = faturaForm.kdvDahil ? girilen : Math.round(matrah * (1 + oran / 100) * 100) / 100;
+    return { matrah, kdv: Math.round((toplam - matrah) * 100) / 100, toplam };
+  }, [faturaForm.tutar, faturaForm.kdv, faturaForm.kdvDahil]);
+
+  const faturaKaydet = async () => {
+    if (!seciliCari) return;
+    if (!faturaForm.fatura_no.trim() || faturaHesap.toplam <= 0) { showToast("hata", "Fatura no ve tutar zorunlu."); return; }
+    setFormSaving(true);
+    const { error } = await supabase.from("faturalar").insert([{
+      cari_id: seciliCari.id, cari_unvan: seciliCari.unvan, fatura_no: faturaForm.fatura_no.trim(),
+      fatura_tarihi: faturaForm.fatura_tarihi, vade_tarihi: faturaForm.vade_tarihi || null,
+      tutar: faturaHesap.matrah, kdv: faturaHesap.kdv, toplam_tutar: faturaHesap.toplam,
+      aciklama: faturaForm.aciklama, durum: "bekliyor", islendi: false,
+    }]);
+    setFormSaving(false);
+    if (error) { showToast("hata", "Kayıt hatası: " + error.message); return; }
+    showToast("basari", "Fatura eklendi.");
+    setFaturaModalAcik(false);
+    cariDetayAc(seciliCari);
+    veriCek();
+  };
+
   /** Ödeme penceresini açar. `seciliKalsin` true ise listede seçili faturalar korunur. */
-  const odemeAc = (seciliKalsin = false) => {
+  const odemeAc = (seciliKalsin = false, cari: Cari | null = seciliCari, yontem?: string) => {
     if (!seciliKalsin) setSeciliFaturalar(new Set());
     setManuelTutar("");
     setOdemeTarih(bugun());
-    setOdemeYontemi("Enpara"); // ödemelerin çoğu Enpara'dan yapılır
+    // Platform carilerinde varsayılan hakedişten mahsup (kasaya yansımaz); diğerlerinde çoğu ödeme Enpara'dan yapılır
+    setOdemeYontemi(yontem || (platformCariMi(cari) ? HAKEDIS_MAHSUP : "Enpara"));
     setOdemeAciklama("");
     setOdemeModalAcik(true);
   };
@@ -203,7 +254,7 @@ export default function CarilerPage() {
     const cari = cariler.find(c => c.id === f.cari_id);
     if (!cari) { showToast("hata", "Faturanın carisi bulunamadı."); return; }
     await cariDetayAc(cari);
-    odemeAc(true);
+    odemeAc(true, cari);
     setSeciliFaturalar(new Set([f.id]));
   };
 
@@ -212,7 +263,7 @@ export default function CarilerPage() {
     const cari = cariler.find(c => c.id === cariId);
     if (!cari) { showToast("hata", "Cari bulunamadı."); return; }
     await cariDetayAc(cari);
-    odemeAc(true);
+    odemeAc(true, cari);
     setSeciliFaturalar(new Set(faturaIdleri));
   };
 
@@ -250,7 +301,7 @@ export default function CarilerPage() {
     setLocalDurumlar(yeniDurumlar);
 
     setTopluIslemYukleniyor(true);
-    await supabase.from("faturalar").update({ durum, islendi: durum === "odendi" }).in("id", Array.from(seciliFaturalar));
+    await supabase.from("faturalar").update({ durum, islendi: durum === "odendi", ...(durum !== "odendi" ? { hatir_faturasi: false } : {}) }).in("id", Array.from(seciliFaturalar));
     showToast("basari", `${seciliFaturalar.size} fatura ${durum === "odendi" ? "ödendi" : durum === "gecikti" ? "gecikti" : "bekliyor"} olarak işaretlendi.`);
     setTopluIslemYukleniyor(false);
     setSeciliFaturalar(new Set());
@@ -275,22 +326,26 @@ export default function CarilerPage() {
     const tutar = manuelTutar ? tv(manuelTutar) : seciliToplam;
     if (!tutar || tutar <= 0) { showToast("hata", "Tutar giriniz veya fatura seçiniz."); return; }
     setFormSaving(true);
-    const hesap = (GIDER_HESAPLARI as readonly string[]).includes(odemeYontemi) ? odemeYontemi : null;
+    // Kasasız yöntemlerde hesap boş kalır → veritabanı tetikleyicisi kasa hareketi oluşturmaz
+    const hesap = !kasasizMi(odemeYontemi) && (GIDER_HESAPLARI as readonly string[]).includes(odemeYontemi) ? odemeYontemi : null;
     const { error } = await supabase.from("cari_odemeler").insert([{
       cari_id: seciliCari.id, cari_unvan: seciliCari.unvan,
       tutar, tarih: odemeTarih,
       odeme_yontemi: hesap && kartMi(hesap) ? `Kredi Kartı (${hesap})` : hesap && hesap !== "Nakit" ? `Banka (${hesap})` : odemeYontemi,
       hesap, fatura_idleri: faturaIdleri,
-      aciklama: odemeAciklama || `${faturaIdleri.length > 0 ? faturaIdleri.length + " fatura için ödeme" : "Manuel ödeme"}`,
+      aciklama: odemeAciklama || (kasasizMi(odemeYontemi)
+        ? `${odemeYontemi}${faturaIdleri.length > 0 ? ` — ${faturaIdleri.length} fatura kapatıldı` : ""}`
+        : `${faturaIdleri.length > 0 ? faturaIdleri.length + " fatura için ödeme" : "Manuel ödeme"}`),
     }]);
     if (error) { showToast("hata", "Kayıt hatası: " + error.message); setFormSaving(false); return; }
     if (faturaIdleri.length > 0) {
-      const { error: fErr } = await supabase.from("faturalar").update({ durum: "odendi", islendi: true }).in("id", faturaIdleri);
+      // Hatır faturası: ödemesiz, KDV için kesilen fatura → kâr/zarar mal alışına da girmez
+      const { error: fErr } = await supabase.from("faturalar").update({ durum: "odendi", islendi: true, hatir_faturasi: odemeYontemi === HATIR_FATURASI }).in("id", faturaIdleri);
       if (fErr) showToast("hata", "Ödeme kaydedildi ama faturalar güncellenemedi: " + fErr.message);
     }
     setFormSaving(false);
     setSeciliFaturalar(new Set());
-    showToast("basari", hesap ? (kartMi(hesap) ? `Ödeme kaydedildi ve ${HESAP_ETIKET[hesap]} borcuna eklendi.` : `Ödeme kaydedildi ve ${HESAP_ETIKET[hesap]} hesabından düşüldü.`) : "Ödeme kaydedildi.");
+    showToast("basari", kasasizMi(odemeYontemi) ? "Faturalar kapatıldı (kasaya yansımadı)." : hesap ? (kartMi(hesap) ? `Ödeme kaydedildi ve ${HESAP_ETIKET[hesap]} borcuna eklendi.` : `Ödeme kaydedildi ve ${HESAP_ETIKET[hesap]} hesabından düşüldü.`) : "Ödeme kaydedildi.");
     if (aktifTab === "buay") buAyVeriCek();
     setOdemeModalAcik(false);
     cariDetayAc(seciliCari);
@@ -303,7 +358,7 @@ export default function CarilerPage() {
     const { error } = await supabase.from("cari_odemeler").delete().eq("id", o.id);
     if (error) { showToast("hata", "Silme hatası: " + error.message); return; }
     if (o.fatura_idleri?.length) {
-      await supabase.from("faturalar").update({ durum: "bekliyor", islendi: false }).in("id", o.fatura_idleri);
+      await supabase.from("faturalar").update({ durum: "bekliyor", islendi: false, hatir_faturasi: false }).in("id", o.fatura_idleri);
     }
     showToast("basari", "Ödeme silindi.");
     if (seciliCari) cariDetayAc(seciliCari);
@@ -454,6 +509,9 @@ export default function CarilerPage() {
                 </button>
                 <button onClick={() => cariDuzenleAc(seciliCari)} title="Cariyi düzenle" className="p-2 text-gray-600 hover:text-blue-400 border border-cizgi rounded-xl transition-colors">
                   <Edit2 size={14} />
+                </button>
+                <button onClick={faturaEkleAc} className="flex items-center gap-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-colors">
+                  <FilePlus size={14} /> Fatura Ekle
                 </button>
                 <button onClick={() => odemeAc()} className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl transition-colors">
                   <Wallet size={14} /> Ödeme Ekle
@@ -817,6 +875,11 @@ export default function CarilerPage() {
               <button onClick={() => setSeciliFaturalar(new Set())} className="text-[11px] text-gray-500 hover:text-yazi transition-colors">Seçimi Temizle</button>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={() => odemeAc(true, seciliCari, platformCariMi(seciliCari) ? HAKEDIS_MAHSUP : HATIR_FATURASI)} disabled={topluIslemYukleniyor}
+                title="Hakedişten kesilen ya da ödemesiz (hatır) faturaları kasaya yansıtmadan kapatır"
+                className="flex items-center gap-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors">
+                <CheckCircle2 size={12} /> Kasasız Kapat
+              </button>
               <button onClick={() => topluDurumGuncelle("odendi")} disabled={topluIslemYukleniyor}
                 className="flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 px-4 py-2 rounded-xl transition-colors">
                 {topluIslemYukleniyor ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Ödendi
@@ -882,6 +945,10 @@ export default function CarilerPage() {
                   {["0", "1", "10", "20"].map(v => <option key={v} value={v} className="bg-kart">%{v}</option>)}
                 </select>
                 <p className="text-[10px] text-gray-500 mt-1">İrsaliyeden fatura oluştururken ve KDV özetinde kullanılır. Tanımsızsa KDV özetinde bu carinin KDV&apos;siz girilmiş faturaları tahmin edilmez.</p>
+                <label className="flex items-start gap-2 mt-3 text-xs text-gray-500 cursor-pointer select-none">
+                  <input type="checkbox" className="mt-0.5" checked={!!form.hakedisten_mahsup} onChange={e => setForm({ ...form, hakedisten_mahsup: e.target.checked })} />
+                  <span>Faturaları platform hakedişinden kesiliyor (Yemeksepeti, Getir, Migros, Trendyol…) — ödemeleri varsayılan olarak &quot;{HAKEDIS_MAHSUP}&quot; ile kapanır, kasaya yansımaz.</span>
+                </label>
               </div>
               <div className="flex gap-2 pt-2">
                 <button onClick={() => setModalAcik(false)} className="flex-1 text-sm font-semibold text-gray-500 hover:text-yazi border border-cizgi py-3 rounded-xl transition-colors">İptal</button>
@@ -961,7 +1028,13 @@ export default function CarilerPage() {
                 </div>
               </div>
               <p className="text-[11px] text-gray-500 -mt-2">
-                {kartMi(odemeYontemi)
+                {odemeYontemi === HAKEDIS_MAHSUP
+                  ? "Fatura online hakedişten kesildi — kapanır ama Kasa & Finans'a hiçbir hareket yazılmaz."
+                  : odemeYontemi === HATIR_FATURASI
+                  ? "Ödeme yapılmayan (KDV için kesilen) fatura — kapanır; Kasa & Finans'a hareket yazılmaz ve Kâr/Zarar'da mal alışına girmez."
+                  : platformCariMi(seciliCari) && (GIDER_HESAPLARI as readonly string[]).includes(odemeYontemi)
+                  ? `Dikkat: bu platform carisi. Fatura hakedişten kesildiyse "${HAKEDIS_MAHSUP}" seçin, yoksa ${HESAP_ETIKET[odemeYontemi]} bakiyesi düşer.`
+                  : kartMi(odemeYontemi)
                   ? `Ödeme ${HESAP_ETIKET[odemeYontemi]} borcuna otomatik eklenecek (Kasa & Finans'a ayrıca girmeyin).`
                   : (GIDER_HESAPLARI as readonly string[]).includes(odemeYontemi)
                   ? `Ödeme ${HESAP_ETIKET[odemeYontemi]} bakiyesinden otomatik düşülecek (Kasa & Finans'a ayrıca girmeyin).`
@@ -974,7 +1047,7 @@ export default function CarilerPage() {
             </div>
             <div className="px-6 py-4 border-t border-cizgi shrink-0">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-gray-500">Ödenecek Tutar</span>
+                <span className="text-sm text-gray-500">{kasasizMi(odemeYontemi) ? "Kapatılacak Tutar" : "Ödenecek Tutar"}</span>
                 <span className="text-2xl font-black text-emerald-400">
                   ₺{fmt(manuelTutar ? tv(manuelTutar) : seciliToplam)}
                 </span>
@@ -983,7 +1056,79 @@ export default function CarilerPage() {
                 <button onClick={() => setOdemeModalAcik(false)} className="flex-1 text-sm font-semibold text-gray-500 hover:text-yazi border border-cizgi py-3 rounded-xl transition-colors">İptal</button>
                 <button onClick={odemeKaydet} disabled={formSaving || (!manuelTutar && seciliFaturalar.size === 0)}
                   className="flex-1 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
-                  {formSaving ? <Loader2 size={14} className="animate-spin" /> : null} Ödemeyi Onayla
+                  {formSaving ? <Loader2 size={14} className="animate-spin" /> : null} {kasasizMi(odemeYontemi) ? "Faturaları Kapat" : "Ödemeyi Onayla"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FATURA EKLE MODAL */}
+      {faturaModalAcik && seciliCari && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-kart border border-cizgi rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-cizgi shrink-0">
+              <div>
+                <h3 className="text-base font-black text-yazi">Fatura Ekle</h3>
+                <p className="text-[10px] text-gray-600 mt-0.5">{seciliCari.unvan}</p>
+              </div>
+              <button onClick={() => setFaturaModalAcik(false)} className="text-gray-600 hover:text-yazi"><X size={18} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Fatura No</p>
+                <input value={faturaForm.fatura_no} onChange={e => setFaturaForm(p => ({ ...p, fatura_no: e.target.value }))} placeholder="Örn. ABC2026000123" className={inputCls} autoFocus />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Fatura Tarihi</p>
+                  <input type="date" value={faturaForm.fatura_tarihi} onChange={e => setFaturaForm(p => ({ ...p, fatura_tarihi: e.target.value }))} className={inputCls} />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Vade <span className="normal-case tracking-normal text-gray-600">(opsiyonel)</span></p>
+                  <input type="date" value={faturaForm.vade_tarihi} onChange={e => setFaturaForm(p => ({ ...p, vade_tarihi: e.target.value }))} className={inputCls} />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Tutar (₺)</p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-sm">₺</span>
+                    <input type="text" inputMode="decimal" value={faturaForm.tutar} placeholder="0"
+                      onChange={e => setFaturaForm(p => ({ ...p, tutar: paraGirdisi(e.target.value) }))}
+                      className={`${inputCls} pl-8`} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">KDV %</p>
+                  <select value={faturaForm.kdv} onChange={e => setFaturaForm(p => ({ ...p, kdv: e.target.value }))} className={inputCls}>
+                    {Array.from(new Set(["0", "1", "10", "20", faturaForm.kdv])).map(k => <option key={k} value={k} className="bg-kart">%{k}</option>)}
+                  </select>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer select-none -mt-1">
+                <input type="checkbox" checked={faturaForm.kdvDahil} onChange={e => setFaturaForm(p => ({ ...p, kdvDahil: e.target.checked }))} />
+                Girdiğim tutar KDV dahil (fatura toplamı)
+              </label>
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Açıklama</p>
+                <input value={faturaForm.aciklama} onChange={e => setFaturaForm(p => ({ ...p, aciklama: e.target.value }))} placeholder="Opsiyonel..." className={inputCls} />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-cizgi shrink-0">
+              <div className="flex items-center justify-between mb-1 text-xs text-gray-500">
+                <span>Matrah ₺{fmt(faturaHesap.matrah)} + KDV ₺{fmt(faturaHesap.kdv)}</span>
+              </div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-gray-500">Fatura Toplamı</span>
+                <span className="text-2xl font-black text-blue-400">₺{fmt(faturaHesap.toplam)}</span>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setFaturaModalAcik(false)} className="flex-1 text-sm font-semibold text-gray-500 hover:text-yazi border border-cizgi py-3 rounded-xl transition-colors">İptal</button>
+                <button onClick={faturaKaydet} disabled={formSaving || !faturaForm.fatura_no.trim() || faturaHesap.toplam <= 0}
+                  className="flex-1 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40 py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
+                  {formSaving ? <Loader2 size={14} className="animate-spin" /> : null} Faturayı Kaydet
                 </button>
               </div>
             </div>

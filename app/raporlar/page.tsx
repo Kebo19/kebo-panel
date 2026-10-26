@@ -2006,6 +2006,26 @@ export default function RaporlarPage() {
                 <CurrencyInput label="Nakit" value={kasaNakit} onChange={setKasaNakit} disabled={isReadOnly}/>
                 <CurrencyInput label="POS" value={kasaPos} onChange={setKasaPos} disabled={isReadOnly}/>
               </div>
+              {(() => {
+                // Dükkan kasası + kuryelerin topladığı nakit/POS — değer girildikçe otomatik toplanır
+                const kNakit = kuryeler.reduce((t, k) => t + tv(k.nakit), 0);
+                const kPos = kuryeler.reduce((t, k) => t + tv(k.pos), 0);
+                const topNakit = tv(kasaNakit) + kNakit, topPos = tv(kasaPos) + kPos;
+                return (
+                  <div className="mx-3 mb-1 grid grid-cols-2 gap-2.5">
+                    <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 px-3 py-2.5">
+                      <p className="text-[11px] font-bold text-amber-300 uppercase tracking-wide">Toplam Nakit</p>
+                      <p className="text-xl font-black text-amber-300">₺{fmt(topNakit)}</p>
+                      <p className="text-[10px] text-gray-500">Dükkan ₺{fmt(tv(kasaNakit))} + Kurye ₺{fmt(kNakit)}</p>
+                    </div>
+                    <div className="rounded-xl bg-blue-500/10 border border-blue-500/25 px-3 py-2.5">
+                      <p className="text-[11px] font-bold text-blue-300 uppercase tracking-wide">Toplam POS</p>
+                      <p className="text-xl font-black text-blue-300">₺{fmt(topPos)}</p>
+                      <p className="text-[10px] text-gray-500">Dükkan ₺{fmt(tv(kasaPos))} + Kurye ₺{fmt(kPos)}</p>
+                    </div>
+                  </div>
+                );
+              })()}
               <p className="px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wide">Yemek kartları</p>
               <div className="p-3 pt-1.5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
                 {YEMEK_KARTLARI.map(k => (

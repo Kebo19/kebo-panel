@@ -12,7 +12,7 @@
 // • Rapordan yapılan cari ödemeler (cari_odemeler.rapor_id dolu) gunluk_gider içinde net
 //   ciroyu düşürür; faturası da mal alışında sayılır → bu tutar net ciroya geri eklenir
 //   ("Kasadan cari ödeme (mal alışında sayıldı)").
-// • Mal alışı faturalardan gelir; "Cari Ödeme" (ve kaynak='cari_odeme') kayıtları
+// • Mal alışı faturalardan gelir (hatır faturaları — hatir_faturasi=true — sorguda hariç tutulur); "Cari Ödeme" (ve kaynak='cari_odeme') kayıtları
 //   o faturaların ödemesidir → kâr/zarara girmez, nakit akışında gösterilir.
 // • POS / yemek kartı / platform tahsilatları satıştır (zaten cirodadır) → gelir sayılmaz.
 // • Ortak sermaye, kredi girişi, kredi taksidi, transferler, nakit kasa açılışı ve hesap
