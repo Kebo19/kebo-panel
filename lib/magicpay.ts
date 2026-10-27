@@ -9,7 +9,7 @@
 // Kasa Raporu'ndaki indirim hücreleri bununla otomatik doldurulur.
 //
 // MagicPay'deki adlar → panel alanları:
-//   • Paket kanalları (online_source_breakdown): marka adında "chick/chikn" geçen
+//   • Paket kanalları (online_source_breakdown): marka adında "kıraloğlu" geçen Kıraloğlu, "chick/chikn" geçen
 //     CNF, diğerleri Kebo. "LOCAL" kanalı = Alo Paket (Kebo + CNF birlikte).
 //     Panelde platform tutarları İNDİRİM ÖNCESİ girildiği için MagicPay'in
 //     `gross_turnover` (brüt) değeriyle karşılaştırılır.
@@ -108,7 +108,8 @@ export function mpGunCoz(r: Record<string, unknown>): MpGun {
 const sade = (s: string) => s.toLocaleLowerCase("tr").normalize("NFD").replace(/[̀-ͯ]/g, "")
   .replace(/ı/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ç/g, "c").replace(/ö/g, "o").replace(/ü/g, "u").trim();
 
-export type Kanal = "kebo_ys" | "kebo_trendyol" | "kebo_migros" | "cnf_ys" | "cnf_trendyol" | "cnf_migros" | "alo" | "diger";
+export type Kanal = "kebo_ys" | "kebo_trendyol" | "kebo_migros" | "cnf_ys" | "cnf_trendyol" | "cnf_migros"
+  | "kir_ys" | "kir_trendyol" | "kir_migros" | "alo" | "diger";
 
 export const KANALLAR: { kanal: Exclude<Kanal, "diger">; ad: string }[] = [
   { kanal: "kebo_ys", ad: "Kebo · Yemeksepeti" },
@@ -117,6 +118,9 @@ export const KANALLAR: { kanal: Exclude<Kanal, "diger">; ad: string }[] = [
   { kanal: "cnf_ys", ad: "CNF · Yemeksepeti" },
   { kanal: "cnf_trendyol", ad: "CNF · Trendyol" },
   { kanal: "cnf_migros", ad: "CNF · Migros Yemek" },
+  { kanal: "kir_ys", ad: "Kıraloğlu · Yemeksepeti" },
+  { kanal: "kir_trendyol", ad: "Kıraloğlu · Trendyol" },
+  { kanal: "kir_migros", ad: "Kıraloğlu · Migros Yemek" },
   { kanal: "alo", ad: "Alo Paket (LOCAL)" },
 ];
 
@@ -124,10 +128,11 @@ export const KANALLAR: { kanal: Exclude<Kanal, "diger">; ad: string }[] = [
 export function kanalBul(k: Pick<MpKaynak, "platform" | "marka">): Kanal {
   const p = sade(k.platform);
   if (p === "local" || p === "restaurant") return "alo";
-  const cnf = /chick|chikn|cnf/.test(sade(k.marka || ""));
-  if (p.includes("yemeksepeti")) return cnf ? "cnf_ys" : "kebo_ys";
-  if (p.includes("trendyol")) return cnf ? "cnf_trendyol" : "kebo_trendyol";
-  if (p.includes("migros")) return cnf ? "cnf_migros" : "kebo_migros";
+  const m = sade(k.marka || "");
+  const marka = /chick|chikn|cnf/.test(m) ? "cnf" : /kiral|kirlog/.test(m) ? "kir" : "kebo";
+  if (p.includes("yemeksepeti")) return `${marka}_ys`;
+  if (p.includes("trendyol")) return `${marka}_trendyol`;
+  if (p.includes("migros")) return `${marka}_migros`;
   return "diger";
 }
 
@@ -139,7 +144,10 @@ const PANEL_ALANLARI: Record<Exclude<Kanal, "diger">, { tutar: string[]; paket: 
   cnf_ys: { tutar: ["os_cnf_ys", "ko_cnf_ys"], paket: ["os_cnf_ys_paket", "ko_cnf_ys_paket"], indirim: ["os_cnf_ys_indirim", "ko_cnf_ys_indirim"] },
   cnf_trendyol: { tutar: ["os_cnf_trendyol", "ko_cnf_trendyol"], paket: ["os_cnf_trendyol_paket", "ko_cnf_trendyol_paket"], indirim: ["os_cnf_trendyol_indirim", "ko_cnf_trendyol_indirim"] },
   cnf_migros: { tutar: ["os_cnf_migros_yemek", "ko_cnf_migros_yemek"], paket: ["os_cnf_migros_yemek_paket", "ko_cnf_migros_yemek_paket"], indirim: ["os_cnf_migros_yemek_indirim"] },
-  alo: { tutar: ["os_kebo_alo", "ko_kebo_alo", "ko_cnf_alo"], paket: ["os_kebo_alo_paket", "ko_kebo_alo_paket", "ko_cnf_alo_paket"], indirim: ["os_kebo_alo_indirim"] },
+  kir_ys: { tutar: ["os_kir_ys", "ko_kir_ys"], paket: ["os_kir_ys_paket", "ko_kir_ys_paket"], indirim: ["os_kir_ys_indirim", "ko_kir_ys_indirim"] },
+  kir_trendyol: { tutar: ["os_kir_trendyol", "ko_kir_trendyol"], paket: ["os_kir_trendyol_paket", "ko_kir_trendyol_paket"], indirim: ["os_kir_trendyol_indirim", "ko_kir_trendyol_indirim"] },
+  kir_migros: { tutar: ["os_kir_migros_yemek", "ko_kir_migros_yemek"], paket: ["os_kir_migros_yemek_paket", "ko_kir_migros_yemek_paket"], indirim: ["os_kir_migros_yemek_indirim"] },
+  alo: { tutar: ["os_kebo_alo", "ko_kebo_alo", "ko_cnf_alo", "ko_kir_alo"], paket: ["os_kebo_alo_paket", "ko_kebo_alo_paket", "ko_cnf_alo_paket", "ko_kir_alo_paket"], indirim: ["os_kebo_alo_indirim"] },
 };
 
 /** Masa ödeme anahtarı → panel kasa alanı. */
@@ -355,11 +363,14 @@ export const INDIRIM_ALANLARI: Record<Exclude<Kanal, "diger">, string> = {
   cnf_ys: "os_cnf_ys_indirim",
   cnf_trendyol: "os_cnf_trendyol_indirim",
   cnf_migros: "os_cnf_migros_yemek_indirim",
+  kir_ys: "os_kir_ys_indirim",
+  kir_trendyol: "os_kir_trendyol_indirim",
+  kir_migros: "os_kir_migros_yemek_indirim",
   alo: "os_kebo_alo_indirim",
 };
 
 /** Formda gösterilmeyen eski kapıda indirim alanları (MagicPay ile doldurulunca 0). */
-export const ESKI_KAPIDA_INDIRIM_ALANLARI = ["ko_kebo_ys_indirim", "ko_kebo_trendyol_indirim", "ko_cnf_ys_indirim", "ko_cnf_trendyol_indirim"] as const;
+export const ESKI_KAPIDA_INDIRIM_ALANLARI = ["ko_kebo_ys_indirim", "ko_kebo_trendyol_indirim", "ko_cnf_ys_indirim", "ko_cnf_trendyol_indirim", "ko_kir_ys_indirim", "ko_kir_trendyol_indirim"] as const;
 
 /** Bir indirim alanının okunur adı (onay ekranı ve uyarılar için). */
 export const INDIRIM_ALAN_ADLARI: Record<string, string> = Object.fromEntries(

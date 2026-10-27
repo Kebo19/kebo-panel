@@ -155,7 +155,15 @@ describe("MagicPay indirimleri → Kasa Raporu", () => {
     expect(m.os_kebo_trendyol_indirim).toBe(4701);
     expect(m.os_cnf_trendyol_indirim).toBe(0);
     expect(m.os_kebo_alo_indirim).toBe(0);
-    expect(Object.keys(m)).toHaveLength(7);
+    expect(m.os_kir_ys_indirim).toBe(0);
+    expect(Object.keys(m)).toHaveLength(10); // Kebo 3 + CNF 3 + Kıraloğlu 3 + Alo
+  });
+  it("Kıraloğlu markasını ayrı kanala eşler", () => {
+    expect(kanalBul({ platform: "Yemeksepeti", marka: "KIRALOĞLU" })).toBe("kir_ys");
+    expect(kanalBul({ platform: "trendyol", marka: "Kıraloğlu Döner" })).toBe("kir_trendyol");
+    expect(kanalBul({ platform: "Migros Yemek", marka: "kiraloglu" })).toBe("kir_migros");
+    expect(kanalBul({ platform: "Yemeksepeti", marka: "Chick'N Fride" })).toBe("cnf_ys");
+    expect(kanalBul({ platform: "Yemeksepeti", marka: "Kebo" })).toBe("kebo_ys");
   });
   it("veri yoksa hepsi 0", () => {
     expect(Object.values(mpIndirimAlanlari(null)).every(v => v === 0)).toBe(true);

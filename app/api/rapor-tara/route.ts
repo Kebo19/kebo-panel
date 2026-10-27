@@ -18,6 +18,11 @@ A) YENİ FORM (tek sayfa, başlık "KEBO Günlük Kasa Formu", bölümler 1–7 
      kutularını "kontrol.paketKebo", "kontrol.paketCnf", "kontrol.paketToplam" alanlarına yaz.
      KEBO satırları: Yemeksepeti, Trendyol, Migros, Alo Paket
      CHICK'N FRIDE satırları: Yemeksepeti, Trendyol, Migros
+     KIRALOĞLU satırları (formda varsa): Yemeksepeti, Trendyol, Migros → online.kir.<platform> / kapida.kir.<platform>
+     (Migros → migrosYemek). Formda Kıraloğlu bölümü yoksa online.kir ve kapida.kir alanlarını 0 bırak.
+     "Kıraloğlu toplam paket" kutusu varsa "kontrol.paketKir" alanına yaz (yoksa 0).
+     Alo Paket kapıda tutarı NAKİT ve POS olarak ayrı yazılmışsa kapida.kebo.alo.nakit ve kapida.kebo.alo.pos
+     alanlarına yaz; tek tutar varsa onu kapida.kebo.alo.tutar alanına yaz.
      Gri hücreler (Alo Paket online/indirim, Chick'n Fride kapıda) genelde boştur; AMA içine bir şey yazılmışsa
      OKU ve işle: Alo Paket online → online.kebo.alo, Chick'n Fride kapıda → kapida.cnf.<platform>.
      İndirim sütunu ONLINE indirimidir (Migros dahil).
@@ -97,6 +102,11 @@ JSON ŞEMASI (tam olarak bu anahtarları kullan, eksik bırakma):
       "ys": {"tutar": number, "paket": number, "indirim": number},
       "trendyol": {"tutar": number, "paket": number, "indirim": number},
       "migrosYemek": {"tutar": number, "paket": number, "indirim": number}
+    },
+    "kir": {
+      "ys": {"tutar": number, "paket": number, "indirim": number},
+      "trendyol": {"tutar": number, "paket": number, "indirim": number},
+      "migrosYemek": {"tutar": number, "paket": number, "indirim": number}
     }
   },
   "kapida": {
@@ -104,17 +114,22 @@ JSON ŞEMASI (tam olarak bu anahtarları kullan, eksik bırakma):
       "ys": {"tutar": number, "paket": number, "indirim": number},
       "trendyol": {"tutar": number, "paket": number, "indirim": number},
       "migrosYemek": {"tutar": number, "paket": number},
-      "alo": {"tutar": number, "paket": number}
+      "alo": {"tutar": number, "paket": number, "nakit": number, "pos": number}
     },
     "cnf": {
       "ys": {"tutar": number, "paket": number, "indirim": number},
       "trendyol": {"tutar": number, "paket": number, "indirim": number},
       "migrosYemek": {"tutar": number, "paket": number},
       "alo": {"tutar": number, "paket": number}
+    },
+    "kir": {
+      "ys": {"tutar": number, "paket": number, "indirim": number},
+      "trendyol": {"tutar": number, "paket": number, "indirim": number},
+      "migrosYemek": {"tutar": number, "paket": number}
     }
   },
   "kasa": {"nakit": number, "pos": number, "edenred": number, "metropol": number, "setcard": number, "pluxee": number, "paye": number, "multinet": number},
-  "kontrol": {"paketKebo": number, "paketCnf": number, "paketToplam": number, "gider": number, "brut": number, "net": number},
+  "kontrol": {"paketKebo": number, "paketCnf": number, "paketKir": number, "paketToplam": number, "gider": number, "brut": number, "net": number},
   "giderler": [{"aciklama": "string", "tutar": number}],
   "avanslar": [{"personel": "string", "aciklama": "string", "tutar": number}],
   "kesintiler": [{"personel": "string", "aciklama": "string", "tutar": number}],

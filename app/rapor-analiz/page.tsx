@@ -158,8 +158,8 @@ export default function RaporAnalizPage() {
     const platformOnline = Object.fromEntries(PLATFORMLAR.map(p => [p, platformToplam(raporlar, p, "online")])) as Record<PlatformAdi, number>;
     const platformKapida = Object.fromEntries(PLATFORMLAR.map(p => [p, platformToplam(raporlar, p, "kapida")])) as Record<PlatformAdi, number>;
     const toplamPlatform = Object.values(platformlar).reduce((s, v) => s + v, 0);
-    let markaKebo = 0, markaCnf = 0;
-    raporlar.forEach(r => { const m = platformKirilimi(r).marka; markaKebo += m.kebo; markaCnf += m.cnf; });
+    let markaKebo = 0, markaCnf = 0, markaKir = 0;
+    raporlar.forEach(r => { const m = platformKirilimi(r).marka; markaKebo += m.kebo; markaCnf += m.cnf; markaKir += m.kir; });
 
     const gunlukDetay = raporlar.map(r => {
       const oz = raporOzeti(r);
@@ -181,7 +181,7 @@ export default function RaporAnalizPage() {
       brutCiro: d.brut, netCiro: d.net, toplamGider, indirim: d.indirim, paket: d.paket,
       oncBrut: o.brut, oncNet: o.net, oncGider: o.gider + o.iade,
       kasaNakit: sum("kasa_nakit"), kasaPos: sum("kasa_pos"), kasaKartlar: YEMEK_KARTLARI.map(k => ({ ad: k.ad, deger: sum(k.alan) })),
-      platformlar, platformOnline, platformKapida, toplamPlatform, markaKebo, markaCnf,
+      platformlar, platformOnline, platformKapida, toplamPlatform, markaKebo, markaCnf, markaKir,
       gunlukDetay,
       gunSayisi: raporlar.length,
       gunlukOrt: raporlar.length > 0 ? d.brut / raporlar.length : 0,
@@ -273,7 +273,7 @@ Dönem: ${fmtTarih(baslangic)} - ${fmtTarih(bitis)} (${stats.gunSayisi} gün)
 FİNANSAL ÖZET:
 - Brüt Ciro: ₺${fmt(stats.brutCiro)} (platform tutarları indirim öncesi)
 - Net Ciro: ₺${fmt(stats.netCiro)} (brüt − gider − iade − ₺${fmt(stats.indirim)} platform indirimi)
-- Marka: Kebo ₺${fmt(stats.markaKebo)}, Chick'N Fride ₺${fmt(stats.markaCnf)}
+- Marka: Kebo ₺${fmt(stats.markaKebo)}, Chick'N Fride ₺${fmt(stats.markaCnf)}, Kıraloğlu ₺${fmt(stats.markaKir)}
 - Toplam Gider: ₺${fmt(stats.toplamGider)} (gider oranı: %${stats.giderOrani.toFixed(1)})
 - Günlük Ortalama: ₺${fmt(stats.gunlukOrt)}
 - ${ciroTrend}

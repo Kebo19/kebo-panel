@@ -20,6 +20,8 @@ import { tv } from "./para";
 //   raporlarda marka bazlı alanlar (os_kebo_ys, os_cnf_ys...) var. Yeni yapıda
 //   eski alanlar platform başına Kebo+CNF toplamıyla doldurulduğu için
 //   os_chicknfride/ko_chicknfride ayrıca TOPLANMAZ (eskiden çift sayılıyordu).
+// • Markalar: Kebo, Chick'N Fride (cnf) ve Kıraloğlu (kir, 26.10.2026'da eklendi). Kıraloğlu alanları
+//   Chick'N Fride'ınkilerin aynısıdır (os_kir_ys, ko_kir_alo...).
 
 export const ROADRUNNER_GECIS_GUNU = "2026-08-13";
 /** Bu günden itibaren kapıda ödemeler kendi POS'umuz/kasamız üzerinden tahsil edilir (kasa sayımına girer). */
@@ -45,6 +47,8 @@ export interface RaporVerisi {
   os_cnf_ys?: number | null; os_cnf_trendyol?: number | null; os_cnf_migros_yemek?: number | null;
   ko_kebo_ys?: number | null; ko_kebo_trendyol?: number | null; ko_kebo_migros_yemek?: number | null; ko_kebo_alo?: number | null;
   ko_cnf_ys?: number | null; ko_cnf_trendyol?: number | null; ko_cnf_migros_yemek?: number | null; ko_cnf_alo?: number | null;
+  os_kir_ys?: number | null; os_kir_trendyol?: number | null; os_kir_migros_yemek?: number | null;
+  ko_kir_ys?: number | null; ko_kir_trendyol?: number | null; ko_kir_migros_yemek?: number | null; ko_kir_alo?: number | null;
   // İndirimler
   os_kebo_ys_indirim?: number | null; os_kebo_trendyol_indirim?: number | null;
   os_cnf_ys_indirim?: number | null; os_cnf_trendyol_indirim?: number | null;
@@ -52,6 +56,8 @@ export interface RaporVerisi {
   os_kebo_alo?: number | null; os_kebo_alo_paket?: number | null;
   ko_kebo_ys_indirim?: number | null; ko_kebo_trendyol_indirim?: number | null;
   ko_cnf_ys_indirim?: number | null; ko_cnf_trendyol_indirim?: number | null;
+  os_kir_ys_indirim?: number | null; os_kir_trendyol_indirim?: number | null; os_kir_migros_yemek_indirim?: number | null;
+  ko_kir_ys_indirim?: number | null; ko_kir_trendyol_indirim?: number | null;
   // Kasa, gider, iade
   kasa_nakit?: number | null; kasa_pos?: number | null; kasa_edenred?: number | null; kasa_metropol?: number | null;
   kasa_setcard?: number | null; kasa_pluxee?: number | null; kasa_paye?: number | null; kasa_multinet?: number | null;
@@ -74,6 +80,7 @@ export function yeniYapiMi(r: RaporVerisi): boolean {
     r.os_kebo_ys, r.os_kebo_trendyol, r.os_kebo_migros, r.os_kebo_alo, r.os_cnf_ys, r.os_cnf_trendyol, r.os_cnf_migros_yemek,
     r.ko_kebo_ys, r.ko_kebo_trendyol, r.ko_kebo_migros_yemek, r.ko_kebo_alo,
     r.ko_cnf_ys, r.ko_cnf_trendyol, r.ko_cnf_migros_yemek, r.ko_cnf_alo,
+    r.os_kir_ys, r.os_kir_trendyol, r.os_kir_migros_yemek, r.ko_kir_ys, r.ko_kir_trendyol, r.ko_kir_migros_yemek, r.ko_kir_alo,
   ].some(v => n(v) !== 0);
 }
 
@@ -123,7 +130,7 @@ export interface PlatformKirilimi {
   // platform → tutar
   online: Record<PlatformAdi, number>;
   kapida: Record<PlatformAdi, number>;
-  marka: { kebo: number; cnf: number; bilinmiyor: number };
+  marka: { kebo: number; cnf: number; kir: number; bilinmiyor: number };
 }
 export type PlatformAdi = "Yemeksepeti" | "Trendyol" | "Migros" | "Getir" | "Alo Paket" | "Chick'N Fride";
 export const PLATFORMLAR: PlatformAdi[] = ["Yemeksepeti", "Trendyol", "Migros", "Alo Paket", "Getir", "Chick'N Fride"];
@@ -141,20 +148,22 @@ const bosPlatform = (): Record<PlatformAdi, number> =>
  */
 export function platformKirilimi(r: RaporVerisi): PlatformKirilimi {
   const online = bosPlatform(), kapida = bosPlatform();
-  const marka = { kebo: 0, cnf: 0, bilinmiyor: 0 };
+  const marka = { kebo: 0, cnf: 0, kir: 0, bilinmiyor: 0 };
   if (yeniYapiMi(r)) {
-    online.Yemeksepeti = n(r.os_kebo_ys) + n(r.os_cnf_ys);
-    online.Trendyol = n(r.os_kebo_trendyol) + n(r.os_cnf_trendyol);
-    online.Migros = n(r.os_kebo_migros) + n(r.os_cnf_migros_yemek);
-    kapida.Yemeksepeti = n(r.ko_kebo_ys) + n(r.ko_cnf_ys);
-    kapida.Trendyol = n(r.ko_kebo_trendyol) + n(r.ko_cnf_trendyol);
-    kapida.Migros = n(r.ko_kebo_migros_yemek) + n(r.ko_cnf_migros_yemek);
-    kapida["Alo Paket"] = n(r.ko_kebo_alo) + n(r.ko_cnf_alo);
+    online.Yemeksepeti = n(r.os_kebo_ys) + n(r.os_cnf_ys) + n(r.os_kir_ys);
+    online.Trendyol = n(r.os_kebo_trendyol) + n(r.os_cnf_trendyol) + n(r.os_kir_trendyol);
+    online.Migros = n(r.os_kebo_migros) + n(r.os_cnf_migros_yemek) + n(r.os_kir_migros_yemek);
+    kapida.Yemeksepeti = n(r.ko_kebo_ys) + n(r.ko_cnf_ys) + n(r.ko_kir_ys);
+    kapida.Trendyol = n(r.ko_kebo_trendyol) + n(r.ko_cnf_trendyol) + n(r.ko_kir_trendyol);
+    kapida.Migros = n(r.ko_kebo_migros_yemek) + n(r.ko_cnf_migros_yemek) + n(r.ko_kir_migros_yemek);
+    kapida["Alo Paket"] = n(r.ko_kebo_alo) + n(r.ko_cnf_alo) + n(r.ko_kir_alo);
     online["Alo Paket"] = n(r.os_kebo_alo);
     marka.kebo = n(r.os_kebo_ys) + n(r.os_kebo_trendyol) + n(r.os_kebo_migros) + n(r.os_kebo_alo)
       + n(r.ko_kebo_ys) + n(r.ko_kebo_trendyol) + n(r.ko_kebo_migros_yemek) + n(r.ko_kebo_alo);
     marka.cnf = n(r.os_cnf_ys) + n(r.os_cnf_trendyol) + n(r.os_cnf_migros_yemek)
       + n(r.ko_cnf_ys) + n(r.ko_cnf_trendyol) + n(r.ko_cnf_migros_yemek) + n(r.ko_cnf_alo);
+    marka.kir = n(r.os_kir_ys) + n(r.os_kir_trendyol) + n(r.os_kir_migros_yemek)
+      + n(r.ko_kir_ys) + n(r.ko_kir_trendyol) + n(r.ko_kir_migros_yemek) + n(r.ko_kir_alo);
   } else {
     online.Yemeksepeti = n(r.os_yemeksepeti); online.Trendyol = n(r.os_trendyol);
     online.Migros = n(r.os_migros); online.Getir = n(r.os_getir); online["Chick'N Fride"] = n(r.os_chicknfride);
@@ -192,7 +201,9 @@ export const iadeToplam = (r: RaporVerisi): number => n(r.iade_tutar);
 export const indirimToplam = (r: RaporVerisi): number =>
   n(r.os_kebo_ys_indirim) + n(r.os_kebo_trendyol_indirim) + n(r.os_cnf_ys_indirim) + n(r.os_cnf_trendyol_indirim)
   + n(r.os_kebo_migros_indirim) + n(r.os_cnf_migros_yemek_indirim) + n(r.os_kebo_alo_indirim)
-  + n(r.ko_kebo_ys_indirim) + n(r.ko_kebo_trendyol_indirim) + n(r.ko_cnf_ys_indirim) + n(r.ko_cnf_trendyol_indirim);
+  + n(r.ko_kebo_ys_indirim) + n(r.ko_kebo_trendyol_indirim) + n(r.ko_cnf_ys_indirim) + n(r.ko_cnf_trendyol_indirim)
+  + n(r.os_kir_ys_indirim) + n(r.os_kir_trendyol_indirim) + n(r.os_kir_migros_yemek_indirim)
+  + n(r.ko_kir_ys_indirim) + n(r.ko_kir_trendyol_indirim);
 
 /**
  * BRÜT CİRO = Online + Kasa + Gider (+ Kapıda, eğer kapıda parası kasaya girmiyorsa)

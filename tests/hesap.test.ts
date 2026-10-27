@@ -45,7 +45,22 @@ describe("brüt / net ciro", () => {
     expect(brutCiro(r)).toBe(1900);
     const k = platformKirilimi(r);
     expect(k.online.Yemeksepeti).toBe(1400);
-    expect(k.marka).toEqual({ kebo: 1000, cnf: 400, bilinmiyor: 0 });
+    expect(k.marka).toEqual({ kebo: 1000, cnf: 400, kir: 0, bilinmiyor: 0 });
+  });
+
+  it("Kıraloğlu markası platformlara, markaya ve indirime girer", () => {
+    const r: RaporVerisi = {
+      tarih: "2026-10-26",
+      os_kebo_ys: 1000, os_kir_ys: 300, os_kir_trendyol: 200, ko_kir_alo: 50, os_kir_ys_indirim: 30,
+      os_yemeksepeti: 1300, os_trendyol: 200, ko_alo_paket: 50, kasa_nakit: 100,
+    };
+    const k = platformKirilimi(r);
+    expect(k.online.Yemeksepeti).toBe(1300);
+    expect(k.online.Trendyol).toBe(200);
+    expect(k.kapida["Alo Paket"]).toBe(50);
+    expect(k.marka).toEqual({ kebo: 1000, cnf: 0, kir: 550, bilinmiyor: 0 });
+    expect(brutCiro(r)).toBe(1000 + 550 + 100);
+    expect(netCiro(r)).toBe(1650 - 30);
   });
 
   it("eski yapıda os_chicknfride dolu olsa bile yeni alanlar önceliklidir", () => {
