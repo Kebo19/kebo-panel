@@ -37,13 +37,12 @@ export default function VadeTakvimi({ yenile, onOde }: {
       supabase.from("faturalar")
         .select("id, cari_id, cari_unvan, fatura_no, fatura_tarihi, vade_tarihi, toplam_tutar, durum")
         .neq("durum", "odendi"),
-      supabase.from("cari_odemeler").select("cari_id, tutar, fatura_idleri"),
+      // Cari bakiye modeli: açık faturalar borçtan fazlaysa fark en eski açık faturanın ödenmiş kısmıdır
+      supabase.rpc("cari_odenmis_kisimlar"),
     ]);
     const m = new Map<string, number>();
-    (o || []).forEach(x => {
-      // Sadece faturaya bağlanmamış (fatura_idleri = []) ödemeler — Cariler sayfasındaki borç kuralı.
-      if (!x.cari_id || !Array.isArray(x.fatura_idleri) || x.fatura_idleri.length > 0) return;
-      m.set(x.cari_id, (m.get(x.cari_id) || 0) + (Number(x.tutar) || 0));
+    ((o || []) as { cari_id: string; odenmis: number | string }[]).forEach(x => {
+      if (x.cari_id && Number(x.odenmis) > 0) m.set(x.cari_id, Number(x.odenmis));
     });
     setFaturalar((f || []) as TakvimFatura[]);
     setSerbest(m);

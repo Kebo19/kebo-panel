@@ -8,8 +8,10 @@ import { bugun, ayBasi, gunEkle } from "@/lib/tarih";
 import {
   Plus, Search, FileText, Trash2, X, Loader2, CheckCircle2,
   AlertTriangle, Building2, Upload, RefreshCw, Calendar,
-  ChevronDown, ChevronUp, Check, Square, CheckSquare, Percent, FileSpreadsheet
+  ChevronDown, ChevronUp, Check, Square, CheckSquare, Percent, FileSpreadsheet, Edit2
 } from "lucide-react";
+import FaturaDuzenle from "@/components/FaturaDuzenle";
+import OdemeDetay, { type DetayOdeme, type DetayFatura } from "@/components/OdemeDetay";
 import { kdvOzeti, faturaKdvAyristir, csvMetni, csvIndir } from "@/lib/cariEkstre";
 import { hepsiniCek } from "@/lib/hepsiniCek";
 
@@ -175,6 +177,18 @@ export default function FaturalarPage() {
     vade_tarihi: "", tutar: "", kdv: "20", toplam_tutar: "",
     aciklama: "", durum: "bekliyor",
   });
+
+  // Fatura düzenleme / ödeme detayı (cari detayındaki pencerelerin aynısı) — açılınca o carinin faturaları ve ödemeleri yüklenir
+  const [duzenle, setDuzenle] = useState<{ fatura: Fatura; faturalar: DetayFatura[]; odemeler: DetayOdeme[] } | null>(null);
+  const [odemeDetay, setOdemeDetay] = useState<{ odeme: DetayOdeme; faturalar: DetayFatura[]; odemeler: DetayOdeme[] } | null>(null);
+  const duzenleAc = async (f: Fatura) => {
+    if (!f.cari_id) { setDuzenle({ fatura: f, faturalar: [f], odemeler: [] }); return; }
+    const [fl, ol] = await Promise.all([
+      hepsiniCek<DetayFatura>((a, b) => supabase.from("faturalar").select("id, fatura_no, fatura_tarihi, toplam_tutar, durum").eq("cari_id", f.cari_id).order("id").range(a, b)).catch(() => [] as DetayFatura[]),
+      hepsiniCek<DetayOdeme>((a, b) => supabase.from("cari_odemeler").select("*").eq("cari_id", f.cari_id).order("id").range(a, b)).catch(() => [] as DetayOdeme[]),
+    ]);
+    setDuzenle({ fatura: f, faturalar: fl, odemeler: ol });
+  };
 
   const showToast = (tip: "basari" | "hata", mesaj: string) => {
     setToast({ tip, mesaj });
@@ -463,6 +477,7 @@ export default function FaturalarPage() {
                     <button onClick={() => durumGuncelle(f.id, "bekliyor")} className="text-[10px] font-bold text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2 py-1 rounded-lg hover:bg-yellow-500/20 transition-colors whitespace-nowrap">Bekliyor</button>
                   )}
                   {f.durum === "odendi" && <span className="text-[10px] text-emerald-400 font-bold">✓</span>}
+                  <button onClick={() => duzenleAc(f)} title="Düzenle (no, tarih, tutar) / bağlı ödemeler" className="text-gray-500 hover:text-blue-400 transition-colors ml-1"><Edit2 size={13} /></button>
                   <button onClick={() => sil(f.id)} className="text-gray-700 hover:text-red-400 transition-colors ml-1"><Trash2 size={13} /></button>
                 </div>
               </td>
@@ -768,6 +783,17 @@ export default function FaturalarPage() {
             </div>
           </div>
         </div>
+      )}
+      {duzenle && (
+        <FaturaDuzenle key={duzenle.fatura.id} fatura={duzenle.fatura} odemeler={duzenle.odemeler}
+          onKapat={() => setDuzenle(null)}
+          onOdemeAc={o => { const d = duzenle; setDuzenle(null); setOdemeDetay({ odeme: o, faturalar: d.faturalar, odemeler: d.odemeler }); }}
+          onKaydedildi={mesaj => { setDuzenle(null); showToast("basari", mesaj); veriCek(); }} />
+      )}
+      {odemeDetay && (
+        <OdemeDetay key={odemeDetay.odeme.id} odeme={odemeDetay.odeme} faturalar={odemeDetay.faturalar} odemeler={odemeDetay.odemeler}
+          onKapat={() => setOdemeDetay(null)}
+          onKaydedildi={mesaj => { setOdemeDetay(null); showToast("basari", mesaj); veriCek(); }} />
       )}
     </div>
   );

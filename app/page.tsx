@@ -72,7 +72,7 @@ export default function Anasayfa() {
         supabase.from("personeller").select("departman,durum"),
         supabase.from("gunluk_raporlar").select("*").eq("tarih", bugunStr).maybeSingle(),
         supabase.from("gunluk_raporlar").select("*").gte("tarih", ayBasi(bugunStr)).lte("tarih", aySonu(bugunStr.slice(0, 4), bugunStr.slice(5, 7))),
-        supabase.from("faturalar").select("toplam_tutar,fatura_tarihi,durum").neq("durum", "odendi").lte("fatura_tarihi", donem.donemBit),
+        supabase.from("faturalar").select("cari_id,toplam_tutar,fatura_tarihi,durum").neq("durum", "odendi"),
         // TC/IBAN personel_hassas'ta (personel_hassas yetkisi okur); eksik sayısı herkese rpc ile gelir.
         supabase.rpc("personel_belge_eksik_sayisi"),
       ]);
@@ -110,13 +110,24 @@ export default function Anasayfa() {
       const g = gunRapor ? raporOzeti(gunRapor) : null;
       const ay = donemOzeti((aylik || []) as RaporVerisi[]);
 
-      // Cari: bu ödeme dönemine kadar kesilmiş, ödenmemiş faturalar
+      // Cari: bu ödeme dönemine kadar kesilmiş, ödenmemiş faturalar. Kısmen ödenmiş kısım
+      // (cari bakiye modeli) her carinin en eski açık faturasından düşülür.
       setCariOkundu(!odenecekHata);
+      const { data: odenmisler } = await supabase.rpc("cari_odenmis_kisimlar");
+      const odenmis = new Map(((odenmisler || []) as { cari_id: string; odenmis: number | string }[]).map(x => [x.cari_id, Number(x.odenmis) || 0]));
       let cariOdenecek = 0, cariGeciken = 0;
-      (odenecek || []).forEach(f => {
-        cariOdenecek += Number(f.toplam_tutar) || 0;
-        if (f.fatura_tarihi < donem.donemBas) cariGeciken += Number(f.toplam_tutar) || 0;
-      });
+      ((odenecek || []) as { cari_id: string | null; toplam_tutar: number | string; fatura_tarihi: string }[])
+        .slice().sort((a, b) => a.fatura_tarihi.localeCompare(b.fatura_tarihi))
+        .forEach(f => {
+          let kalan = Number(f.toplam_tutar) || 0;
+          if (f.cari_id) {
+            const k = odenmis.get(f.cari_id) || 0, d = Math.min(k, kalan);
+            kalan -= d; odenmis.set(f.cari_id, k - d);
+          }
+          if (kalan <= 0 || f.fatura_tarihi > donem.donemBit) return;
+          cariOdenecek += kalan;
+          if (f.fatura_tarihi < donem.donemBas) cariGeciken += kalan;
+        });
 
       // Bu ayın günlük serisi (KPI kartlarındaki eğilim çizgisi ve son iki gün karşılaştırması)
       const seri = ((aylik || []) as RaporVerisi[])

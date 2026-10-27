@@ -57,7 +57,8 @@ export interface TakvimCari { cari_id: string; cari_unvan: string; toplam: numbe
 export interface TakvimGrubu { anahtar: VadeGrubu; etiket: string; toplam: number; faturaSayisi: number; cariler: TakvimCari[]; }
 
 /**
- * Açık faturaları vade gruplarına ayırır. `serbestOdemeler` (cari_id → faturaya bağlanmamış
+ * Açık faturaları vade gruplarına ayırır. `serbestOdemeler` (cari_id → açık faturaların ödenmiş kısmı,
+ * public.cari_odenmis_kisimlar(); eskiden faturaya bağlanmamış
  * ödeme toplamı) carinin en erken vadeli faturalarından düşülür; böylece takvim toplamı
  * carideki "Toplam Borç" ile tutarlı olur. Ödenmiş faturalar yok sayılır.
  */

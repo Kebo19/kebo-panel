@@ -1,0 +1,22 @@
+KEBO MİKRO ROBOTU
+=================
+Her gün Mikro e-Portal'dan gelen faturaları okuyup Kebo Panel'e aktarır:
+faturalar ilgili carilere işlenir (Excel yüklemek gerekmez), stok fiyatları güncellenir.
+
+KURULUM (dükkân bilgisayarında bir kez)
+1) Bu klasörü dükkân bilgisayarına kopyalayın (ör. Belgeler\kebo-mikro-robot). ayar.json dosyası da içinde olmalı.
+2) Bilgisayarda Google Chrome ve Node.js (https://nodejs.org, LTS) kurulu olmalı.
+3) KURULUM.bat dosyasına çift tıklayın ve ekrandaki adımları izleyin:
+   - Mikro e-posta / parola sorulur (bu bilgisayarda şifreli saklanır),
+   - Chrome açılır, Mikro'ya bir kez giriş yaparsınız,
+   - Görev Zamanlayıcı'ya "Kebo Mikro Robotu" eklenir: her gün 11:15'te ve bilgisayar açılıp oturum
+     açıldıktan 10 dakika sonra çalışır (günde bir kez başarılı çalışması yeterli).
+
+SONRASI
+- Masaüstündeki "Mikro robotu - şimdi çalıştır" kısayolu aktarımı hemen yapar.
+- Mikro parolası değişirse ya da oturum düşerse "Mikro robotu - giriş" kısayoluyla tekrar giriş yapın.
+- Robot çalışırken küçük bir Chrome penceresi açılıp kapanır; kapatmayın.
+- Kayıt dosyası: %LOCALAPPDATA%\kebo-mikro-robot\robot.log
+- Panelde: Fiyat Listesi sayfasında "son otomatik güncelleme" satırı; hata olursa orada görünür.
+
+ayar.json dosyasını kimseyle paylaşmayın (panelin robot anahtarı içindedir).

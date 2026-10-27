@@ -13,6 +13,7 @@ import {
 } from "@/lib/stok";
 import VakitSecici from "@/components/VakitSecici";
 import IrsaliyePaneli, { type IrsaliyeKalemi } from "@/components/IrsaliyePaneli";
+import SayimKagidiTara from "@/components/SayimKagidiTara";
 
 // Ekran tercihleri bu tarayıcıda hatırlanır (tarayıcı izin vermezse varsayılanlar kullanılır).
 function tercihOku<T>(anahtar: string, varsayilan: T): T {
@@ -26,7 +27,7 @@ import {
   Package, PlusCircle, Search, AlertTriangle, TrendingDown,
   Truck, ClipboardCheck, Loader2, X, Save, Edit3, Trash2,
   RefreshCw, Layers, Box, Clock, BrainCircuit, CheckSquare, Square,
-  ListOrdered, Calendar, ArrowUp, ArrowDown, PackageMinus, ShoppingCart, ChefHat
+  ListOrdered, Calendar, ArrowUp, ArrowDown, PackageMinus, ShoppingCart, ChefHat, Camera, Printer,
 } from "lucide-react";
 
 interface Urun {
@@ -109,6 +110,7 @@ export default function StokPage() {
   const [sayimVakti, setSayimVakti] = useState<SayimVakti>("sabah");
   const [topluVakit, setTopluVakit] = useState<SayimVakti>("sabah");
   const [topluSayimAcik, setTopluSayimAcik] = useState(false);
+  const [kagitTaraAcik, setKagitTaraAcik] = useState(false);
 
   // Form Verileri
   const [yUrunAdi, setYUrunAdi] = useState("");
@@ -563,6 +565,14 @@ export default function StokPage() {
               className="flex items-center gap-1.5 text-[11px] font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 border border-altin/40 px-3 py-2 rounded-xl transition-all shadow-lg shadow-altin/20">
               <ClipboardCheck size={13}/> Toplu Sayım
             </button>
+            <button onClick={() => setKagitTaraAcik(true)}
+              className="flex items-center gap-1.5 text-[11px] font-bold text-blue-300 bg-kart border border-blue-500/40 px-3 py-2 rounded-xl hover:bg-blue-500/10">
+              <Camera size={13}/> Sayım kağıdı tara
+            </button>
+            <Link href="/stok/kagit"
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-yazi border border-cizgi px-3 py-2 rounded-xl">
+              <Printer size={13}/> Kağıt yazdır
+            </Link>
             <button 
               onClick={() => setSiraDuzenleModu(!siraDuzenleModu)}
               className={`flex items-center gap-1.5 text-[11px] font-semibold px-3 py-2 rounded-xl border transition-colors ${
@@ -809,6 +819,16 @@ export default function StokPage() {
       </div>
 
       {/* 4 SEKMELİ TOPLU SAYIM MODAL */}
+      {kagitTaraAcik && (
+        <SayimKagidiTara
+          urunler={urunler.map(u => ({ id: u.id, urun_adi: u.urun_adi, birim: u.birim, kategori: u.kategori, sayim_periyodu: u.sayim_periyodu, sira_no: u.sira_no ?? null }))}
+          hareketler={hareketler}
+          kullanici={userEmail.split("@")[0] || "Bilinmiyor"}
+          onKapat={() => setKagitTaraAcik(false)}
+          onKaydedildi={veriCek}
+        />
+      )}
+
       {topluSayimAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-kart border border-blue-500/30 rounded-2xl w-full max-w-3xl shadow-2xl max-h-[85vh] flex flex-col">

@@ -48,3 +48,7 @@ next-env.d.ts
 repomix-output.*
 repomix.config.json
 _kebo_test/
+
+# Mikro robotu: anahtar ve kurulu paketler repoya girmez
+mikro-robot/ayar.json
+mikro-robot/node_modules/

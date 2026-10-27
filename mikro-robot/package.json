@@ -1,0 +1,14 @@
+{
+  "name": "kebo-mikro-robot",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Dükkân bilgisayarında her gün Mikro e-Portal'dan gelen faturaları okuyup Kebo Panel'e aktarır",
+  "scripts": {
+    "aktar": "node robot.mjs --zorla",
+    "kurulum": "node robot.mjs --kurulum"
+  },
+  "dependencies": {
+    "playwright-core": "1.63.0"
+  }
+}

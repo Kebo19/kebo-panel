@@ -1,10 +1,5 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-<meta charset="utf-8">
-<title>KEBO Günlük Kasa Formu</title>
-<style>
-  @page { size: A4; margin: 6mm 9mm; }
+<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><title>KEBO Kasa Formu + Günlük Sayım</title><style>
+  @page { size: A4; margin: 8mm 9mm; }
   * { box-sizing: border-box; }
   body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111; margin: 0; font-size: 9.5pt; }
   .ust { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2.5px solid #111; padding-bottom: 5px; margin-bottom: 7px; }
@@ -12,10 +7,10 @@
   .ust h1 small { font-size: 9pt; font-weight: normal; color: #444; margin-left: 6px; }
   .alanlar { display: flex; gap: 18px; font-size: 10.5pt; font-weight: bold; }
   .alanlar span.cizgi { display: inline-block; border-bottom: 1.5px solid #111; height: 20px; vertical-align: bottom; }
-  h2 { font-size: 10pt; margin: 5px 0 3px; padding: 3px 7px; background: #111; color: #fff; display: flex; justify-content: space-between; }
+  h2 { font-size: 10pt; margin: 4px 0 3px; white-space: nowrap; padding: 3px 7px; background: #111; color: #fff; display: flex; justify-content: space-between; }
   h2 small { font-weight: normal; font-size: 8pt; color: #ddd; }
   table { width: 100%; border-collapse: collapse; }
-  th, td { border: 1.2px solid #333; padding: 0 6px; height: 22px; }
+  th, td { border: 1.2px solid #333; padding: 0 6px; height: 18.5px; }
   table.esit { table-layout: fixed; }
   th { background: #e9e9e9; font-size: 8pt; height: 17px; text-align: center; }
   td.ad { font-weight: bold; width: 26%; font-size: 9.5pt; }
@@ -26,9 +21,9 @@
   .toplam td.et.b { background: #111; color: #fff; }
   table.ptoplam { width: auto; margin: 4px 0 0 auto; }
   table.ptoplam td { height: 24px; }
-  table.ptoplam td.et { border: none; font-weight: bold; font-size: 8.5pt; text-align: right; padding: 0 5px 0 12px; }
+  table.ptoplam td.et { border: none; font-weight: bold; font-size: 8pt; white-space: nowrap; text-align: right; padding: 0 5px 0 12px; }
   table.ptoplam td.et.b { color: #111; }
-  table.ptoplam td.kutu { width: 78px; border: 1.5px solid #111; background: #fff; }
+  table.ptoplam td.kutu { width: 62px; border: 1.5px solid #111; background: #fff; }
   tr.ptop td { height: 25px; }
   tr.gtop td { height: 26px; }
   table.nk td { height: 24px; }
@@ -39,7 +34,10 @@
   tr.gtop td.et { text-align: right; font-weight: bold; font-size: 10pt; border: none; }
   tr.gtop td.et small { font-weight: normal; font-size: 8pt; }
   tr.gtop td.kutu { border: 2px solid #111; }
-  table.ciro td { height: 40px; font-size: 12pt; }
+  table.ciro td { height: 28px; font-size: 12pt; }
+  table.nptop th { height: 24px; font-size: 7.5pt; line-height: 1.15; }
+  table.nptop th small { font-weight: normal; font-size: 6.5pt; color: #444; }
+  table.nptop td { height: 24px; }
   table.ciro td.et { font-size: 11.5pt; letter-spacing: .5px; }
   tr.ptop td.et { font-weight: bold; text-align: right; background: #f3f3f3; font-size: 9pt; }
   tr.ptop td.et.b { background: #111; color: #fff; }
@@ -50,15 +48,20 @@
   .not { border: 1.2px solid #333; height: 30px; }
   .alt { margin-top: 6px; font-size: 7.5pt; color: #333; display: flex; justify-content: space-between; }
   .kural { border: 1px dashed #555; padding: 4px 7px; font-size: 8pt; margin-top: 6px; }
-  .w-tutar { width: 17%; } .w-paket { width: 9%; } .w-ind { width: 14%; }
+  .w-tutar { width: 15%; } .w-paket { width: 7.5%; } .w-ind { width: 12%; } .w-kap { width: 12.5%; }
 
   /* Notlar sayfanın sonuna kadar uzar */
-  html, body { height: 100%; }
-  body { display: flex; flex-direction: column; height: 281mm; }
-  .not { flex: 1 1 auto; min-height: 60px; }
-</style>
-</head>
-<body>
+  .sayfa { display: flex; flex-direction: column; height: 277mm; overflow: hidden; }
+  .sayfa.on { page-break-after: always; break-after: page; }
+  .not { flex: 1 1 auto; min-height: 28px; }
+
+  table.sayim td { height: var(--h, 27px); }
+  table.sayim th small { font-weight: normal; font-size: 6.5pt; color: #444; }
+  table.sayim td.no { text-align: center; font-weight: bold; font-size: 9pt; }
+  table.sayim td.ad { font-size: 8.5pt; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; }
+  table.sayim td.br { text-align: center; color: #444; font-size: 8.5pt; }
+  .kod { font-size: 7pt; color: #555; letter-spacing: 1px; text-align: right; margin-top: 2px; }
+</style></head><body><section class="sayfa on">
   <div class="ust">
     <h1>KEBO <small>Günlük Kasa Formu</small></h1>
     <div class="alanlar">
@@ -67,9 +70,9 @@
     </div>
   </div>
 
-  <h2>1. SATIŞLAR <small>İndirim = online indirim · gri kutular genelde boş kalır</small></h2>
+  <h2>1. SATIŞLAR <small>Kapıda: nakit ve POS ayrı · Toplam Paket = online + kapıda · gri kutular boş</small></h2>
   <table>
-    <tr><th>Platform</th><th class="w-tutar">Online ₺</th><th class="w-paket">Paket</th><th class="w-ind">İndirim ₺</th><th class="w-tutar">Kapıda ₺</th><th class="w-paket">Paket</th><th class="w-paket">Toplam<br>Paket</th></tr>
+    <tr><th>Platform</th><th class="w-tutar">Online ₺</th><th class="w-paket">Online<br>Paket</th><th class="w-ind">İndirim ₺</th><th class="w-kap">Kapıda<br>Nakit ₺</th><th class="w-kap">Kapıda<br>POS ₺</th><th class="w-paket">Toplam<br>Paket</th></tr>
     <tr class="marka"><td colspan="7">KEBO</td></tr>
     <tr><td class="ad">Yemeksepeti</td><td></td><td></td><td></td><td></td><td></td><td class="top"></td></tr>
     <tr><td class="ad">Trendyol</td><td></td><td></td><td></td><td></td><td></td><td class="top"></td></tr>
@@ -79,17 +82,26 @@
     <tr><td class="ad">Yemeksepeti</td><td></td><td></td><td></td><td class="yok"></td><td class="yok"></td><td class="top"></td></tr>
     <tr><td class="ad">Trendyol</td><td></td><td></td><td></td><td class="yok"></td><td class="yok"></td><td class="top"></td></tr>
     <tr><td class="ad">Migros</td><td></td><td></td><td></td><td class="yok"></td><td class="yok"></td><td class="top"></td></tr>
+    <tr class="marka"><td colspan="7">KIRALOĞLU</td></tr>
+    <tr><td class="ad">Yemeksepeti</td><td></td><td></td><td></td><td class="yok"></td><td class="yok"></td><td class="top"></td></tr>
+    <tr><td class="ad">Trendyol</td><td></td><td></td><td></td><td class="yok"></td><td class="yok"></td><td class="top"></td></tr>
+    <tr><td class="ad">Migros</td><td></td><td></td><td></td><td class="yok"></td><td class="yok"></td><td class="top"></td></tr>
   </table>
   <table class="ptoplam">
-    <tr><td class="et">KEBO toplam paket</td><td class="kutu"></td><td class="et">Chick'n toplam paket</td><td class="kutu"></td><td class="et b">Dükkân toplam paket</td><td class="kutu"></td></tr>
+    <tr><td class="et">KEBO toplam paket</td><td class="kutu"></td><td class="et">Chick'n toplam paket</td><td class="kutu"></td><td class="et">Kıraloğlu toplam paket</td><td class="kutu"></td><td class="et b">Dükkân toplam paket</td><td class="kutu"></td></tr>
   </table>
 
   <h2>2. KASA <small>Gün sonu sayım</small></h2>
   <table class="esit">
-    <tr><th>Nakit ₺</th><th>POS ₺</th><th>Edenred ₺</th><th>Metropol ₺</th><th>Setcard ₺</th><th>Pluxee ₺</th><th>Paye ₺</th></tr>
-    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><th>Nakit ₺</th><th>POS ₺</th><th>Edenred ₺</th><th>Metropol ₺</th><th>Setcard ₺</th><th>Pluxee ₺</th><th>Paye ₺</th><th>Multinet ₺</th></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
   </table>
-  <table class="toplam esit ciro" style="margin-top:4px">
+  <table class="esit nptop" style="margin-top:3px">
+    <tr><th>Dükkân Toplam Nakit ₺<br><small>kasa + Kurye 1-2 (havuz hariç)</small></th><th>Dükkân Toplam POS ₺<br><small>kasa + Kurye 1-2 (havuz hariç)</small></th>
+        <th>Genel Toplam Nakit ₺<br><small>dükkân + havuz kuryesi</small></th><th>Genel Toplam POS ₺<br><small>dükkân + havuz kuryesi</small></th></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+  </table>
+  <table class="toplam esit ciro" style="margin-top:3px">
     <tr><td class="et">BRÜT CİRO ₺</td><td></td><td class="et">NET CİRO ₺</td><td></td></tr>
   </table>
 
@@ -100,7 +112,6 @@
     <tr><td></td><td></td><td></td></tr>
     <tr><td></td><td></td><td></td></tr>
     <tr><td></td><td></td><td></td></tr>
-      <tr><td></td><td></td><td></td></tr>
     <tr><td></td><td></td><td></td></tr>
 <tr class="gtop"><td colspan="2" class="et">TOPLAM GİDER ₺ <small>(avanslar dahil)</small></td><td class="kutu"></td></tr>
   </table>
@@ -147,5 +158,38 @@
   <h2>8. NOTLAR <small>Nokta koymadan yazın (9413) · kuruş için virgül (12,50) · toplamlar kontrol içindir</small></h2>
   <div class="not"></div>
 
-  </body>
-</html>
+</section><section class="sayfa arka">
+  <div class="ust">
+    <h1>KEBO <small>Günlük Sayım Listesi</small></h1>
+    <div class="alanlar">
+      <div>Tarih: <span class="cizgi" style="width:32px"></span> / <span class="cizgi" style="width:32px"></span> / 20<span class="cizgi" style="width:24px"></span></div>
+      <div>Sayan: <span class="cizgi" style="width:150px"></span></div>
+    </div>
+  </div>
+  <h2>GÜNLÜK SAYILAN ÜRÜNLER <small>Miktarı ürünün birimiyle yazın · gelen mal faturadan otomatik işlenir, buraya yazmayın</small></h2>
+  <table class="sayim esit" style="--h:27px">
+    <tr><th style="width:5%">No</th><th>Ürün</th><th style="width:6%">Birim</th><th style="width:11.5%">Sabah sayım<br><small>(gün başı)</small></th><th style="width:11.5%">Akşam sayım<br><small>(gün sonu)</small></th><th style="width:9%">Fire<br><small>(bozuk/SKT)</small></th><th style="width:11%">Not</th></tr>
+<tr><td class="no">1</td><td class="ad" style="font-size:8.5pt">ET DÖNER (1 KOLİ 8 KG)</td><td class="br">kg</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">2</td><td class="ad" style="font-size:8.5pt">TAVUK DÖNER (1 KOLİ 10 KG)</td><td class="br">kg</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">3</td><td class="ad" style="font-size:8.5pt">DONUK EKMEK (100 GR) (160 ADET)</td><td class="br">adet</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">4</td><td class="ad" style="font-size:8.5pt">DONUK EKMEK (80 GR) (120 ADET)</td><td class="br">adet</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">5</td><td class="ad" style="font-size:8.5pt">DONUK CHICKN LAVAŞ (60 GR) (120 ADET)</td><td class="br">adet</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">6</td><td class="ad" style="font-size:8.5pt">DONUK BAGET EKMEK (50 ADET)</td><td class="br">adet</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">7</td><td class="ad" style="font-size:8.5pt">NUGGET (1 KOLİ 10 KG)</td><td class="br">kg</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">8</td><td class="ad" style="font-size:8.5pt">SCHNITZEL (1 KOLİ 60 ADET)</td><td class="br">adet</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">9</td><td class="ad" style="font-size:8.5pt">TAVUK TOPU (1 KOLİ 10 KG)</td><td class="br">kg</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">10</td><td class="ad" style="font-size:8.5pt">ÇITIR BONFİLE (1 KOLİ 6 KG)</td><td class="br">kg</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">11</td><td class="ad" style="font-size:8.5pt">DONUK PATATES (1 KOLİ 10 KG)</td><td class="br">kg</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">12</td><td class="ad" style="font-size:8.5pt">SOĞAN HALKASI (1 KOLİ 8 KG)</td><td class="br">kg</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">13</td><td class="ad" style="font-size:8.5pt">CHURROS ÇİKOLATA SOS (1 KOLİ 8 KG)</td><td class="br">kg</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">14</td><td class="ad" style="font-size:8.5pt">CHURROS KARAMEL SOS (1 KOLİ 8 KG)</td><td class="br">kg</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">15</td><td class="ad" style="font-size:8.5pt">DOMATES SOS (1 KOVA 10 KG)</td><td class="br">kg</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">16</td><td class="ad" style="font-size:8.5pt">YOĞURTLU MAYONEZ SOS (1 KOVA 9 KG)</td><td class="br">kg</td><td></td><td></td><td></td><td></td></tr>
+<tr><td class="no">17</td><td class="ad" style="font-size:8.5pt">YUMMY SOS (1 KOVA 9 KG)</td><td class="br">kg</td><td></td><td></td><td></td><td></td></tr><tr><td class="no"></td><td class="ad"></td><td class="br"></td><td></td><td></td><td></td><td></td></tr><tr><td class="no"></td><td class="ad"></td><td class="br"></td><td></td><td></td><td></td><td></td></tr><tr><td class="no"></td><td class="ad"></td><td class="br"></td><td></td><td></td><td></td><td></td></tr>
+  </table>
+  <div class="kural">Sabah ya da akşam sayımından en az biri yeterlidir. Koli/kova sayıyorsanız birime çevirin (ör. 2 koli tavuk döner = 20 kg).
+    Sayılmayan ürünün kutusunu boş bırakın — sıfır yazmayın (0 = stok bitti demektir). Rakamları net yazın; kağıt telefonla taranıp sisteme girilir.</div>
+  <h2 style="margin-top:6px">NOTLAR <small>Eksik, bozuk, iade edilen ürünler</small></h2>
+  <div class="not"></div>
+  <div class="kod">KEBO-SAYIM · GUNLUK · 17 ÜRÜN</div>
+</section></body></html>

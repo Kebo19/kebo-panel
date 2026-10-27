@@ -13,6 +13,10 @@ oku ve TEK JSON üret). Form iki düzenden biri olabilir:
 
 A) YENİ FORM (tek sayfa, başlık "KEBO Günlük Kasa Formu", bölümler 1–7 numaralı):
   1. SATIŞLAR: tek tablo. Sütunlar: Online ₺ | Paket | İndirim ₺ | Kapıda ₺ | Paket | Toplam Paket
+     (Formun yeni sürümünde sütunlar: Online ₺ | Online Paket | İndirim ₺ | Kapıda Nakit ₺ | Kapıda POS ₺ | Toplam Paket.
+     Kapıda Nakit/POS → kapida.<marka>.<platform>.nakit ve .pos, .tutar = nakit + pos. Ayrı "kapıda paket" sütunu YOK:
+     kapida.<...>.paket = Toplam Paket − Online Paket (online tutar yoksa Toplam Paket'in tamamı kapıda paketidir). Yeni sürümde CHICK'N FRIDE'ın altında KIRALOĞLU bölümü ve "Kıraloğlu toplam paket"
+     kutusu da vardır.)
      En sağdaki "Toplam Paket" sütunu satırın toplam paketidir (kontrol amaçlı, JSON'a satır bazında yazma).
      Tablonun hemen altında yan yana duran "KEBO toplam paket", "Chick'n toplam paket", "Dükkân toplam paket"
      kutularını "kontrol.paketKebo", "kontrol.paketCnf", "kontrol.paketToplam" alanlarına yaz.
@@ -21,8 +25,9 @@ A) YENİ FORM (tek sayfa, başlık "KEBO Günlük Kasa Formu", bölümler 1–7 
      KIRALOĞLU satırları (formda varsa): Yemeksepeti, Trendyol, Migros → online.kir.<platform> / kapida.kir.<platform>
      (Migros → migrosYemek). Formda Kıraloğlu bölümü yoksa online.kir ve kapida.kir alanlarını 0 bırak.
      "Kıraloğlu toplam paket" kutusu varsa "kontrol.paketKir" alanına yaz (yoksa 0).
-     Alo Paket kapıda tutarı NAKİT ve POS olarak ayrı yazılmışsa kapida.kebo.alo.nakit ve kapida.kebo.alo.pos
-     alanlarına yaz; tek tutar varsa onu kapida.kebo.alo.tutar alanına yaz.
+     KEBO kapıda satırlarında (Yemeksepeti, Trendyol, Migros, Alo Paket) tahsilat NAKİT ve POS olarak iki ayrı
+     kutuya yazılmışsa kapida.kebo.<platform>.nakit ve .pos alanlarına yaz, .tutar = nakit + pos; tek tutar
+     varsa sadece .tutar alanına yaz (nakit/pos 0).
      Gri hücreler (Alo Paket online/indirim, Chick'n Fride kapıda) genelde boştur; AMA içine bir şey yazılmışsa
      OKU ve işle: Alo Paket online → online.kebo.alo, Chick'n Fride kapıda → kapida.cnf.<platform>.
      İndirim sütunu ONLINE indirimidir (Migros dahil).
@@ -32,6 +37,9 @@ A) YENİ FORM (tek sayfa, başlık "KEBO Günlük Kasa Formu", bölümler 1–7 
      İndirim → online.<marka>.<platform>.indirim ; kapıda indirimleri her zaman 0.
   2. KASA: Nakit, POS ve yemek kartları: Edenred, Metropol, Setcard, Pluxee, Paye, Multinet.
      Altındaki "Brüt Ciro" ve "Net Ciro" kutularını "kontrol.brut" ve "kontrol.net" alanlarına yaz.
+     Yeni sürümde Kasa tablosunun altında "Dükkân Toplam Nakit / POS" ve "Genel Toplam Nakit / POS" kutuları
+     vardır: bunlar elle yapılan kontrol toplamlarıdır, hiçbir alana yazma (kasa.nakit / kasa.pos'a KARIŞTIRMA).
+     Formun arka yüzündeki "Sayım Listesi" sayfası stok sayımıdır, kasa raporuna ait değildir: tamamen yok say.
   3. GİDERLER: Açıklama | Personel (avans ise) | Tutar. Personel sütunu DOLU olan satır avanstır →
      "avanslar" dizisine {personel, aciklama, tutar}; personel sütunu boş olan satır → "giderler".
      Tablonun en altındaki "TOPLAM GİDER" kutusunu "kontrol.gider" alanına yaz (satır olarak ekleme).
@@ -111,9 +119,9 @@ JSON ŞEMASI (tam olarak bu anahtarları kullan, eksik bırakma):
   },
   "kapida": {
     "kebo": {
-      "ys": {"tutar": number, "paket": number, "indirim": number},
-      "trendyol": {"tutar": number, "paket": number, "indirim": number},
-      "migrosYemek": {"tutar": number, "paket": number},
+      "ys": {"tutar": number, "paket": number, "indirim": number, "nakit": number, "pos": number},
+      "trendyol": {"tutar": number, "paket": number, "indirim": number, "nakit": number, "pos": number},
+      "migrosYemek": {"tutar": number, "paket": number, "nakit": number, "pos": number},
       "alo": {"tutar": number, "paket": number, "nakit": number, "pos": number}
     },
     "cnf": {
