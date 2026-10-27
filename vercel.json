@@ -3,6 +3,14 @@
     {
       "path": "/api/keepalive",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/telegram/bildirim?tur=sabah",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/telegram/bildirim?tur=oglen",
+      "schedule": "0 9 * * *"
     }
   ]
 }

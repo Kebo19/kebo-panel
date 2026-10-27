@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { yetkiOnbelleginiTemizle, useYetki } from "@/lib/useYetki";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import TelegramAyari from "@/components/TelegramAyari";
 import { LogOut, User, History, MessageSquareWarning, Sparkles, ChevronRight, ShieldCheck } from "lucide-react";
 
 export default function AyarlarPage() {
@@ -53,6 +54,8 @@ export default function AyarlarPage() {
           </div>
           <p className="text-sm text-yazi font-semibold">{email}</p>
         </div>
+
+        <TelegramAyari />
 
         {/* Çıkış */}
         <button

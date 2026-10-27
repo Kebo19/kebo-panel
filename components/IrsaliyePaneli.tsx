@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { bugun, fmtTarih } from "@/lib/tarih";
 import { miktarOku } from "@/lib/stok";
+import TelegramGelenler from "@/components/TelegramGelenler";
 import { yuklemeIcinHazirla, jsonCevap } from "@/lib/gorsel";
 import { useYetki } from "@/lib/useYetki";
 import { FileText, Camera, Loader2, Plus, Trash2, X, Save, PackageCheck, Truck, AlertTriangle, Receipt } from "lucide-react";
@@ -286,6 +287,7 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
           <FileText size={12}/> İrsaliye Ekle
         </button>
       </div>
+      <div className="mb-3"><TelegramGelenler tur="irsaliye" devreDisi={taraniyor} onSec={f => { formuAc(); tara(f[0]); }}/></div>
       {belgeler.length === 0 ? (
         <p className="text-xs text-gray-600">Bekleyen irsaliye yok. Sipariş verdiğin malın irsaliyesi gelince buradan ekle; sipariş önerisi yoldaki malı hesaba katar.</p>
       ) : (

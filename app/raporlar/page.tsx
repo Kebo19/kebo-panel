@@ -26,6 +26,7 @@ import { raporOnaycisiMi, RAPOR_ONAYCI_ADLARI } from "@/lib/yetki";
 import { RaporMagicpayPaneli } from "@/components/MagicpayKarsilastirma";
 import { alanEtiketi } from "@/lib/tarama";
 import { yuklemeIcinHazirla, jsonCevap } from "@/lib/gorsel";
+import TelegramGelenler from "@/components/TelegramGelenler";
 import { PUANTAJ_DURUMLARI, DURUM_ETIKET, DURUM_KISA, DURUM_RENK, durumGecerliMi, gunlukOzetMetni, puantajListesi, puantajFarklari, type PuantajDurum, type PuantajGirdisi } from "@/lib/puantaj";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -2084,6 +2085,7 @@ export default function RaporlarPage() {
           </div>
         </div>
       )}
+      {!isReadOnly && <TelegramGelenler tur="kasa" devreDisi={taramaYukleniyor} onSec={f => handleFisTara(f.slice(0, 3))}/>}
       {taramaHata && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2.5 flex items-center gap-2">
           <AlertTriangle size={13} className="text-red-400 shrink-0"/>
