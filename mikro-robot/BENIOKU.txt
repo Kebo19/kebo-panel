@@ -1,22 +1,29 @@
 KEBO MİKRO ROBOTU
 =================
-Her gün Mikro e-Portal'dan gelen faturaları okuyup Kebo Panel'e aktarır:
-faturalar ilgili carilere işlenir (Excel yüklemek gerekmez), stok fiyatları güncellenir.
+Mikro e-Portal'dan gelen faturaları okuyup Kebo Panel'e aktarır: faturalar ilgili carilere işlenir
+(Excel yüklemek gerekmez, yeni tedarikçiye cari açılır), stok fiyatları güncellenir, sonuç rapor edilir.
+
+NE ZAMAN ÇALIŞIR?
+- Panelde Faturalar ya da Fiyat Listesi sayfasındaki "Faturaları şimdi çek" butonuna basılınca
+  (ya da Telegram'da /mikro yazılınca) en geç 5 dakika içinde.
+- Kimse istemezse her gün 11:00'den sonra bir kez kendiliğinden.
+- Robot 5 dakikada bir görünmez bir kontrol yapar; iş yoksa hiçbir pencere açmadan kapanır.
 
 KURULUM (dükkân bilgisayarında bir kez)
 1) Bu klasörü dükkân bilgisayarına kopyalayın (ör. Belgeler\kebo-mikro-robot). ayar.json dosyası da içinde olmalı.
 2) Bilgisayarda Google Chrome ve Node.js (https://nodejs.org, LTS) kurulu olmalı.
 3) KURULUM.bat dosyasına çift tıklayın ve ekrandaki adımları izleyin:
-   - Mikro e-posta / parola sorulur (bu bilgisayarda şifreli saklanır),
-   - Chrome açılır, Mikro'ya bir kez giriş yaparsınız,
-   - Görev Zamanlayıcı'ya "Kebo Mikro Robotu" eklenir: her gün 11:15'te ve bilgisayar açılıp oturum
-     açıldıktan 10 dakika sonra çalışır (günde bir kez başarılı çalışması yeterli).
+   - Mikro e-posta / parola sorulur (bu bilgisayarda, bu Windows kullanıcısına özel şifreli saklanır),
+   - Chrome açılır, Mikro'ya bir kez giriş yaparsınız (pencere kendiliğinden kapanır),
+   - Görev Zamanlayıcı'ya "Kebo Mikro Robotu" eklenir,
+   - ilk aktarım hemen yapılır.
+4) Panelde Faturalar sayfasında "Dükkân bilgisayarı açık" yazısını görünce kurulum tamamdır.
 
 SONRASI
-- Masaüstündeki "Mikro robotu - şimdi çalıştır" kısayolu aktarımı hemen yapar.
+- Masaüstündeki "Mikro robotu - şimdi çalıştır" kısayolu aktarımı elle hemen yapar.
 - Mikro parolası değişirse ya da oturum düşerse "Mikro robotu - giriş" kısayoluyla tekrar giriş yapın.
-- Robot çalışırken küçük bir Chrome penceresi açılıp kapanır; kapatmayın.
+- Robot çalışırken küçük bir Chrome penceresi açılıp kapanabilir; kapatmayın.
 - Kayıt dosyası: %LOCALAPPDATA%\kebo-mikro-robot\robot.log
-- Panelde: Fiyat Listesi sayfasında "son otomatik güncelleme" satırı; hata olursa orada görünür.
+- Panelde: Faturalar / Fiyat Listesi sayfasındaki "Mikro'dan şimdi çek" kartı son çalışmayı ve hataları gösterir.
 
 ayar.json dosyasını kimseyle paylaşmayın (panelin robot anahtarı içindedir).

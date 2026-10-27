@@ -4,8 +4,8 @@
 #  2) Mikro kullanıcı adı / parolasını sorar ve bu Windows kullanıcısına özel şifreleyip saklar
 #     (oturum kapanırsa robot yeniden giriş yapabilsin diye)
 #  3) Chrome'u açar: Mikro'ya bir kez giriş yaparsınız, oturum robotun profiline kaydedilir
-#  4) Görev Zamanlayıcı'ya "Kebo Mikro Robotu" görevini ekler: her gün 11:15 ve oturum açılınca
-#     (bilgisayar 11:15'te kapalıysa açıldığında çalışır; günde bir kez başarıyla çalışır)
+#  4) Görev Zamanlayıcı'ya "Kebo Mikro Robotu" görevini ekler: 5 dakikada bir gizli kontrol
+#     (panelden "Mikro'dan çek" istenince hemen; istenmezse her gün 11:00'den sonra bir kez)
 #  5) Masaüstüne iki kısayol koyar: "Mikro robotu - şimdi çalıştır" ve "Mikro robotu - giriş"
 $ErrorActionPreference = "Stop"
 $Klasor = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -43,14 +43,25 @@ Write-Host "Chrome acilacak. Mikro'ya giris yapin; Gelen e-Faturalar sayfasi aci
 & $node (Join-Path $Klasor "robot.mjs") --kurulum
 
 Baslik "4/5 Gorev Zamanlayici"
-$eylem = New-ScheduledTaskAction -Execute $node -Argument "`"$Klasor\robot.mjs`"" -WorkingDirectory $Klasor
-$tetik1 = New-ScheduledTaskTrigger -Daily -At 11:15
+# Robot 5 dakikada bir gizli pencerede kisa bir kontrol yapar (panelden "Mikro'dan cek" istendi mi?).
+# Istek yoksa 11:00'den sonra gunde bir kez faturalari ceker. Is yoksa tarayici acmadan hemen kapanir.
+$vbs = Join-Path $Klasor "gizli-calistir.vbs"
+@(
+  "' Kebo Mikro robotunu pencere acmadan calistirir (Gorev Zamanlayici bunu cagirir). KURULUM.bat olusturur.",
+  'Set sh = CreateObject("WScript.Shell")',
+  "sh.CurrentDirectory = `"$Klasor`"",
+  "sh.Run `"`"`"$node`"`" `"`"$Klasor\robot.mjs`"`" --bekle`", 0, True"
+) | Set-Content -Encoding ASCII $vbs
+$eylem = New-ScheduledTaskAction -Execute "wscript.exe" -Argument "`"$vbs`"" -WorkingDirectory $Klasor
+# Her gun 07:00'den gece yarisina kadar 5 dakikada bir
+$tetik1 = New-ScheduledTaskTrigger -Daily -At 07:00
+$tetik1.Repetition = (New-ScheduledTaskTrigger -Once -At 07:00 -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Hours 17)).Repetition
 $tetik2 = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
-$tetik2.Delay = "PT10M"
-$ayarlar = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+$tetik2.Delay = "PT3M"
+$ayarlar = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 Register-ScheduledTask -TaskName "Kebo Mikro Robotu" -Action $eylem -Trigger @($tetik1, $tetik2) -Settings $ayarlar `
-  -Description "Mikro e-Portal'dan gelen faturalari her gun Kebo Panel'e aktarir" -Force | Out-Null
-Write-Host "Gorev eklendi: her gun 11:15 ve oturum acildiktan 10 dk sonra (gunde bir kez)." -ForegroundColor Green
+  -Description "Mikro e-Portal'dan gelen faturalari Kebo Panel'e aktarir (panelden istenince hemen, yoksa her gun 11:00'den sonra)" -Force | Out-Null
+Write-Host "Gorev eklendi: 5 dakikada bir kontrol; panelden istenince hemen, istenmezse her gun 11:00'den sonra bir kez." -ForegroundColor Green
 
 Baslik "5/5 Masaustu kisayollari ve ilk calistirma"
 $ws = New-Object -ComObject WScript.Shell

@@ -224,3 +224,35 @@ export function asistanBaglami(v: TgVeri, bugunStr: string): string {
   } else s.push("\n(Stok görme yetkisi yok.)");
   return s.join("\n");
 }
+
+// ── Mikro "şimdi çek" raporu (panel ve Telegram ortak) ──
+export interface MikroRapor {
+  durum: string; mesaj: string | null; istendi: string; basladi: string | null; bitti: string | null; isteyen_ad: string | null;
+  sonuc: { bulunan?: number; okunamayan?: number; yeni_cari?: number } | null;
+  faturalar: { cari: string; no: string; tarih: string; tutar: number }[];
+  fiyat: { guncellenen?: { urun: string; eski: number; yeni: number }[] | null; kontrol?: { urun: string; eski: number; yeni: number; oran: number }[] | null } | null;
+}
+
+export function mikroRaporMetni(r: MikroRapor): string {
+  if (r.durum === "hata") return `❌ <b>Mikro'dan çekme başarısız</b>\n${html(r.mesaj || "")}`;
+  const s = ["✅ <b>Mikro faturaları işlendi</b>"];
+  if (r.sonuc?.bulunan !== undefined) s.push(`Mikro'da son günlerde ${r.sonuc.bulunan} fatura tarandı${r.sonuc.okunamayan ? `, ${r.sonuc.okunamayan} tanesi okunamadı` : ""}.`);
+  if (r.faturalar.length) {
+    const top = r.faturalar.reduce((t, f) => t + Number(f.tutar || 0), 0);
+    s.push("", `<b>Faturalar'a eklenen ${r.faturalar.length} fatura</b> (toplam ${tl(top)}):`);
+    r.faturalar.slice(0, 15).forEach(f => s.push(`• ${fmtTarih(f.tarih).slice(0, 5)} ${html(kisaAd(f.cari))}: ${tl(Number(f.tutar))}`));
+    if (r.faturalar.length > 15) s.push(`… ve ${r.faturalar.length - 15} fatura daha`);
+  } else s.push("Yeni fatura yok.");
+  if (r.sonuc?.yeni_cari) s.push(`🆕 ${r.sonuc.yeni_cari} yeni cari açıldı.`);
+  const g = (r.fiyat?.guncellenen || []).filter(x => Math.abs(Number(x.yeni) - Number(x.eski)) > 0.005);
+  if (g.length) {
+    s.push("", `<b>Fiyatı değişen ${g.length} stok ürünü:</b>`);
+    g.slice(0, 10).forEach(x => {
+      const p = Number(x.eski) > 0 ? Math.round((Number(x.yeni) / Number(x.eski) - 1) * 100) : 0;
+      s.push(`• ${html(x.urun)}: ${sayi(Number(x.eski), 2)} → ${sayi(Number(x.yeni), 2)} ₺ (${p >= 0 ? "+" : ""}%${p})`);
+    });
+  }
+  const k = r.fiyat?.kontrol || [];
+  if (k.length) s.push("", `⚠️ ${k.length} fiyat %30'dan fazla değişmiş, Fiyat Listesi'nde onayınızı bekliyor: ${k.slice(0, 5).map(x => html(x.urun)).join(", ")}`);
+  return s.join("\n");
+}

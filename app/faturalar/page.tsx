@@ -1,5 +1,6 @@
 "use client";
 
+import MikroCek from "@/components/MikroCek";
 import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { aramaKelimeleri, faturaEslesir } from "@/lib/faturaArama";
@@ -532,6 +533,8 @@ export default function FaturalarPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-5 space-y-4">
+
+        <MikroCek onBitti={veriCek} />
 
         {/* KPI */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

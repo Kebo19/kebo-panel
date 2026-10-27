@@ -39,6 +39,7 @@ const YARDIM = `<b>Neler yapabilirim?</b>
 /odemeler — vadesi gelen ödemeler
 /stok — bitmek üzere olanlar
 /robot — Mikro faturaları ve zamlar
+/mikro — dükkân bilgisayarından Mikro faturalarını şimdi çek
 /bildirim — sabah özeti / öğlen uyarısı aç-kapat
 /ayril — bu Telegram'ı panelden ayır`;
 
@@ -75,6 +76,15 @@ export async function guncellemeIsle(g: TgGuncelleme): Promise<unknown> {
     return mesajGonder(chat, "Bu Telegram hesabı panelden ayrıldı. Tekrar bağlamak için panelden yeni kod alın.");
   }
   if (komut === "/bildirim") return bildirimMenusu(chat);
+  if (komut === "/mikro") {
+    if (!izin(k, "stok") && !izin(k, "cari")) return mesajGonder(chat, "Bu işlem için panelde stok ya da cari yetkiniz olmalı.");
+    const r = await rpc<{ yeni: boolean; pc_son_gorulme: string | null }>("tg_mikro_talep", { p_chat: chat });
+    const dk = r.pc_son_gorulme ? Math.round((Date.now() - Date.parse(r.pc_son_gorulme)) / 60000) : null;
+    const pc = dk === null ? "⚠️ Dükkân bilgisayarındaki robot henüz hiç bağlanmadı (kurulum yapılmamış olabilir)."
+      : dk <= 10 ? "Dükkân bilgisayarı açık, birkaç dakika içinde başlar."
+      : `⚠️ Dükkân bilgisayarı ${dk < 120 ? `${dk} dakikadır` : "uzun süredir"} görünmüyor; açılınca çalışır.`;
+    return mesajGonder(chat, `${r.yeni ? "⏳ Mikro'dan çekme isteği alındı." : "⏳ Zaten bekleyen bir çekme isteği var."}\n${pc}\nBitince sonucu buraya yazacağım.`);
+  }
 
   if (komut === "/ozet" || komut === "/odemeler" || komut === "/stok" || komut === "/robot") {
     await yaziyor(chat);

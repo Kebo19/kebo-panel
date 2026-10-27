@@ -52,3 +52,4 @@ _kebo_test/
 # Mikro robotu: anahtar ve kurulu paketler repoya girmez
 mikro-robot/ayar.json
 mikro-robot/node_modules/
+mikro-robot-kurulum.zip

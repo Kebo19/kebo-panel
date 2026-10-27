@@ -7,12 +7,16 @@
 //   4) Panele gönderir: faturalar carilere işlenir, stok fiyatları güncellenir. Sonuç panelde Fiyat Listesi'nde görünür.
 // Mikro, sunuculardan (Vercel/Supabase) gelen girişleri engellediği için bu iş dükkânın kendi bilgisayarından yapılır.
 //
-// Kullanım:  node robot.mjs            → günlük aktarım (bugün başarıyla çalıştıysa tekrar çalışmaz)
+// Kullanım:  node robot.mjs --bekle   → Görev Zamanlayıcı 5 dakikada bir çağırır: panele "buradayım" der;
+//                                       panelden/Telegram'dan "Mikro'dan çek" istenmişse hemen çalışır,
+//                                       istenmemişse saat 11:00'den sonra günde bir kez çalışır. Yoksa hemen çıkar.
+//            node robot.mjs            → günlük aktarım (bugün başarıyla çalıştıysa tekrar çalışmaz)
 //            node robot.mjs --zorla    → bugün çalışmış olsa da çalıştır
 //            node robot.mjs --kurulum  → Chrome'u açar, Mikro'ya bir kez elle giriş yapılır (oturum kaydedilir)
 
 import { chromium } from "playwright-core";
-import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync, statSync, unlinkSync } from "node:fs";
+import { hostname } from "node:os";
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,6 +28,8 @@ const LOG = join(VERI, "robot.log");
 const SON_CALISMA = join(VERI, "son-basarili.txt");
 const KIMLIK = join(VERI, "mikro-kimlik.txt"); // Windows DPAPI ile şifreli (sadece bu Windows kullanıcısı çözebilir)
 const PROFIL = join(VERI, "chrome-profil");
+const KILIT = join(VERI, "calisiyor.kilit");   // aynı anda iki robot çalışmasın
+const SON_HATA = join(VERI, "son-hata.txt");    // günlük çalışma hata verdiyse 1 saat sonra tekrar dener
 
 const MIKRO = process.env.KEBO_MIKRO_ADRES || "https://eportal.mikrogrup.com"; // ortam değişkeni sadece test içindir
 const FIRMA = "9351d4b5-c397-48da-a383-d9da89b5dc9d"; // BCM Restoran firma kodu (lib/fiyatListesi.ts ile aynı)
@@ -182,10 +188,10 @@ async function kurulum() {
   await tarayici.close();
 }
 
-async function aktarim() {
-  if (!argv.has("--zorla") && existsSync(SON_CALISMA) && readFileSync(SON_CALISMA, "utf8").trim() === bugun()) {
-    log("Bugün zaten başarıyla çalıştı, atlanıyor."); return;
-  }
+const bugunCalisti = () => existsSync(SON_CALISMA) && readFileSync(SON_CALISMA, "utf8").trim() === bugun();
+
+async function aktarim({ zorla = argv.has("--zorla"), talep = null } = {}) {
+  if (!zorla && bugunCalisti()) { log("Bugün zaten başarıyla çalıştı, atlanıyor."); return; }
   const ayar = ayarOku();
   let tarayici;
   try {
@@ -203,14 +209,36 @@ async function aktarim() {
     const sonuc = await rpc(ayar, "mikro_pc_aktar", { p_anahtar: ayar.anahtar, p: faturalar });
     log(sonuc?.mesaj || "Aktarıldı.");
     writeFileSync(SON_CALISMA, bugun());
+    if (talep) await rpc(ayar, "mikro_pc_talep_bitir", { p_anahtar: ayar.anahtar, p_id: talep, p_durum: "bitti",
+      p_mesaj: sonuc?.mesaj || "Aktarıldı.", p_sonuc: { ...(sonuc || {}), bulunan: toplam, okunamayan: hatali } }).catch((e) => log("Talep kapatılamadı: " + e.message));
   } catch (e) {
     const mesaj = String(e?.message || e);
     log("HATA: " + mesaj);
     await rpc(ayar, "mikro_pc_hata", { p_anahtar: ayar.anahtar, p_mesaj: mesaj }).catch(() => {});
+    writeFileSync(SON_HATA, String(Date.now()));
+    if (talep) await rpc(ayar, "mikro_pc_talep_bitir", { p_anahtar: ayar.anahtar, p_id: talep, p_durum: "hata", p_mesaj: mesaj, p_sonuc: null }).catch(() => {});
     process.exitCode = 1;
   } finally {
     await tarayici?.close().catch(() => {});
   }
 }
 
-(argv.has("--kurulum") ? kurulum() : aktarim()).catch((e) => { log("HATA: " + (e?.message || e)); process.exitCode = 1; });
+/** 5 dakikada bir: talep var mı, günlük çalışma zamanı geldi mi? İş yoksa tarayıcı açılmadan çıkar. */
+async function bekle() {
+  if (existsSync(KILIT) && Date.now() - statSync(KILIT).mtimeMs < 25 * 60 * 1000) return;   // önceki çalışma sürüyor
+  const ayar = ayarOku();
+  const { talep } = await rpc(ayar, "mikro_pc_nabiz", { p_anahtar: ayar.anahtar, p_bilgisayar: hostname() });
+  const saat = Number(new Date().toLocaleTimeString("en-GB", { timeZone: "Europe/Istanbul", hour: "2-digit", hour12: false }));
+  const yeniHata = existsSync(SON_HATA) && Date.now() - Number(readFileSync(SON_HATA, "utf8")) < 60 * 60 * 1000;
+  if (!talep && (bugunCalisti() || saat < 11 || yeniHata)) return;
+  writeFileSync(KILIT, String(process.pid));
+  try {
+    if (talep) log("Panelden \"Mikro'dan çek\" istendi.");
+    await aktarim({ zorla: !!talep, talep });
+  } finally {
+    try { unlinkSync(KILIT); } catch { /* yok */ }
+  }
+}
+
+(argv.has("--kurulum") ? kurulum() : argv.has("--bekle") ? bekle() : aktarim())
+  .catch((e) => { log("HATA: " + (e?.message || e)); process.exitCode = 1; });

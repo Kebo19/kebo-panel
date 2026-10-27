@@ -6,6 +6,7 @@
 // "Mikro'dan güncelle" butonu yeni faturaları aktarır ve stok fiyatlarını günceller.
 // Akış ve güvenlik: lib/fiyatListesi.ts. Sadece STOK_DEGER_GORENLER (proxy.ts + RLS).
 
+import MikroCek from "@/components/MikroCek";
 import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -202,6 +203,7 @@ export default function FiyatListesiPage() {
       </div>
 
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-5 space-y-4">
+        <MikroCek onBitti={cek} />
         {/* ── AKTARIM DURUMU ── */}
         {aktarim.durum !== "yok" && (
           <section className={`kebo-kart p-4 flex items-start gap-3 ${aktarim.durum === "hata" ? "border-red-500/40" : ""}`}>

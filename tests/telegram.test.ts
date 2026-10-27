@@ -186,3 +186,19 @@ describe("telegram asistan akışı", () => {
     expect(giden.length).toBe(0);
   });
 });
+
+describe("mikro raporu", () => {
+  it("eklenen faturaları ve fiyat değişimlerini yazar", async () => {
+    const { mikroRaporMetni } = await import("@/lib/telegram/ozet");
+    const t = mikroRaporMetni({ durum: "bitti", mesaj: "ok", istendi: "", basladi: "", bitti: "", isteyen_ad: "murat",
+      sonuc: { bulunan: 40, yeni_cari: 1 },
+      faturalar: [{ cari: "Sütaş Süt Ürünleri Anonim Şirketi", no: "S1", tarih: "2026-10-27", tutar: 4000 }],
+      fiyat: { guncellenen: [{ urun: "NUGGET", eski: 100, yeni: 110 }], kontrol: [] } });
+    expect(t).toContain("Faturalar'a eklenen 1 fatura");
+    expect(t).toContain("Sütaş");
+    expect(t).toContain("+%10");
+    expect(t).toContain("1 yeni cari");
+    expect(mikroRaporMetni({ durum: "hata", mesaj: "Mikro oturumu kapalı", istendi: "", basladi: null, bitti: null, isteyen_ad: null, sonuc: null, faturalar: [], fiyat: null }))
+      .toContain("başarısız");
+  });
+});
