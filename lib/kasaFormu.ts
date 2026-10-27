@@ -6,20 +6,41 @@
 // (app/api/sayim-tara). Ürün eklenip sırası değişirse kağıdı yeniden yazdırın.
 // docs/kagit-form/kebo-kasa-formu.html bu şablonun bir önizlemesidir.
 
-export type SayimPeriyodu = "gunluk" | "haftalik" | "aylik";
-export const PERIYOT_ADI: Record<SayimPeriyodu, string> = { gunluk: "Günlük", haftalik: "Haftalık", aylik: "Aylık" };
+export type SayimPeriyodu = "gunluk" | "haftalik" | "aylik" | "envanter";
+export const PERIYOT_ADI: Record<SayimPeriyodu, string> = { gunluk: "Günlük", haftalik: "Haftalık", aylik: "Aylık", envanter: "Envanter" };
+export const PERIYOTLAR: SayimPeriyodu[] = ["gunluk", "haftalik", "aylik", "envanter"];
 
-export interface KagitUrunu { no: number; urun_adi: string; birim: string; kategori?: string | null }
+/**
+ * Bir sayım listesinin kapsadığı gruplar: haftalık sayımda günlükler de, aylık sayımda günlük + haftalıklar da sayılır.
+ * Envanter (demirbaş) ayrı listedir, ara sıra sayılır.
+ */
+export const PERIYOT_KAPSAMI: Record<SayimPeriyodu, SayimPeriyodu[]> = {
+  gunluk: ["gunluk"], haftalik: ["gunluk", "haftalik"], aylik: ["gunluk", "haftalik", "aylik"], envanter: ["envanter"],
+};
+export const urunPeriyodu = (p: string | null | undefined): SayimPeriyodu =>
+  (PERIYOTLAR as string[]).includes(p || "") ? (p as SayimPeriyodu) : "gunluk";
+export const listedeMi = (liste: SayimPeriyodu, urunPeriyot: string | null | undefined) => PERIYOT_KAPSAMI[liste].includes(urunPeriyodu(urunPeriyot));
+
+export interface KagitUrunu { no: number; urun_adi: string; birim: string; kategori?: string | null; sayim_yeri?: string | null }
 
 /** stok_urunler satırının kağıt için gereken kısmı */
-export interface SayimUrunKaydi { id: string; urun_adi: string; birim: string; kategori: string | null; sayim_periyodu: string | null; sira_no: number | null }
+export interface SayimUrunKaydi { id: string; urun_adi: string; birim: string; kategori: string | null; sayim_periyodu: string | null; sira_no: number | null; sayim_yeri?: string | null }
 
-/** Bir sayım grubunun kağıttaki sırası (Stok sayfasındaki sıra). Tarama da aynı numaraları kullanır. */
+/**
+ * Bir sayım listesinin kağıttaki sırası. Sayım yeri girilmişse ürünler yere göre gruplanır (yerler,
+ * içlerindeki ilk ürünün sırasına göre dizilir), yer içinde Stok sayfasındaki sıra korunur.
+ * Tarama da aynı numaraları kullanır.
+ */
 export function grupUrunleri(urunler: SayimUrunKaydi[], periyot: SayimPeriyodu): (KagitUrunu & { id: string })[] {
-  return urunler
-    .filter(u => (u.sayim_periyodu || "gunluk") === periyot)
-    .sort((a, b) => (a.sira_no ?? 9999) - (b.sira_no ?? 9999) || a.urun_adi.localeCompare(b.urun_adi, "tr"))
-    .map((u, i) => ({ id: u.id, no: i + 1, urun_adi: u.urun_adi, birim: u.birim, kategori: u.kategori }));
+  const sira = (u: SayimUrunKaydi) => u.sira_no ?? 9999;
+  const secili = urunler.filter(u => listedeMi(periyot, u.sayim_periyodu))
+    .sort((a, b) => sira(a) - sira(b) || a.urun_adi.localeCompare(b.urun_adi, "tr"));
+  const yerSirasi = new Map<string, number>();
+  secili.forEach((u, i) => { const y = (u.sayim_yeri || "").trim(); if (!yerSirasi.has(y)) yerSirasi.set(y, y ? i : 1e6); });
+  return secili
+    .map((u, i) => ({ u, i }))
+    .sort((a, b) => yerSirasi.get((a.u.sayim_yeri || "").trim())! - yerSirasi.get((b.u.sayim_yeri || "").trim())! || a.i - b.i)
+    .map(({ u }, i) => ({ id: u.id, no: i + 1, urun_adi: u.urun_adi, birim: u.birim, kategori: u.kategori, sayim_yeri: (u.sayim_yeri || "").trim() || null }));
 }
 
 const CSS = `
@@ -186,17 +207,34 @@ const ON_YUZ = `
 
 `;
 
+const KAPSAM_NOTU: Record<SayimPeriyodu, string> = {
+  gunluk: "Miktarı ürünün birimiyle yazın · gelen mal faturadan otomatik işlenir",
+  haftalik: "Günlük + haftalık ürünler · gelen mal faturadan otomatik işlenir",
+  aylik: "Günlük + haftalık + aylık ürünler · gelen mal faturadan otomatik işlenir",
+  envanter: "Ara sıra sayılan demirbaşlar",
+};
+
 const kacis = (t: string) => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 
 /** Sayım sayfası. Satır yüksekliği ürün sayısına göre küçülür, tek A4'e sığar. */
 export function sayimSayfasi(urunler: KagitUrunu[], periyot: SayimPeriyodu, bosSatir = 3): string {
-  const n = urunler.length + bosSatir;
+  const n = urunler.length + bosSatir + new Set(urunler.map(u => u.sayim_yeri || "")).size * (urunler.some(u => u.sayim_yeri) ? 0.7 : 0);
   const yukseklik = Math.max(13, Math.min(27, Math.floor(740 / Math.max(n, 1))));
   const yazi = yukseklik < 16 ? "7pt" : yukseklik < 20 ? "7.5pt" : "8.5pt";
-  const satirlar = urunler.map(u =>
-    `<tr><td class="no">${u.no}</td><td class="ad" style="font-size:${yazi}">${kacis(u.urun_adi)}</td><td class="br">${kacis(u.birim)}</td><td></td><td></td><td></td><td></td></tr>`).join("\n")
-    + Array.from({ length: bosSatir }, () => `<tr><td class="no"></td><td class="ad"></td><td class="br"></td><td></td><td></td><td></td><td></td></tr>`).join("");
+  const env = periyot === "envanter";
+  const bosHucre = env ? "<td></td><td></td>" : "<td></td><td></td><td></td><td></td>";
+  const sutun = env ? 5 : 7;
+  const yerVar = urunler.some(u => u.sayim_yeri);
+  let sonYer: string | null | undefined;
+  const satirlar = urunler.map(u => {
+    let bas = "";
+    if (yerVar && u.sayim_yeri !== sonYer) { sonYer = u.sayim_yeri; bas = `<tr class="marka"><td colspan="${sutun}">${kacis(u.sayim_yeri || "Diğer")}</td></tr>`; }
+    return bas + `<tr><td class="no">${u.no}</td><td class="ad" style="font-size:${yazi}">${kacis(u.urun_adi)}</td><td class="br">${kacis(u.birim)}</td>${bosHucre}</tr>`;
+  }).join("\n")
+    + Array.from({ length: bosSatir }, () => `<tr><td class="no"></td><td class="ad"></td><td class="br"></td>${bosHucre}</tr>`).join("");
   const ad = PERIYOT_ADI[periyot];
+  const kural = env ? "Her demirbaşın kaç adet olduğunu ve arızalı/kayıp olanları yazın. Listede olmayanı alttaki boş satırlara ekleyin."
+    : "Sabah ya da akşam sayımından en az biri yeterlidir. Koli/kova sayıyorsanız birime çevirin (ör. 2 koli tavuk döner = 20 kg). Sayılmayan ürünün kutusunu boş bırakın — sıfır yazmayın (0 = stok bitti demektir). Rakamları net yazın; kağıt telefonla taranıp sisteme girilir.";
   return `<section class="sayfa arka">
   <div class="ust">
     <h1>KEBO <small>${ad} Sayım Listesi</small></h1>
@@ -205,13 +243,12 @@ export function sayimSayfasi(urunler: KagitUrunu[], periyot: SayimPeriyodu, bosS
       <div>Sayan: <span class="cizgi" style="width:150px"></span></div>
     </div>
   </div>
-  <h2>${ad.toLocaleUpperCase("tr-TR")} SAYILAN ÜRÜNLER <small>Miktarı ürünün birimiyle yazın · gelen mal faturadan otomatik işlenir, buraya yazmayın</small></h2>
+  <h2>${env ? "ENVANTER (DEMİRBAŞ) SAYIMI" : `${ad.toLocaleUpperCase("tr-TR")} SAYILAN ÜRÜNLER`} <small>${KAPSAM_NOTU[periyot]}</small></h2>
   <table class="sayim esit" style="--h:${yukseklik}px">
-    <tr><th style="width:5%">No</th><th>Ürün</th><th style="width:6%">Birim</th><th style="width:11.5%">Sabah sayım<br><small>(gün başı)</small></th><th style="width:11.5%">Akşam sayım<br><small>(gün sonu)</small></th><th style="width:9%">Fire<br><small>(bozuk/SKT)</small></th><th style="width:11%">Not</th></tr>
+    ${env ? `<tr><th style="width:5%">No</th><th>Ürün / demirbaş</th><th style="width:7%">Birim</th><th style="width:13%">Sayılan</th><th style="width:30%">Durum / not <small>(arızalı, kayıp…)</small></th></tr>` : `<tr><th style="width:5%">No</th><th>Ürün</th><th style="width:6%">Birim</th><th style="width:11.5%">Sabah sayım<br><small>(gün başı)</small></th><th style="width:11.5%">Akşam sayım<br><small>(gün sonu)</small></th><th style="width:9%">Fire<br><small>(bozuk/SKT)</small></th><th style="width:11%">Not</th></tr>`}
 ${satirlar}
   </table>
-  <div class="kural">Sabah ya da akşam sayımından en az biri yeterlidir. Koli/kova sayıyorsanız birime çevirin (ör. 2 koli tavuk döner = 20 kg).
-    Sayılmayan ürünün kutusunu boş bırakın — sıfır yazmayın (0 = stok bitti demektir). Rakamları net yazın; kağıt telefonla taranıp sisteme girilir.</div>
+  <div class="kural">${kural}</div>
   <h2 style="margin-top:6px">NOTLAR <small>Eksik, bozuk, iade edilen ürünler</small></h2>
   <div class="not"></div>
   <div class="kod">KEBO-SAYIM · ${periyot.toLocaleUpperCase("tr-TR")} · ${urunler.length} ÜRÜN</div>

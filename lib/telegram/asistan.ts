@@ -142,6 +142,7 @@ function dosyaKimligi(m: TgMesaj): string | null {
 
 function turBul(aciklama: string): string | null {
   const a = aciklama.toLocaleLowerCase("tr-TR");
+  if (/envanter|demirbaş|demirbas/.test(a)) return "sayim_envanter";
   if (/sayım|sayim/.test(a)) return /haftal/.test(a) ? "sayim_haftalik" : /ayl/.test(a) ? "sayim_aylik" : "sayim_gunluk";
   if (/kasa|rapor|form/.test(a)) return "kasa";
   if (/irsaliye|fatura|fiş|fis/.test(a)) return "irsaliye";
@@ -151,7 +152,8 @@ function turBul(aciklama: string): string | null {
 const TUR_BUTONLARI: Buton[][] = [
   [{ text: "🧾 Kasa formu", callback_data: "tur:kasa" }, { text: "📋 Günlük sayım", callback_data: "tur:sayim_gunluk" }],
   [{ text: "📋 Haftalık sayım", callback_data: "tur:sayim_haftalik" }, { text: "📋 Aylık sayım", callback_data: "tur:sayim_aylik" }],
-  [{ text: "🚚 İrsaliye / fatura", callback_data: "tur:irsaliye" }, { text: "✖️ Vazgeç", callback_data: "tur:iptal" }],
+  [{ text: "🗄 Envanter sayımı", callback_data: "tur:sayim_envanter" }, { text: "🚚 İrsaliye / fatura", callback_data: "tur:irsaliye" }],
+  [{ text: "✖️ Vazgeç", callback_data: "tur:iptal" }],
 ];
 
 async function fotografIsle(m: TgMesaj, k: TgKullanici) {

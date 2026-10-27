@@ -8,7 +8,10 @@ export interface Satir { id: string; no: number; ad: string; birim: string }
 function sistemPromptu(liste: Satir[], periyot: string) {
   const tablo = liste.map(u => `${u.no} | ${u.id} | ${u.ad} | ${u.birim}`).join("\n");
   return `Sen bir restoranın depo asistanısın. Sana elle doldurulmuş bir "KEBO ${periyot} Sayım Listesi" kağıdının
-fotoğrafı verilecek. Kağıttaki tablo sütunları: No | Ürün | Birim | Sabah sayım | Akşam sayım | Fire | Not.
+fotoğrafı verilecek. ${periyot === "Envanter"
+  ? 'Kağıttaki tablo sütunları: No | Ürün / demirbaş | Birim | Sayılan | Durum / not. "Sayılan" değerini "aksam" alanına yaz; "sabah" ve "fire" her zaman null; durum yazısını "not" alanına yaz.'
+  : "Kağıttaki tablo sütunları: No | Ürün | Birim | Sabah sayım | Akşam sayım | Fire | Not."}
+Satırların arasında bölüm başlıkları (ör. DONDURUCU) olabilir; onlar ürün değildir.
 
 KAĞITTAKİ ÜRÜNLER (No | id | ad | birim) — kağıt bu listeyle basıldı:
 ${tablo}

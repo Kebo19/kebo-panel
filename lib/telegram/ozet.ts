@@ -10,7 +10,7 @@ import { gunEkle, fmtTarih } from "@/lib/tarih";
 export const GUN_ADLARI_KISA = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
 
 export interface TgBakiye { cari_id: string; unvan: string; borc: number; odenmis: number; hakedisten: boolean }
-export interface TgUrun { id: string; urun_adi: string; birim: string; kategori: string | null; min_stok: number; mevcut_stok: number; sayim_periyodu: string | null; sira_no: number | null }
+export interface TgUrun { id: string; urun_adi: string; birim: string; kategori: string | null; min_stok: number; mevcut_stok: number; sayim_periyodu: string | null; sira_no: number | null; sayim_yeri?: string | null }
 export interface TgBotLog { bitti: string | null; durum: string; mesaj: string | null; guncellenen?: unknown; kontrol?: unknown }
 export interface TgVeri {
   raporlar?: RaporVerisi[];
@@ -21,6 +21,7 @@ export interface TgVeri {
   stok_hareketler?: StokHareketi[];
   bot_log?: TgBotLog[];
   telegram_bekleyen?: number;
+  mikro_pc_son?: string | null;
   telegram_kasa_bekleyen?: number;
   bekleyen_talepler?: number;
 }
@@ -140,13 +141,23 @@ export function stokBolumu(v: TgVeri, bugunStr: string, enFazla = 6): string[] {
 // ── Robot / fiyat ──
 export function robotBolumu(v: TgVeri, bugunStr: string, sadeceBugun = false): string[] {
   const l = v.bot_log; if (!l) return [];
-  const son = l[0];
   const s = ["<b>🤖 Mikro faturaları</b>"];
+  // Dükkân bilgisayarındaki robot hiç bağlanmadıysa eski (sunucudaki) robotun kayıtları gösterilmez:
+  // o robotu Mikro engelliyordu (HTTP 403), şifre sorunu değildi.
+  if (!v.mikro_pc_son && "mikro_pc_son" in v) {
+    s.push("Dükkân bilgisayarındaki robot henüz kurulmadı. Kurulunca faturalar her gün kendiliğinden gelecek; şimdilik Fiyat Listesi → \"Mikro'dan güncelle\" ile aktarabilirsiniz.");
+    return s;
+  }
+  const son = l[0];
   if (!son) { s.push("Henüz çalışma kaydı yok."); return s; }
   const tarih = son.bitti ? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date(son.bitti)) : null;
   if (sadeceBugun && tarih !== bugunStr) {
     s.push(`⚠️ Bugün çalışmadı (son çalışma ${tarih ? fmtTarih(tarih) : "bilinmiyor"}). Dükkân bilgisayarı açık mı?`);
     return s;
+  }
+  if (v.mikro_pc_son) {
+    const dk = Math.round((Date.now() - Date.parse(v.mikro_pc_son)) / 60000);
+    s.push(dk <= 10 ? "Dükkân bilgisayarı açık." : `Dükkân bilgisayarı ${dk < 120 ? `${dk} dakikadır` : "uzun süredir"} görünmüyor.`);
   }
   s.push(`${son.durum === "hata" ? "❌" : "✅"} ${html(son.mesaj || son.durum)}`);
   const g = Array.isArray(son.guncellenen) ? (son.guncellenen as Record<string, unknown>[]) : [];

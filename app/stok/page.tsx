@@ -14,6 +14,7 @@ import {
 import VakitSecici from "@/components/VakitSecici";
 import IrsaliyePaneli, { type IrsaliyeKalemi } from "@/components/IrsaliyePaneli";
 import SayimKagidiTara from "@/components/SayimKagidiTara";
+import { listedeMi, type SayimPeriyodu } from "@/lib/kasaFormu";
 
 // Ekran tercihleri bu tarayıcıda hatırlanır (tarayıcı izin vermezse varsayılanlar kullanılır).
 function tercihOku<T>(anahtar: string, varsayilan: T): T {
@@ -27,7 +28,7 @@ import {
   Package, PlusCircle, Search, AlertTriangle, TrendingDown,
   Truck, ClipboardCheck, Loader2, X, Save, Edit3, Trash2,
   RefreshCw, Layers, Box, Clock, BrainCircuit, CheckSquare, Square,
-  ListOrdered, Calendar, ArrowUp, ArrowDown, PackageMinus, ShoppingCart, ChefHat, Camera, Printer,
+  ListOrdered, Calendar, ArrowUp, ArrowDown, PackageMinus, ShoppingCart, ChefHat, Camera, Printer, ListChecks,
 } from "lucide-react";
 
 interface Urun {
@@ -42,6 +43,7 @@ interface Urun {
   notlar: string | null;
   sayim_periyodu: string;
   sira_no?: number;
+  sayim_yeri?: string | null;
   updated_at: string;
 }
 
@@ -68,7 +70,8 @@ const fmt = (v: number, decimals = 1): string =>
 const PERIYOTLAR = [
   { v: "gunluk", l: "Günlük Sayım" },
   { v: "haftalik", l: "Haftalık Sayım" },
-  { v: "aylik", l: "Aylık Sayım" }
+  { v: "aylik", l: "Aylık Sayım" },
+  { v: "envanter", l: "Envanter (demirbaş)" }
 ];
 const BIRIMLER = ["kg", "gr", "lt", "ml", "adet", "koli", "paket", "düzine", "torba", "kova", "şişe"];
 
@@ -129,7 +132,7 @@ export default function StokPage() {
   const [cokluPeriyot, setCokluPeriyot] = useState("");
 
   // Toplu Sayım Formu Verileri (4 Sekmeli Yapı)
-  const [topluSayimSekme, setTopluSayimSekme] = useState<"gunluk" | "haftalik" | "aylik" | "all">("gunluk");
+  const [topluSayimSekme, setTopluSayimSekme] = useState<SayimPeriyodu | "all">("gunluk");
   const [topluSayimTarih, setTopluSayimTarih] = useState(bugun());
   const [topluMiktarlar, setTopluMiktarlar] = useState<Record<string, string>>({});
   const [topluNotlar, setTopluNotlar] = useState<Record<string, string>>({});
@@ -272,7 +275,7 @@ export default function StokPage() {
   const topluSayimSekmeFiltreliUrunler = useMemo(() => {
     return urunler.filter(u => {
       if (topluSayimSekme === "all") return true;
-      return u.sayim_periyodu === topluSayimSekme;
+      return listedeMi(topluSayimSekme, u.sayim_periyodu);
     });
   }, [urunler, topluSayimSekme]);
 
@@ -569,6 +572,10 @@ export default function StokPage() {
               className="flex items-center gap-1.5 text-[11px] font-bold text-blue-300 bg-kart border border-blue-500/40 px-3 py-2 rounded-xl hover:bg-blue-500/10">
               <Camera size={13}/> Sayım kağıdı tara
             </button>
+            <Link href="/stok/liste"
+              className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-300 bg-kart border border-emerald-500/30 px-3 py-2 rounded-xl hover:bg-emerald-500/10">
+              <ListChecks size={13}/> Listeyi düzenle
+            </Link>
             <Link href="/stok/kagit"
               className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-yazi border border-cizgi px-3 py-2 rounded-xl">
               <Printer size={13}/> Kağıt yazdır
@@ -821,7 +828,7 @@ export default function StokPage() {
       {/* 4 SEKMELİ TOPLU SAYIM MODAL */}
       {kagitTaraAcik && (
         <SayimKagidiTara
-          urunler={urunler.map(u => ({ id: u.id, urun_adi: u.urun_adi, birim: u.birim, kategori: u.kategori, sayim_periyodu: u.sayim_periyodu, sira_no: u.sira_no ?? null }))}
+          urunler={urunler.map(u => ({ id: u.id, urun_adi: u.urun_adi, birim: u.birim, kategori: u.kategori, sayim_periyodu: u.sayim_periyodu, sira_no: u.sira_no ?? null, sayim_yeri: u.sayim_yeri ?? null }))}
           hareketler={hareketler}
           kullanici={userEmail.split("@")[0] || "Bilinmiyor"}
           onKapat={() => setKagitTaraAcik(false)}
@@ -854,12 +861,13 @@ export default function StokPage() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-4 gap-1 bg-zemin p-1 rounded-xl border border-cizgi">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1 bg-zemin p-1 rounded-xl border border-cizgi">
                 {[
-                  { id: "gunluk", l: "⏱ Günlük Liste" },
-                  { id: "haftalik", l: "📅 Haftalık Liste" },
-                  { id: "aylik", l: "🗓 Aylık Liste" },
-                  { id: "all", l: "📦 Tüm Liste" }
+                  { id: "gunluk", l: "⏱ Günlük" },
+                  { id: "haftalik", l: "📅 Haftalık" },
+                  { id: "aylik", l: "🗓 Aylık" },
+                  { id: "envanter", l: "🗄 Envanter" },
+                  { id: "all", l: "📦 Tümü" }
                 ].map(tab => (
                   <button key={tab.id} type="button" onClick={() => setTopluSayimSekme(tab.id as any)}
                     className={`py-2 text-[11px] font-bold rounded-lg transition-all text-center ${topluSayimSekme === tab.id ? "kebo-btn-altin text-[#1a1408] shadow" : "text-gray-50 hover:text-yazi"}`}>

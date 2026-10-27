@@ -249,7 +249,7 @@ export function siparisPlani(d: StokDurumu, ayar: SiparisAyari, minStok: number,
 /** Sayım periyoduna göre sayım gecikmiş mi? */
 export function sayimGecikti(periyot: string | null | undefined, sonSayimdanBeriGun: number | null): boolean {
   if (sonSayimdanBeriGun === null) return true;
-  const sinir = periyot === "aylik" ? 31 : periyot === "haftalik" ? 7 : 1;
+  const sinir = periyot === "envanter" ? 400 : periyot === "aylik" ? 31 : periyot === "haftalik" ? 7 : 1;
   return sonSayimdanBeriGun > sinir;
 }
 

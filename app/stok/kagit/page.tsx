@@ -1,7 +1,7 @@
 "use client";
 
 // Kağıt kasa formu ve sayım listeleri: ürünler stoktan canlı gelir, sayfa tarayıcıdan yazdırılır.
-// Ön yüz kasa formu + arka yüz günlük sayım (çift taraflı) ya da tek sayfa haftalık / aylık sayım.
+// Ön yüz kasa formu + arka yüz günlük sayım (çift taraflı) ya da tek sayfa günlük / haftalık / aylık / envanter sayımı.
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -9,14 +9,15 @@ import { useYetki } from "@/lib/useYetki";
 import { kagitBelgesi, grupUrunleri, PERIYOT_ADI, type SayimPeriyodu } from "@/lib/kasaFormu";
 import { ArrowLeft, Loader2, Printer } from "lucide-react";
 
-type Urun = { id: string; urun_adi: string; birim: string; kategori: string | null; sayim_periyodu: string | null; sira_no: number | null };
+type Urun = { id: string; urun_adi: string; birim: string; kategori: string | null; sayim_periyodu: string | null; sira_no: number | null; sayim_yeri: string | null };
 
 type Secim = "kasa" | SayimPeriyodu;
 const SECENEKLER: { v: Secim; l: string; a: string }[] = [
   { v: "kasa", l: "Kasa formu + günlük sayım", a: "Çift taraflı: ön yüz kasa raporu, arka yüz günlük sayım" },
-  { v: "gunluk", l: "Günlük sayım", a: "Tek sayfa" },
-  { v: "haftalik", l: "Haftalık sayım", a: "Tek sayfa" },
-  { v: "aylik", l: "Aylık sayım", a: "Tek sayfa" },
+  { v: "gunluk", l: "Günlük sayım", a: "Sadece günlükler" },
+  { v: "haftalik", l: "Haftalık sayım", a: "Günlük + haftalık" },
+  { v: "aylik", l: "Aylık sayım", a: "Günlük + haftalık + aylık" },
+  { v: "envanter", l: "Envanter sayımı", a: "Demirbaşlar (ara sıra)" },
 ];
 
 export default function KagitFormPage() {
@@ -28,10 +29,16 @@ export default function KagitFormPage() {
   const [secim, setSecim] = useState<Secim>("kasa");
   const cerceve = useRef<HTMLIFrameElement>(null);
 
+  // /stok/kagit?liste=haftalik gibi doğrudan bir liste açılabilir (Liste düzenle sayfasındaki "Yazdır")
+  useEffect(() => {
+    const l = new URLSearchParams(window.location.search).get("liste");
+    if (l && SECENEKLER.some(s => s.v === l)) setSecim(l as Secim);
+  }, []);
+
   useEffect(() => {
     if (yetki.yukleniyor || !izinli) return;
     let iptal = false;
-    supabase.from("stok_urunler").select("id,urun_adi,birim,kategori,sayim_periyodu,sira_no").eq("durum", "aktif")
+    supabase.from("stok_urunler").select("id,urun_adi,birim,kategori,sayim_periyodu,sira_no,sayim_yeri").eq("durum", "aktif")
       .then(({ data, error }) => { if (iptal) return; if (error) setHata(error.message); else setUrunler((data || []) as Urun[]); });
     return () => { iptal = true; };
   }, [supabase, yetki.yukleniyor, izinli]);
@@ -62,7 +69,7 @@ export default function KagitFormPage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
           {SECENEKLER.map(s => (
             <button key={s.v} onClick={() => setSecim(s.v)}
               className={`text-left rounded-xl border p-3 ${secim === s.v ? "border-emerald-500/60 bg-emerald-500/10" : "border-cizgi bg-kart hover:border-emerald-500/30"}`}>
@@ -74,7 +81,7 @@ export default function KagitFormPage() {
 
         {hata && <p className="text-xs text-red-400">{hata}</p>}
         <p className="text-[11px] text-gray-600">
-          {PERIYOT_ADI[periyot]} sayım grubunda <b className="text-yazi">{liste.length}</b> ürün var.
+          {PERIYOT_ADI[periyot]} sayım listesinde <b className="text-yazi">{liste.length}</b> ürün var.
           {secim === "kasa" && " Yazıcıda “çift taraflı (uzun kenardan çevir)” seçin."}
           {" "}Doldurulan sayım kağıdını Stok → “Sayım kağıdı tara” ile telefondan sisteme girebilirsiniz.
         </p>
