@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { oturumKontrol } from "@/lib/supabase/server";
-import { magicpayGorebilirMi, mpGunCoz, mpIndirimAlanlari } from "@/lib/magicpay";
+import { mpGunCoz, mpIndirimAlanlari, mpRaporDoldurma } from "@/lib/magicpay";
 import { izinVar } from "@/lib/yetki";
 
 // MagicPay (kebo-admin-ui.magicpay.ai) köprüsü — SALT OKUNUR.
@@ -10,9 +10,9 @@ import { izinVar } from "@/lib/yetki";
 // Raporu ile karşılaştırır. Hiçbir veriyi kaydetmez veya değiştirmez.
 //
 // ERİŞİM:
-//   • Tam karşılaştırma verisi: sadece lib/magicpay.ts → MAGICPAY_GORENLER (Murat, Bülent).
-//   • `kapsam=indirim`: Kasa Raporu girebilen herkes; sadece günlük platform
-//     indirimleri döner (rapor formundaki indirim hücreleri otomatik dolar).
+//   • Tam karşılaştırma verisi: "magicpay" yetkisi olanlar (Tam Yetkili dahil).
+//   • `kapsam=indirim`: Kasa Raporu girebilen herkes; günlük platform indirimleri ve
+//     formu dolduracak satış / kasa değerleri döner (lib/magicpay.ts → mpRaporDoldurma).
 //
 // Kimlik bilgileri Vercel ortam değişkeni olarak tanımlanır, sadece burada
 // (sunucu tarafında) kullanılır, tarayıcıya hiç gitmez:
@@ -69,7 +69,7 @@ export async function GET(req: Request) {
   if (!oturum.ok) return oturum.yanit;
   const { searchParams } = new URL(req.url);
   const sadeceIndirim = searchParams.get("kapsam") === "indirim";
-  const tamGorur = magicpayGorebilirMi(oturum.userId);
+  const tamGorur = izinVar(oturum.rol, oturum.yetkiler, "magicpay");
   const raporGirer = izinVar(oturum.rol, oturum.yetkiler, "rapor_gir") || izinVar(oturum.rol, oturum.yetkiler, "rapor_duzenle");
   if (sadeceIndirim ? !(tamGorur || raporGirer) : !tamGorur) {
     return NextResponse.json({ error: "Bu işlem için yetkiniz yok." }, { status: 403 });
@@ -91,7 +91,8 @@ export async function GET(req: Request) {
     const gunler = ((sube?.rows as Record<string, unknown>[]) || []).map(mpGunCoz);
     if (sadeceIndirim) {
       return NextResponse.json(
-        { gunler: gunler.map(g => ({ tarih: g.tarih, indirimler: mpIndirimAlanlari(g) })) },
+        // Kasa Raporu formu: indirimler + otomatik doldurulacak satış / kasa alanları
+        { gunler: gunler.map(g => ({ tarih: g.tarih, indirimler: mpIndirimAlanlari(g), doldurma: mpRaporDoldurma(g) })) },
         { headers: { "Cache-Control": "no-store" } });
     }
     return NextResponse.json(

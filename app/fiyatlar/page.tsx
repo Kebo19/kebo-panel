@@ -4,7 +4,7 @@
 // Satın alınan her ürünün son alış fiyatı (Mikro faturalarından): "domatesi ne
 // kadara aldım?" sorusunun cevabı. Satıra tıklayınca o ürünün bütün alımları.
 // "Mikro'dan güncelle" butonu yeni faturaları aktarır ve stok fiyatlarını günceller.
-// Akış ve güvenlik: lib/fiyatListesi.ts. Sadece STOK_DEGER_GORENLER (proxy.ts + RLS).
+// Akış ve güvenlik: lib/fiyatListesi.ts. "stok_deger" yetkisi (proxy.ts + RLS).
 
 import MikroCek from "@/components/MikroCek";
 import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
@@ -13,7 +13,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useYetki } from "@/lib/useYetki";
 import { sadelestir } from "@/lib/menu";
-import { stokDegerGorebilirMi } from "@/lib/stokDeger";
 import {
   MIKRO_GELEN_URL, MIKRO_ORIGIN, yerImiKodu, fiyatKalemleri, aramaEslesir, mikroMesajiMi, parcala,
   type FiyatSatiri, type AktarimFaturasi, type BirimFiyatlari,
@@ -58,7 +57,7 @@ type Aktarim =
 export default function FiyatListesiPage() {
   const supabase = useMemo(() => createClient(), []);
   const yetki = useYetki();
-  const izinli = stokDegerGorebilirMi(yetki.userId);
+  const izinli = yetki.izin("stok_deger");
 
   const [satirlar, setSatirlar] = useState<FiyatSatiri[] | null>(null);
   const [hata, setHata] = useState("");

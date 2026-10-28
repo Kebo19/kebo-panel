@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useYetki } from "@/lib/useYetki";
 import { bugun, gunEkle, fmtTarih } from "@/lib/tarih";
-import { magicpayGorebilirMi, gunuKarsilastir, type MpGun, type PanelRaporu } from "@/lib/magicpay";
+import { gunuKarsilastir, type MpGun, type PanelRaporu } from "@/lib/magicpay";
 import { GunDetayi } from "@/components/MagicpayKarsilastirma";
 import { Lock, Loader2, RefreshCw, AlertTriangle, EyeOff } from "lucide-react";
 
@@ -22,7 +22,7 @@ const gunAdi = (t: string) => GUN_ADLARI[new Date(t + "T12:00:00Z").getUTCDay()]
 export default function MagicpayKontrolPage() {
   const supabase = createClient();
   const yetki = useYetki();
-  const izinli = magicpayGorebilirMi(yetki.userId);
+  const izinli = yetki.izin("magicpay");
 
   const dun = gunEkle(bugun(), -1);
   const [baslangic, setBaslangic] = useState(dun);

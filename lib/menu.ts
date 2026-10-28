@@ -8,8 +8,6 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { YetkiAnahtari } from "@/lib/yetki";
-import { magicpayGorebilirMi } from "@/lib/magicpay";
-import { stokDegerGorebilirMi } from "@/lib/stokDeger";
 
 export interface MenuOgesi {
   name: string;
@@ -21,9 +19,7 @@ export interface MenuOgesi {
   aciklama: string;
   /** Ek arama kelimeleri */
   anahtar?: string;
-  /** "ozel_magicpay": sadece lib/magicpay.ts → MAGICPAY_GORENLER (rol/yetki yetmez)
-   *  "ozel_stok_deger": sadece lib/stokDeger.ts → STOK_DEGER_GORENLER (rol/yetki yetmez) */
-  izin?: YetkiAnahtari | "tam_yetkili" | "ozel_magicpay" | "ozel_stok_deger";
+  izin?: YetkiAnahtari | "tam_yetkili";
 }
 
 export const MENU: { ust: MenuOgesi[]; finans: MenuOgesi[]; alt: MenuOgesi[]; ayarAlt: MenuOgesi[] } = {
@@ -37,14 +33,14 @@ export const MENU: { ust: MenuOgesi[]; finans: MenuOgesi[]; alt: MenuOgesi[]; ay
     { name: "Personel", icon: Users, href: "/personel", izin: "personel", renk: "#c084fc", aciklama: "Kadro ve belgeler", anahtar: "personel çalışan kadro" },
     { name: "Puantaj", icon: CalendarCheck, href: "/puantaj", izin: "puantaj", renk: "#2dd4bf", aciklama: "Devam takibi", anahtar: "puantaj mesai izin" },
     // Sadece Murat ve Bülent görür (lib/magicpay.ts). Listenin sonunda: anasayfa kısayolları MENU.ust sırasına bağlı.
-    { name: "MagicPay Kontrol", icon: ScanSearch, href: "/magicpay", izin: "ozel_magicpay", renk: "#22d3ee", aciklama: "Kasa raporu ↔ MagicPay", anahtar: "magicpay adisyon karşılaştırma kontrol paket kasa" },
+    { name: "MagicPay Kontrol", icon: ScanSearch, href: "/magicpay", izin: "magicpay", renk: "#22d3ee", aciklama: "Kasa raporu ↔ MagicPay", anahtar: "magicpay adisyon karşılaştırma kontrol paket kasa" },
   ],
   finans: [
     { name: "Kasa", icon: Wallet, href: "/kasa", izin: "kasa", renk: "#34d399", aciklama: "Bakiye ve işlemler", anahtar: "kasa banka nakit teb vakıfbank enpara bakiye" },
     { name: "Cariler", icon: Building2, href: "/cariler", izin: "cari", renk: "#f87171", aciklama: "Tedarikçi hesapları", anahtar: "cari tedarikçi borç ekstre" },
     { name: "Faturalar", icon: FileText, href: "/faturalar", izin: "cari", renk: "#fb7185", aciklama: "Alış faturaları", anahtar: "fatura irsaliye kdv" },
     // Sadece Murat ve Bülent görür (lib/stokDeger.ts).
-    { name: "Fiyat Listesi", icon: Tags, href: "/fiyatlar", izin: "ozel_stok_deger", renk: "#facc15", aciklama: "Son alış fiyatları", anahtar: "fiyat alış domates kola eldiven tedarikçi mikro fatura ürün" },
+    { name: "Fiyat Listesi", icon: Tags, href: "/fiyatlar", izin: "stok_deger", renk: "#facc15", aciklama: "Son alış fiyatları", anahtar: "fiyat alış domates kola eldiven tedarikçi mikro fatura ürün" },
   ],
   alt: [
     { name: "Ayarlar", icon: Settings, href: "/ayarlar", renk: "#a1a1aa", aciklama: "Hesap ve sistem", anahtar: "ayar" },
@@ -82,8 +78,6 @@ export function menuGorunurMu(
 ): boolean {
   if (!m.izin) return true;
   if (m.izin === "tam_yetkili") return k.tamYetkili;
-  if (m.izin === "ozel_magicpay") return magicpayGorebilirMi(k.userId);
-  if (m.izin === "ozel_stok_deger") return stokDegerGorebilirMi(k.userId);
   return k.izin(m.izin);
 }
 

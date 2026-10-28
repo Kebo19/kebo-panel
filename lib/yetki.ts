@@ -29,7 +29,9 @@ export type YetkiAnahtari =
   | "kasa" | "cari" | "kar_zarar"
   | "stok" | "recete"
   | "personel" | "personel_hassas" | "puantaj" | "puantaj_duzenle"
-  | "yonetim";
+  | "yonetim"
+  // 28.10.2026: eskiden kodda kişi listesiyle tutulan yetkiler
+  | "rapor_onay" | "stok_deger" | "magicpay";
 
 export type YetkiGrubu = "Günlük işler" | "Finans" | "Stok & Maliyet" | "Personel" | "Yönetim";
 
@@ -48,12 +50,15 @@ export interface YetkiTanimi {
 export const YETKILER: YetkiTanimi[] = [
   { anahtar: "anasayfa", etiket: "Anasayfa özeti", aciklama: "Ciro, kasa ve fatura özet kartları", grup: "Günlük işler", sayfalar: ["/"] },
   { anahtar: "rapor_gir", etiket: "Kasa Raporu girme", aciklama: "Günlük kasa raporu girme", grup: "Günlük işler", sayfalar: ["/raporlar"] },
-  { anahtar: "rapor_duzenle", etiket: "Rapor düzenleme", aciklama: "Girilmiş raporu düzenleme (onaya gider), tarih ve toplam uyarılarını geçme. Onay ve silme sadece Murat ile Bülent'te", grup: "Günlük işler", sayfalar: [] },
+  { anahtar: "rapor_duzenle", etiket: "Rapor düzenleme", aciklama: "Girilmiş raporu düzenleme (onaya gider), tarih ve toplam uyarılarını geçme", grup: "Günlük işler", sayfalar: [] },
+  { anahtar: "rapor_onay", etiket: "Rapor onaylama", aciklama: "Rapor değişikliklerini onaylama; raporu onaysız düzenleme ve silme", grup: "Günlük işler", sayfalar: [] },
   { anahtar: "rapor_analiz", etiket: "Rapor Analizi", aciklama: "Dönemsel satış ve platform analizleri", grup: "Günlük işler", sayfalar: ["/rapor-analiz"] },
   { anahtar: "kasa", etiket: "Kasa", aciklama: "Kasa hareketleri, sabit giderler, banka ekstresi", grup: "Finans", sayfalar: ["/kasa"] },
   { anahtar: "cari", etiket: "Cariler & Faturalar", aciklama: "Tedarikçiler, faturalar, ödemeler; irsaliyeden fatura oluşturma", grup: "Finans", sayfalar: ["/cariler", "/faturalar"] },
+  { anahtar: "magicpay", etiket: "MagicPay karşılaştırma", aciklama: "Kasa raporunu adisyon programıyla gün gün karşılaştırma", grup: "Finans", sayfalar: ["/magicpay"] },
   { anahtar: "kar_zarar", etiket: "Kâr / Zarar", aciklama: "Aylık kâr/zarar ve nakit akışı", grup: "Finans", sayfalar: ["/kar-zarar"] },
   { anahtar: "stok", etiket: "Stok & İrsaliye", aciklama: "Stok listesi, ürün kartı, irsaliye girişi", grup: "Stok & Maliyet", sayfalar: ["/stok"] },
+  { anahtar: "stok_deger", etiket: "Stok değeri & Fiyat Listesi", aciklama: "Depodaki malın TL değeri, alış fiyatları, Mikro fatura aktarımı", grup: "Stok & Maliyet", sayfalar: ["/fiyatlar"] },
   { anahtar: "recete", etiket: "Reçete & Maliyet", aciklama: "Reçeteler ve ürün satışları (food cost için ayrıca Cari veya Kâr/Zarar gerekir)", grup: "Stok & Maliyet", sayfalar: ["/stok/recete"] },
   { anahtar: "personel", etiket: "Personel", aciklama: "Personel listesi, kartı, avans ve kesinti", grup: "Personel", sayfalar: ["/personel"] },
   { anahtar: "personel_hassas", etiket: "TC kimlik & IBAN", aciklama: "Personelin TC kimlik ve IBAN bilgisini görme/düzenleme", grup: "Personel", sayfalar: [] },
@@ -63,18 +68,11 @@ export const YETKILER: YetkiTanimi[] = [
 ];
 
 /**
- * Kasa Raporu düzenlemelerini onaylayabilen / raporu doğrudan düzenleyip silebilen
- * kişiler (auth kullanıcı id'leri): Murat Can Çömüz ve Bülent Çöphüseyinoğlu.
- * Diğer herkesin düzenlemesi (ve elle değiştirilen MagicPay indirimleri) onaya gider.
- * Veritabanında aynı liste: public.kebo_rapor_onaycisi().
+ * Kasa Raporu düzenlemelerini onaylayan / raporu doğrudan düzenleyip silen kişiler:
+ * "rapor_onay" yetkisi (Tam Yetkili'de her zaman var). Diğer herkesin düzenlemesi
+ * (ve elle değiştirilen MagicPay indirimleri) onaya gider. Veritabanında: public.kebo_rapor_onaycisi().
  */
-export const RAPOR_ONAYCILARI: readonly string[] = [
-  "c4d199e9-e0b7-4d33-8ad8-556f7d488bac", // murat@kebo.com
-  "e75d458f-1c36-405a-bd56-3c590c28cd54", // bulent@kebo.com
-];
-export const RAPOR_ONAYCI_ADLARI = "Murat veya Bülent";
-export const raporOnaycisiMi = (userId?: string | null): boolean =>
-  !!userId && RAPOR_ONAYCILARI.includes(userId);
+export const RAPOR_ONAYCI_ADLARI = "yönetici";
 
 export const YETKI_ANAHTARLARI: YetkiAnahtari[] = YETKILER.map(y => y.anahtar);
 

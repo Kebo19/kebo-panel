@@ -21,8 +21,8 @@ import {
   ROADRUNNER_GECIS_GUNU, KENDI_POS_GECIS_GUNU, kuryeTahsilati, roadrunnerTahsilati, KURYE_GARANTI_PAKET, YEMEK_KARTLARI, type YemekKartiAlani,
 } from "@/lib/hesap";
 import { useYetki } from "@/lib/useYetki";
-import { magicpayGorebilirMi, indirimFarkliAlanlar, INDIRIM_ALAN_ADLARI, ESKI_KAPIDA_INDIRIM_ALANLARI, type PanelRaporu } from "@/lib/magicpay";
-import { raporOnaycisiMi, RAPOR_ONAYCI_ADLARI } from "@/lib/yetki";
+import { indirimFarkliAlanlar, INDIRIM_ALAN_ADLARI, ESKI_KAPIDA_INDIRIM_ALANLARI, type PanelRaporu, type MpRaporDoldurma } from "@/lib/magicpay";
+import { RAPOR_ONAYCI_ADLARI } from "@/lib/yetki";
 import { RaporMagicpayPaneli } from "@/components/MagicpayKarsilastirma";
 import { alanEtiketi } from "@/lib/tarama";
 import { yuklemeIcinHazirla, jsonCevap } from "@/lib/gorsel";
@@ -868,10 +868,10 @@ export default function RaporlarPage() {
   // kasa_manuel_islemler okuma yetkisi (RLS) — yoksa nakit hareketleri yüklenmez/gönderilmez.
   const kasaOkur = yetki.izin("kasa") || yetki.izin("kar_zarar") || yetki.izin("rapor_analiz") || yetki.izin("anasayfa");
   const userEmail = yetki.email;
-  // Rapor açılınca yanında MagicPay karşılaştırması — sadece lib/magicpay.ts → MAGICPAY_GORENLER.
-  const magicpayGorur = magicpayGorebilirMi(yetki.userId);
-  // Rapor düzenlemelerini onaylayan / raporu doğrudan düzenleyip silen: sadece Murat ve Bülent.
-  const onayci = raporOnaycisiMi(yetki.userId);
+  // Rapor açılınca yanında MagicPay karşılaştırması — "magicpay" yetkisi.
+  const magicpayGorur = yetki.izin("magicpay");
+  // Rapor düzenlemelerini onaylayan / raporu doğrudan düzenleyip silen: "rapor_onay" yetkisi.
+  const onayci = yetki.izin("rapor_onay");
 
   // ── Auth & Data ──
   const [loading, setLoading] = useState(true);
@@ -1016,6 +1016,9 @@ export default function RaporlarPage() {
   const [mpIndirim, setMpIndirim] = useState<Record<string, number> | null>(null);
   const [mpIndirimDurum, setMpIndirimDurum] = useState<"bos" | "yukleniyor" | "hazir" | "yok" | "hata">("bos");
   const [mpIndirimHata, setMpIndirimHata] = useState("");
+  // MagicPay'den formu doldurma verisi (satışlar, Alo, POS, yemek kartları) ve forma yazıldı mı
+  const [mpDoldurma, setMpDoldurma] = useState<MpRaporDoldurma | null>(null);
+  const [mpFormaYazildi, setMpFormaYazildi] = useState(false);
   // Hangi tarih için MagicPay indirimleri forma yazıldı (geç gelen cevap kullanıcının girdiğini ezmesin)
   const mpDolduruldu = useRef("");
   const formAlaniRef = useRef<HTMLDivElement>(null);
@@ -1131,6 +1134,27 @@ export default function RaporlarPage() {
     const tum = mpTumIndirimler(m);
     for (const [alan, set] of Object.entries(indirimSetleri)) set(paraYaz(tum[alan] || 0));
   };
+  /** MagicPay'in kapsadığı her şeyi forma yazar (Kıraloğlu Migros, nakit sayımı, gider, kurye hariç). */
+  const magicleDoldur = (d: MpRaporDoldurma) => {
+    const pg = (t: number, p: number): PlatformGiris => ({ tutar: t ? paraYaz(t) : "", paket: p ? String(p) : "" });
+    const ayarla: Record<string, React.Dispatch<React.SetStateAction<PlatformGiris>>> = {
+      os_kebo_ys: setOsKeboYs, os_kebo_trendyol: setOsKeboTrendyol, os_kebo_migros: setOsKeboMigros,
+      os_cnf_ys: setOsCnfYs, os_cnf_trendyol: setOsCnfTrendyol, os_cnf_migros_yemek: setOsCnfMigrosYemek,
+      os_kir_ys: setOsKirYs, os_kir_trendyol: setOsKirTrendyol,
+      ko_cnf_ys: setKoCnfYs, ko_cnf_trendyol: setKoCnfTrendyol, ko_cnf_migros_yemek: setKoCnfMigrosYemek,
+      ko_kir_ys: setKoKirYs, ko_kir_trendyol: setKoKirTrendyol,
+    };
+    for (const [alan, v] of Object.entries(d.platform)) ayarla[alan]?.(pg(v.tutar, v.paket));
+    // Kebo kapıda (nakit/POS ayrımı bilinmiyor → nakit), paket online sütununda
+    (["ys", "trendyol", "migros"] as const).forEach(k => kapidaNPYaz(k, d.kapidaKebo[k] ? paraYaz(d.kapidaKebo[k]) : "", ""));
+    setKoKeboYs(o => ({ ...o, paket: "" })); setKoKeboTrendyol(o => ({ ...o, paket: "" })); setKoKeboMigrosYemek(o => ({ ...o, paket: "" }));
+    setOsKeboAlo(o => ({ ...o, tutar: "", paket: "" }));
+    aloYaz(d.alo.nakit ? paraYaz(d.alo.nakit) : "", d.alo.pos ? paraYaz(d.alo.pos) : "", d.alo.paket ? String(d.alo.paket) : "");
+    setKasaPos(d.kasa.pos ? paraYaz(d.kasa.pos) : "");
+    setKartlar(o => ({ ...o, ...Object.fromEntries(YEMEK_KARTLARI.map(k => [k.alan, d.kasa.kartlar[k.alan] ? paraYaz(d.kasa.kartlar[k.alan]) : ""])) }));
+    indirimleriMagicleDoldur(d.indirimler);
+    setMpFormaYazildi(true);
+  };
   const mpIndirimHazir = mpIndirimDurum === "hazir" && !!mpIndirim;
   /** Elle değiştirilmiş (MagicPay'den farklı) indirim alanları. */
   const indirimFarklari: string[] = mpIndirimHazir ? indirimFarkliAlanlar(mpIndirim!, formIndirimleri) : [];
@@ -1145,22 +1169,23 @@ export default function RaporlarPage() {
   const yeniRaporFormu = !selectedRapor;
   useEffect(() => {
     if (!formAcik || !/^\d{4}-\d{2}-\d{2}$/.test(tarih) || tarih > bugun()) {
-      setMpIndirim(null); setMpIndirimDurum("bos"); setMpIndirimHata(""); return;
+      setMpIndirim(null); setMpIndirimDurum("bos"); setMpIndirimHata(""); setMpDoldurma(null); return;
     }
     let iptal = false;
-    setMpIndirim(null); setMpIndirimDurum("yukleniyor"); setMpIndirimHata("");
+    setMpIndirim(null); setMpIndirimDurum("yukleniyor"); setMpIndirimHata(""); setMpDoldurma(null); setMpFormaYazildi(false);
     (async () => {
       try {
         const res = await fetch(`/api/magicpay-karsilastirma?kapsam=indirim&start=${tarih}&end=${tarih}`, { cache: "no-store" });
         const d = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(d?.error || `HTTP ${res.status}`);
-        const gun = ((d.gunler || []) as { tarih: string; indirimler: Record<string, number> }[]).find(g => g.tarih === tarih);
+        const gun = ((d.gunler || []) as { tarih: string; indirimler: Record<string, number>; doldurma?: MpRaporDoldurma }[]).find(g => g.tarih === tarih);
         if (iptal) return;
         if (!gun) { setMpIndirimDurum("yok"); return; }
-        setMpIndirim(gun.indirimler); setMpIndirimDurum("hazir");
+        setMpIndirim(gun.indirimler); setMpIndirimDurum("hazir"); setMpDoldurma(gun.doldurma ?? null);
+        // Yeni raporda MagicPay'de olan her şey forma yazılır; dükkân sadece sayımı ve elle kalanları girer.
         if (yeniRaporFormu && mpDolduruldu.current !== tarih) {
           mpDolduruldu.current = tarih;
-          indirimleriMagicleDoldur(gun.indirimler);
+          if (gun.doldurma) magicleDoldur(gun.doldurma); else indirimleriMagicleDoldur(gun.indirimler);
         }
       } catch (e) {
         if (!iptal) { setMpIndirimDurum("hata"); setMpIndirimHata(e instanceof Error ? e.message : "Bilinmeyen hata."); }
@@ -1224,7 +1249,7 @@ export default function RaporlarPage() {
     setNotlar("");setSelectedRapor(null);setIsEditMode(false);
     setTaramaHata(""); setTaramaBelirsizAlanlar([]);
     setTaramaIleDoldu(false); setTaramaTarihNotu(""); setKontrolOnay(false); setTarihOnaylandi(false); setTaramaKontrol({}); setFarkOnay(false);
-    mpDolduruldu.current = "";
+    mpDolduruldu.current = ""; setMpFormaYazildi(false);
   };
 
   /** Yeni rapor: formu temizler, tarih adımını sıradaki günle hazır açar. */
@@ -2164,6 +2189,29 @@ export default function RaporlarPage() {
                 </span>
               </div>
               <div className="p-3 space-y-2">
+                {!isReadOnly && mpDoldurma && (
+                  <div className={`text-[12px] rounded-lg px-3 py-2.5 border space-y-1.5 ${mpFormaYazildi ? "text-emerald-200 bg-emerald-500/10 border-emerald-500/25" : "text-sky-200 bg-sky-500/10 border-sky-500/25"}`}>
+                    {mpFormaYazildi ? (
+                      <p className="font-bold">✓ MagicPay&apos;den dolduruldu: platform satışları ve paketler, Alo Paket, kasa POS, yemek kartları, indirimler.</p>
+                    ) : (
+                      <p className="font-bold">Bu günün satışları MagicPay&apos;de hazır.</p>
+                    )}
+                    <p>
+                      Sizin girmeniz gerekenler: <b>kasa nakit sayımı</b>
+                      {mpDoldurma.kasa.nakit > 0 && <> (MagicPay&apos;e göre masa nakdi ₺{fmt(mpDoldurma.kasa.nakit)} − gider ₺{fmt(ch.tGider)} = <b>₺{fmt(mpDoldurma.kasa.nakit - ch.tGider)}</b> olmalı)</>}
+                      , <b>giderler</b>, <b>kuryeler</b> ve <b>Kıraloğlu Migros</b> (MagicPay&apos;de yok).
+                    </p>
+                    {mpDoldurma.uyarilar.length > 0 && (
+                      <ul className="list-disc pl-4 space-y-0.5 text-amber-200">
+                        {mpDoldurma.uyarilar.map((u, i) => <li key={i}>{u}</li>)}
+                      </ul>
+                    )}
+                    <button type="button" onClick={() => magicleDoldur(mpDoldurma)}
+                      className="text-[11px] font-semibold border border-current/40 rounded-md px-2 py-1 hover:bg-white/5">
+                      {mpFormaYazildi ? "MagicPay değerlerine geri dön" : "Satışları MagicPay'den doldur"}
+                    </button>
+                  </div>
+                )}
                 <div className={`hidden ${SATIS_IZGARA} text-[11px] font-bold text-gray-500 px-0.5`}>
                   <span/>
                   <span className="text-right pr-3">Online ₺</span><span className="text-center">Paket</span>

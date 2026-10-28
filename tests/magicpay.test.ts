@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
-  mpGunCoz, kanalBul, masaOdemeKalemi, paketOdemeTuru, gunuKarsilastir, magicpayGorebilirMi,
+  mpGunCoz, kanalBul, masaOdemeKalemi, paketOdemeTuru, gunuKarsilastir,
   mpIndirimAlanlari, indirimFarkliAlanlar,
   type PanelRaporu,
 } from "@/lib/magicpay";
 import { menuGorunurMu, MENU } from "@/lib/menu";
+import { sayfaErisimi } from "@/lib/yetki";
 
 // 01.10.2026 Çorum, MagicPay /reports/turnover/daily cevabından (kısaltılmış)
 const HAM = {
@@ -48,19 +49,15 @@ const satirBul = (k: ReturnType<typeof gunuKarsilastir>, bolum: string, ad: stri
   k.bolumler.find(b => b.baslik.startsWith(bolum))!.satirlar.find(s => s.ad === ad)!;
 
 describe("MagicPay erişimi", () => {
-  it("sadece Murat görebilir", () => {
-    expect(magicpayGorebilirMi("c4d199e9-e0b7-4d33-8ad8-556f7d488bac")).toBe(true);
-    expect(magicpayGorebilirMi("e75d458f-1c36-405a-bd56-3c590c28cd54")).toBe(true); // Bülent
-    expect(magicpayGorebilirMi("08e2388a-f033-4255-aebc-f976d6eac338")).toBe(false); // Bekir (Tam Yetkili)
-    expect(magicpayGorebilirMi("")).toBe(false);
-    expect(magicpayGorebilirMi(null)).toBe(false);
-  });
-  it("menü öğesi Tam Yetkili'ye bile görünmez", () => {
+  it("menü öğesi 'magicpay' yetkisine bağlı", () => {
     const oge = MENU.ust.find(m => m.href === "/magicpay")!;
-    const tamYetkili = { tamYetkili: true, izin: () => true };
-    expect(menuGorunurMu(oge, { ...tamYetkili, userId: "e75d458f-1c36-405a-bd56-3c590c28cd54" })).toBe(true); // Bülent
-    expect(menuGorunurMu(oge, { ...tamYetkili, userId: "08e2388a-f033-4255-aebc-f976d6eac338" })).toBe(false); // Bekir
-    expect(menuGorunurMu(oge, { ...tamYetkili, userId: "c4d199e9-e0b7-4d33-8ad8-556f7d488bac" })).toBe(true);
+    expect(menuGorunurMu(oge, { userId: "x", tamYetkili: false, izin: a => a === "magicpay" })).toBe(true);
+    expect(menuGorunurMu(oge, { userId: "x", tamYetkili: false, izin: a => a === "rapor_gir" })).toBe(false);
+  });
+  it("sayfa 'magicpay' yetkisi ister (Tam Yetkili hep görür)", () => {
+    expect(sayfaErisimi("Tam Yetkili", [], "/magicpay")).toBe(true);
+    expect(sayfaErisimi("Müdür", ["rapor_gir"], "/magicpay")).toBe(false);
+    expect(sayfaErisimi("Müdür", ["magicpay"], "/magicpay")).toBe(true);
   });
   it("anasayfa kısayolları kaymadı", () => {
     expect([MENU.ust[1], MENU.finans[0], MENU.ust[2], MENU.ust[6]].map(m => m.href))

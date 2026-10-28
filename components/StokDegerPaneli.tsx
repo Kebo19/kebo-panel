@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { Boxes, ChevronDown, RefreshCw, AlertTriangle, Search, Bot, Tags } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useYetki } from "@/lib/useYetki";
-import { stokDegerGorebilirMi, stokDegerOzeti, type StokDegerSatiri } from "@/lib/stokDeger";
+import { stokDegerOzeti, type StokDegerSatiri } from "@/lib/stokDeger";
 
 const fmt2 = (v: number) => new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 const fmtM = (v: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(v);
@@ -28,8 +28,8 @@ const KAT_RENK = ["#34d399", "#f0a94b", "#60a5fa", "#c084fc", "#f472b6", "#facc1
 
 /** Depodaki malın TL değeri. Sadece STOK_DEGER_GORENLER görür; diğerlerine hiçbir şey çizilmez. */
 export default function StokDegerPaneli() {
-  const { userId, yukleniyor: yetkiYukleniyor } = useYetki();
-  const gorebilir = stokDegerGorebilirMi(userId);
+  const { izin, yukleniyor: yetkiYukleniyor } = useYetki();
+  const gorebilir = izin("stok_deger");
   const [satirlar, setSatirlar] = useState<StokDegerSatiri[] | null>(null);
   const [hata, setHata] = useState<string | null>(null);
   const [yenileniyor, setYenileniyor] = useState(false);

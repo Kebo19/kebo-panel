@@ -3,10 +3,9 @@
 // rakamlarını elle girilen Kasa Raporu ile karşılaştırır. Hiçbir şey
 // kaydetmez/değiştirmez; sadece "nerede fark var" sorusunu cevaplar.
 //
-// Karşılaştırma ekranını SADECE `MAGICPAY_GORENLER` listesindeki kullanıcılar
-// görür (proxy.ts sayfayı, /api/magicpay-karsilastirma veriyi korur). Diğer
-// kullanıcılar API'den sadece platform indirimlerini alır (`kapsam=indirim`):
-// Kasa Raporu'ndaki indirim hücreleri bununla otomatik doldurulur.
+// Karşılaştırma ekranını "magicpay" yetkisi olanlar görür (proxy.ts sayfayı,
+// /api/magicpay-karsilastirma veriyi korur). Kasa Raporu girenler API'den sadece
+// formu dolduracak değerleri alır (`kapsam=indirim`, bkz. mpRaporDoldurma).
 //
 // MagicPay'deki adlar → panel alanları:
 //   • Paket kanalları (online_source_breakdown): marka adında "kıraloğlu" geçen Kıraloğlu, "chick/chikn" geçen
@@ -21,18 +20,7 @@
 //     içerir ("KREDİ KARTI", "kart", "Pos", "NAKİT"...). Kapıda tahsil edilenler
 //     panelde kurye satırlarındaki nakit/POS ile karşılaştırılır.
 
-/**
- * MagicPay karşılaştırmasını görebilenler (auth kullanıcı id'leri):
- * Murat Can Çömüz (murat@kebo.com) ve Bülent Çöphüseyinoğlu (bulent@kebo.com).
- * Diğer kullanıcılar MagicPay'den sadece platform indirimlerini çeker (Kasa Raporu'na otomatik yazılır).
- */
-export const MAGICPAY_GORENLER: readonly string[] = [
-  "c4d199e9-e0b7-4d33-8ad8-556f7d488bac", // murat@kebo.com
-  "e75d458f-1c36-405a-bd56-3c590c28cd54", // bulent@kebo.com
-];
 export const MAGICPAY_SAYFASI = "/magicpay";
-export const magicpayGorebilirMi = (userId?: string | null): boolean =>
-  !!userId && MAGICPAY_GORENLER.includes(userId);
 
 // ─── MagicPay verisi (API route'un döndürdüğü sade biçim) ───────────────────
 
@@ -399,4 +387,124 @@ export function mpIndirimAlanlari(gun: MpGun | null | undefined): Record<string,
 export function indirimFarkliAlanlar(magic: Record<string, number>, form: Record<string, number>): string[] {
   const alanlar = [...Object.values(INDIRIM_ALANLARI), ...ESKI_KAPIDA_INDIRIM_ALANLARI];
   return alanlar.filter(a => Math.abs((form[a] || 0) - (magic[a] || 0)) > 0.01);
+}
+
+// ─── MagicPay → Kasa Raporu formunu doldurma ────────────────────────────────
+// Kasa raporu girişini kısaltmak için: MagicPay'de olan her şey forma otomatik yazılır,
+// dükkân sadece sayabildiğini girer (nakit sayımı, giderler, kuryeler, Kıraloğlu Migros).
+//   • Platform satışları (marka × platform): brüt tutar ve paket → online sütunu.
+//     Platform "kapıda ödeme" (…_ON_DELIVERY) tutarı o platformun Kebo satırına kapıda olarak
+//     yazılır, online'dan düşülür (MagicPay kapıdayı markaya göre ayırmıyor; nakit/POS ayrımı
+//     da yok → nakit kutusuna yazılır, uyarı verilir).
+//   • Alo Paket (LOCAL): kapıda nakit / POS (paket ödemelerindeki serbest adlardan), paket sayısı.
+//   • Kasa: POS (masa "card") ve türü belli yemek kartları. NAKİT SAYIMI DOLDURULMAZ (sayılır);
+//     MagicPay'e göre beklenen nakit (masa nakit − günlük gider) sadece ipucu olarak döner.
+//   • Kıraloğlu Migros MagicPay'de yok: elle girilir, dokunulmaz.
+
+/** Form alanı adları: online ve kapıda tutar/paket. */
+export const ONLINE_ALANI: Record<Exclude<Kanal, "alo" | "diger">, string> = {
+  kebo_ys: "os_kebo_ys", kebo_trendyol: "os_kebo_trendyol", kebo_migros: "os_kebo_migros",
+  cnf_ys: "os_cnf_ys", cnf_trendyol: "os_cnf_trendyol", cnf_migros: "os_cnf_migros_yemek",
+  kir_ys: "os_kir_ys", kir_trendyol: "os_kir_trendyol", kir_migros: "os_kir_migros_yemek",
+};
+export const KAPIDA_ALANI: Record<Exclude<Kanal, "alo" | "diger">, string> = {
+  kebo_ys: "ko_kebo_ys", kebo_trendyol: "ko_kebo_trendyol", kebo_migros: "ko_kebo_migros_yemek",
+  cnf_ys: "ko_cnf_ys", cnf_trendyol: "ko_cnf_trendyol", cnf_migros: "ko_cnf_migros_yemek",
+  kir_ys: "ko_kir_ys", kir_trendyol: "ko_kir_trendyol", kir_migros: "ko_kir_migros_yemek",
+};
+/** MagicPay'de olmayan, elle girilen kanallar. */
+export const ELLE_KANALLAR: Exclude<Kanal, "alo" | "diger">[] = ["kir_migros"];
+
+export interface MpRaporDoldurma {
+  /** os_* / ko_* alanı → { tutar, paket } (sadece MagicPay'in kapsadığı kanallar) */
+  platform: Record<string, { tutar: number; paket: number }>;
+  /** Kebo satırlarındaki platform kapıda ödemesi (nakit/POS ayrımı bilinmiyor) */
+  kapidaKebo: { ys: number; trendyol: number; migros: number };
+  alo: { nakit: number; pos: number; belirsiz: number; paket: number; tutar: number };
+  indirimler: Record<string, number>;
+  kasa: { pos: number; kartlar: Record<string, number>; nakit: number; tanimsizKart: number };
+  uyarilar: string[];
+}
+
+const PLATFORM_KOD: Record<string, "ys" | "trendyol" | "migros"> = { yemeksepeti: "ys", trendyol: "trendyol", migros: "migros" };
+const tl = (x: number) => "₺" + Math.round(x).toLocaleString("tr-TR");
+
+export function mpRaporDoldurma(gun: MpGun): MpRaporDoldurma {
+  const uyarilar: string[] = [];
+  // 1) Kanal toplamları
+  const kanal: Partial<Record<Kanal, { brut: number; siparis: number }>> = {};
+  for (const k of gun.kaynaklar) {
+    const c = kanalBul(k);
+    const t = (kanal[c] ||= { brut: 0, siparis: 0 });
+    t.brut += k.brut; t.siparis += k.siparis;
+  }
+  if (kanal.diger?.brut) uyarilar.push(`MagicPay'de eşleşmeyen bir satış kanalı var (${tl(kanal.diger.brut)}); forma yazılmadı, elle kontrol edin.`);
+
+  // 2) Paket ödemeleri: platform kapıda (…_ON_DELIVERY) ve Alo (serbest adlar)
+  const kapida = { ys: 0, trendyol: 0, migros: 0 };
+  const alo = { nakit: 0, pos: 0, belirsiz: 0, paket: kanal.alo?.siparis || 0, tutar: kurus(kanal.alo?.brut || 0) };
+  let aloYemek = 0;
+  for (const [ad, v] of Object.entries(gun.paketOdeme)) {
+    const a = sade(ad);
+    const platform = /^(yemeksepeti|trendyol|migros|getir)_/.exec(a)?.[1];
+    if (platform) {
+      if (/on_delivery/.test(a) && PLATFORM_KOD[platform]) kapida[PLATFORM_KOD[platform]] += v;
+      continue; // platform online ödemesi
+    }
+    const t = paketOdemeTuru(ad);
+    if (t === "kapida_nakit") alo.nakit += v;
+    else if (t === "kapida_kart") alo.pos += v;
+    else if (t === "kapida_yemek" || /meal/.test(a)) aloYemek += v;
+    else alo.belirsiz += v;
+  }
+  // Alo'da türü belli olmayan tutar nakde yazılır (toplam tutmalı); kullanıcı düzeltebilir.
+  if (alo.belirsiz > 0.01) uyarilar.push(`Alo Paket'te ${tl(alo.belirsiz)} ödemenin türü MagicPay'de seçilmemiş; nakde yazıldı, POS ise düzeltin.`);
+  if (aloYemek > 0.01) uyarilar.push(`Alo Paket'te ${tl(aloYemek)} kapıda yemek kartı var; nakde yazıldı. Token Flex / Paye ise kurye satırına da yazın.`);
+  alo.nakit = kurus(alo.nakit + alo.belirsiz + aloYemek);
+  alo.pos = kurus(alo.pos);
+
+  // 3) Platform satırları: online = brüt − (Kebo'ya yazılan kapıda)
+  const platformAlanlari: MpRaporDoldurma["platform"] = {};
+  for (const c of Object.keys(ONLINE_ALANI) as (keyof typeof ONLINE_ALANI)[]) {
+    if (ELLE_KANALLAR.includes(c)) continue;
+    platformAlanlari[ONLINE_ALANI[c]] = { tutar: kurus(kanal[c]?.brut || 0), paket: kanal[c]?.siparis || 0 };
+    platformAlanlari[KAPIDA_ALANI[c]] = { tutar: 0, paket: 0 };
+  }
+  const kapidaKebo = { ys: 0, trendyol: 0, migros: 0 };
+  for (const p of ["ys", "trendyol", "migros"] as const) {
+    let kalan = kurus(kapida[p]);
+    if (kalan <= 0) continue;
+    // Önce Kebo, yetmezse CNF, sonra Kıraloğlu satırının online tutarından düşülür.
+    for (const marka of ["kebo", "cnf", "kir"] as const) {
+      const c = `${marka}_${p}` as keyof typeof ONLINE_ALANI;
+      if (ELLE_KANALLAR.includes(c) || kalan <= 0) continue;
+      const on = platformAlanlari[ONLINE_ALANI[c]];
+      const al = Math.min(kalan, on.tutar);
+      if (al <= 0) continue;
+      on.tutar = kurus(on.tutar - al);
+      if (marka === "kebo") kapidaKebo[p] = kurus(kapidaKebo[p] + al);
+      else platformAlanlari[KAPIDA_ALANI[c]].tutar = kurus(platformAlanlari[KAPIDA_ALANI[c]].tutar + al);
+      kalan = kurus(kalan - al);
+    }
+    const ad = p === "ys" ? "Yemeksepeti" : p === "trendyol" ? "Trendyol" : "Migros";
+    uyarilar.push(`${ad} kapıda ödeme ${tl(kapida[p])}: MagicPay nakit/POS ayırmıyor, nakde yazıldı; kurye kartla aldıysa POS'a taşıyın.`);
+  }
+
+  // 4) Kasa (masa ödemeleri)
+  const kartlar: Record<string, number> = {};
+  let pos = 0, nakit = 0, tanimsizKart = 0;
+  for (const [ad, v] of Object.entries(gun.masaOdeme)) {
+    const k = masaOdemeKalemi(ad);
+    if (k === "pos") pos += v;
+    else if (k === "nakit") nakit += v;
+    else if (k === "yemek_tanimsiz") tanimsizKart += v;
+    else kartlar[k] = kurus((kartlar[k] || 0) + v);
+  }
+  if (tanimsizKart > 0.01) uyarilar.push(`Kasada ${tl(tanimsizKart)} yemek kartının türü MagicPay'de seçilmemiş; doğru karta elle yazın.`);
+
+  return {
+    platform: platformAlanlari, kapidaKebo, alo, indirimler: mpIndirimAlanlari(gun),
+    kasa: { pos: kurus(pos), kartlar, nakit: kurus(nakit), tanimsizKart: kurus(tanimsizKart) },
+    uyarilar,
+  };
 }

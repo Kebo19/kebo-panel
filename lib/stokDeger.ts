@@ -4,16 +4,8 @@
 // Fiyatlar Mikro e-Portal'daki gelen faturalardan gelir; her sabah zamanlanmış
 // görev yeni faturaları okuyup stok_fiyatlar tablosunu günceller.
 //
-// Paneli SADECE `STOK_DEGER_GORENLER` listesindekiler görür (rol/yetki yetmez).
-// Asıl koruma veritabanında: public.stok_deger_raporu() yalnızca
-// stok_deger_izinli tablosundaki kullanıcılara veri döner. Birini eklerken ikisine de ekleyin.
-
-export const STOK_DEGER_GORENLER: readonly string[] = [
-  "c4d199e9-e0b7-4d33-8ad8-556f7d488bac", // murat@kebo.com
-  "e75d458f-1c36-405a-bd56-3c590c28cd54", // bulent@kebo.com
-];
-export const stokDegerGorebilirMi = (userId?: string | null): boolean =>
-  !!userId && STOK_DEGER_GORENLER.includes(userId);
+// Paneli "stok_deger" yetkisi olanlar görür (Ayarlar > Kullanıcılar ve yetkiler; Tam Yetkili'de hep var).
+// Asıl koruma veritabanında: public.stok_deger_yetkili() = kebo_izin('stok_deger').
 
 /** public.stok_deger_raporu() satırı (numeric alanlar Supabase'den metin ya da sayı gelebilir) */
 export interface StokDegerSatiri {

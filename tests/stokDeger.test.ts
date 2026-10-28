@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { stokDegerOzeti, stokDegerGorebilirMi, type StokDegerSatiri } from "@/lib/stokDeger";
+import { stokDegerOzeti, type StokDegerSatiri } from "@/lib/stokDeger";
+import { sayfaErisimi } from "@/lib/yetki";
 
 const satir = (p: Partial<StokDegerSatiri>): StokDegerSatiri => ({
   urun_id: "x", urun_adi: "Ürün", kategori: "Donuk", birim: "kg", mevcut_stok: 0,
@@ -26,10 +27,9 @@ describe("stok değeri", () => {
     expect(o.sonFiyatGuncelleme).toBe("2026-10-02T01:00:00Z");
   });
 
-  it("sadece listedekiler görür", () => {
-    expect(stokDegerGorebilirMi("c4d199e9-e0b7-4d33-8ad8-556f7d488bac")).toBe(true);
-    expect(stokDegerGorebilirMi("e75d458f-1c36-405a-bd56-3c590c28cd54")).toBe(true);
-    expect(stokDegerGorebilirMi("08e2388a-f033-4255-aebc-f976d6eac338")).toBe(false);
-    expect(stokDegerGorebilirMi(null)).toBe(false);
+  it("Fiyat Listesi 'stok_deger' yetkisi ister", () => {
+    expect(sayfaErisimi("Tam Yetkili", [], "/fiyatlar")).toBe(true);
+    expect(sayfaErisimi("Müdür", ["stok"], "/fiyatlar")).toBe(false);
+    expect(sayfaErisimi("Müdür", ["stok_deger"], "/fiyatlar")).toBe(true);
   });
 });
