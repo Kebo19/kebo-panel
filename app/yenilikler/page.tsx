@@ -4,6 +4,16 @@ import { Sparkles } from "lucide-react";
 // başına bir öğe eklemek yeterli.
 const SURUMLER: { tarih: string; baslik: string; maddeler: string[] }[] = [
   {
+    tarih: "28.10.2026",
+    baslik: "Kullanıcı yönetimi ve şifreler",
+    maddeler: [
+      "Ayarlar > Kullanıcılar ve yetkiler: kullanıcı ekleme, silme ve kişi bazında yetki verme tek ekranda.",
+      "Şifresini unutan kişiye \"Yeni şifre ver\" ile geçici şifre verilir; şifre yöneticiye görünür, kişinin açık oturumları kapanır.",
+      "Geçici şifreyle giren kişi Profil sayfasına yönlenir ve kendi şifresini belirler; bundan sonra şifresi kimseye görünmez.",
+      "Herkes Ayarlar > Şifremi değiştir'den kendi şifresini değiştirebilir.",
+    ],
+  },
+  {
     tarih: "02.10.2026",
     baslik: "Kredi kartları ve yemek kartı alacakları",
     maddeler: [

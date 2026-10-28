@@ -34,14 +34,15 @@ export default function LoginPage() {
       if (error) throw error;
       if (data.session) {
         yetkiOnbelleginiTemizle();
-        const { data: profil } = await supabase.from("profiles").select("role, yetkiler").eq("id", data.session.user.id).maybeSingle();
+        const { data: profil } = await supabase.from("profiles").select("role, yetkiler, sifre_degismeli").eq("id", data.session.user.id).maybeSingle();
         const rol = rolCoz(profil?.role);
         if (rol !== TAM_YETKILI && rol !== MUDUR) {
           await supabase.auth.signOut();
           setError(PASIF_MESAJ);
           return;
         }
-        router.push(anaSayfaBul(rol, yetkilerCoz(profil?.yetkiler)));
+        // Yöneticinin verdiği geçici şifreyle girdiyse önce kendi şifresini belirlesin.
+        router.push(profil?.sifre_degismeli ? "/profil#sifre" : anaSayfaBul(rol, yetkilerCoz(profil?.yetkiler)));
         router.refresh();
       }
     } catch {
@@ -166,7 +167,7 @@ export default function LoginPage() {
 
         {/* Alt not */}
         <p className="text-center text-[11px] text-gray-500 mt-6">
-          Erişim sorununuz varsa yöneticinizle iletişime geçin.
+          Şifrenizi unuttuysanız Murat veya Bülent&apos;ten yeni şifre isteyin.
         </p>
 
       </div>

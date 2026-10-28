@@ -1,6 +1,6 @@
 # KEBO PANEL — DEVAM NOTU (yeni sohbete başlarken okunacak)
 
-Son güncelleme: 28.10.2026
+Son güncelleme: 28.10.2026 (gece)
 
 ## Proje
 - BCM Restoran (Kebo franchise + Chick'N Fride + Kıraloğlu, Çorum) yönetim paneli: https://kebo-panel.vercel.app
@@ -19,10 +19,11 @@ Son güncelleme: 28.10.2026
 - **Telegram asistanı** (@Kebobcm_bot, `lib/telegram/*`, `/api/telegram/*`): soru-cevap (Gemini, kullanıcının yetkisi kadar veri), fotoğraf (kasa formu → Raporlar'da "Telegram'dan gelenler", sayım kağıdı → okunur ve Kaydet ile stoğa, irsaliye → Stok), sabah özeti (~10:00) ve öğlen uyarısı (~12:00, Vercel cron), komutlar: /ozet /odemeler /stok /robot /mikro /stokgiris /belge /bildirim /ayril. Murat bağlı.
 - **Faturadan stok girişi (onaylı)** (`stok_giris_onerileri`, `stok_kalem_eslesme`, `components/StokGirisOnay.tsx`): Mikro'dan gelen her fatura kalemi "stoğa işlensin mi?" diye bekler; eşleşmiş kalemde ürün+çarpan hazır (ör. 3 koli × 10 = 30 kg); seçim hatırlanır; "takip etme" ile elektrik vb. bir daha sorulmaz; Telegram'a fatura bazında butonlu mesaj gider.
 - **İrsaliye önce, fatura sonra** (`_irsaliye_eslesme`, `_irsaliye_bagla`): mal gelince irsaliye girilip teslim alınır (stoğa girer). Fatura gelince aynı VKN'li yakın tarihli irsaliye bulunur, kalem kalem karşılaştırılır (irsaliye 20 / fatura 24 → +4); "irsaliyeye bağla" stoğa ikinci kez girmez, istenirse fark faturaya göre düzeltilir; eşleşmeyen kalem irsaliyedeki ürüne elle bağlanınca çarpan öğrenilir.
+- **Kullanıcı yönetimi (28.10 gece)** (`app/ayarlar/yetkiler`, migration `20261028200000_kullanici_yonetimi.sql`): Ayarlar → Kullanıcılar ve yetkiler'de ekleme / silme / yetki / "Yeni şifre ver". Hepsi veritabanı fonksiyonu (`kullanici_olustur`, `kullanici_sil`, `kullanici_sifre_belirle`, `sifremi_degistir`) — service_role anahtarı GEREKMEZ. Yöneticinin verdiği geçici şifre `kullanici_sifreleri` tablosunda (sadece Tam Yetkili okur) durur ve panelde görünür; `profiles.sifre_degismeli` true olan kişi girişte `/profil#sifre`'ye gider, kendi şifresini koyunca kayıt silinir (kendi şifresi bcrypt, kimse göremez). Kendini ve son Tam Yetkili'yi silemez. Ayşe (ayse@kebo.com) 28.10'da silindi; kullanıcılar: Murat, Bülent (Tam Yetkili), Bekir (Müdür). Migration Supabase'e uygulandı.
 - **İrsaliye ↔ fatura sorgusu**: Stok ve Faturalar sayfasında "İrsaliye ↔ fatura" arama kutusu; Telegram'da `/belge <no ya da firma>` ve serbest soru.
 
 ## Bekleyenler / sıradaki işler
-1. **28.10 akşamı yazılan son değişiklikler (faturadan stok girişi, irsaliye eşleştirme, belge arama) henüz yayınlanmadı** → `yayinla.bat` çalıştırılmalı, sonra Ayarlar → Telegram → "Kurulumu yenile" (yeni komutlar menüye gelsin).
+1. **28.10 akşamı yazılan son değişiklikler (faturadan stok girişi, irsaliye eşleştirme, belge arama, kullanıcı yönetimi/şifreler) henüz yayınlanmadı** → `yayinla.bat` çalıştırılmalı, sonra Ayarlar → Telegram → "Kurulumu yenile" (yeni komutlar menüye gelsin). Yayından sonra kullanıcı yönetimi canlıda denenmeli (deneme kullanıcısı ekle → giriş → şifre değiştir → sil).
 2. Dükkân bilgisayarına Mikro robotunu kurmak (`mikro-robot-kurulum.zip` → Chrome + Node.js LTS → `KURULUM.bat`).
 3. Kullanıcı: ürünlere sayım yeri ata, minimum stokları gözden geçir ('1' olanlar yer tutucu), envanter ürünlerini ve içecekleri (ayran, kola…) stok listesine ekle. `Stok-Sayim-Listeleri.xlsx` dolu gelirse panele toplu işlenecek.
 4. **Reçeteler** kullanıcıdan gelecek → `receteler` tablosuna gir (menü ürünü adı MagicPay'deki adla aynı olmalı).

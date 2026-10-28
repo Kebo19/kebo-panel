@@ -6,7 +6,7 @@ import { yetkiOnbelleginiTemizle, useYetki } from "@/lib/useYetki";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import TelegramAyari from "@/components/TelegramAyari";
-import { LogOut, User, History, MessageSquareWarning, Sparkles, ChevronRight, ShieldCheck } from "lucide-react";
+import { LogOut, User, History, MessageSquareWarning, Sparkles, ChevronRight, ShieldCheck, KeyRound } from "lucide-react";
 
 export default function AyarlarPage() {
   const supabase = createClient();
@@ -16,12 +16,13 @@ export default function AyarlarPage() {
 
   const kartlar = [
     ...(tamYetkili ? [
-      { href: "/ayarlar/yetkiler", icon: ShieldCheck, baslik: "Yetkilendirme", aciklama: "Kullanıcı ekleme ve kişi bazında erişim yetkileri" },
+      { href: "/ayarlar/yetkiler", icon: ShieldCheck, baslik: "Kullanıcılar ve yetkiler", aciklama: "Kullanıcı ekleme / silme, erişim yetkileri, şifre yenileme" },
     ] : []),
     ...(izin("yonetim") ? [
       { href: "/ayarlar/gecmis", icon: History, baslik: "İşlem geçmişi", aciklama: "Kim, neyi, ne zaman ekledi / değiştirdi / sildi" },
       { href: "/ayarlar/bildirimler", icon: MessageSquareWarning, baslik: "Sorun bildirimleri ve hata kayıtları", aciklama: "Kullanıcıların bildirdiği sorunlar ve sistem hataları" },
     ] : []),
+    { href: "/profil#sifre", icon: KeyRound, baslik: "Şifremi değiştir", aciklama: "Kendi giriş şifrenizi değiştirin" },
     { href: "/yenilikler", icon: Sparkles, baslik: "Yenilikler", aciklama: "Panele eklenen son özellikler" },
   ];
 

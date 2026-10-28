@@ -11,6 +11,7 @@ import {
 } from "@/lib/yetki";
 import {
   ArrowLeft, Loader2, ShieldCheck, UserPlus, X, Check, RefreshCw, Info, Save, KeyRound,
+  Trash2, Copy, Eye, EyeOff, AlertTriangle,
 } from "lucide-react";
 
 interface Kullanici {
@@ -19,6 +20,15 @@ interface Kullanici {
   full_name: string | null;
   role: Rol | null;
   yetkiler: YetkiAnahtari[];
+  /** Yöneticinin verdiği ve kullanıcının henüz değiştirmediği geçici şifre. */
+  geciciSifre: { sifre: string; tarih: string; belirleyen: string | null } | null;
+}
+
+const tarihSaat = (iso: string) =>
+  new Date(iso).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+async function kopyala(metin: string): Promise<boolean> {
+  try { await navigator.clipboard.writeText(metin); return true; } catch { return false; }
 }
 
 const ROZET: Record<string, string> = {
@@ -138,7 +148,7 @@ function YeniKullaniciModal({ onKapat, onEklendi }: { onKapat: () => void; onEkl
       });
       const { hata: h } = await jsonCevap(res);
       if (h) { setHata(h); return; }
-      alert(`${adSoyad} eklendi.\n\nGiriş bilgilerini kendisine iletin:\nE-posta: ${email.trim().toLowerCase()}\nGeçici şifre: ${sifre}`);
+      alert(`${adSoyad} eklendi.\n\nGiriş bilgilerini kendisine iletin:\nE-posta: ${email.trim().toLowerCase()}\nGeçici şifre: ${sifre}\n\nŞifreyi bu sayfada kişiyi seçince de görebilirsiniz; ilk girişte kendi şifresini belirlemesi istenir.`);
       onEklendi();
     } catch (e) {
       setHata(e instanceof Error ? e.message : String(e));
@@ -192,6 +202,128 @@ function YeniKullaniciModal({ onKapat, onEklendi }: { onKapat: () => void; onEkl
   );
 }
 
+/** Şifre: yöneticinin verdiği geçici şifreyi gösterir, yenisini verir. */
+function SifreBolumu({ k, kendisi, onDegisti }: { k: Kullanici; kendisi: boolean; onDegisti: () => Promise<void> }) {
+  const [goster, setGoster] = useState(true);
+  const [acik, setAcik] = useState(false);
+  const [yeni, setYeni] = useState("");
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+  const [mesaj, setMesaj] = useState<{ tur: "ok" | "hata"; metin: string } | null>(null);
+
+  const ver = async () => {
+    setMesaj(null);
+    if (yeni.length < 8) { setMesaj({ tur: "hata", metin: "Şifre en az 8 karakter olmalı." }); return; }
+    setKaydediliyor(true);
+    const { error } = await createClient().rpc("kullanici_sifre_belirle", { p_id: k.id, p_sifre: yeni });
+    setKaydediliyor(false);
+    if (error) { setMesaj({ tur: "hata", metin: "Şifre değiştirilemedi: " + error.message }); return; }
+    setAcik(false); setYeni(""); setGoster(true);
+    setMesaj({ tur: "ok", metin: kendisi
+      ? "Şifreniz değiştirildi. Bir sonraki girişte yeni şifrenizi kullanın."
+      : "Yeni şifre verildi. Kişinin açık oturumları kapatıldı; bu şifreyle giriş yapıp kendi şifresini belirleyecek." });
+    await onDegisti();
+  };
+
+  return (
+    <div className="rounded-xl border border-cizgi bg-alan p-4 space-y-3">
+      <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5"><KeyRound size={12} /> Şifre</p>
+      {k.geciciSifre ? (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <code className="flex-1 min-w-0 truncate font-mono text-[15px] font-bold bg-kart border border-cizgi rounded-lg px-3 py-2">
+              {goster ? k.geciciSifre.sifre : "••••••••••"}
+            </code>
+            <button type="button" onClick={() => setGoster(!goster)} title={goster ? "Gizle" : "Göster"}
+              className="p-2 rounded-lg border border-cizgi bg-kart text-gray-500 hover:text-yazi">{goster ? <EyeOff size={15} /> : <Eye size={15} />}</button>
+            <button type="button" title="Kopyala"
+              onClick={async () => setMesaj(await kopyala(k.geciciSifre!.sifre) ? { tur: "ok", metin: "Şifre kopyalandı." } : { tur: "hata", metin: "Kopyalanamadı, elle seçip kopyalayın." })}
+              className="p-2 rounded-lg border border-cizgi bg-kart text-gray-500 hover:text-yazi"><Copy size={15} /></button>
+          </div>
+          <p className="text-[11px] text-gray-500">
+            Geçici şifre · {tarihSaat(k.geciciSifre.tarih)}{k.geciciSifre.belirleyen ? ` · veren: ${k.geciciSifre.belirleyen.split("@")[0]}` : ""}.
+            Kişi kendi şifresini belirleyince buradan kalkar.
+          </p>
+        </div>
+      ) : (
+        <p className="text-[12px] text-gray-500">
+          {kendisi ? "Kendi şifrenizi buradan ya da Profil sayfasından değiştirebilirsiniz."
+            : "Kişi kendi şifresini kullanıyor (güvenlik gereği görünmez). Şifresini unuttuysa ona yeni bir şifre verin."}
+        </p>
+      )}
+
+      {acik ? (
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <input value={yeni} onChange={e => setYeni(e.target.value)} autoComplete="new-password" placeholder="Yeni şifre (en az 8 karakter)"
+              className="flex-1 min-w-0 bg-kart border border-cizgi-guclu font-mono text-[13px] h-10 px-3 rounded-lg outline-none focus:border-altin/50" />
+            <button type="button" onClick={() => setYeni(rastgeleSifre())}
+              className="shrink-0 text-[12px] font-semibold px-3 rounded-lg border border-cizgi bg-kart hover:border-blue-500/25">Rastgele</button>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => { setAcik(false); setYeni(""); }} className="text-[12px] font-semibold px-3 py-1.5 rounded-lg border border-cizgi text-gray-600">Vazgeç</button>
+            <button type="button" onClick={ver} disabled={kaydediliyor}
+              className="text-[12px] font-bold px-4 py-1.5 rounded-lg kebo-btn-altin text-[#1a1408] disabled:opacity-50 flex items-center gap-1.5">
+              {kaydediliyor ? <Loader2 size={13} className="animate-spin" /> : <KeyRound size={13} />} Şifreyi kaydet
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" onClick={() => { setAcik(true); setYeni(rastgeleSifre()); setMesaj(null); }}
+          className="text-[12px] font-bold px-3 py-1.5 rounded-lg border border-blue-500/25 text-blue-300 bg-blue-500/10 hover:brightness-110 flex items-center gap-1.5">
+          <KeyRound size={13} /> {kendisi ? "Şifremi değiştir" : "Yeni şifre ver"}
+        </button>
+      )}
+      {mesaj && (
+        <p className={`text-[12px] rounded-lg px-3 py-2 border ${mesaj.tur === "ok" ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/25" : "text-red-300 bg-red-500/10 border-red-500/25"}`}>{mesaj.metin}</p>
+      )}
+    </div>
+  );
+}
+
+/** Kullanıcıyı tamamen silme (iki adımlı onay). */
+function SilBolumu({ k, onSilindi }: { k: Kullanici; onSilindi: () => Promise<void> }) {
+  const [onay, setOnay] = useState(false);
+  const [siliniyor, setSiliniyor] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+  const ad = k.full_name || k.email || "Bu kullanıcı";
+
+  const sil = async () => {
+    setSiliniyor(true); setHata(null);
+    const { error } = await createClient().rpc("kullanici_sil", { p_id: k.id });
+    setSiliniyor(false);
+    if (error) { setHata("Silinemedi: " + error.message); return; }
+    await onSilindi();
+  };
+
+  return (
+    <div className="rounded-xl border border-red-500/25 bg-red-500/5 p-4 space-y-2">
+      <p className="text-[11px] font-bold text-red-400 uppercase tracking-wider flex items-center gap-1.5"><Trash2 size={12} /> Kullanıcıyı sil</p>
+      {!onay ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[12px] text-gray-500 flex-1 min-w-[200px]">Hesap tamamen silinir, giriş yapamaz. Girdiği raporlar ve kayıtlar silinmez. Geçici olarak durdurmak için rolü &quot;Pasif&quot; yapabilirsiniz.</p>
+          <button type="button" onClick={() => setOnay(true)}
+            className="text-[12px] font-bold px-3 py-1.5 rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 flex items-center gap-1.5">
+            <Trash2 size={13} /> Sil
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-[13px] text-red-300 flex items-start gap-2"><AlertTriangle size={15} className="shrink-0 mt-0.5" />
+            <span><b>{ad}</b> kalıcı olarak silinsin mi? Bu işlem geri alınamaz.</span></p>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setOnay(false)} className="text-[12px] font-semibold px-3 py-1.5 rounded-lg border border-cizgi text-gray-600">Vazgeç</button>
+            <button type="button" onClick={sil} disabled={siliniyor}
+              className="text-[12px] font-bold px-4 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-500 disabled:opacity-50 flex items-center gap-1.5">
+              {siliniyor ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Evet, sil
+            </button>
+          </div>
+        </div>
+      )}
+      {hata && <p className="text-[12px] text-red-300">{hata}</p>}
+    </div>
+  );
+}
+
 export default function YetkilerPage() {
   const yetki = useYetki();
   const [kullanicilar, setKullanicilar] = useState<Kullanici[]>([]);
@@ -209,12 +341,19 @@ export default function YetkilerPage() {
 
   const yukle = useCallback(async () => {
     setYukleniyor(true); setHata(null);
-    const { data, error } = await createClient().from("profiles")
-      .select("id,email,full_name,role,yetkiler,created_at").order("created_at");
+    const supabase = createClient();
+    const [{ data, error }, { data: sifreler }] = await Promise.all([
+      supabase.from("profiles").select("id,email,full_name,role,yetkiler,created_at").order("created_at"),
+      supabase.from("kullanici_sifreleri").select("user_id,sifre,tarih,belirleyen"),
+    ]);
     if (error) setHata(error.message);
+    const sifreHaritasi = new Map((sifreler || []).map(s => [s.user_id as string, {
+      sifre: s.sifre as string, tarih: s.tarih as string, belirleyen: s.belirleyen as string | null,
+    }]));
     setKullanicilar((data || []).map(k => ({
       id: k.id as string, email: k.email as string | null, full_name: k.full_name as string | null,
       role: rolCoz(k.role), yetkiler: yetkilerCoz(k.yetkiler),
+      geciciSifre: sifreHaritasi.get(k.id as string) ?? null,
     })));
     setYukleniyor(false);
   }, []);
@@ -268,8 +407,8 @@ export default function YetkilerPage() {
           <ArrowLeft size={16} />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-black flex items-center gap-2"><ShieldCheck size={22} className="text-blue-400" /> Yetkilendirme</h1>
-          <p className="text-[12px] text-gray-500">Kullanıcı ekleyin ve her kişinin hangi bölümlere erişeceğini seçin.</p>
+          <h1 className="text-2xl font-black flex items-center gap-2"><ShieldCheck size={22} className="text-blue-400" /> Kullanıcılar ve yetkiler</h1>
+          <p className="text-[12px] text-gray-500">Kullanıcı ekleyin / silin, yetkilerini seçin, şifresini unutanlara yeni şifre verin.</p>
         </div>
         <button onClick={yukle} className="p-2 rounded-xl border border-cizgi bg-kart text-gray-500 hover:text-yazi" title="Yenile">
           <RefreshCw size={15} />
@@ -282,7 +421,7 @@ export default function YetkilerPage() {
 
       <div className="mb-4 flex items-start gap-2 text-[12px] text-gray-600 bg-kart border border-cizgi rounded-xl px-3 py-2.5">
         <Info size={14} className="text-blue-400 shrink-0 mt-0.5" />
-        <span>Değişiklikler kullanıcının bir sonraki sayfa açılışında geçerli olur (kullanıcı sayfayı yenileyince). Supabase&apos;den eklediğiniz bir kullanıcı burada görünmüyorsa profiles satırı yoktur.</span>
+        <span>Yetki değişiklikleri kullanıcı sayfayı yenileyince geçerli olur. Şifresini unutan kişiye &quot;Yeni şifre ver&quot; ile geçici şifre verin; şifre burada görünür ve kişi ilk girişte kendi şifresini belirler. Kişinin kendi koyduğu şifre güvenlik gereği kimseye görünmez.</span>
       </div>
 
       {hata && <p className="mb-4 text-[12px] text-red-300 bg-red-500/10 border border-red-500/25 rounded-lg px-3 py-2">Kullanıcılar okunamadı: {hata}</p>}
@@ -305,7 +444,10 @@ export default function YetkilerPage() {
                   </div>
                   <div className="flex items-center justify-between gap-2 mt-0.5">
                     <span className="text-[11px] text-gray-500 truncate">{k.email || "—"}</span>
-                    <span className="text-[11px] text-gray-500 shrink-0">{yetkiSayisi(k)}</span>
+                    <span className="text-[11px] text-gray-500 shrink-0 flex items-center gap-1.5">
+                      {k.geciciSifre && <span title="Geçici şifre verildi" className="inline-flex items-center gap-0.5 text-amber-400"><KeyRound size={11} /> geçici</span>}
+                      {yetkiSayisi(k)}
+                    </span>
                   </div>
                 </button>
               ))}
@@ -338,8 +480,15 @@ export default function YetkilerPage() {
               <span className="text-[11px] text-gray-500">Kullanıcı sayfayı yenileyince geçerli olur.</span>
               <button onClick={kaydet} disabled={!degisti || kaydediliyor}
                 className="text-[13px] font-bold px-5 py-2 rounded-xl kebo-btn-altin text-[#1a1408] hover:brightness-110 disabled:opacity-40 flex items-center gap-2">
-                {kaydediliyor ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Kaydet
+                {kaydediliyor ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Yetkileri kaydet
               </button>
+            </div>
+            <div className="p-5 pt-4 border-t border-cizgi space-y-3">
+              <SifreBolumu key={`sifre-${secili.id}`} k={secili} kendisi={kendisi} onDegisti={yukle} />
+              {!kendisi && (
+                <SilBolumu key={`sil-${secili.id}`} k={secili}
+                  onSilindi={async () => { setSeciliId(null); await yukle(); }} />
+              )}
             </div>
           </div>
         ) : (

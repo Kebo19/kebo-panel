@@ -52,7 +52,7 @@ export const MENU: { ust: MenuOgesi[]; finans: MenuOgesi[]; alt: MenuOgesi[]; ay
   ],
   // Ayarlar'ın alt sayfaları
   ayarAlt: [
-    { name: "Yetkilendirme", icon: ShieldCheck, href: "/ayarlar/yetkiler", izin: "tam_yetkili", renk: "#a1a1aa", aciklama: "Kullanıcı yetkileri", anahtar: "yetki kullanıcı rol" },
+    { name: "Kullanıcılar", icon: ShieldCheck, href: "/ayarlar/yetkiler", izin: "tam_yetkili", renk: "#a1a1aa", aciklama: "Kullanıcılar, yetkiler, şifreler", anahtar: "yetki kullanıcı rol şifre sifre parola sil ekle" },
   ],
 };
 

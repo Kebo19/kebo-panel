@@ -4,7 +4,7 @@
 //   • "Tam Yetkili" → her şey
 //   • "Müdür" (arayüzde "Yetkili kullanıcı") → sadece `yetkiler` listesindekiler
 //   • "Pasif" → hiçbir erişim yok
-// Kullanıcılar Ayarlar > Yetkilendirme sayfasından yönetilir.
+// Kullanıcılar Ayarlar > Kullanıcılar ve yetkiler sayfasından yönetilir.
 // Asıl koruma veritabanındaki RLS kurallarıdır (public.kebo_izin); buradaki
 // kontroller arayüzü ve sayfa yönlendirmelerini düzenler.
 
