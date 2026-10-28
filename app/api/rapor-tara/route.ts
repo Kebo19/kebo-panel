@@ -35,17 +35,19 @@ A) YENİ FORM (tek sayfa, başlık "KEBO Günlük Kasa Formu", bölümler 1–7 
      Chick'n Fride Migros online → online.cnf.migrosYemek, Chick'n Fride Migros kapıda → kapida.cnf.migrosYemek,
      Alo Paket kapıda → kapida.kebo.alo.
      İndirim → online.<marka>.<platform>.indirim ; kapıda indirimleri her zaman 0.
-  2. KASA: Nakit, POS ve yemek kartları: Edenred, Metropol, Setcard, Pluxee, Paye, Multinet.
+  2. KASA: Nakit, POS ve yemek kartları: Edenred, Metropol, Setcard, Pluxee, Paye, Multinet, Token Flex.
      Altındaki "Brüt Ciro" ve "Net Ciro" kutularını "kontrol.brut" ve "kontrol.net" alanlarına yaz.
      Yeni sürümde Kasa tablosunun altında "Dükkân Toplam Nakit / POS" ve "Genel Toplam Nakit / POS" kutuları
-     vardır: bunlar elle yapılan kontrol toplamlarıdır, hiçbir alana yazma (kasa.nakit / kasa.pos'a KARIŞTIRMA).
+     vardır (yeni sürümde ayrıca "Toplam Yemek Kartı"): bunlar elle yapılan kontrol toplamlarıdır, hiçbir alana
+     yazma (kasa.nakit / kasa.pos / yemek kartlarına KARIŞTIRMA).
      Formun arka yüzündeki "Sayım Listesi" sayfası stok sayımıdır, kasa raporuna ait değildir: tamamen yok say.
   3. GİDERLER: Açıklama | Personel (avans ise) | Tutar. Personel sütunu DOLU olan satır avanstır →
      "avanslar" dizisine {personel, aciklama, tutar}; personel sütunu boş olan satır → "giderler".
      Tablonun en altındaki "TOPLAM GİDER" kutusunu "kontrol.gider" alanına yaz (satır olarak ekleme).
   4. PERSONEL KESİNTİSİ: Personel | Sebep | Tutar → "kesintiler"
   5. İPTAL / İADE: Açıklama | Tutar → "iadeler"
-  6. KURYE: satırlar "Sabit 1", "Sabit 2", "Havuz"; sütunlar Kurye adı | Paket | Nakit | POS.
+  6. KURYE: satırlar "Sabit 1", "Sabit 2", "Havuz"; sütunlar Kurye adı | Paket | Nakit | POS | Token Flex | Paye Kart
+     (eski formlarda son iki sütun yoktur → 0).
      Sabit satırlar → "kuryeSabit" (sırasıyla; isim = yazılan kurye adı).
      "Havuz" satırı → "kuryeHavuz". Havuz satırında İSİM YAZILMAZ; isim boş olsa bile paket/nakit/POS
      doluysa satırı MUTLAKA ekle ve isim olarak "Havuz" yaz. Paket sayısını mutlaka oku.
@@ -136,14 +138,14 @@ JSON ŞEMASI (tam olarak bu anahtarları kullan, eksik bırakma):
       "migrosYemek": {"tutar": number, "paket": number}
     }
   },
-  "kasa": {"nakit": number, "pos": number, "edenred": number, "metropol": number, "setcard": number, "pluxee": number, "paye": number, "multinet": number},
+  "kasa": {"nakit": number, "pos": number, "edenred": number, "metropol": number, "setcard": number, "pluxee": number, "paye": number, "multinet": number, "tokenflex": number},
   "kontrol": {"paketKebo": number, "paketCnf": number, "paketKir": number, "paketToplam": number, "gider": number, "brut": number, "net": number},
   "giderler": [{"aciklama": "string", "tutar": number}],
   "avanslar": [{"personel": "string", "aciklama": "string", "tutar": number}],
   "kesintiler": [{"personel": "string", "aciklama": "string", "tutar": number}],
   "iadeler": [{"aciklama": "string", "tutar": number}],
-  "kuryeSabit": [{"isim": "string", "nakit": number, "pos": number, "paket": number}],
-  "kuryeHavuz": [{"isim": "string", "nakit": number, "pos": number, "paket": number}],
+  "kuryeSabit": [{"isim": "string", "nakit": number, "pos": number, "tokenflex": number, "paye": number, "paket": number}],
+  "kuryeHavuz": [{"isim": "string", "nakit": number, "pos": number, "tokenflex": number, "paye": number, "paket": number}],
   "nakitKasa": {"devreden": number, "hareketler": [{"aciklama": "string", "banka": "string", "tutar": number}], "sayim": number},
   "notlar": "string",
   "belirsiz_alanlar": ["dot.path.gibi.anahtarlar"]

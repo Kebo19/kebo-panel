@@ -138,7 +138,7 @@ interface GunlukRapor {
   ko_kir_migros_yemek?: number; ko_kir_migros_yemek_paket?: number;
   ko_kir_alo?: number; ko_kir_alo_paket?: number;
   kasa_nakit: number; kasa_pos: number; kasa_edenred: number; kasa_metropol: number;
-  kasa_setcard?: number; kasa_pluxee?: number; kasa_paye?: number; kasa_multinet?: number;
+  kasa_setcard?: number; kasa_pluxee?: number; kasa_paye?: number; kasa_multinet?: number; kasa_tokenflex?: number;
   nakit_kasa_sayim?: number | null; nakit_devreden_kagit?: number | null;
   gunluk_gider: number; gider_aciklama?: string;
   iade_tutar: number; iade_aciklama?: string;
@@ -1361,7 +1361,7 @@ export default function RaporlarPage() {
       os_migros:"Migros (Online, eski)", os_chicknfride:"Chick'N Fride (Online, eski)",
       ko_yemeksepeti:"Yemeksepeti (Kapıda, eski)", ko_getir:"Getir (Kapıda)", ko_trendyol:"Trendyol (Kapıda, eski)",
       ko_migros:"Migros (Kapıda, eski)", ko_alo_paket:"Alo Paket (eski)", ko_chicknfride:"Chick'N Fride (Kapıda, eski)",
-      kasa_nakit:"Kasa Nakit", kasa_pos:"Kasa POS", kasa_edenred:"Kasa Edenred", kasa_metropol:"Kasa Metropol", kasa_setcard:"Kasa Setcard", kasa_pluxee:"Kasa Pluxee", kasa_paye:"Kasa Paye", kasa_multinet:"Kasa Multinet",
+      kasa_nakit:"Kasa Nakit", kasa_pos:"Kasa POS", kasa_edenred:"Kasa Edenred", kasa_metropol:"Kasa Metropol", kasa_setcard:"Kasa Setcard", kasa_pluxee:"Kasa Pluxee", kasa_paye:"Kasa Paye", kasa_multinet:"Kasa Multinet", kasa_tokenflex:"Kasa Token Flex",
       gunluk_gider:"Günlük Gider", iade_tutar:"İade Tutarı", toplam_ciro:"Brüt Ciro",
       gider_aciklama:"Gider Açıklaması", iade_aciklama:"İade Açıklaması",
     };
@@ -1666,7 +1666,7 @@ export default function RaporlarPage() {
         sYaz(setKasaNakit, veri.kasa.nakit); sYaz(setKasaPos, veri.kasa.pos);
         YEMEK_KARTLARI.forEach(k => { const anahtar = k.alan.replace("kasa_", ""); sYaz(v => kartYaz(k.alan, v), veri.kasa[anahtar]); });
       }
-      type TaramaSatiri = { tutar?: number; aciklama?: string; personel?: string; isim?: string; nakit?: number; pos?: number; paket?: number };
+      type TaramaSatiri = { tutar?: number; aciklama?: string; personel?: string; isim?: string; nakit?: number; pos?: number; tokenflex?: number; paye?: number; paket?: number };
       const yeniGiderler: SatirRaporu[] = [];
       (veri.giderler||[]).forEach((g:TaramaSatiri,i:number) => {
         if (g.tutar || g.aciklama) yeniGiderler.push({ id: Date.now()+i, aciklama: g.aciklama||"", tutar: nToStr(g.tutar), tip: "normal" });
@@ -1684,11 +1684,12 @@ export default function RaporlarPage() {
         .map((i:TaramaSatiri,idx:number)=>({ id: Date.now()+300+idx, aciklama: i.aciklama||"", tutar: nToStr(i.tutar) }));
       if (yeniIadeler.length) setIadeler(onceki => ekle ? [...onceki.filter(i => i.aciklama || i.tutar), ...yeniIadeler] : yeniIadeler);
       const sabitler: TaramaSatiri[] = (veri.kuryeSabit||[]);
-      const havuzlar: TaramaSatiri[] = (veri.kuryeHavuz||[]).filter((k:TaramaSatiri)=>k.isim||k.paket||k.nakit||k.pos);
+      const havuzlar: TaramaSatiri[] = (veri.kuryeHavuz||[]).filter((k:TaramaSatiri)=>k.isim||k.paket||k.nakit||k.pos||k.tokenflex||k.paye);
       const satir = (k: TaramaSatiri|undefined, id: number, tip: KuryeRaporu["tip"], varsayilanIsim: string): KuryeRaporu => ({
         id, isim: k?.isim || varsayilanIsim, nakit: nToStr(k?.nakit), pos: nToStr(k?.pos),
+        tokenflex: k?.tokenflex ? nToStr(k.tokenflex) : "", paye: k?.paye ? nToStr(k.paye) : "",
         paketSayisi: k?.paket ? String(k.paket) : "", uzakPaket:"", paket9km:"", tip });
-      const kuryeOkundu = [...sabitler, ...havuzlar].some(k => k.isim || k.paket || k.nakit || k.pos);
+      const kuryeOkundu = [...sabitler, ...havuzlar].some(k => k.isim || k.paket || k.nakit || k.pos || k.tokenflex || k.paye);
       if (ekle && !kuryeOkundu) {
         // Bu sayfada kurye bölümü yok; mevcut kurye satırları korunur.
       } else if (hedefTarih && hedefTarih < ROADRUNNER_GECIS_GUNU) {
@@ -2278,10 +2279,20 @@ export default function RaporlarPage() {
                 const hNakit = kuryeler.filter(havuzMu).reduce((t, k) => t + tv(k.nakit), 0);
                 const hPos = kuryeler.filter(havuzMu).reduce((t, k) => t + tv(k.pos), 0);
                 const dNakit = tv(kasaNakit) + kNakit, dPos = tv(kasaPos) + kPos;
-                const kutu = (baslik: string, tutar: number, alt: string, renk: "amber" | "blue") => (
-                  <div className={renk === "amber" ? "rounded-xl bg-amber-500/10 border border-amber-500/25 px-3 py-2.5" : "rounded-xl bg-blue-500/10 border border-blue-500/25 px-3 py-2.5"}>
-                    <p className={`text-[11px] font-bold uppercase tracking-wide ${renk === "amber" ? "text-amber-300" : "text-blue-300"}`}>{baslik}</p>
-                    <p className={`text-xl font-black ${renk === "amber" ? "text-amber-300" : "text-blue-300"}`}>₺{fmt(tutar)}</p>
+                // Yemek kartı: dükkânda girilen kartlar + kuryenin kapıda aldığı Token Flex / Paye Kart.
+                // Hepsi alacaktır (kart şirketi bankaya öder); havuzunki de Roadrunner'da kalmaz.
+                // Havuz kuryesinin kartla aldığı da bize yatar: tek "Toplam Yemek Kartı" kutusu.
+                const dukkanKart = YEMEK_KARTLARI.reduce((t, k) => t + tv(kartlar[k.alan]), 0);
+                const kuryeKart = kuryeler.reduce((t, k) => t + tv(k.tokenflex) + tv(k.paye), 0);
+                const RENK = {
+                  amber: { kutu: "bg-amber-500/10 border-amber-500/25", yazi: "text-amber-300" },
+                  blue: { kutu: "bg-blue-500/10 border-blue-500/25", yazi: "text-blue-300" },
+                  pink: { kutu: "bg-pink-500/10 border-pink-500/25", yazi: "text-pink-300" },
+                } as const;
+                const kutu = (baslik: string, tutar: number, alt: string, renk: keyof typeof RENK, ek = "") => (
+                  <div className={`rounded-xl border px-3 py-2.5 ${RENK[renk].kutu} ${ek}`}>
+                    <p className={`text-[11px] font-bold uppercase tracking-wide ${RENK[renk].yazi}`}>{baslik}</p>
+                    <p className={`text-xl font-black ${RENK[renk].yazi}`}>₺{fmt(tutar)}</p>
                     <p className="text-[10px] text-gray-500">{alt}</p>
                   </div>
                 );
@@ -2295,11 +2306,12 @@ export default function RaporlarPage() {
                       {kutu("Genel Toplam Nakit", dNakit + hNakit, `Dükkân toplamı + Havuz ₺${fmt(hNakit)}`, "amber")}
                       {kutu("Genel Toplam POS", dPos + hPos, `Dükkân toplamı + Havuz ₺${fmt(hPos)}`, "blue")}
                     </div>
+                    {kutu("Toplam Yemek Kartı", dukkanKart + kuryeKart, `Dükkân yemek kartları ₺${fmt(dukkanKart)} + Kuryeler Token Flex / Paye ₺${fmt(kuryeKart)} (havuz dahil) · hepsi bankaya yatar`, "pink")}
                   </div>
                 );
               })()}
               <p className="px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wide">Yemek kartları</p>
-              <div className="p-3 pt-1.5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+              <div className="p-3 pt-1.5 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
                 {YEMEK_KARTLARI.map(k => (
                   <CurrencyInput key={k.alan} label={k.ad} value={kartlar[k.alan]} onChange={v => kartYaz(k.alan, v)} disabled={isReadOnly}/>
                 ))}

@@ -4,7 +4,7 @@
 // Para tutarlarında 3 ondalık hane olamayacağı için bu durum güvenle 3285'e
 // çevrilir. Metin olarak gelen sayılar da Türkçe biçime göre okunur.
 
-const PARA_ALANLARI = new Set(["tutar", "indirim", "nakit", "pos", "edenred", "metropol", "setcard", "pluxee", "paye", "multinet", "brut", "net", "gider", "devreden", "sayim"]);
+const PARA_ALANLARI = new Set(["tutar", "indirim", "nakit", "pos", "edenred", "metropol", "setcard", "pluxee", "paye", "multinet", "tokenflex", "brut", "net", "gider", "devreden", "sayim"]);
 const ADET_ALANLARI = new Set(["paket", "paketKebo", "paketCnf", "paketKir", "paketToplam"]);
 
 /** "5.002" → 5002, "1.234,50" → 1234.5, "12,5" → 12.5, 3.285 → 3285 */
@@ -79,7 +79,7 @@ const ETIKET: Record<string, string> = {
   online: "Online", kapida: "Kapıda", kebo: "KEBO", cnf: "Chick'n Fride", kir: "Kıraloğlu",
   ys: "Yemeksepeti", trendyol: "Trendyol", migros: "Migros", migrosYemek: "Migros Yemek", alo: "Alo Paket",
   tutar: "Tutar", paket: "Paket", indirim: "İndirim", kasa: "Kasa", nakit: "Nakit", pos: "POS",
-  edenred: "Edenred", metropol: "Metropol", setcard: "Setcard", pluxee: "Pluxee", paye: "Paye", multinet: "Multinet",
+  edenred: "Edenred", metropol: "Metropol", setcard: "Setcard", pluxee: "Pluxee", paye: "Paye", multinet: "Multinet", tokenflex: "Token Flex",
   kontrol: "Kontrol", gider: "Toplam gider", nakitKasa: "Nakit kasa", devreden: "Devreden", sayim: "Gün sonu sayım", hareketler: "Ödeme/banka", brut: "Brüt ciro", net: "Net ciro", paketKebo: "KEBO toplam paket", paketCnf: "Chick'n Fride toplam paket", paketKir: "Kıraloğlu toplam paket", paketToplam: "Dükkân toplam paket", giderler: "Gider", avanslar: "Avans", kesintiler: "Kesinti",
   iadeler: "İade", kuryeSabit: "Sabit kurye", kuryeHavuz: "Havuz kurye", isim: "İsim", personel: "Personel",
   aciklama: "Açıklama", tarih: "Tarih", giren: "Giren", notlar: "Notlar",

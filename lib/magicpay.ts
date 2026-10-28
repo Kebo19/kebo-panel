@@ -151,7 +151,7 @@ const PANEL_ALANLARI: Record<Exclude<Kanal, "diger">, { tutar: string[]; paket: 
 };
 
 /** Masa ödeme anahtarı → panel kasa alanı. */
-export type KasaKalemi = "nakit" | "pos" | "kasa_edenred" | "kasa_metropol" | "kasa_setcard" | "kasa_pluxee" | "kasa_paye" | "kasa_multinet" | "yemek_tanimsiz";
+export type KasaKalemi = "nakit" | "pos" | "kasa_edenred" | "kasa_metropol" | "kasa_setcard" | "kasa_pluxee" | "kasa_paye" | "kasa_multinet" | "kasa_tokenflex" | "yemek_tanimsiz";
 
 export function masaOdemeKalemi(anahtar: string): KasaKalemi {
   const a = sade(anahtar);
@@ -161,6 +161,7 @@ export function masaOdemeKalemi(anahtar: string): KasaKalemi {
   if (/pluxee|sodexo/.test(a)) return "kasa_pluxee";
   if (/paye/.test(a)) return "kasa_paye";
   if (/multinet/.test(a)) return "kasa_multinet";
+  if (/token/.test(a)) return "kasa_tokenflex";
   if (/meal|yemek/.test(a)) return "yemek_tanimsiz";
   if (/^(cash|nakit)$|nakit/.test(a)) return "nakit";
   return "pos"; // card, kredi kartı, pos...
@@ -244,7 +245,7 @@ function kuryeToplamlari(r: PanelRaporu | null): { nakit: number; pos: number; p
 
 const YEMEK_KARTI_ADLARI: Record<string, string> = {
   kasa_edenred: "Edenred (Ticket)", kasa_metropol: "Metropol", kasa_setcard: "Setcard",
-  kasa_pluxee: "Pluxee", kasa_paye: "Paye", kasa_multinet: "Multinet",
+  kasa_pluxee: "Pluxee", kasa_paye: "Paye", kasa_multinet: "Multinet", kasa_tokenflex: "Token Flex",
 };
 
 /** Tek günün karşılaştırması. `rapor` null ise o gün panelde rapor yok. */
@@ -298,7 +299,7 @@ export function gunuKarsilastir(mp: MpGun, rapor: PanelRaporu | null): GunKarsil
   }
 
   // 2) Kasa (masa ödemeleri)
-  const masa: Record<KasaKalemi, number> = { nakit: 0, pos: 0, kasa_edenred: 0, kasa_metropol: 0, kasa_setcard: 0, kasa_pluxee: 0, kasa_paye: 0, kasa_multinet: 0, yemek_tanimsiz: 0 };
+  const masa: Record<KasaKalemi, number> = { nakit: 0, pos: 0, kasa_edenred: 0, kasa_metropol: 0, kasa_setcard: 0, kasa_pluxee: 0, kasa_paye: 0, kasa_multinet: 0, kasa_tokenflex: 0, yemek_tanimsiz: 0 };
   for (const [k, v] of Object.entries(mp.masaOdeme)) masa[masaOdemeKalemi(k)] += v;
   const gider = rapor ? n(rapor.gunluk_gider) : 0;
   const kasaSatirlari: Satir[] = [
@@ -316,7 +317,7 @@ export function gunuKarsilastir(mp: MpGun, rapor: PanelRaporu | null): GunKarsil
   }
   if (masa.yemek_tanimsiz) kasaSatirlari.push(satir("Tanımsız yemek kartı", null, masa.yemek_tanimsiz, "para",
     { aciklama: "MagicPay'de türü seçilmemiş yemek kartı (unknown_meal_card) — toplamda karşılaştırılır" }));
-  const mpYemek = masa.kasa_edenred + masa.kasa_metropol + masa.kasa_setcard + masa.kasa_pluxee + masa.kasa_paye + masa.kasa_multinet + masa.yemek_tanimsiz;
+  const mpYemek = masa.kasa_edenred + masa.kasa_metropol + masa.kasa_setcard + masa.kasa_pluxee + masa.kasa_paye + masa.kasa_multinet + masa.kasa_tokenflex + masa.yemek_tanimsiz;
   if (panelYemek || mpYemek) kasaSatirlari.push(satir("Yemek kartları toplamı", rapor ? panelYemek : null, mpYemek, "para"));
   const panelKasa = rapor ? n(rapor.kasa_nakit) + gider + n(rapor.kasa_pos) + panelYemek : null;
   kasaSatirlari.push(satir("Kasa toplamı (masa)", panelKasa, Object.values(masa).reduce((a, b) => a + b, 0), "para"));

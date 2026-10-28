@@ -81,7 +81,7 @@ export interface RaporVerisi {
   ko_kir_ys_indirim?: number | null; ko_kir_trendyol_indirim?: number | null;
   // Kasa, gider, iade
   kasa_nakit?: number | null; kasa_pos?: number | null; kasa_edenred?: number | null; kasa_metropol?: number | null;
-  kasa_setcard?: number | null; kasa_pluxee?: number | null; kasa_paye?: number | null; kasa_multinet?: number | null;
+  kasa_setcard?: number | null; kasa_pluxee?: number | null; kasa_paye?: number | null; kasa_multinet?: number | null; kasa_tokenflex?: number | null;
   gunluk_gider?: number | null; iade_tutar?: number | null;
   kurye_raporlari?: KuryeSatiri[] | null;
 }
@@ -211,10 +211,11 @@ export const YEMEK_KARTLARI = [
   { alan: "kasa_pluxee", ad: "Pluxee" },
   { alan: "kasa_paye", ad: "Paye" },
   { alan: "kasa_multinet", ad: "Multinet" },
+  { alan: "kasa_tokenflex", ad: "Token Flex" }, // 28.10.2026
 ] as const;
 export type YemekKartiAlani = typeof YEMEK_KARTLARI[number]["alan"];
 
-/** Alacak / mutabakat listesindeki bütün yemek kartları (kasa kartları + yalnız kuryenin aldığı Token Flex). */
+/** Alacak / mutabakat listesindeki bütün yemek kartları (kasa kartlarıyla aynı; kurye kartları bunlara eklenir). */
 export const YEMEK_KARTI_ADLARI = ["Edenred", "Metropol", "Setcard", "Pluxee", "Paye", "Multinet", "Token Flex"] as const;
 export type YemekKartiAdi = typeof YEMEK_KARTI_ADLARI[number];
 

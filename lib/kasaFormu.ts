@@ -140,13 +140,14 @@ const ON_YUZ = `
 
   <h2>2. KASA <small>Gün sonu sayım</small></h2>
   <table class="esit">
-    <tr><th>Nakit ₺</th><th>POS ₺</th><th>Edenred ₺</th><th>Metropol ₺</th><th>Setcard ₺</th><th>Pluxee ₺</th><th>Paye ₺</th><th>Multinet ₺</th></tr>
-    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><th>Nakit ₺</th><th>POS ₺</th><th>Edenred ₺</th><th>Metropol ₺</th><th>Setcard ₺</th><th>Pluxee ₺</th><th>Paye ₺</th><th>Multinet ₺</th><th>Token Flex ₺</th></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
   </table>
   <table class="esit nptop" style="margin-top:3px">
     <tr><th>Dükkân Toplam Nakit ₺<br><small>kasa + Kurye 1-2 (havuz hariç)</small></th><th>Dükkân Toplam POS ₺<br><small>kasa + Kurye 1-2 (havuz hariç)</small></th>
-        <th>Genel Toplam Nakit ₺<br><small>dükkân + havuz kuryesi</small></th><th>Genel Toplam POS ₺<br><small>dükkân + havuz kuryesi</small></th></tr>
-    <tr><td></td><td></td><td></td><td></td></tr>
+        <th>Genel Toplam Nakit ₺<br><small>dükkân + havuz kuryesi</small></th><th>Genel Toplam POS ₺<br><small>dükkân + havuz kuryesi</small></th>
+        <th>Toplam Yemek Kartı ₺<br><small>kartlar + kurye Token/Paye</small></th></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td></tr>
   </table>
   <table class="toplam esit ciro" style="margin-top:3px">
     <tr><td class="et">BRÜT CİRO ₺</td><td></td><td class="et">NET CİRO ₺</td><td></td></tr>
@@ -186,10 +187,10 @@ const ON_YUZ = `
 
   <h2>6. KURYE <small>Sabit kuryede günlük 30 paket garantisi var</small></h2>
   <table>
-    <tr><th style="width:14%"></th><th>Kurye adı</th><th style="width:11%">Paket</th><th style="width:17%">Nakit ₺</th><th style="width:17%">POS ₺</th></tr>
-    <tr><td class="ad">Sabit 1</td><td></td><td></td><td></td><td></td></tr>
-    <tr><td class="ad">Sabit 2</td><td></td><td></td><td></td><td></td></tr>
-    <tr><td class="ad">Havuz</td><td class="yok" style="font-size:8pt;color:#777;text-align:center">isim yazılmaz</td><td></td><td></td><td></td></tr>
+    <tr><th style="width:11%"></th><th>Kurye adı</th><th style="width:9%">Paket</th><th style="width:14%">Nakit ₺</th><th style="width:14%">POS ₺</th><th style="width:13%">Token Flex ₺</th><th style="width:13%">Paye Kart ₺</th></tr>
+    <tr><td class="ad">Sabit 1</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="ad">Sabit 2</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td class="ad">Havuz</td><td class="yok" style="font-size:8pt;color:#777;text-align:center">isim yazılmaz</td><td></td><td></td><td></td><td></td><td></td></tr>
   </table>
 
   <h2>7. NAKİT KASA <small>Sadece eski nakitten ödeme / bankaya yatırma olduysa · giderlere yazmayın</small></h2>
