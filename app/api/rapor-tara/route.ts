@@ -9,7 +9,17 @@ import { geminiIstek } from "@/lib/gemini";
 
 const SISTEM_PROMPT = `Sen KEBO ERP için bir kağıt rapor okuma asistanısın. Sana KEBO'nun kağıt günlük kasa
 formunun fotoğrafları verilecek (bir veya birkaç görsel; birden fazlaysa aynı günün sayfalarıdır, hepsini birlikte
-oku ve TEK JSON üret). Form iki düzenden biri olabilir:
+oku ve TEK JSON üret). Form üç düzenden biri olabilir:
+
+K) KISA FORM (28.10.2026'dan itibaren; başlık "KEBO Günlük Kasa Formu (kısa)"). Satış tablosu YOKTUR:
+  platform satışları, Alo Paket, POS ve yemek kartları otomatik geldiği için kağıtta yazılmaz.
+  1. KASA SAYIMI: tek kutu "Kasadaki NAKİT" → kasa.nakit. Diğer kasa alanları (pos, yemek kartları) 0.
+  2. KIRALOĞLU MİGROS: Online ₺ | Online Paket | İndirim ₺ | Kapıda ₺ | Kapıda Paket →
+     online.kir.migrosYemek {tutar, paket, indirim} ve kapida.kir.migrosYemek {tutar, paket}.
+  online / kapida altındaki diğer bütün alanlar 0; kontrol.paket* ve kontrol.brut / kontrol.net 0.
+  3–8 (Giderler + TOPLAM GİDER, Personel kesintisi, İptal/İade, Kurye, Nakit kasa, Notlar) aşağıdaki A
+  formundaki 3–8 ile aynıdır. 7. bölümdeki "Biriken nakit sayıldıysa: TOPLAM" kutusu → nakitKasa.sayim
+  (1. bölümdeki "Kasadaki NAKİT" ile karıştırma).
 
 A) YENİ FORM (tek sayfa, başlık "KEBO Günlük Kasa Formu", bölümler 1–7 numaralı):
   1. SATIŞLAR: tek tablo. Sütunlar: Online ₺ | Paket | İndirim ₺ | Kapıda ₺ | Paket | Toplam Paket

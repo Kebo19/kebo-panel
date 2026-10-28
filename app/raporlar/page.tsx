@@ -48,6 +48,9 @@ interface SatirRaporu {
   firmaId?: string; firmaUnvan?: string; personelIsim?: string; personelId?: string;
 }
 
+/** Kasa raporu giriş adımları (sırasıyla). */
+const ADIMLAR = ["Kasa", "Gider", "Kurye", "Kontrol"] as const;
+
 /** Form satırları için benzersiz anahtar. */
 const yeniSatirId = () => Date.now() + Math.floor(Math.random() * 1000);
 
@@ -1019,6 +1022,8 @@ export default function RaporlarPage() {
   // MagicPay'den formu doldurma verisi (satışlar, Alo, POS, yemek kartları) ve forma yazıldı mı
   const [mpDoldurma, setMpDoldurma] = useState<MpRaporDoldurma | null>(null);
   const [mpFormaYazildi, setMpFormaYazildi] = useState(false);
+  // Tek sayfa + adım çubuğu: 1 Kasa → 2 Gider → 3 Kurye → 4 Kontrol ve kaydet (son tıklanan adım vurgulanır)
+  const [adim, setAdim] = useState(1);
   // Hangi tarih için MagicPay indirimleri forma yazıldı (geç gelen cevap kullanıcının girdiğini ezmesin)
   const mpDolduruldu = useRef("");
   const formAlaniRef = useRef<HTMLDivElement>(null);
@@ -1156,6 +1161,17 @@ export default function RaporlarPage() {
     setMpFormaYazildi(true);
   };
   const mpIndirimHazir = mpIndirimDurum === "hazir" && !!mpIndirim;
+  // Tek sayfa: bütün bölümler alt alta; üstteki adım çubuğu bölüme kaydırır ve neyin bittiğini gösterir.
+  const adimaGit = (n: number) => {
+    setAdim(n);
+    document.getElementById(`adim-${n}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const adimTamam = [
+    !!kasaNakit.trim(),
+    giderler.some(g => tv(g.tutar) > 0),
+    kuryeler.some(k => (parseInt(k.paketSayisi) || 0) > 0),
+    false,
+  ];
   /** Elle değiştirilmiş (MagicPay'den farklı) indirim alanları. */
   const indirimFarklari: string[] = mpIndirimHazir ? indirimFarkliAlanlar(mpIndirim!, formIndirimleri) : [];
   const indirimAlanAdi = (a: string) => INDIRIM_ALAN_ADLARI[a] || ({
@@ -1249,7 +1265,7 @@ export default function RaporlarPage() {
     setNotlar("");setSelectedRapor(null);setIsEditMode(false);
     setTaramaHata(""); setTaramaBelirsizAlanlar([]);
     setTaramaIleDoldu(false); setTaramaTarihNotu(""); setKontrolOnay(false); setTarihOnaylandi(false); setTaramaKontrol({}); setFarkOnay(false);
-    mpDolduruldu.current = ""; setMpFormaYazildi(false);
+    mpDolduruldu.current = ""; setMpFormaYazildi(false); setAdim(1);
   };
 
   /** Yeni rapor: formu temizler, tarih adımını sıradaki günle hazır açar. */
@@ -1738,8 +1754,13 @@ export default function RaporlarPage() {
       if (veri.notlar) setNotlar(onceki => ekle && onceki ? `${onceki}\n${veri.notlar}` : veri.notlar);
       setTaramaBelirsizAlanlar(onceki => ekle ? [...new Set([...onceki, ...(veri.belirsiz_alanlar || [])])] : (veri.belirsiz_alanlar || []));
       setTaramaIleDoldu(true); setKontrolOnay(false);
-      // İndirimler kağıttan değil MagicPay'den gelir (alınabildiyse).
-      if (!selectedRapor && mpIndirimHazir) indirimleriMagicleDoldur(mpIndirim!);
+      // Satışlar, Alo, POS, yemek kartları ve indirimler kağıttan değil MagicPay'den gelir (alınabildiyse).
+      // Kısa formda bu alanlar kağıtta yok; eski formda yazılmışsa da MagicPay'deki doğru kabul edilir.
+      // Nakit sayımı, giderler, kuryeler ve Kıraloğlu Migros kağıttan gelir, dokunulmaz.
+      if (!selectedRapor) {
+        if (mpDoldurma) magicleDoldur(mpDoldurma);
+        else if (mpIndirimHazir) indirimleriMagicleDoldur(mpIndirim!);
+      }
       const kontrol = Object.fromEntries(Object.entries(veri.kontrol || {}).filter(([, v]) => Number(v) > 0)) as Record<string, number>;
       setTaramaKontrol(onceki => ekle ? { ...onceki, ...kontrol } : kontrol);
       setTimeout(() => formAlaniRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
@@ -2179,16 +2200,23 @@ export default function RaporlarPage() {
         {(
           <div className="space-y-3">
 
-            {/* ── 1. SATIŞLAR (kağıt formla aynı tablo) ── */}
-            <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
-              <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[14px] font-bold text-yazi">1. Satışlar</span>
-                <span title={ch.kapidaKasada ? "13.08.2026 öncesi: kendi kuryelerimizin topladığı para kasa sayımının içinde" : tarih >= KENDI_POS_GECIS_GUNU ? "28.09.2026'dan itibaren: kapıda ödemenin tamamı brüte eklenir. Kurye 1 ve 2 parayı gün sonu kasaya / POS'a teslim eder; havuz kuryelerininki Roadrunner'da kalır, borcumuzdan düşülür" : "Roadrunner'da kalır, haftalık mutabakatla mahsup edilir"}
-                  className="text-[10px] font-semibold text-purple-300 bg-purple-500/10 border border-purple-500/25 px-2 py-0.5 rounded-full">
-                  Kapıda: {ch.kapidaKasada ? "kasa sayımına dahil" : tarih >= KENDI_POS_GECIS_GUNU ? "brüte eklenir · havuzunki Roadrunner'da" : "Roadrunner'da, brüte ayrıca eklenir"}
-                </span>
-              </div>
-              <div className="p-3 space-y-2">
+            {/* ── ADIM ÇUBUĞU: 1 Kasa → 2 Gider → 3 Kurye → 4 Kontrol ── */}
+            {!isReadOnly && (
+              <nav aria-label="Rapor bölümleri" className="sticky top-0 z-30 grid grid-cols-4 gap-1.5 bg-zemin/95 backdrop-blur py-2">
+                {ADIMLAR.map((ad, i) => {
+                  const no = i + 1, aktif = adim === no, gecti = adimTamam[i];
+                  return (
+                    <button key={ad} type="button" onClick={() => adimaGit(no)} aria-current={aktif ? "step" : undefined}
+                      className="flex flex-col gap-1.5 text-left">
+                      <span className={`h-1.5 rounded-full ${aktif || gecti ? "bg-altin" : "bg-cizgi-guclu"}`}/>
+                      <span className={`text-[12px] font-bold ${aktif ? "text-altin" : gecti ? "text-gray-400" : "text-gray-600"}`}>{gecti ? "✓ " : `${no} `}{ad}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            )}
+            <section id="adim-1" className="space-y-3 scroll-mt-14">
+            {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">1 · Kasa <span className="font-medium text-[12px] text-gray-500">kasadaki nakit ve Kıraloğlu Migros</span></h2>}
                 {!isReadOnly && mpDoldurma && (
                   <div className={`text-[12px] rounded-lg px-3 py-2.5 border space-y-1.5 ${mpFormaYazildi ? "text-emerald-200 bg-emerald-500/10 border-emerald-500/25" : "text-sky-200 bg-sky-500/10 border-sky-500/25"}`}>
                     {mpFormaYazildi ? (
@@ -2212,176 +2240,41 @@ export default function RaporlarPage() {
                     </button>
                   </div>
                 )}
-                <div className={`hidden ${SATIS_IZGARA} text-[11px] font-bold text-gray-500 px-0.5`}>
-                  <span/>
-                  <span className="text-right pr-3">Online ₺</span><span className="text-center">Paket</span>
-                  <span className="text-right pr-3 text-red-400">İndirim ₺</span>
-                  <span className="text-right pr-3 text-purple-300">Kapıda ₺</span><span className="text-center">Paket</span>
-                  <span className="text-center">Toplam</span>
-                </div>
-                <p className="text-[11px] font-bold text-amber-300 uppercase tracking-wide pt-1">🍔 Kebo</p>
-                <SatisSatiri ad="Yemeksepeti" online={osKeboYs} onOnline={setOsKeboYs} indirim={osKeboYsIndirim} onIndirim={setOsKeboYsIndirim} kapida={koKeboYs} onKapida={setKoKeboYs} disabled={isReadOnly}
-                  nakitPos={{ nakit: kapidaNP.ys.nakit, pos: kapidaNP.ys.pos, onNakit: v => kapidaNPYaz("ys", v, kapidaNP.ys.pos), onPos: v => kapidaNPYaz("ys", kapidaNP.ys.nakit, v) }}/>
-                <SatisSatiri ad="Trendyol" online={osKeboTrendyol} onOnline={setOsKeboTrendyol} indirim={osKeboTrendyolIndirim} onIndirim={setOsKeboTrendyolIndirim} kapida={koKeboTrendyol} onKapida={setKoKeboTrendyol} disabled={isReadOnly}
-                  nakitPos={{ nakit: kapidaNP.trendyol.nakit, pos: kapidaNP.trendyol.pos, onNakit: v => kapidaNPYaz("trendyol", v, kapidaNP.trendyol.pos), onPos: v => kapidaNPYaz("trendyol", kapidaNP.trendyol.nakit, v) }}/>
-                <SatisSatiri ad="Migros" online={osKeboMigros} onOnline={setOsKeboMigros} indirim={osKeboMigrosIndirim} onIndirim={setOsKeboMigrosIndirim} kapida={koKeboMigrosYemek} onKapida={setKoKeboMigrosYemek} disabled={isReadOnly}
-                  nakitPos={{ nakit: kapidaNP.migros.nakit, pos: kapidaNP.migros.pos, onNakit: v => kapidaNPYaz("migros", v, kapidaNP.migros.pos), onPos: v => kapidaNPYaz("migros", kapidaNP.migros.nakit, v) }}/>
-                <AloSatiri online={osKeboAlo} nakit={koKeboAloNakit} onNakit={v => aloYaz(v, koKeboAloPos)} pos={koKeboAloPos} onPos={v => aloYaz(koKeboAloNakit, v)}
-                  kapida={koKeboAlo} onKapida={setKoKeboAlo} disabled={isReadOnly}/>
-                <p className="text-[11px] font-bold text-red-300 uppercase tracking-wide pt-2">🍗 Chick&apos;n Fride</p>
-                <SatisSatiri ad="Yemeksepeti" online={osCnfYs} onOnline={setOsCnfYs} indirim={osCnfYsIndirim} onIndirim={setOsCnfYsIndirim} kapida={koCnfYs} onKapida={setKoCnfYs} soluk={["kapida"]} disabled={isReadOnly}/>
-                <SatisSatiri ad="Trendyol" online={osCnfTrendyol} onOnline={setOsCnfTrendyol} indirim={osCnfTrendyolIndirim} onIndirim={setOsCnfTrendyolIndirim} kapida={koCnfTrendyol} onKapida={setKoCnfTrendyol} soluk={["kapida"]} disabled={isReadOnly}/>
-                <SatisSatiri ad="Migros" online={osCnfMigrosYemek} onOnline={setOsCnfMigrosYemek} indirim={osCnfMigrosIndirim} onIndirim={setOsCnfMigrosIndirim} kapida={koCnfMigrosYemek} onKapida={setKoCnfMigrosYemek} soluk={["kapida"]} disabled={isReadOnly}/>
-                <p className="text-[11px] font-bold text-teal-300 uppercase tracking-wide pt-2">🥙 Kıraloğlu</p>
-                <SatisSatiri ad="Yemeksepeti" online={osKirYs} onOnline={setOsKirYs} indirim={osKirYsIndirim} onIndirim={setOsKirYsIndirim} kapida={koKirYs} onKapida={setKoKirYs} soluk={["kapida"]} disabled={isReadOnly}/>
-                <SatisSatiri ad="Trendyol" online={osKirTrendyol} onOnline={setOsKirTrendyol} indirim={osKirTrendyolIndirim} onIndirim={setOsKirTrendyolIndirim} kapida={koKirTrendyol} onKapida={setKoKirTrendyol} soluk={["kapida"]} disabled={isReadOnly}/>
-                <SatisSatiri ad="Migros" online={osKirMigrosYemek} onOnline={setOsKirMigrosYemek} indirim={osKirMigrosIndirim} onIndirim={setOsKirMigrosIndirim} kapida={koKirMigrosYemek} onKapida={setKoKirMigrosYemek} soluk={["kapida"]} disabled={isReadOnly}/>
-                {(tv(koKirAlo.tutar)+tv(koKirYsIndirim)+tv(koKirTrendyolIndirim)) > 0 && (
-                  <p className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
-                    Bu raporda Kıraloğlu Alo Paket / kapıda indirim tutarı var (₺{fmt(tv(koKirAlo.tutar))} Alo, ₺{fmt(tv(koKirYsIndirim)+tv(koKirTrendyolIndirim))} indirim). Hesaplara dahil.
-                  </p>
-                )}
-                {/* Eski raporlarda girilmiş Chick'n Fride kapıda / kapıda indirim varsa kaybolmasın diye gösterilir */}
-                {(tv(koCnfAlo.tutar)+tv(koKeboYsIndirim)+tv(koKeboTrendyolIndirim)+tv(koCnfYsIndirim)+tv(koCnfTrendyolIndirim)) > 0 && (
-                  <p className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
-                    Bu raporda eski formdan kalan Chick&apos;n Fride Alo Paket / kapıda indirim tutarı var (₺{fmt(tv(koCnfAlo.tutar))} Alo, ₺{fmt(tv(koKeboYsIndirim)+tv(koKeboTrendyolIndirim)+tv(koCnfYsIndirim)+tv(koCnfTrendyolIndirim))} indirim). Hesaplara dahil.
-                  </p>
-                )}
-                {/* MagicPay platform indirimleri: otomatik dolar, elle değişiklik onaya gider */}
-                {!isReadOnly && mpIndirimDurum === "yukleniyor" && (
-                  <p className="text-[11px] text-gray-500 flex items-center gap-1.5 px-1"><Loader2 size={11} className="animate-spin"/> Platform indirimleri MagicPay&apos;den alınıyor…</p>
-                )}
-                {!isReadOnly && mpIndirimHazir && indirimFarklari.length === 0 && (
-                  <p className="text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-3 py-2">
-                    ✓ Platform indirimleri MagicPay&apos;den otomatik girildi. Elle değiştirirseniz {onayci ? "doğrudan kaydedilir." : `değişiklik ${RAPOR_ONAYCI_ADLARI} onayına gider.`}
-                  </p>
-                )}
-                {!isReadOnly && mpIndirimHazir && indirimFarklari.length > 0 && (
-                  <div className="text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 space-y-1.5">
-                    <p className="font-bold">İndirimler MagicPay&apos;den farklı:</p>
-                    <ul className="list-disc pl-4 space-y-0.5">
-                      {indirimFarklari.map(a => (
-                        <li key={a}>{indirimAlanAdi(a)}: MagicPay ₺{fmt(mpTumIndirimler(mpIndirim!)[a] || 0)} → girilen ₺{fmt(formIndirimleri[a] || 0)}</li>
-                      ))}
-                    </ul>
-                    <p>
-                      {onayci ? "Rapor sizin girdiğiniz değerlerle kaydedilir."
-                        : selectedRapor ? `Düzenlemeniz ${RAPOR_ONAYCI_ADLARI} onayına gider.`
-                        : `Rapor MagicPay indirimleriyle kaydedilir; sizin girdiğiniz indirimler ${RAPOR_ONAYCI_ADLARI} onayına gider.`}
-                    </p>
-                    <button type="button" onClick={() => indirimleriMagicleDoldur(mpIndirim!)}
-                      className="text-[11px] font-semibold text-amber-100 border border-amber-400/40 rounded-md px-2 py-1 hover:bg-amber-500/15">
-                      MagicPay değerlerine geri al
-                    </button>
-                  </div>
-                )}
-                {!isReadOnly && mpIndirimDurum === "hata" && (
-                  <p className="text-[11px] text-red-300 bg-red-500/10 border border-red-500/25 rounded-lg px-3 py-2">
-                    Platform indirimleri MagicPay&apos;den alınamadı ({mpIndirimHata}). İndirimleri elle girin.
-                  </p>
-                )}
-                {(() => {
-                  const pk = (...l: PlatformGiris[]) => l.reduce((t, x) => t + sayi(x.paket), 0);
-                  const kebo = pk(osKeboYs, osKeboTrendyol, osKeboMigros, osKeboAlo, koKeboYs, koKeboTrendyol, koKeboMigrosYemek, koKeboAlo);
-                  const cnf = pk(osCnfYs, osCnfTrendyol, osCnfMigrosYemek, koCnfYs, koCnfTrendyol, koCnfMigrosYemek, koCnfAlo);
-                  const kir = pk(osKirYs, osKirTrendyol, osKirMigrosYemek, koKirYs, koKirTrendyol, koKirMigrosYemek, koKirAlo);
-                  return (
-                    <div className="border-t border-cizgi pt-2.5 mt-1 space-y-2">
-                      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1.5 text-[12px] font-semibold text-gray-600">
-                        <span>KEBO <b className="ml-1 inline-block min-w-14 text-center rounded-md border border-cizgi-guclu text-yazi px-2 py-0.5">{kebo}</b></span>
-                        <span>Chick&apos;n <b className="ml-1 inline-block min-w-14 text-center rounded-md border border-cizgi-guclu text-yazi px-2 py-0.5">{cnf}</b></span>
-                        <span>Kıraloğlu <b className="ml-1 inline-block min-w-14 text-center rounded-md border border-cizgi-guclu text-yazi px-2 py-0.5">{kir}</b></span>
-                        <span className="text-yazi font-bold">Dükkân <b className="ml-1 inline-block min-w-14 text-center rounded-md border-2 border-altin/60 text-yazi px-2 py-0.5">{kebo + cnf + kir}</b> <span className="font-medium text-gray-500">paket</span></span>
-                      </div>
-                      <div className="flex flex-wrap gap-x-5 gap-y-1 text-[13px] font-black pt-1.5">
-                        <span className="text-blue-300">Online ₺{fmt(ch.tOnline)}</span>
-                        <span className={ch.indirimUyari ? "text-red-300" : "text-red-400"}>İndirim ₺{fmt(ch.tIndirim)} <span className="font-semibold text-[11px]">(%{ch.indirimOrani.toFixed(1)})</span></span>
-                        <span className="text-purple-300">Kapıda ₺{fmt(ch.tKapida)}</span>
-                      </div>
-                    </div>
-                  );
-                })()}
-                {ch.indirimUyari && (
-                  <p className="text-[12px] text-red-300 bg-red-500/10 border border-red-500/25 rounded-lg px-3 py-2 flex items-center gap-2"><AlertTriangle size={13}/> İndirim online cironun %15&apos;ini geçti — rakamları kontrol edin.</p>
-                )}
-              </div>
-            </div>
-
-            {/* ── 2. KASA ── */}
-            <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
-              <div className="px-4 py-3 border-b border-cizgi flex items-center justify-between">
-                <span className="text-[14px] font-bold text-yazi">2. Kasa</span>
-                <span className="text-sm font-black text-emerald-300">₺{fmt(ch.tKasa)}</span>
-              </div>
-              <div className="p-3 grid grid-cols-2 gap-2.5">
-                <CurrencyInput label="Nakit" value={kasaNakit} onChange={setKasaNakit} disabled={isReadOnly}/>
-                <CurrencyInput label="POS" value={kasaPos} onChange={setKasaPos} disabled={isReadOnly}/>
-              </div>
-              {(() => {
-                // Değer girildikçe otomatik toplanır.
-                //  • Dükkân toplam: dükkân kasası + kasaya teslim eden kuryeler (havuz kuryesi hariç — parası Roadrunner'da kalır)
-                //  • Genel toplam: dükkân + bütün kuryeler (havuz dahil). Ciro hesabı bunlardan bağımsızdır, havuz ciroya girer.
-                const havuzMu = (k: KuryeRaporu) => k.tip === "havuz";
-                const kNakit = kuryeler.filter(k => !havuzMu(k)).reduce((t, k) => t + tv(k.nakit), 0);
-                const kPos = kuryeler.filter(k => !havuzMu(k)).reduce((t, k) => t + tv(k.pos), 0);
-                const hNakit = kuryeler.filter(havuzMu).reduce((t, k) => t + tv(k.nakit), 0);
-                const hPos = kuryeler.filter(havuzMu).reduce((t, k) => t + tv(k.pos), 0);
-                const dNakit = tv(kasaNakit) + kNakit, dPos = tv(kasaPos) + kPos;
-                // Yemek kartı: dükkânda girilen kartlar + kuryenin kapıda aldığı Token Flex / Paye Kart.
-                // Hepsi alacaktır (kart şirketi bankaya öder); havuzunki de Roadrunner'da kalmaz.
-                // Havuz kuryesinin kartla aldığı da bize yatar: tek "Toplam Yemek Kartı" kutusu.
-                const dukkanKart = YEMEK_KARTLARI.reduce((t, k) => t + tv(kartlar[k.alan]), 0);
-                const kuryeKart = kuryeler.reduce((t, k) => t + tv(k.tokenflex) + tv(k.paye), 0);
-                const RENK = {
-                  amber: { kutu: "bg-amber-500/10 border-amber-500/25", yazi: "text-amber-300" },
-                  blue: { kutu: "bg-blue-500/10 border-blue-500/25", yazi: "text-blue-300" },
-                  pink: { kutu: "bg-pink-500/10 border-pink-500/25", yazi: "text-pink-300" },
-                } as const;
-                const kutu = (baslik: string, tutar: number, alt: string, renk: keyof typeof RENK, ek = "") => (
-                  <div className={`rounded-xl border px-3 py-2.5 ${RENK[renk].kutu} ${ek}`}>
-                    <p className={`text-[11px] font-bold uppercase tracking-wide ${RENK[renk].yazi}`}>{baslik}</p>
-                    <p className={`text-xl font-black ${RENK[renk].yazi}`}>₺{fmt(tutar)}</p>
-                    <p className="text-[10px] text-gray-500">{alt}</p>
-                  </div>
-                );
+            {/* ── 1. ADIM: KASA SAYIMI + Kıraloğlu Migros ── */}
+            <div className="rounded-xl border border-cizgi bg-kart p-4 space-y-3">
+              <label className="block space-y-1.5">
+                <span className="block text-[15px] font-bold text-yazi">Kasadaki nakit</span>
+                <span className="block text-[12px] text-gray-500">Gün sonu saydığınız para (giderler ödendikten sonra)</span>
+                <input type="text" inputMode="decimal" value={kasaNakit} onChange={e => setKasaNakit(paraGirdisi(e.target.value))} disabled={isReadOnly}
+                  placeholder="0" className="w-full h-16 rounded-xl border-2 border-altin/60 bg-alan text-yazi text-3xl font-black px-4 outline-none focus:border-altin disabled:opacity-50"/>
+              </label>
+              {mpDoldurma && mpDoldurma.kasa.nakit > 0 && (() => {
+                const beklenen = mpDoldurma.kasa.nakit - ch.tGider;
+                const fark = tv(kasaNakit) - beklenen;
                 return (
-                  <div className="mx-3 mb-1 space-y-2">
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {kutu("Dükkân Toplam Nakit", dNakit, `Dükkân ₺${fmt(tv(kasaNakit))} + Kurye ₺${fmt(kNakit)} (havuz hariç)`, "amber")}
-                      {kutu("Dükkân Toplam POS", dPos, `Dükkân ₺${fmt(tv(kasaPos))} + Kurye ₺${fmt(kPos)} (havuz hariç)`, "blue")}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {kutu("Genel Toplam Nakit", dNakit + hNakit, `Dükkân toplamı + Havuz ₺${fmt(hNakit)}`, "amber")}
-                      {kutu("Genel Toplam POS", dPos + hPos, `Dükkân toplamı + Havuz ₺${fmt(hPos)}`, "blue")}
-                    </div>
-                    {kutu("Toplam Yemek Kartı", dukkanKart + kuryeKart, `Dükkân yemek kartları ₺${fmt(dukkanKart)} + Kuryeler Token Flex / Paye ₺${fmt(kuryeKart)} (havuz dahil) · hepsi bankaya yatar`, "pink")}
-                  </div>
+                  <p className="text-[13px] text-gray-500">
+                    MagicPay&apos;e göre olması gereken: <b className="text-yazi">₺{fmt(beklenen)}</b>
+                    {kasaNakit.trim() && <> · fark <b className={Math.abs(fark) < 1 ? "text-emerald-300" : fark > 0 ? "text-emerald-300" : "text-red-300"}>{fark >= 0 ? "+" : "−"}₺{fmt(Math.abs(fark))}</b></>}
+                    {ch.tGider > 0 && <span className="text-[11px]"> (gider ₺{fmt(ch.tGider)} düşüldü)</span>}
+                  </p>
                 );
               })()}
-              <p className="px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wide">Yemek kartları</p>
-              <div className="p-3 pt-1.5 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
-                {YEMEK_KARTLARI.map(k => (
-                  <CurrencyInput key={k.alan} label={k.ad} value={kartlar[k.alan]} onChange={v => kartYaz(k.alan, v)} disabled={isReadOnly}/>
-                ))}
-              </div>
-              <div className="mx-3 mb-2 flex flex-wrap items-center justify-between gap-2 text-[13px] text-gray-600 border-t border-cizgi pt-2.5">
-                <span>Kasa ₺<b className="text-yazi">{fmt(ch.tKasa)}</b> + Giderler ₺<b className="text-red-300">{fmt(ch.tGider)}</b>{ch.kapidaKasada ? "" : <> + Kapıda ₺<b className="text-purple-300">{fmt(ch.tKapida)}</b></>} + Online ₺<b className="text-blue-300">{fmt(ch.tOnline)}</b></span>
-              </div>
-              <div className="mx-3 mb-3 grid grid-cols-2 gap-2.5">
-                <div className="rounded-xl bg-blue-500/10 border border-blue-500/25 px-5 py-5">
-                  <p className="text-[13px] font-bold text-blue-300 uppercase tracking-wide">Brüt ciro</p>
-                  <p className="text-3xl md:text-4xl font-black text-blue-300 mt-1">₺{fmt(ch.brutCiro)}</p>
-                </div>
-                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/25 px-5 py-5">
-                  <p className="text-[13px] font-bold text-emerald-300 uppercase tracking-wide">Net ciro</p>
-                  <p className="text-3xl md:text-4xl font-black text-emerald-300 mt-1">₺{fmt(ch.netCiro)}</p>
-                </div>
-              </div>
             </div>
+            <div className="rounded-xl border border-teal-500/25 bg-kart p-3 space-y-1.5">
+              <p className="text-[13px] font-bold text-teal-300">Kıraloğlu Migros <span className="font-medium text-[11px] text-gray-500">MagicPay&apos;de yok, elle girin (satış yoksa boş bırakın)</span></p>
+              <div className={`hidden ${SATIS_IZGARA} text-[11px] font-bold text-gray-500 px-0.5`}>
+                <span/>
+                <span className="text-right pr-3">Online ₺</span><span className="text-center">Paket</span>
+                <span className="text-right pr-3 text-red-400">İndirim ₺</span>
+                <span className="text-right pr-3 text-purple-300">Kapıda ₺</span><span className="text-center">Paket</span>
+                <span className="text-center">Toplam</span>
+              </div>
+              <SatisSatiri ad="Migros" online={osKirMigrosYemek} onOnline={setOsKirMigrosYemek} indirim={osKirMigrosIndirim} onIndirim={setOsKirMigrosIndirim} kapida={koKirMigrosYemek} onKapida={setKoKirMigrosYemek} disabled={isReadOnly}/>
+            </div>
+            </section>
 
-            {/* ALT KISIM: Gider / İade / Kurye / Notlar */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-
+            <section id="adim-2" className="space-y-3 scroll-mt-14">
+            {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">2 · Gider <span className="font-medium text-[12px] text-gray-500">giderler, kesinti, iade</span></h2>}
               {/* Giderler */}
               <div className="rounded-xl border border-red-500/20 bg-kart overflow-hidden">
                 <div className="px-4 py-3 border-b border-red-500/15 flex flex-wrap items-center justify-between gap-2 bg-red-500/[0.03]">
@@ -2495,8 +2388,6 @@ export default function RaporlarPage() {
                 </div>
               </div>
 
-              {/* İade + Kurye + Notlar */}
-              <div className="space-y-3">
                 {/* Personel Kesintisi — kasayı/gideri etkilemez, sadece ay sonu maaştan düşülür */}
                 <div className="rounded-xl border border-rose-500/15 bg-kart overflow-hidden">
                   <div className="px-3 py-2 border-b border-rose-500/15 flex items-center justify-between">
@@ -2567,6 +2458,10 @@ export default function RaporlarPage() {
                   </div>
                 </div>
 
+            </section>
+
+            <section id="adim-3" className="space-y-3 scroll-mt-14">
+            {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">3 · Kurye <span className="font-medium text-[12px] text-gray-500">kuryeler ve bugün çalışanlar</span></h2>}
                 {/* Kuryeler */}
                 <div className="rounded-xl border border-amber-500/15 bg-kart overflow-hidden">
                   <div className="px-3 py-2 border-b border-amber-500/15 flex items-center justify-between">
@@ -2768,22 +2663,6 @@ export default function RaporlarPage() {
                   </div>
                 </div>
 
-                {/* Notlar */}
-                <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
-                  <div className="px-3 py-2 border-b border-cizgi">
-                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5"><StickyNote size={11}/>8. Notlar</span>
-                  </div>
-                  <div className="p-3">
-                    <textarea value={notlar} disabled={isReadOnly} onChange={e=>setNotlar(e.target.value)}
-                      placeholder="Özel durumlar, hatırlatmalar..."
-                      rows={2}
-                      className="w-full bg-alan border border-cizgi hover:border-cizgi-guclu focus:border-altin/50 text-yazi text-xs px-3 py-2 rounded-lg outline-none transition-all resize-none disabled:opacity-40 placeholder:text-gray-700"/>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
             {/* ── BUGÜN ÇALIŞANLAR (puantaj) ── */}
             <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
               <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
@@ -2820,6 +2699,192 @@ export default function RaporlarPage() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            </section>
+
+            <section id="adim-4" className="space-y-3 scroll-mt-14">
+            {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">4 · Kontrol <span className="font-medium text-[12px] text-gray-500">satışlar, kasa özeti, notlar ve kaydet</span></h2>}
+            {/* ── SATIŞLAR (4. adım; MagicPay'den dolar) ── */}
+            <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
+              <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[14px] font-bold text-yazi">Satışlar <span className="font-medium text-[11px] text-gray-500">MagicPay&apos;den</span></span>
+                <span title={ch.kapidaKasada ? "13.08.2026 öncesi: kendi kuryelerimizin topladığı para kasa sayımının içinde" : tarih >= KENDI_POS_GECIS_GUNU ? "28.09.2026'dan itibaren: kapıda ödemenin tamamı brüte eklenir. Kurye 1 ve 2 parayı gün sonu kasaya / POS'a teslim eder; havuz kuryelerininki Roadrunner'da kalır, borcumuzdan düşülür" : "Roadrunner'da kalır, haftalık mutabakatla mahsup edilir"}
+                  className="text-[10px] font-semibold text-purple-300 bg-purple-500/10 border border-purple-500/25 px-2 py-0.5 rounded-full">
+                  Kapıda: {ch.kapidaKasada ? "kasa sayımına dahil" : tarih >= KENDI_POS_GECIS_GUNU ? "brüte eklenir · havuzunki Roadrunner'da" : "Roadrunner'da, brüte ayrıca eklenir"}
+                </span>
+              </div>
+              <div className="p-3 space-y-2">
+                <div className={`hidden ${SATIS_IZGARA} text-[11px] font-bold text-gray-500 px-0.5`}>
+                  <span/>
+                  <span className="text-right pr-3">Online ₺</span><span className="text-center">Paket</span>
+                  <span className="text-right pr-3 text-red-400">İndirim ₺</span>
+                  <span className="text-right pr-3 text-purple-300">Kapıda ₺</span><span className="text-center">Paket</span>
+                  <span className="text-center">Toplam</span>
+                </div>
+                <p className="text-[11px] font-bold text-amber-300 uppercase tracking-wide pt-1">🍔 Kebo</p>
+                <SatisSatiri ad="Yemeksepeti" online={osKeboYs} onOnline={setOsKeboYs} indirim={osKeboYsIndirim} onIndirim={setOsKeboYsIndirim} kapida={koKeboYs} onKapida={setKoKeboYs} disabled={isReadOnly}
+                  nakitPos={{ nakit: kapidaNP.ys.nakit, pos: kapidaNP.ys.pos, onNakit: v => kapidaNPYaz("ys", v, kapidaNP.ys.pos), onPos: v => kapidaNPYaz("ys", kapidaNP.ys.nakit, v) }}/>
+                <SatisSatiri ad="Trendyol" online={osKeboTrendyol} onOnline={setOsKeboTrendyol} indirim={osKeboTrendyolIndirim} onIndirim={setOsKeboTrendyolIndirim} kapida={koKeboTrendyol} onKapida={setKoKeboTrendyol} disabled={isReadOnly}
+                  nakitPos={{ nakit: kapidaNP.trendyol.nakit, pos: kapidaNP.trendyol.pos, onNakit: v => kapidaNPYaz("trendyol", v, kapidaNP.trendyol.pos), onPos: v => kapidaNPYaz("trendyol", kapidaNP.trendyol.nakit, v) }}/>
+                <SatisSatiri ad="Migros" online={osKeboMigros} onOnline={setOsKeboMigros} indirim={osKeboMigrosIndirim} onIndirim={setOsKeboMigrosIndirim} kapida={koKeboMigrosYemek} onKapida={setKoKeboMigrosYemek} disabled={isReadOnly}
+                  nakitPos={{ nakit: kapidaNP.migros.nakit, pos: kapidaNP.migros.pos, onNakit: v => kapidaNPYaz("migros", v, kapidaNP.migros.pos), onPos: v => kapidaNPYaz("migros", kapidaNP.migros.nakit, v) }}/>
+                <AloSatiri online={osKeboAlo} nakit={koKeboAloNakit} onNakit={v => aloYaz(v, koKeboAloPos)} pos={koKeboAloPos} onPos={v => aloYaz(koKeboAloNakit, v)}
+                  kapida={koKeboAlo} onKapida={setKoKeboAlo} disabled={isReadOnly}/>
+                <p className="text-[11px] font-bold text-red-300 uppercase tracking-wide pt-2">🍗 Chick&apos;n Fride</p>
+                <SatisSatiri ad="Yemeksepeti" online={osCnfYs} onOnline={setOsCnfYs} indirim={osCnfYsIndirim} onIndirim={setOsCnfYsIndirim} kapida={koCnfYs} onKapida={setKoCnfYs} soluk={["kapida"]} disabled={isReadOnly}/>
+                <SatisSatiri ad="Trendyol" online={osCnfTrendyol} onOnline={setOsCnfTrendyol} indirim={osCnfTrendyolIndirim} onIndirim={setOsCnfTrendyolIndirim} kapida={koCnfTrendyol} onKapida={setKoCnfTrendyol} soluk={["kapida"]} disabled={isReadOnly}/>
+                <SatisSatiri ad="Migros" online={osCnfMigrosYemek} onOnline={setOsCnfMigrosYemek} indirim={osCnfMigrosIndirim} onIndirim={setOsCnfMigrosIndirim} kapida={koCnfMigrosYemek} onKapida={setKoCnfMigrosYemek} soluk={["kapida"]} disabled={isReadOnly}/>
+                <p className="text-[11px] font-bold text-teal-300 uppercase tracking-wide pt-2">🥙 Kıraloğlu</p>
+                <SatisSatiri ad="Yemeksepeti" online={osKirYs} onOnline={setOsKirYs} indirim={osKirYsIndirim} onIndirim={setOsKirYsIndirim} kapida={koKirYs} onKapida={setKoKirYs} soluk={["kapida"]} disabled={isReadOnly}/>
+                <SatisSatiri ad="Trendyol" online={osKirTrendyol} onOnline={setOsKirTrendyol} indirim={osKirTrendyolIndirim} onIndirim={setOsKirTrendyolIndirim} kapida={koKirTrendyol} onKapida={setKoKirTrendyol} soluk={["kapida"]} disabled={isReadOnly}/>
+                <SatisSatiri ad="Migros" online={osKirMigrosYemek} onOnline={setOsKirMigrosYemek} indirim={osKirMigrosIndirim} onIndirim={setOsKirMigrosIndirim} kapida={koKirMigrosYemek} onKapida={setKoKirMigrosYemek} soluk={["kapida"]} disabled={isReadOnly}/>
+                {(tv(koKirAlo.tutar)+tv(koKirYsIndirim)+tv(koKirTrendyolIndirim)) > 0 && (
+                  <p className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
+                    Bu raporda Kıraloğlu Alo Paket / kapıda indirim tutarı var (₺{fmt(tv(koKirAlo.tutar))} Alo, ₺{fmt(tv(koKirYsIndirim)+tv(koKirTrendyolIndirim))} indirim). Hesaplara dahil.
+                  </p>
+                )}
+                {/* Eski raporlarda girilmiş Chick'n Fride kapıda / kapıda indirim varsa kaybolmasın diye gösterilir */}
+                {(tv(koCnfAlo.tutar)+tv(koKeboYsIndirim)+tv(koKeboTrendyolIndirim)+tv(koCnfYsIndirim)+tv(koCnfTrendyolIndirim)) > 0 && (
+                  <p className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
+                    Bu raporda eski formdan kalan Chick&apos;n Fride Alo Paket / kapıda indirim tutarı var (₺{fmt(tv(koCnfAlo.tutar))} Alo, ₺{fmt(tv(koKeboYsIndirim)+tv(koKeboTrendyolIndirim)+tv(koCnfYsIndirim)+tv(koCnfTrendyolIndirim))} indirim). Hesaplara dahil.
+                  </p>
+                )}
+                {/* MagicPay platform indirimleri: otomatik dolar, elle değişiklik onaya gider */}
+                {!isReadOnly && mpIndirimDurum === "yukleniyor" && (
+                  <p className="text-[11px] text-gray-500 flex items-center gap-1.5 px-1"><Loader2 size={11} className="animate-spin"/> Platform indirimleri MagicPay&apos;den alınıyor…</p>
+                )}
+                {!isReadOnly && mpIndirimHazir && indirimFarklari.length === 0 && (
+                  <p className="text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-3 py-2">
+                    ✓ Platform indirimleri MagicPay&apos;den otomatik girildi. Elle değiştirirseniz {onayci ? "doğrudan kaydedilir." : `değişiklik ${RAPOR_ONAYCI_ADLARI} onayına gider.`}
+                  </p>
+                )}
+                {!isReadOnly && mpIndirimHazir && indirimFarklari.length > 0 && (
+                  <div className="text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 space-y-1.5">
+                    <p className="font-bold">İndirimler MagicPay&apos;den farklı:</p>
+                    <ul className="list-disc pl-4 space-y-0.5">
+                      {indirimFarklari.map(a => (
+                        <li key={a}>{indirimAlanAdi(a)}: MagicPay ₺{fmt(mpTumIndirimler(mpIndirim!)[a] || 0)} → girilen ₺{fmt(formIndirimleri[a] || 0)}</li>
+                      ))}
+                    </ul>
+                    <p>
+                      {onayci ? "Rapor sizin girdiğiniz değerlerle kaydedilir."
+                        : selectedRapor ? `Düzenlemeniz ${RAPOR_ONAYCI_ADLARI} onayına gider.`
+                        : `Rapor MagicPay indirimleriyle kaydedilir; sizin girdiğiniz indirimler ${RAPOR_ONAYCI_ADLARI} onayına gider.`}
+                    </p>
+                    <button type="button" onClick={() => indirimleriMagicleDoldur(mpIndirim!)}
+                      className="text-[11px] font-semibold text-amber-100 border border-amber-400/40 rounded-md px-2 py-1 hover:bg-amber-500/15">
+                      MagicPay değerlerine geri al
+                    </button>
+                  </div>
+                )}
+                {!isReadOnly && mpIndirimDurum === "hata" && (
+                  <p className="text-[11px] text-red-300 bg-red-500/10 border border-red-500/25 rounded-lg px-3 py-2">
+                    Platform indirimleri MagicPay&apos;den alınamadı ({mpIndirimHata}). İndirimleri elle girin.
+                  </p>
+                )}
+                {(() => {
+                  const pk = (...l: PlatformGiris[]) => l.reduce((t, x) => t + sayi(x.paket), 0);
+                  const kebo = pk(osKeboYs, osKeboTrendyol, osKeboMigros, osKeboAlo, koKeboYs, koKeboTrendyol, koKeboMigrosYemek, koKeboAlo);
+                  const cnf = pk(osCnfYs, osCnfTrendyol, osCnfMigrosYemek, koCnfYs, koCnfTrendyol, koCnfMigrosYemek, koCnfAlo);
+                  const kir = pk(osKirYs, osKirTrendyol, osKirMigrosYemek, koKirYs, koKirTrendyol, koKirMigrosYemek, koKirAlo);
+                  return (
+                    <div className="border-t border-cizgi pt-2.5 mt-1 space-y-2">
+                      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1.5 text-[12px] font-semibold text-gray-600">
+                        <span>KEBO <b className="ml-1 inline-block min-w-14 text-center rounded-md border border-cizgi-guclu text-yazi px-2 py-0.5">{kebo}</b></span>
+                        <span>Chick&apos;n <b className="ml-1 inline-block min-w-14 text-center rounded-md border border-cizgi-guclu text-yazi px-2 py-0.5">{cnf}</b></span>
+                        <span>Kıraloğlu <b className="ml-1 inline-block min-w-14 text-center rounded-md border border-cizgi-guclu text-yazi px-2 py-0.5">{kir}</b></span>
+                        <span className="text-yazi font-bold">Dükkân <b className="ml-1 inline-block min-w-14 text-center rounded-md border-2 border-altin/60 text-yazi px-2 py-0.5">{kebo + cnf + kir}</b> <span className="font-medium text-gray-500">paket</span></span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-5 gap-y-1 text-[13px] font-black pt-1.5">
+                        <span className="text-blue-300">Online ₺{fmt(ch.tOnline)}</span>
+                        <span className={ch.indirimUyari ? "text-red-300" : "text-red-400"}>İndirim ₺{fmt(ch.tIndirim)} <span className="font-semibold text-[11px]">(%{ch.indirimOrani.toFixed(1)})</span></span>
+                        <span className="text-purple-300">Kapıda ₺{fmt(ch.tKapida)}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+                {ch.indirimUyari && (
+                  <p className="text-[12px] text-red-300 bg-red-500/10 border border-red-500/25 rounded-lg px-3 py-2 flex items-center gap-2"><AlertTriangle size={13}/> İndirim online cironun %15&apos;ini geçti — rakamları kontrol edin.</p>
+                )}
+              </div>
+            </div>
+
+            {/* ── KASA ÖZETİ (4. adım): POS, yemek kartları, toplamlar, ciro ── */}
+            <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
+              <div className="px-4 py-3 border-b border-cizgi flex items-center justify-between">
+                <span className="text-[14px] font-bold text-yazi">Kasa özeti</span>
+                <span className="text-sm font-black text-emerald-300">₺{fmt(ch.tKasa)}</span>
+              </div>
+              <div className="p-3 grid grid-cols-2 gap-2.5">
+                {isReadOnly
+                  ? <CurrencyInput label="Nakit" value={kasaNakit} onChange={setKasaNakit} disabled/>
+                  : <button type="button" onClick={() => adimaGit(1)} className="text-left rounded-xl border border-cizgi bg-alan/40 px-3 py-2 hover:border-altin/40">
+                      <span className="block text-[11px] text-gray-500">Nakit (1. adımda girildi)</span>
+                      <span className="block text-lg font-black text-amber-300">₺{fmt(tv(kasaNakit))}</span>
+                    </button>}
+                <CurrencyInput label="POS" value={kasaPos} onChange={setKasaPos} disabled={isReadOnly}/>
+              </div>
+              {(() => {
+                // Değer girildikçe otomatik toplanır.
+                //  • Dükkân toplam: dükkân kasası + kasaya teslim eden kuryeler (havuz kuryesi hariç — parası Roadrunner'da kalır)
+                //  • Genel toplam: dükkân + bütün kuryeler (havuz dahil). Ciro hesabı bunlardan bağımsızdır, havuz ciroya girer.
+                const havuzMu = (k: KuryeRaporu) => k.tip === "havuz";
+                const kNakit = kuryeler.filter(k => !havuzMu(k)).reduce((t, k) => t + tv(k.nakit), 0);
+                const kPos = kuryeler.filter(k => !havuzMu(k)).reduce((t, k) => t + tv(k.pos), 0);
+                const hNakit = kuryeler.filter(havuzMu).reduce((t, k) => t + tv(k.nakit), 0);
+                const hPos = kuryeler.filter(havuzMu).reduce((t, k) => t + tv(k.pos), 0);
+                const dNakit = tv(kasaNakit) + kNakit, dPos = tv(kasaPos) + kPos;
+                // Yemek kartı: dükkânda girilen kartlar + kuryenin kapıda aldığı Token Flex / Paye Kart.
+                // Hepsi alacaktır (kart şirketi bankaya öder); havuzunki de Roadrunner'da kalmaz.
+                // Havuz kuryesinin kartla aldığı da bize yatar: tek "Toplam Yemek Kartı" kutusu.
+                const dukkanKart = YEMEK_KARTLARI.reduce((t, k) => t + tv(kartlar[k.alan]), 0);
+                const kuryeKart = kuryeler.reduce((t, k) => t + tv(k.tokenflex) + tv(k.paye), 0);
+                const RENK = {
+                  amber: { kutu: "bg-amber-500/10 border-amber-500/25", yazi: "text-amber-300" },
+                  blue: { kutu: "bg-blue-500/10 border-blue-500/25", yazi: "text-blue-300" },
+                  pink: { kutu: "bg-pink-500/10 border-pink-500/25", yazi: "text-pink-300" },
+                } as const;
+                const kutu = (baslik: string, tutar: number, alt: string, renk: keyof typeof RENK, ek = "") => (
+                  <div className={`rounded-xl border px-3 py-2.5 ${RENK[renk].kutu} ${ek}`}>
+                    <p className={`text-[11px] font-bold uppercase tracking-wide ${RENK[renk].yazi}`}>{baslik}</p>
+                    <p className={`text-xl font-black ${RENK[renk].yazi}`}>₺{fmt(tutar)}</p>
+                    <p className="text-[10px] text-gray-500">{alt}</p>
+                  </div>
+                );
+                return (
+                  <div className="mx-3 mb-1 space-y-2">
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {kutu("Dükkân Toplam Nakit", dNakit, `Dükkân ₺${fmt(tv(kasaNakit))} + Kurye ₺${fmt(kNakit)} (havuz hariç)`, "amber")}
+                      {kutu("Dükkân Toplam POS", dPos, `Dükkân ₺${fmt(tv(kasaPos))} + Kurye ₺${fmt(kPos)} (havuz hariç)`, "blue")}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {kutu("Genel Toplam Nakit", dNakit + hNakit, `Dükkân toplamı + Havuz ₺${fmt(hNakit)}`, "amber")}
+                      {kutu("Genel Toplam POS", dPos + hPos, `Dükkân toplamı + Havuz ₺${fmt(hPos)}`, "blue")}
+                    </div>
+                    {kutu("Toplam Yemek Kartı", dukkanKart + kuryeKart, `Dükkân yemek kartları ₺${fmt(dukkanKart)} + Kuryeler Token Flex / Paye ₺${fmt(kuryeKart)} (havuz dahil) · hepsi bankaya yatar`, "pink")}
+                  </div>
+                );
+              })()}
+              <p className="px-3 text-[11px] font-bold text-gray-500 uppercase tracking-wide">Yemek kartları</p>
+              <div className="p-3 pt-1.5 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5">
+                {YEMEK_KARTLARI.map(k => (
+                  <CurrencyInput key={k.alan} label={k.ad} value={kartlar[k.alan]} onChange={v => kartYaz(k.alan, v)} disabled={isReadOnly}/>
+                ))}
+              </div>
+              <div className="mx-3 mb-2 flex flex-wrap items-center justify-between gap-2 text-[13px] text-gray-600 border-t border-cizgi pt-2.5">
+                <span>Kasa ₺<b className="text-yazi">{fmt(ch.tKasa)}</b> + Giderler ₺<b className="text-red-300">{fmt(ch.tGider)}</b>{ch.kapidaKasada ? "" : <> + Kapıda ₺<b className="text-purple-300">{fmt(ch.tKapida)}</b></>} + Online ₺<b className="text-blue-300">{fmt(ch.tOnline)}</b></span>
+              </div>
+              <div className="mx-3 mb-3 grid grid-cols-2 gap-2.5">
+                <div className="rounded-xl bg-blue-500/10 border border-blue-500/25 px-5 py-5">
+                  <p className="text-[13px] font-bold text-blue-300 uppercase tracking-wide">Brüt ciro</p>
+                  <p className="text-3xl md:text-4xl font-black text-blue-300 mt-1">₺{fmt(ch.brutCiro)}</p>
+                </div>
+                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/25 px-5 py-5">
+                  <p className="text-[13px] font-bold text-emerald-300 uppercase tracking-wide">Net ciro</p>
+                  <p className="text-3xl md:text-4xl font-black text-emerald-300 mt-1">₺{fmt(ch.netCiro)}</p>
+                </div>
               </div>
             </div>
 
@@ -2899,6 +2964,19 @@ export default function RaporlarPage() {
                 </div>
               );
             })()}
+
+                {/* Notlar */}
+                <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
+                  <div className="px-3 py-2 border-b border-cizgi">
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5"><StickyNote size={11}/>8. Notlar</span>
+                  </div>
+                  <div className="p-3">
+                    <textarea value={notlar} disabled={isReadOnly} onChange={e=>setNotlar(e.target.value)}
+                      placeholder="Özel durumlar, hatırlatmalar..."
+                      rows={2}
+                      className="w-full bg-alan border border-cizgi hover:border-cizgi-guclu focus:border-altin/50 text-yazi text-xs px-3 py-2 rounded-lg outline-none transition-all resize-none disabled:opacity-40 placeholder:text-gray-700"/>
+                  </div>
+                </div>
 
             {/* ── TOPLAM UYUŞMAZLIKLARI: düzeltilmeden kayıt yapılmaz ── */}
             {!isReadOnly && uyumsuzluklar.length > 0 && (
@@ -2981,6 +3059,7 @@ export default function RaporlarPage() {
                 )}
               </div>
             </div>
+            </section>
 
           </div>
         )}

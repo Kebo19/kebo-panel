@@ -99,6 +99,7 @@ const CSS = `
   .sayfa { display: flex; flex-direction: column; height: 277mm; overflow: hidden; }
   .sayfa.on { page-break-after: always; break-after: page; }
   .not { flex: 1 1 auto; min-height: 28px; }
+  .bilgi { font-size: 8.5pt; border: 1px dashed #888; padding: 4px 8px; margin: 4px 0 2px; }
 
   table.sayim td { height: var(--h, 27px); }
   table.sayim th small { font-weight: normal; font-size: 6.5pt; color: #444; }
@@ -110,52 +111,33 @@ const CSS = `
 
 const ON_YUZ = `
   <div class="ust">
-    <h1>KEBO <small>Günlük Kasa Formu</small></h1>
+    <h1>KEBO <small>Günlük Kasa Formu (kısa)</small></h1>
     <div class="alanlar">
       <div>Tarih: <span class="cizgi" style="width:32px"></span> / <span class="cizgi" style="width:32px"></span> / 2026</div>
       <div>Giren: <span class="cizgi" style="width:150px"></span></div>
     </div>
   </div>
 
-  <h2>1. SATIŞLAR <small>Kapıda: nakit ve POS ayrı · Toplam Paket = online + kapıda · gri kutular boş</small></h2>
-  <table>
-    <tr><th>Platform</th><th class="w-tutar">Online ₺</th><th class="w-paket">Online<br>Paket</th><th class="w-ind">İndirim ₺</th><th class="w-kap">Kapıda<br>Nakit ₺</th><th class="w-kap">Kapıda<br>POS ₺</th><th class="w-paket">Toplam<br>Paket</th></tr>
-    <tr class="marka"><td colspan="7">KEBO</td></tr>
-    <tr><td class="ad">Yemeksepeti</td><td></td><td></td><td></td><td></td><td></td><td class="top"></td></tr>
-    <tr><td class="ad">Trendyol</td><td></td><td></td><td></td><td></td><td></td><td class="top"></td></tr>
-    <tr><td class="ad">Migros</td><td></td><td></td><td></td><td></td><td></td><td class="top"></td></tr>
-    <tr><td class="ad">Alo Paket</td><td class="yok"></td><td class="yok"></td><td class="yok"></td><td></td><td></td><td class="top"></td></tr>
-    <tr class="marka"><td colspan="7">CHICK'N FRIDE</td></tr>
-    <tr><td class="ad">Yemeksepeti</td><td></td><td></td><td></td><td class="yok"></td><td class="yok"></td><td class="top"></td></tr>
-    <tr><td class="ad">Trendyol</td><td></td><td></td><td></td><td class="yok"></td><td class="yok"></td><td class="top"></td></tr>
-    <tr><td class="ad">Migros</td><td></td><td></td><td></td><td class="yok"></td><td class="yok"></td><td class="top"></td></tr>
-    <tr class="marka"><td colspan="7">KIRALOĞLU</td></tr>
-    <tr><td class="ad">Yemeksepeti</td><td></td><td></td><td></td><td class="yok"></td><td class="yok"></td><td class="top"></td></tr>
-    <tr><td class="ad">Trendyol</td><td></td><td></td><td></td><td class="yok"></td><td class="yok"></td><td class="top"></td></tr>
-    <tr><td class="ad">Migros</td><td></td><td></td><td></td><td class="yok"></td><td class="yok"></td><td class="top"></td></tr>
-  </table>
-  <table class="ptoplam">
-    <tr><td class="et">KEBO toplam paket</td><td class="kutu"></td><td class="et">Chick'n toplam paket</td><td class="kutu"></td><td class="et">Kıraloğlu toplam paket</td><td class="kutu"></td><td class="et b">Dükkân toplam paket</td><td class="kutu"></td></tr>
+  <p class="bilgi">Platform satışları, Alo Paket, POS, yemek kartları ve indirimler <b>MagicPay'den otomatik gelir</b> — buraya yazmayın.</p>
+
+  <h2>1. KASA SAYIMI <small>Gün sonu</small></h2>
+  <table class="nk">
+    <tr><td class="et b" style="width:70%">Kasadaki NAKİT ₺ <small style="font-weight:normal">(gün sonu sayılan para; giderler ödendikten sonra)</small></td><td class="kutu" style="height:30px"></td></tr>
   </table>
 
-  <h2>2. KASA <small>Gün sonu sayım</small></h2>
+  <h2>2. KIRALOĞLU MİGROS <small>MagicPay'de yok, elle yazılır</small></h2>
   <table class="esit">
-    <tr><th>Nakit ₺</th><th>POS ₺</th><th>Edenred ₺</th><th>Metropol ₺</th><th>Setcard ₺</th><th>Pluxee ₺</th><th>Paye ₺</th><th>Multinet ₺</th><th>Token Flex ₺</th></tr>
-    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-  </table>
-  <table class="esit nptop" style="margin-top:3px">
-    <tr><th>Dükkân Toplam Nakit ₺<br><small>kasa + Kurye 1-2 (havuz hariç)</small></th><th>Dükkân Toplam POS ₺<br><small>kasa + Kurye 1-2 (havuz hariç)</small></th>
-        <th>Genel Toplam Nakit ₺<br><small>dükkân + havuz kuryesi</small></th><th>Genel Toplam POS ₺<br><small>dükkân + havuz kuryesi</small></th>
-        <th>Toplam Yemek Kartı ₺<br><small>kartlar + kurye Token/Paye</small></th></tr>
+    <tr><th>Online ₺</th><th>Online Paket</th><th>İndirim ₺</th><th>Kapıda ₺</th><th>Kapıda Paket</th></tr>
     <tr><td></td><td></td><td></td><td></td><td></td></tr>
   </table>
-  <table class="toplam esit ciro" style="margin-top:3px">
-    <tr><td class="et">BRÜT CİRO ₺</td><td></td><td class="et">NET CİRO ₺</td><td></td></tr>
-  </table>
 
-  <h2 style="margin-top:6px">3. GİDERLER <small>Kasadan çıkan her şey · avansa personel adı yazın · iade/iptal buraya değil</small></h2>
+  <h2>3. GİDERLER <small>Kasadan çıkan her şey · avansa personel adı yazın · iade/iptal buraya değil</small></h2>
   <table>
     <tr><th>Açıklama</th><th style="width:26%">Personel (avans ise)</th><th style="width:17%">Tutar ₺</th></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
     <tr><td></td><td></td><td></td></tr>
     <tr><td></td><td></td><td></td></tr>
     <tr><td></td><td></td><td></td></tr>
@@ -171,8 +153,9 @@ const ON_YUZ = `
         <tr><th style="width:36%">Personel</th><th>Sebep</th><th style="width:28%">Tutar ₺</th></tr>
         <tr><td></td><td></td><td></td></tr>
         <tr><td></td><td></td><td></td></tr>
-              <tr><td></td><td></td><td></td></tr>
-</table>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+      </table>
     </div>
     <div>
       <h2>5. İPTAL / İADE</h2>
@@ -180,8 +163,9 @@ const ON_YUZ = `
         <tr><th>Açıklama</th><th style="width:30%">Tutar ₺</th></tr>
         <tr><td></td><td></td></tr>
         <tr><td></td><td></td></tr>
-              <tr><td></td><td></td></tr>
-</table>
+        <tr><td></td><td></td></tr>
+        <tr><td></td><td></td></tr>
+      </table>
     </div>
   </div>
 
@@ -200,7 +184,7 @@ const ON_YUZ = `
     <tr><td></td><td></td><td></td></tr>
   </table>
   <table class="nk" style="margin-top:3px">
-    <tr><td class="bos"></td><td class="et b" style="width:60%; white-space:nowrap">Kasa sayıldıysa: kasadaki TOPLAM nakit ₺ <small style="font-weight:normal">(isteğe bağlı)</small></td><td class="kutu" style="width:17%"></td></tr>
+    <tr><td class="bos"></td><td class="et b" style="width:60%; white-space:nowrap">Biriken nakit sayıldıysa: TOPLAM ₺ <small style="font-weight:normal">(isteğe bağlı)</small></td><td class="kutu" style="width:17%"></td></tr>
   </table>
 
   <h2>8. NOTLAR <small>Nokta koymadan yazın (9413) · kuruş için virgül (12,50) · toplamlar kontrol içindir</small></h2>

@@ -28,7 +28,8 @@ Son güncelleme: 28.10.2026 (gece)
   - **Mikro**: robot ana yol. Supabase `mikro-fiyat-guncelle` edge function 410 dönen boş sürümle değiştirildi (eskisi herkese açıktı); yerel klasörü `temizlik.bat` siler. Takılı kalan 27.10 "çek" isteği iptal edildi.
   - `temizlik.bat`: repomix çıktıları, `_kebo_test`, eski fonksiyon klasörünü siler.
   - Karar: `app/raporlar/page.tsx` (≈240 KB) bir seferde bölünmeyecek; dokunulan her bölüm ayrı bileşene/lib'e alınacak (yeni hesaplar lib'de, test edilebilir).
-  - Konuşulacak: geçmiş ayları dondurma (kaç ay geriye); kağıt formun kısaltılması (satış bölümü artık MagicPay'den geliyor).
+  - **Kağıt form kısaldı** ("Günlük Kasa Formu (kısa)", `lib/kasaFormu.ts`): sadece kasadaki nakit sayımı, Kıraloğlu Migros, giderler, kesinti, iade, kurye (Token Flex/Paye dahil), nakit kasa, notlar. Satış tablosu, POS/yemek kartı kutuları, toplam kutuları ve brüt/net ciro kaldırıldı. Tarama (`rapor-tara`) kısa formu "K" düzeni olarak tanıyor; taramadan sonra MagicPay değerleri yeniden yazılıyor (kağıt satışları ezmesin). `public/kebo-gunluk-kasa-formu.pdf` ön yüzü yenilendi.
+  - Konuşulacak: geçmiş ayları dondurma (öneri: Eylül sonuna kadar; Ekim eksikler bitince).
 - **İrsaliye ↔ fatura sorgusu**: Stok ve Faturalar sayfasında "İrsaliye ↔ fatura" arama kutusu; Telegram'da `/belge <no ya da firma>` ve serbest soru.
 
 ## Bekleyenler / sıradaki işler
