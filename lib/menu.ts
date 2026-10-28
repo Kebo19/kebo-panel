@@ -5,6 +5,7 @@ import {
   LayoutDashboard, Wallet, ClipboardList, Users, Settings, BarChart3, Building2,
   FileText, Package, TrendingUp, ChefHat, CalendarCheck, Sparkles, ShieldCheck,
   Bell, History, UserRound, ScanSearch, Tags,
+  Truck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { YetkiAnahtari } from "@/lib/yetki";
@@ -33,6 +34,7 @@ export const MENU: { ust: MenuOgesi[]; finans: MenuOgesi[]; alt: MenuOgesi[]; ay
     { name: "Personel", icon: Users, href: "/personel", izin: "personel", renk: "#c084fc", aciklama: "Kadro ve belgeler", anahtar: "personel çalışan kadro" },
     { name: "Puantaj", icon: CalendarCheck, href: "/puantaj", izin: "puantaj", renk: "#2dd4bf", aciklama: "Devam takibi", anahtar: "puantaj mesai izin" },
     // Sadece Murat ve Bülent görür (lib/magicpay.ts). Listenin sonunda: anasayfa kısayolları MENU.ust sırasına bağlı.
+    { name: "Kurye Kontrol", icon: Truck, href: "/kurye-kontrol", izin: "rapor_gir", renk: "#f59e0b", aciklama: "Roket ↔ kasa raporu ↔ MagicPay", anahtar: "kurye roket roadrunner paket havuz tahsilat excel" },
     { name: "MagicPay Kontrol", icon: ScanSearch, href: "/magicpay", izin: "magicpay", renk: "#22d3ee", aciklama: "Kasa raporu ↔ MagicPay", anahtar: "magicpay adisyon karşılaştırma kontrol paket kasa" },
   ],
   finans: [

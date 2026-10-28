@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -21,6 +22,7 @@ import {
   ROADRUNNER_GECIS_GUNU, KENDI_POS_GECIS_GUNU, kuryeTahsilati, roadrunnerTahsilati, KURYE_GARANTI_PAKET, YEMEK_KARTLARI, type YemekKartiAlani,
 } from "@/lib/hesap";
 import { useYetki } from "@/lib/useYetki";
+import { slotToplami, atamaBul, type RoketGun } from "@/lib/roket";
 import { indirimFarkliAlanlar, INDIRIM_ALAN_ADLARI, ESKI_KAPIDA_INDIRIM_ALANLARI, type PanelRaporu, type MpRaporDoldurma } from "@/lib/magicpay";
 import { RAPOR_ONAYCI_ADLARI } from "@/lib/yetki";
 import { RaporMagicpayPaneli } from "@/components/MagicpayKarsilastirma";
@@ -1022,8 +1024,11 @@ export default function RaporlarPage() {
   // MagicPay'den formu doldurma verisi (satışlar, Alo, POS, yemek kartları) ve forma yazıldı mı
   const [mpDoldurma, setMpDoldurma] = useState<MpRaporDoldurma | null>(null);
   const [mpFormaYazildi, setMpFormaYazildi] = useState(false);
-  // Tek sayfa + adım çubuğu: 1 Kasa → 2 Gider → 3 Kurye → 4 Kontrol ve kaydet (son tıklanan adım vurgulanır)
+  // Adım adım giriş: 1 Kasa → 2 Gider → 3 Kurye → 4 Kontrol ve kaydet
   const [adim, setAdim] = useState(1);
+  // O günün Roket (Roadrunner) özeti — Kurye Kontrol sayfasından yüklenen Excel; varsa kurye adımı ondan dolar
+  const [roketGun, setRoketGun] = useState<RoketGun | null>(null);
+  const [roketNotu, setRoketNotu] = useState<string[]>([]);
   // Hangi tarih için MagicPay indirimleri forma yazıldı (geç gelen cevap kullanıcının girdiğini ezmesin)
   const mpDolduruldu = useRef("");
   const formAlaniRef = useRef<HTMLDivElement>(null);
@@ -1161,10 +1166,11 @@ export default function RaporlarPage() {
     setMpFormaYazildi(true);
   };
   const mpIndirimHazir = mpIndirimDurum === "hazir" && !!mpIndirim;
-  // Tek sayfa: bütün bölümler alt alta; üstteki adım çubuğu bölüme kaydırır ve neyin bittiğini gösterir.
+  // Adım adım: ekranda tek adım görünür (salt okunur görünümde hepsi). Adım çubuğundan istenen adıma geçilir.
+  const goster = (n: number) => isReadOnly || adim === n;
   const adimaGit = (n: number) => {
-    setAdim(n);
-    document.getElementById(`adim-${n}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setAdim(Math.min(4, Math.max(1, n)));
+    setTimeout(() => formAlaniRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
   };
   const adimTamam = [
     !!kasaNakit.trim(),
@@ -1210,6 +1216,52 @@ export default function RaporlarPage() {
     return () => { iptal = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formAcik, tarih, yeniRaporFormu]);
+
+  useEffect(() => {
+    if (!formAcik || !/^\d{4}-\d{2}-\d{2}$/.test(tarih)) { setRoketGun(null); return; }
+    let iptal = false;
+    setRoketNotu([]);
+    supabase.from("roket_gunluk").select("veri").eq("tarih", tarih).maybeSingle()
+      .then(({ data }) => { if (!iptal) setRoketGun(data ? (data.veri as RoketGun) : null); });
+    return () => { iptal = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formAcik, tarih]);
+
+  /** Roket özetinden kurye satırlarını doldurur: Sabit 1, Sabit 2 (yerine gelenler dahil) ve havuz toplamı.
+   *  Atamalar Kurye Kontrol'de seçilir. Uzak / 9 km paketleri (elle girilen) korunur. */
+  const roketleDoldur = (g: RoketGun) => {
+    const notlar: string[] = [];
+    const s = (v: number) => (v ? paraYaz(v) : "");
+    const ilkAd = (ad: string) => { const a = ad.trim().split(/\s+/)[0] || ad; return a.charAt(0).toLocaleUpperCase("tr-TR") + a.slice(1).toLocaleLowerCase("tr-TR"); };
+    g.kuryeler.forEach(k => {
+      if (k.bilinmeyen) notlar.push(`${k.ad}: ₺${fmt(k.bilinmeyen)} ödemenin türü Roket'te "Bilinmeyen"; nakde yazıldı.`);
+      if (k.yemek) notlar.push(`${k.ad}: Alo Paket'te ₺${fmt(k.yemek)} kapıda yemek kartı (türü belli değil); Token Flex ya da Paye ise ilgili kutuya yazın.`);
+    });
+    const yeniPaket = (toplam: number, eski?: KuryeRaporu) =>
+      String(Math.max(0, toplam - (parseInt(eski?.uzakPaket || "") || 0) - (parseInt(eski?.paket9km || "") || 0)));
+    setKuryeler(onceki => {
+      const sabitSatirlar = onceki.filter(k => k.tip !== "havuz");
+      const yeniSabit = (["s1", "s2"] as const).map((slot, i) => {
+        const t = slotToplami(g, slot);
+        const eski = sabitSatirlar[i];
+        const adlar = g.kuryeler.filter(k => atamaBul(g, k) === slot).map(k => ilkAd(k.ad));
+        return {
+          ...(eski || { id: Date.now() + i, uzakPaket: "", paket9km: "" }), tip: (eski?.tip || "sabit") as KuryeRaporu["tip"],
+          isim: adlar.length ? adlar.join(" + ") : (eski?.isim || `Kurye ${i + 1}`),
+          paketSayisi: t.paket ? yeniPaket(t.paket, eski) : "",
+          nakit: s(t.nakit + t.bilinmeyen), pos: s(t.pos), paye: s(t.paye), tokenflex: eski?.tokenflex || "",
+        } as KuryeRaporu;
+      });
+      const h = slotToplami(g, "havuz");
+      const eskiHavuz = onceki.find(k => k.tip === "havuz");
+      const havuz: KuryeRaporu = {
+        ...(eskiHavuz || { id: Date.now() + 99, uzakPaket: "", paket9km: "" }), tip: "havuz", isim: "Havuz",
+        paketSayisi: yeniPaket(h.paket, eskiHavuz), nakit: s(h.nakit + h.bilinmeyen), pos: s(h.pos), paye: s(h.paye), tokenflex: eskiHavuz?.tokenflex || "",
+      } as KuryeRaporu;
+      return [...yeniSabit, havuz];
+    });
+    setRoketNotu(notlar);
+  };
 
   // ── Helpers ──
   const siradakiTarih = (): string|null => enSonRaporTarihi ? gunEkle(enSonRaporTarihi, 1) : null;
@@ -2204,7 +2256,7 @@ export default function RaporlarPage() {
             {!isReadOnly && (
               <nav aria-label="Rapor bölümleri" className="sticky top-0 z-30 grid grid-cols-4 gap-1.5 bg-zemin/95 backdrop-blur py-2">
                 {ADIMLAR.map((ad, i) => {
-                  const no = i + 1, aktif = adim === no, gecti = adimTamam[i];
+                  const no = i + 1, aktif = adim === no, gecti = !aktif && (adimTamam[i] || adim > no);
                   return (
                     <button key={ad} type="button" onClick={() => adimaGit(no)} aria-current={aktif ? "step" : undefined}
                       className="flex flex-col gap-1.5 text-left">
@@ -2215,7 +2267,7 @@ export default function RaporlarPage() {
                 })}
               </nav>
             )}
-            <section id="adim-1" className="space-y-3 scroll-mt-14">
+            {goster(1) && <section id="adim-1" className="space-y-3 scroll-mt-14">
             {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">1 · Kasa <span className="font-medium text-[12px] text-gray-500">kasadaki nakit ve Kıraloğlu Migros</span></h2>}
                 {!isReadOnly && mpDoldurma && (
                   <div className={`text-[12px] rounded-lg px-3 py-2.5 border space-y-1.5 ${mpFormaYazildi ? "text-emerald-200 bg-emerald-500/10 border-emerald-500/25" : "text-sky-200 bg-sky-500/10 border-sky-500/25"}`}>
@@ -2271,9 +2323,9 @@ export default function RaporlarPage() {
               </div>
               <SatisSatiri ad="Migros" online={osKirMigrosYemek} onOnline={setOsKirMigrosYemek} indirim={osKirMigrosIndirim} onIndirim={setOsKirMigrosIndirim} kapida={koKirMigrosYemek} onKapida={setKoKirMigrosYemek} disabled={isReadOnly}/>
             </div>
-            </section>
+            </section>}
 
-            <section id="adim-2" className="space-y-3 scroll-mt-14">
+            {goster(2) && <section id="adim-2" className="space-y-3 scroll-mt-14">
             {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">2 · Gider <span className="font-medium text-[12px] text-gray-500">giderler, kesinti, iade</span></h2>}
               {/* Giderler */}
               <div className="rounded-xl border border-red-500/20 bg-kart overflow-hidden">
@@ -2458,9 +2510,9 @@ export default function RaporlarPage() {
                   </div>
                 </div>
 
-            </section>
+            </section>}
 
-            <section id="adim-3" className="space-y-3 scroll-mt-14">
+            {goster(3) && <section id="adim-3" className="space-y-3 scroll-mt-14">
             {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">3 · Kurye <span className="font-medium text-[12px] text-gray-500">kuryeler ve bugün çalışanlar</span></h2>}
                 {/* Kuryeler */}
                 <div className="rounded-xl border border-amber-500/15 bg-kart overflow-hidden">
@@ -2475,6 +2527,18 @@ export default function RaporlarPage() {
                     </div>
                   </div>
                   <div className="p-3 space-y-3">
+                    {!isReadOnly && (roketGun ? (
+                      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 space-y-1.5 text-[12px]">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-amber-200">Roket&apos;te bu gün: <b>{roketGun.toplamPaket} paket</b>, {roketGun.kuryeler.length} kurye</span>
+                          <button type="button" onClick={() => roketleDoldur(roketGun)}
+                            className="text-[12px] font-bold px-3 py-1.5 rounded-lg kebo-btn-altin text-[#1a1408] hover:brightness-110">Roket&apos;ten doldur</button>
+                        </div>
+                        {roketNotu.length > 0 && <ul className="list-disc pl-4 text-amber-300 space-y-0.5">{roketNotu.map((n, i) => <li key={i}>{n}</li>)}</ul>}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-gray-500">Roket Excel&apos;i yüklerseniz kuryeler otomatik dolar: <Link href="/kurye-kontrol" className="text-amber-300 underline">Kurye Kontrol</Link></p>
+                    ))}
                     <p className="text-[10px] text-gray-600">Kurye 1 ve Kurye 2&apos;de günlük en az <span className="text-amber-400 font-bold">30 paket</span> garantisi var — altında kalırsa ödemeye esas 30 alınır. Havuzda garanti ve isim yok.</p>
                     {(ch.tKapida > 0 || ch.tKuryeNakit + ch.tKuryePos + ch.tKuryeKart > 0) && (() => {
                       const fark = (x: number) => Math.round(x * 100) / 100;
@@ -2702,9 +2766,9 @@ export default function RaporlarPage() {
               </div>
             </div>
 
-            </section>
+            </section>}
 
-            <section id="adim-4" className="space-y-3 scroll-mt-14">
+            {goster(4) && <section id="adim-4" className="space-y-3 scroll-mt-14">
             {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">4 · Kontrol <span className="font-medium text-[12px] text-gray-500">satışlar, kasa özeti, notlar ve kaydet</span></h2>}
             {/* ── SATIŞLAR (4. adım; MagicPay'den dolar) ── */}
             <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
@@ -2995,6 +3059,9 @@ export default function RaporlarPage() {
               </div>
             )}
 
+            {!isReadOnly && (
+              <button type="button" onClick={() => adimaGit(3)} className="text-[13px] font-semibold text-gray-500 hover:text-yazi">← Geri: Kurye</button>
+            )}
             {/* ÖZET BANT */}
             <div className="rounded-xl border border-cizgi bg-alan px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1">
               <div className="flex flex-wrap items-center gap-4 text-xs">
@@ -3059,7 +3126,21 @@ export default function RaporlarPage() {
                 )}
               </div>
             </div>
-            </section>
+            </section>}
+
+            {/* ── Adımlar arası geçiş (1–3) ── */}
+            {!isReadOnly && adim < 4 && (
+              <div className="sticky bottom-0 z-30 flex gap-2.5 bg-zemin/95 backdrop-blur py-3">
+                {adim > 1 && (
+                  <button type="button" onClick={() => adimaGit(adim - 1)}
+                    className="flex-1 h-14 rounded-xl border border-cizgi text-gray-400 text-[15px] font-semibold">Geri</button>
+                )}
+                <button type="button" onClick={() => adimaGit(adim + 1)}
+                  className="flex-[2] h-14 rounded-xl kebo-btn-altin text-[#1a1408] text-[16px] font-black hover:brightness-110">
+                  İleri: {ADIMLAR[adim]}
+                </button>
+              </div>
+            )}
 
           </div>
         )}

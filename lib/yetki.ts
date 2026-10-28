@@ -49,7 +49,7 @@ export interface YetkiTanimi {
 /** Tek kaynak: tüm yetki anahtarları. Veritabanındaki kullanici_yetki_guncelle ile aynı liste. */
 export const YETKILER: YetkiTanimi[] = [
   { anahtar: "anasayfa", etiket: "Anasayfa özeti", aciklama: "Ciro, kasa ve fatura özet kartları", grup: "Günlük işler", sayfalar: ["/"] },
-  { anahtar: "rapor_gir", etiket: "Kasa Raporu girme", aciklama: "Günlük kasa raporu girme", grup: "Günlük işler", sayfalar: ["/raporlar"] },
+  { anahtar: "rapor_gir", etiket: "Kasa Raporu girme", aciklama: "Günlük kasa raporu girme, Kurye Kontrol (Roket Excel yükleme)", grup: "Günlük işler", sayfalar: ["/raporlar", "/kurye-kontrol"] },
   { anahtar: "rapor_duzenle", etiket: "Rapor düzenleme", aciklama: "Girilmiş raporu düzenleme (onaya gider), tarih ve toplam uyarılarını geçme", grup: "Günlük işler", sayfalar: [] },
   { anahtar: "rapor_onay", etiket: "Rapor onaylama", aciklama: "Rapor değişikliklerini onaylama; raporu onaysız düzenleme ve silme", grup: "Günlük işler", sayfalar: [] },
   { anahtar: "rapor_analiz", etiket: "Rapor Analizi", aciklama: "Dönemsel satış ve platform analizleri", grup: "Günlük işler", sayfalar: ["/rapor-analiz"] },
