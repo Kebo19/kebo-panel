@@ -38,6 +38,8 @@ interface KuryeRaporu {
   // 02.09.2026: Roadrunner bazı paketleri farklı ücretlendiriyor — uzak paketler 1.5 kat,
   // 9km üzeri paketler 2 kat. paketSayisi = normal (1x) ücretli paket sayısı; bu ikisi ayrı tutulur.
   uzakPaket?: string; paket9km?: string;
+  // 28.10.2026: kapıda Token Flex / Paye Kart ile alınan tutar — yemek kartı alacağı (kasaya/Roadrunner'a gitmez)
+  tokenflex?: string; paye?: string;
   tip?: "sabit" | "havuz" | "kendi"; // sabit = Roadrunner garantili kurye, havuz = garantisiz ek kurye, kendi = 14.08.2026 öncesi kendi personel kurye
 }
 interface PlatformGiris { tutar: string; paket: string; }
@@ -502,7 +504,7 @@ function PrintModal({rapor, onClose}: {rapor:GunlukRapor, onClose:()=>void}) {
               {rapor.kurye_raporlari.map((k,i)=>(
                 <div key={i} className="row">
                   <span>{k.isim||"—"} · {kuryeGercekPaket(k)} pkt</span>
-                  <span>Nakit: ₺{fmt(Number(k.nakit))} | Kredi: ₺{fmt(Number(k.pos))}</span>
+                  <span>Nakit: ₺{fmt(Number(k.nakit))} | Kredi: ₺{fmt(Number(k.pos))}{tv(k.tokenflex)>0?` | Token Flex: ₺${fmt(tv(k.tokenflex))}`:""}{tv(k.paye)>0?` | Paye Kart: ₺${fmt(tv(k.paye))}`:""}</span>
                 </div>
               ))}
             </>}
@@ -743,7 +745,7 @@ function kuryeYapisiHesapla(tarihStr: string): KuryeRaporu[] {
 }
 /** Tarih değişince kurye yapısını yeni döneme uyarlar ama girilmiş/taranmış verileri korur. */
 function kuryeleriUyarla(mevcut: KuryeRaporu[], tarihStr: string): KuryeRaporu[] {
-  const dolu = mevcut.filter(k => k.nakit || k.pos || k.paketSayisi || k.uzakPaket || k.paket9km ||
+  const dolu = mevcut.filter(k => k.nakit || k.pos || k.tokenflex || k.paye || k.paketSayisi || k.uzakPaket || k.paket9km ||
     (k.isim && !/^(Kurye \d|Havuz Kurye)$/.test(k.isim)));
   if (!dolu.length) return kuryeYapisiHesapla(tarihStr);
   if (!tarihStr || tarihStr < ROADRUNNER_GECIS_GUNU) return dolu.map(k => ({ ...k, tip: "kendi" }));
@@ -1452,7 +1454,9 @@ export default function RaporlarPage() {
     setKuryeler(r.kurye_raporlari?.length
       ? r.kurye_raporlari.map((k,i)=>({...k, id:k.id ?? Date.now()+i, isim:k.isim||"",
           nakit:paraYaz(tv(k.nakit)), pos:paraYaz(tv(k.pos)), paketSayisi:String(k.paketSayisi??""),
-          uzakPaket:k.uzakPaket||"", paket9km:k.paket9km||"", tip:k.tip || (r.tarih < ROADRUNNER_GECIS_GUNU ? "kendi" : "havuz")}))
+          uzakPaket:k.uzakPaket||"", paket9km:k.paket9km||"",
+          tokenflex:tv(k.tokenflex)?paraYaz(tv(k.tokenflex)):"", paye:tv(k.paye)?paraYaz(tv(k.paye)):"",
+          tip:k.tip || (r.tarih < ROADRUNNER_GECIS_GUNU ? "kendi" : "havuz")}))
       : kuryeYapisiHesapla(r.tarih));
     const ayrik = giderMetniniAyristir(r.gider_aciklama);
     setNotlar(ayrik.not);
@@ -1535,7 +1539,7 @@ export default function RaporlarPage() {
       const paket9km = parseInt(k.paket9km||"")||0;
       const gercek = normalPaket + uzakPaket + paket9km;
       const garantiSatiri = k.tip!=="havuz" && garantiSira++ < 2;
-      const dolu = gercek>0 || tv(k.nakit)>0 || tv(k.pos)>0 || (!!k.isim && !/^Kurye \d$/.test(k.isim.trim()));
+      const dolu = gercek>0 || tv(k.nakit)>0 || tv(k.pos)>0 || tv(k.tokenflex)>0 || tv(k.paye)>0 || (!!k.isim && !/^Kurye \d$/.test(k.isim.trim()));
       const garantiUygulandi = garantiSatiri && dolu && gercek<KURYE_GARANTI_PAKET;
       const uygulanan = garantiUygulandi ? KURYE_GARANTI_PAKET : gercek;
       return { ...k, normalPaket, uzakPaket, paket9km, gercekPaket:gercek, uygulananPaket:uygulanan, garantiUygulandi };
@@ -1544,7 +1548,10 @@ export default function RaporlarPage() {
     const tKuryeGercekPaket=kuryelerHesap.reduce((a,k)=>a+k.gercekPaket,0);
     const tKuryeUzakPaket=kuryelerHesap.reduce((a,k)=>a+k.uzakPaket,0);
     const tKuryePaket9km=kuryelerHesap.reduce((a,k)=>a+k.paket9km,0);
-    const tKuryeTahsilat=kuryeler.reduce((a,k)=>a+tv(k.nakit)+tv(k.pos),0);
+    // Token Flex / Paye Kart: kapıda alınır, yemek kartı alacağıdır (kasa ve Roadrunner hesabına girmez)
+    const tKuryeTokenFlex=kuryeler.reduce((a,k)=>a+tv(k.tokenflex),0), tKuryePaye=kuryeler.reduce((a,k)=>a+tv(k.paye),0);
+    const tKuryeKart=tKuryeTokenFlex+tKuryePaye;
+    const tKuryeTahsilat=kuryeler.reduce((a,k)=>a+tv(k.nakit)+tv(k.pos),0)+tKuryeKart;
     const tKuryeNakit=kuryeler.reduce((a,k)=>a+tv(k.nakit),0), tKuryePos=kuryeler.reduce((a,k)=>a+tv(k.pos),0);
     // Sepet ortalaması gerçek teslim edilen pakete göre (garanti farkı ortalamayı düşürmesin)
     const paketOrt = paketCiroToplami>0 && tKuryeGercekPaket>0 ? paketCiroToplami/tKuryeGercekPaket : 0;
@@ -1552,8 +1559,9 @@ export default function RaporlarPage() {
     // Kapıda tahsilat türü: Alo Paket nakit/POS ayrı girilir; platformların kapıda ödemesinde tür bilinmez
     const aloNakit = tv(koKeboAloNakit) + tv(kapidaNP.ys.nakit) + tv(kapidaNP.trendyol.nakit) + tv(kapidaNP.migros.nakit);
     const aloPos = tv(koKeboAloPos) + tv(kapidaNP.ys.pos) + tv(kapidaNP.trendyol.pos) + tv(kapidaNP.migros.pos);
-    const kapidaTuruBilinmeyen = Math.round((tKapida - aloNakit - aloPos)*100)/100;
-    return {aloNakit,aloPos,kapidaTuruBilinmeyen,tKuryeNakit,tKuryePos,pkKebo,pkCnf,pkKir,tOnline,tOnlineKebo,tOnlineCnf,tOnlineKir,tOnlinePaket,tKapida,tKapidaKebo,tKapidaCnf,tKapidaKir,tKapidaPaket,kapidaKasada,
+    // Kapıda kartla ödenen (Token Flex / Paye) satış, nakit/POS kırılımında yer almaz: kurye girişinden alınır.
+    const kapidaTuruBilinmeyen = Math.round((tKapida - aloNakit - aloPos - tKuryeKart)*100)/100;
+    return {aloNakit,aloPos,kapidaTuruBilinmeyen,tKuryeNakit,tKuryePos,tKuryeTokenFlex,tKuryePaye,tKuryeKart,pkKebo,pkCnf,pkKir,tOnline,tOnlineKebo,tOnlineCnf,tOnlineKir,tOnlinePaket,tKapida,tKapidaKebo,tKapidaCnf,tKapidaKir,tKapidaPaket,kapidaKasada,
       tIndirimYS,tIndirimTrendyol,tIndirim,indirimOrani,indirimUyari,
       tKasa,brutCiro,tGider,tIade,netCiro,kuryelerHesap,tKuryePaket,tKuryeGercekPaket,
       tKuryeUzakPaket,tKuryePaket9km,tKuryeTahsilat,paketOrt,kuryeFark};
@@ -1587,7 +1595,7 @@ export default function RaporlarPage() {
     tip: tarih && tarih < ROADRUNNER_GECIS_GUNU ? "kendi" : "havuz"}]);
   const kuryeSil = (id:number)=>setKuryeler(kuryeler.filter(k=>k.id!==id));
   const kuryeDegistir = (id:number,field:keyof KuryeRaporu,val:string)=>{
-    const v=(field==="nakit"||field==="pos")?paraGirdisi(val):val;
+    const v=(field==="nakit"||field==="pos"||field==="tokenflex"||field==="paye")?paraGirdisi(val):val;
     setKuryeler(kuryeler.map(k=>k.id===id?{...k,[field]:v}:k));
   };
   // ── Fişten Doldur: kağıt raporu fotoğraflayıp/yükleyip AI'ye okutma ──
@@ -1750,7 +1758,8 @@ export default function RaporlarPage() {
 
       const giderAciklamaFinal = giderMetniOlustur(giderler, notlar);
       const birlesikIade = iadeler.filter(i=>i.tutar||i.aciklama).map(i=>`${temizMetin(i.aciklama)||"Belirtilmemiş"}: ₺${i.tutar||"0"}`).join(" | ");
-      const temizKuryeler = kuryeler.map(k=>({...k,nakit:tv(k.nakit).toString(),pos:tv(k.pos).toString()}));
+      const temizKuryeler = kuryeler.map(k=>({...k,nakit:tv(k.nakit).toString(),pos:tv(k.pos).toString(),
+        tokenflex:tv(k.tokenflex).toString(),paye:tv(k.paye).toString()}));
       const pk = (p:PlatformGiris)=>parseInt(p.paket)||0;
 
       const raporData = {
@@ -2512,7 +2521,7 @@ export default function RaporlarPage() {
                   </div>
                   <div className="p-3 space-y-3">
                     <p className="text-[10px] text-gray-600">Kurye 1 ve Kurye 2&apos;de günlük en az <span className="text-amber-400 font-bold">30 paket</span> garantisi var — altında kalırsa ödemeye esas 30 alınır. Havuzda garanti ve isim yok.</p>
-                    {(ch.tKapida > 0 || ch.tKuryeNakit + ch.tKuryePos > 0) && (() => {
+                    {(ch.tKapida > 0 || ch.tKuryeNakit + ch.tKuryePos + ch.tKuryeKart > 0) && (() => {
                       const fark = (x: number) => Math.round(x * 100) / 100;
                       const fN = fark(ch.aloNakit - ch.tKuryeNakit), fP = fark(ch.aloPos - ch.tKuryePos);
                       const etiket = (f: number) => Math.abs(f) < 0.01
@@ -2531,7 +2540,9 @@ export default function RaporlarPage() {
                             <div className="grid grid-cols-4 gap-2"><span className="text-blue-300 font-semibold">POS</span><span className="text-right text-yazi">₺{fmt(ch.aloPos)}</span><span className="text-right text-yazi">₺{fmt(ch.tKuryePos)}</span><span className="text-right text-gray-600">kurye POS</span></div>
                             <div className="grid grid-cols-4 gap-2"><span className="text-purple-300 font-semibold">CNF/Kıraloğlu kapıda</span><span className="text-right text-yazi">₺{fmt(ch.kapidaTuruBilinmeyen)}</span><span className="col-span-2 text-right text-gray-600">nakit/POS ayrımı yok</span></div>
                           </>}
-                          <div className="grid grid-cols-4 gap-2 border-t border-cizgi pt-1 font-bold"><span className="text-yazi">Toplam</span><span className="text-right text-yazi">₺{fmt(ch.tKapida)}</span><span className="text-right text-yazi">₺{fmt(ch.tKuryeNakit + ch.tKuryePos)}</span><span className="text-right">{etiket(ch.kuryeFark)}</span></div>
+                          {ch.tKuryeTokenFlex > 0 && <div className="grid grid-cols-4 gap-2" title="Yemek kartı alacağı: kasaya ya da Roadrunner'a gitmez, Token şirketi bankaya öder"><span className="text-pink-300 font-semibold">Token Flex</span><span className="text-right text-gray-600">kartla</span><span className="text-right text-yazi">₺{fmt(ch.tKuryeTokenFlex)}</span><span className="text-right text-gray-600">alacak</span></div>}
+                          {ch.tKuryePaye > 0 && <div className="grid grid-cols-4 gap-2" title="Yemek kartı alacağı: kasaya ya da Roadrunner'a gitmez, Paye bankaya öder"><span className="text-pink-300 font-semibold">Paye Kart</span><span className="text-right text-gray-600">kartla</span><span className="text-right text-yazi">₺{fmt(ch.tKuryePaye)}</span><span className="text-right text-gray-600">alacak</span></div>}
+                          <div className="grid grid-cols-4 gap-2 border-t border-cizgi pt-1 font-bold"><span className="text-yazi">Toplam</span><span className="text-right text-yazi">₺{fmt(ch.tKapida)}</span><span className="text-right text-yazi">₺{fmt(ch.tKuryeNakit + ch.tKuryePos + ch.tKuryeKart)}</span><span className="text-right">{etiket(ch.kuryeFark)}</span></div>
                         </div>
                       );
                     })()}
@@ -2649,6 +2660,26 @@ export default function RaporlarPage() {
                               )}
                             </div>
                           )}
+                          {/* 28.10.2026: kapıda Token Flex / Paye Kart — yemek kartı alacağı, kasaya/Roadrunner'a gitmez */}
+                          {(!isReadOnly || tv(k.tokenflex)>0 || tv(k.paye)>0) && (
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5 pl-1">
+                              {([["tokenflex","Token Flex"],["paye","Paye Kart"]] as const).map(([alan, etiket], i) => (
+                                <span key={alan} className={`flex items-center gap-1.5 ${i ? "ml-2" : ""}`}>
+                                  <span className="text-[9px] text-pink-400 font-semibold shrink-0">{etiket}</span>
+                                  {isReadOnly ? (
+                                    <span className="text-[11px] font-bold text-pink-300">₺{fmt(tv(k[alan]))}</span>
+                                  ) : (
+                                    <span className="relative">
+                                      <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-pink-400 text-[9px] font-bold">₺</span>
+                                      <input type="text" inputMode="decimal" placeholder="0" value={k[alan]||""}
+                                        onChange={e=>kuryeDegistir(k.id,alan,e.target.value)}
+                                        className="w-20 bg-alan border border-pink-500/20 text-yazi h-6 text-[11px] font-bold pl-4 pr-1.5 rounded-lg outline-none focus:border-pink-500/40"/>
+                                    </span>
+                                  )}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           {!isReadOnly && k.tip!=="sabit" && (
                             <button type="button" onClick={()=>kuryeSil(k.id)}
                               className="absolute -right-5 top-1/2 -translate-y-1/2 text-gray-700 hover:text-red-400 transition-colors">
@@ -2662,6 +2693,12 @@ export default function RaporlarPage() {
                       <span className="text-gray-600">Gerçek toplam: <span className="text-gray-700 font-bold">{ch.tKuryeGercekPaket} pkt</span></span>
                       <span className="text-gray-600">Ödemeye esas toplam: <span className="text-amber-400 font-bold">{ch.tKuryePaket} pkt</span></span>
                     </div>
+                    {ch.tKuryeKart>0 && (
+                      <div className="flex items-center justify-between text-[10px]" title="Kapıda yemek kartıyla alınan: Kasa > yemek kartı alacaklarına eklenir, kasada ve Roadrunner borcunda beklenmez">
+                        <span className="text-gray-600">Token Flex: <span className="text-pink-300 font-bold">₺{fmt(ch.tKuryeTokenFlex)}</span></span>
+                        <span className="text-gray-600">Paye Kart: <span className="text-pink-300 font-bold">₺{fmt(ch.tKuryePaye)}</span> · yemek kartı alacağı</span>
+                      </div>
+                    )}
                     {(ch.tKuryeUzakPaket>0 || ch.tKuryePaket9km>0) && (
                       <div className="flex items-center justify-between text-[10px]">
                         <span className="text-gray-600">Uzak (1.5x): <span className="text-orange-300 font-bold">{ch.tKuryeUzakPaket} pkt</span></span>

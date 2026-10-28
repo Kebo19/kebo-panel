@@ -12,7 +12,7 @@
 //   için tüm hesaplara bakılır; komisyonun yasal üst sınırı %6.
 
 import { gunEkle, gunFarki } from "@/lib/tarih";
-import { YEMEK_KARTLARI } from "@/lib/hesap";
+import { YEMEK_KARTI_ADLARI, yemekKartiSatislari, type YemekKartiAdi } from "@/lib/hesap";
 
 export const POS_KOMISYON_ORANI = 0.0199;
 export const POS_BANKA_HESABI = "VakıfBank";
@@ -214,7 +214,7 @@ export function posMutabakati(gunler: PosGunu[], hareketler: BankaHareketi[], bu
 
 // ─── YEMEK KARTLARI ──────────────────────────────────────────────────────────
 
-export type YemekKartiAdi = typeof YEMEK_KARTLARI[number]["ad"];
+export type { YemekKartiAdi };
 
 /** Açıklamada geçen anahtar kelimeler → kart. (Pluxee eski adı Sodexo; Edenred ürünü Ticket.) */
 const KART_ANAHTARLARI: { ad: YemekKartiAdi; kelimeler: string[] }[] = [
@@ -224,6 +224,7 @@ const KART_ANAHTARLARI: { ad: YemekKartiAdi; kelimeler: string[] }[] = [
   { ad: "Pluxee", kelimeler: ["pluxee", "sodexo"] },
   { ad: "Paye", kelimeler: ["paye"] },
   { ad: "Multinet", kelimeler: ["multinet"] },
+  { ad: "Token Flex", kelimeler: ["token flex", "tokenflex", "token"] },
 ];
 
 const kucult = (s: string) => s.toLocaleLowerCase("tr-TR").replace(/ı/g, "i");
@@ -296,7 +297,8 @@ export function yemekKartiMutabakati<T extends { tarih: string }>(
   };
   raporlar.forEach(r => {
     const a = ayAl(ayAnahtari(r.tarih));
-    YEMEK_KARTLARI.forEach(k => { a.satis[k.ad] = (a.satis[k.ad] || 0) + sayi((r as Record<string, unknown>)[k.alan]); });
+    const s = yemekKartiSatislari(r as Parameters<typeof yemekKartiSatislari>[0]);
+    YEMEK_KARTI_ADLARI.forEach(ad => { a.satis[ad] = (a.satis[ad] || 0) + s[ad]; });
   });
 
   let belirsizToplam = 0;
@@ -314,11 +316,11 @@ export function yemekKartiMutabakati<T extends { tarih: string }>(
   const ayListesi: YemekKartiAyi[] = [...aylar.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([ay, a]) => {
-      const kartlar = YEMEK_KARTLARI.map(k => {
-        const s = a.satis[k.ad] || 0, y = a.yatan[k.ad] || 0;
-        toplamSatis[k.ad] = (toplamSatis[k.ad] || 0) + s;
-        toplamYatan[k.ad] = (toplamYatan[k.ad] || 0) + y;
-        return kartSatiri(k.ad, s, y);
+      const kartlar = YEMEK_KARTI_ADLARI.map(ad => {
+        const s = a.satis[ad] || 0, y = a.yatan[ad] || 0;
+        toplamSatis[ad] = (toplamSatis[ad] || 0) + s;
+        toplamYatan[ad] = (toplamYatan[ad] || 0) + y;
+        return kartSatiri(ad, s, y);
       });
       return {
         ay, kartlar, belirsizYatan: kurus(a.belirsiz),
@@ -329,7 +331,7 @@ export function yemekKartiMutabakati<T extends { tarih: string }>(
 
   return {
     aylar: ayListesi,
-    toplam: YEMEK_KARTLARI.map(k => kartSatiri(k.ad, toplamSatis[k.ad] || 0, toplamYatan[k.ad] || 0)),
+    toplam: YEMEK_KARTI_ADLARI.map(ad => kartSatiri(ad, toplamSatis[ad] || 0, toplamYatan[ad] || 0)),
     belirsizYatan: kurus(belirsizToplam),
     hareketVar: hGecerli.length > 0,
   };

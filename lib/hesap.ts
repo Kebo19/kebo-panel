@@ -32,7 +32,28 @@ export const KURYE_GARANTI_PAKET = 30;
 export interface KuryeSatiri {
   id?: number; isim?: string; nakit?: string | number; pos?: string | number;
   paketSayisi?: string | number; uzakPaket?: string | number; paket9km?: string | number;
+  /** Kapıda Token Flex / Paye Kart ile alınan tutar (28.10.2026). Kasaya ya da Roadrunner'a
+   *  gitmez: yemek kartı alacağıdır, kart şirketi bankaya öder (sabit ve havuz kurye aynı). */
+  tokenflex?: string | number; paye?: string | number;
   tip?: "sabit" | "havuz" | "kendi";
+}
+
+/** Kuryenin kapıda alabildiği yemek kartları (KuryeSatiri alanı → yemek kartı adı). */
+export const KURYE_KARTLARI = [
+  { alan: "tokenflex", ad: "Token Flex", etiket: "Token Flex" },
+  { alan: "paye", ad: "Paye", etiket: "Paye Kart" },
+] as const;
+export type KuryeKartiAlani = typeof KURYE_KARTLARI[number]["alan"];
+
+/** Bir kurye satırının kapıda yemek kartıyla aldığı toplam (Token Flex + Paye). */
+export const kuryeKartToplami = (k: KuryeSatiri): number =>
+  KURYE_KARTLARI.reduce((t, c) => t + tv(k[c.alan]), 0);
+
+/** Günün bütün kuryelerinin (sabit + havuz) kapıda yemek kartıyla aldığı tutarlar. */
+export function kuryeKartTahsilati(r: Pick<RaporVerisi, "kurye_raporlari">): Record<KuryeKartiAlani, number> {
+  const t = { tokenflex: 0, paye: 0 } as Record<KuryeKartiAlani, number>;
+  for (const k of r.kurye_raporlari || []) for (const c of KURYE_KARTLARI) t[c.alan] += tv(k[c.alan]);
+  return t;
 }
 
 /** Günlük rapor satırı — hesaplar için gereken alanlar (hepsi opsiyonel/0 olabilir). */
@@ -181,7 +202,8 @@ const topla = (o: Record<string, number>) => Object.values(o).reduce((a, b) => a
 
 export const onlineToplam = (r: RaporVerisi): number => topla(platformKirilimi(r).online);
 export const kapidaToplam = (r: RaporVerisi): number => topla(platformKirilimi(r).kapida);
-/** Kasaya giren yemek kartları (veritabanı kolonu → görünen ad). Yeni kart eklemek için buraya + kolona ekleyin. */
+/** Kasaya giren yemek kartları (veritabanı kolonu → görünen ad). Yeni kart eklemek için buraya + kolona ekleyin.
+ *  Kuryenin kapıda aldığı kartlar KURYE_KARTLARI'nda; alacak ve mutabakatta YEMEK_KARTI_ADLARI kullanılır. */
 export const YEMEK_KARTLARI = [
   { alan: "kasa_edenred", ad: "Edenred" },
   { alan: "kasa_metropol", ad: "Metropol" },
@@ -191,6 +213,19 @@ export const YEMEK_KARTLARI = [
   { alan: "kasa_multinet", ad: "Multinet" },
 ] as const;
 export type YemekKartiAlani = typeof YEMEK_KARTLARI[number]["alan"];
+
+/** Alacak / mutabakat listesindeki bütün yemek kartları (kasa kartları + yalnız kuryenin aldığı Token Flex). */
+export const YEMEK_KARTI_ADLARI = ["Edenred", "Metropol", "Setcard", "Pluxee", "Paye", "Multinet", "Token Flex"] as const;
+export type YemekKartiAdi = typeof YEMEK_KARTI_ADLARI[number];
+
+/** Bir raporun yemek kartı satışları: kasaya girenler + kuryelerin kapıda aldıkları. */
+export function yemekKartiSatislari(r: Partial<Record<YemekKartiAlani, unknown>> & Pick<RaporVerisi, "kurye_raporlari">): Record<YemekKartiAdi, number> {
+  const s = Object.fromEntries(YEMEK_KARTI_ADLARI.map(a => [a, 0])) as Record<YemekKartiAdi, number>;
+  for (const k of YEMEK_KARTLARI) s[k.ad] += n(r[k.alan]);
+  const kurye = kuryeKartTahsilati(r);
+  for (const c of KURYE_KARTLARI) s[c.ad] += kurye[c.alan];
+  return s;
+}
 
 export const yemekKartiToplam = (r: Partial<Record<YemekKartiAlani, unknown>>): number =>
   YEMEK_KARTLARI.reduce((t, k) => t + n(r[k.alan]), 0);

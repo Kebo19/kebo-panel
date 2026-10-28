@@ -14,8 +14,18 @@
   if (window.__keboAktarim) return;
   window.__keboAktarim = true;
 
-  var PANEL = window.KEBO_PANEL;
+  // Panel adresi: yer imine yazılan adres eski olabilir (alan adı değişmiş, önizleme adresi...).
+  // Bu yüzden "hazir" mesajı her adrese gider; panelin "ayar" cevabı hangi adresten gelirse
+  // (izinli Kebo Panel adresiyse) veriler sadece oraya gönderilir.
+  var PANEL = null;
   var KAYNAK = "kebo-aktar";
+  // Bu dosyanın yüklendiği adres = panelin adresi (yer imindeki adres eskiyse bile doğru olur).
+  var BETIK_KOKU = (function () {
+    try { return new URL(document.currentScript.src).origin; } catch (_) { return window.KEBO_PANEL || ""; }
+  })();
+  function panelAdresiMi(o) {
+    return o === window.KEBO_PANEL || /^https:\/\/kebo-panel[a-z0-9-]*\.vercel\.app$/.test(o) || /^http:\/\/localhost:\d+$/.test(o);
+  }
 
   // ─── Ekrandaki durum kutusu ──────────────────────────────────────────────
   var kutu = document.createElement("div");
@@ -39,15 +49,27 @@
     setTimeout(function () { kutu.remove(); }, hata ? 15000 : 6000);
   }
 
-  var panel = window.opener;
-  if (!PANEL || !panel || panel.closed) {
-    return bitir("Bu pencereyi Kebo Panel → Fiyat Listesi → \"Mikro'dan güncelle\" butonuyla açın, sonra yer imine tekrar tıklayın.", true);
-  }
   var eslesme = location.pathname.match(/\/cp\/([0-9a-f-]{36})\//i);
   if (!eslesme) return bitir("Önce Mikro'ya giriş yapıp Gelen e-Faturalar sayfasını açın, sonra yer imine tekrar tıklayın.", true);
   var FIRMA = eslesme[1];
 
-  function panele(mesaj) { mesaj.kaynak = KAYNAK; panel.postMessage(mesaj, PANEL); }
+  // Normalde bu pencereyi panel açar (window.opener = panel). Mikro elle açıldıysa ya da
+  // tarayıcı (ör. Brave) pencere bağlantısını kopardıysa, paneli buradan açıp onunla konuşuruz.
+  var panel = window.opener;
+  var tersYon = false;
+  try { if (panel && panel.closed) panel = null; } catch (_) { panel = null; }
+  if (!panel) {
+    if (!BETIK_KOKU) return bitir("Panel adresi bulunamadı. Yer imini Fiyat Listesi sayfasından yeniden ekleyin.", true);
+    panel = window.open(BETIK_KOKU + "/fiyatlar?mikro=1", "kebo-panel-aktarim");
+    if (!panel) return bitir("Tarayıcı paneli açmayı engelledi. Adres çubuğundaki açılır pencere uyarısından bu siteye izin verip yer imine tekrar tıklayın.", true);
+    tersYon = true;
+  }
+
+  function panele(mesaj) {
+    mesaj.kaynak = KAYNAK;
+    // Fatura verisi yalnızca doğrulanmış panel adresine gider; ilk "hazir" mesajında veri yok.
+    panel.postMessage(mesaj, PANEL || "*");
+  }
 
   // ─── Ayrıştırma (supabase/functions/mikro-fiyat-guncelle/ayristir.ts ile aynı kurallar) ─────
   function trSayi(m) {
@@ -65,7 +87,8 @@
     var s = String(miktarMetni || "").replace(/\\r\\n/g, " ").replace(/[\d.,]/g, " ").replace(/\s+/g, " ").trim();
     return s ? s.toLocaleUpperCase("tr-TR").slice(0, 12) : null;
   }
-  var AD = /^(mal\s*\/\s*hizmet|mal hizmet|malzeme\s*\/\s*hizmet açıklaması|ürün adı)$/i;
+  // "Malzeme / Hizmet" (açıklaması olmadan) Trendyol vb. faturalarda kullanılıyor.
+  var AD = /^(mal\s*\/\s*hizmet|mal hizmet|malzeme\s*\/\s*hizmet(\s*açıklaması)?|ürün adı)$/i;
   function kalemleriOku(html) {
     var doc = new DOMParser().parseFromString(html, "text/html");
     // Bazı faturalarda (ör. HKS) kalem tablosu başka tabloların içinde: en içteki uygun tabloyu seç.
@@ -150,7 +173,11 @@
         var f = faturalar[i++];
         return fetch(KOK + "GetDocumentAsHtml?id=" + encodeURIComponent(f.Id), { credentials: "include" })
           .then(function (r) { return r.ok ? r.text() : ""; })
-          .then(function (html) {
+          .then(function (metin) {
+            // Mikro önizlemeyi {"success":true,"html":"..."} biçiminde döndürüyor: içindeki HTML'i al
+            // (yoksa kaçışlı tırnaklar yüzünden colspan okunmaz, sütunlar kayabilir).
+            var html = metin;
+            try { var o = JSON.parse(metin); if (o && typeof o.html === "string") html = o.html; } catch (_) { /* düz HTML */ }
             var kalemler = html ? kalemleriOku(html) : [];
             if (!html) hatali++;
             sonuc.push({
@@ -176,12 +203,20 @@
 
   // ─── Panelle konuşma ─────────────────────────────────────────────────────
   var zamanAsimi = setTimeout(function () {
-    bitir("Panel cevap vermedi. Fiyat Listesi sayfasının açık olduğundan emin olup butona tekrar basın.", true);
-  }, 15000);
+    bitir(tersYon
+      ? "Panel cevap vermedi. Açılan panel sekmesinde giriş yapmanız gerekiyorsa giriş yapın, sonra bu sayfada yer imine tekrar tıklayın."
+      : "Panel cevap vermedi. Fiyat Listesi sayfasının açık olduğundan emin olup butona tekrar basın.", true);
+  }, tersYon ? 45000 : 15000);
   window.addEventListener("message", function (e) {
-    if (e.origin !== PANEL || e.source !== panel || !e.data || e.data.kaynak !== "kebo-panel") return;
+    if (e.source !== panel || !e.data || e.data.kaynak !== "kebo-panel" || !panelAdresiMi(e.origin)) return;
+    if (PANEL && e.origin !== PANEL) return;
     var m = e.data;
-    if (m.tip === "ayar") {
+    if (m.tip === "selam") {
+      // Ters yön: panel sekmesi yüklendi, aktarımı başlatalım.
+      if (!PANEL) panele({ tip: "hazir", firma: FIRMA });
+    } else if (m.tip === "ayar") {
+      if (PANEL) return; // ikinci kez başlatma
+      PANEL = e.origin;
       clearTimeout(zamanAsimi);
       durum("Faturalar " + m.baslangic + " tarihinden itibaren okunacak…", 0.02);
       aktar(m.baslangic).catch(function (err) {
@@ -195,6 +230,6 @@
       bitir("Panel kaydedemedi: " + m.mesaj, true);
     }
   });
-  durum("Panel bekleniyor…", 0.01);
-  panele({ tip: "hazir", firma: FIRMA });
+  durum(tersYon ? "Panel yeni sekmede açılıyor…" : "Panel bekleniyor…", 0.01);
+  if (!tersYon) panele({ tip: "hazir", firma: FIRMA });
 })();

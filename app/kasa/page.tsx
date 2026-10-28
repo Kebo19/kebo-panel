@@ -13,7 +13,7 @@ import EkstreYukle from "@/components/EkstreYukle";
 import { KrediKartlariPaneli, KartAyarPenceresi, YemekKartiPaneli } from "@/components/KasaKartlari";
 import StokDegerPaneli from "@/components/StokDegerPaneli";
 import { krediKartiDurumu, yemekKartiAlacaklari, VARSAYILAN_KARTLAR, type KrediKarti } from "@/lib/kasaHesaplari";
-import { YEMEK_KARTLARI } from "@/lib/hesap";
+import { YEMEK_KARTI_ADLARI } from "@/lib/hesap";
 import { YEMEK_KARTI_KATEGORI, yemekKartiBul } from "@/lib/mutabakat";
 import Link from "next/link";
 import {
@@ -136,7 +136,7 @@ export default function KasaPage() {
   const [krediKartlari, setKrediKartlari] = useState<KrediKarti[]>(() => VARSAYILAN_KARTLAR.map(varsayilanKart));
   const [kartTabloYok, setKartTabloYok] = useState(false);
   const [duzenlenenKart, setDuzenlenenKart] = useState<KrediKarti|null>(null);
-  const [iYemekKarti, setIYemekKarti] = useState<string>(YEMEK_KARTLARI[0].ad);
+  const [iYemekKarti, setIYemekKarti] = useState<string>(YEMEK_KARTI_ADLARI[0]);
 
   const [secilenAy, setSecilenAy] = useState(() => buAyYil().ay);
   const [secilenYil, setSecilenYil] = useState(() => buAyYil().yil);
@@ -969,9 +969,9 @@ export default function KasaPage() {
                 <div>
                   <p className="text-[10px] text-gray-600 uppercase tracking-widest mb-2">Hangi yemek kartı?</p>
                   <div className="grid grid-cols-3 gap-1.5">
-                    {YEMEK_KARTLARI.map(k=>(
-                      <button key={k.ad} type="button" onClick={()=>setIYemekKarti(k.ad)}
-                        className={`text-[11px] font-semibold py-2 rounded-lg border transition-colors ${iYemekKarti===k.ad?"border-altin/50 bg-altin/10 text-altin-acik":"border-cizgi text-gray-600 hover:text-yazi"}`}>{k.ad}</button>
+                    {YEMEK_KARTI_ADLARI.map(ad=>(
+                      <button key={ad} type="button" onClick={()=>setIYemekKarti(ad)}
+                        className={`text-[11px] font-semibold py-2 rounded-lg border transition-colors ${iYemekKarti===ad?"border-altin/50 bg-altin/10 text-altin-acik":"border-cizgi text-gray-600 hover:text-yazi"}`}>{ad}</button>
                     ))}
                   </div>
                 </div>

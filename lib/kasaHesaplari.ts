@@ -1,5 +1,5 @@
 // ─── KASA: KREDİ KARTLARI VE YEMEK KARTI ALACAKLARI ────────────────────────
-import { YEMEK_KARTLARI } from "./hesap";
+import { YEMEK_KARTLARI, YEMEK_KARTI_ADLARI, yemekKartiSatislari } from "./hesap";
 import { YEMEK_KARTI_KATEGORI, yemekKartiBul } from "./mutabakat";
 
 /** Nakit ve banka hesapları (bakiyesi pozitif varlık). */
@@ -148,12 +148,16 @@ export function yemekKartiAlacaklari(
   baslangic: string,
   buAy: string,
 ): { kartlar: YemekKartiAlacagi[]; belirsizYatan: number; toplamBekleyen: number } {
-  const kartlar: YemekKartiAlacagi[] = YEMEK_KARTLARI.map(k => ({ ad: k.ad, alan: k.alan, satis: 0, yatan: 0, bekleyen: 0, buAySatis: 0 }));
+  // Satış = kasaya giren kart + kuryenin kapıda aldığı (Paye Kart, Token Flex).
+  const kartlar: YemekKartiAlacagi[] = YEMEK_KARTI_ADLARI.map(ad => ({
+    ad, alan: YEMEK_KARTLARI.find(k => k.ad === ad)?.alan ?? "", satis: 0, yatan: 0, bekleyen: 0, buAySatis: 0,
+  }));
   const bul = (ad: string) => kartlar.find(k => k.ad === ad);
   for (const r of raporlar) {
     if (!r.tarih || r.tarih < baslangic) continue;
+    const s = yemekKartiSatislari(r as Parameters<typeof yemekKartiSatislari>[0]);
     for (const k of kartlar) {
-      const v = sayi((r as Record<string, unknown>)[k.alan]);
+      const v = s[k.ad as keyof typeof s] || 0;
       k.satis += v;
       if (r.tarih.slice(0, 7) === buAy) k.buAySatis += v;
     }

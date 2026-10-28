@@ -115,7 +115,7 @@ async function faturalariOku(sayfa, baslangic) {
       return s.replace(/\s+/g, " ").trim().toLocaleUpperCase("tr-TR");
     };
     const birimTemizle = (m) => { const s = String(m || "").replace(/\\r\\n/g, " ").replace(/[\d.,]/g, " ").replace(/\s+/g, " ").trim(); return s ? s.toLocaleUpperCase("tr-TR").slice(0, 12) : null; };
-    const AD = /^(mal\s*\/\s*hizmet|mal hizmet|malzeme\s*\/\s*hizmet açıklaması|ürün adı)$/i;
+    const AD = /^(mal\s*\/\s*hizmet|mal hizmet|malzeme\s*\/\s*hizmet(\s*açıklaması)?|ürün adı)$/i;
     const kalemleriOku = (html) => {
       const doc = new DOMParser().parseFromString(html, "text/html");
       let tablo = null;
@@ -164,7 +164,9 @@ async function faturalariOku(sayfa, baslangic) {
         const f = tum[i++];
         try {
           const r = await fetch(KOK + "GetDocumentAsHtml?id=" + encodeURIComponent(f.Id), { credentials: "include" });
-          const html = r.ok ? await r.text() : "";
+          let html = r.ok ? await r.text() : "";
+          // Mikro önizlemeyi {"success":true,"html":"..."} olarak döndürüyor: içindeki HTML'i al.
+          try { const o = JSON.parse(html); if (o && typeof o.html === "string") html = o.html; } catch { /* düz HTML */ }
           if (!html) hatali++;
           sonuc.push({ gib_no: f.FormattedGibNumber, mikro_id: f.Id, vkn: f.UserTaxIdentification, tedarikci: f.UserTitle,
             tarih: String((f.Header && f.Header.DocumentDate) || "").slice(0, 10), tip: f.InvoiceTypeCode,

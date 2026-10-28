@@ -91,7 +91,11 @@ export default function FiyatListesiPage() {
   useEffect(() => {
     if (!izinli) return;
     const dinle = async (e: MessageEvent) => {
-      if (!mikroMesajiMi(e.origin, e.data) || !pencere.current || e.source !== pencere.current) return;
+      if (!mikroMesajiMi(e.origin, e.data)) return;
+      // Panel sayfası Mikro penceresi açıkken yenilendiyse pencere bağlantısı kaybolur: mesajı
+      // gönderen Mikro penceresini (adresi yukarıda doğrulandı) yeniden sahiplen.
+      if (!pencere.current || pencere.current.closed) pencere.current = e.source as Window | null;
+      if (!pencere.current || e.source !== pencere.current) return;
       const m = e.data;
       const cevap = (veri: Record<string, unknown>) => pencere.current?.postMessage({ kaynak: "kebo-panel", ...veri }, MIKRO_ORIGIN);
       if (m.tip === "hazir") {
@@ -129,6 +133,20 @@ export default function FiyatListesiPage() {
     window.addEventListener("message", dinle);
     return () => window.removeEventListener("message", dinle);
   }, [izinli, supabase, cek]);
+
+  // Ters yön: Mikro sayfasındaki yer imi bu sekmeyi "?mikro=1" ile açtıysa (Mikro elle açıldı ya da
+  // tarayıcı pencere bağlantısını kopardı), açan Mikro penceresine "buradayım" de.
+  useEffect(() => {
+    if (!izinli || typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("mikro") !== "1" || !window.opener) return;
+    pencere.current = window.opener as Window;
+    tamTarama.current = false;
+    const t = setTimeout(() => {
+      setAktarim({ durum: "bekliyor" });
+      try { pencere.current?.postMessage({ kaynak: "kebo-panel", tip: "selam" }, MIKRO_ORIGIN); } catch { /* pencere kapandı */ }
+    }, 0);
+    return () => clearTimeout(t);
+  }, [izinli]);
 
   const mikroyuAc = (tam = false) => {
     tamTarama.current = tam;

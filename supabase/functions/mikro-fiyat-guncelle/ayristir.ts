@@ -38,7 +38,7 @@ function hucreler(tr: El, sec: string): string[] {
   return sonuc;
 }
 
-const AD_BASLIK = /^(mal\s*\/\s*hizmet|mal hizmet|malzeme\s*\/\s*hizmet açıklaması|ürün adı)$/i;
+const AD_BASLIK = /^(mal\s*\/\s*hizmet|mal hizmet|malzeme\s*\/\s*hizmet(\s*açıklaması)?|ürün adı)$/i;
 
 /** Faturanın HTML önizlemesinden ("GetDocumentAsHtml") kalem tablosunu okur. */
 export function kalemleriOku(doc: { querySelectorAll(sel: string): ArrayLike<El> }): Kalem[] {
