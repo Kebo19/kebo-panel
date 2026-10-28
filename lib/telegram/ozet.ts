@@ -267,3 +267,53 @@ export function mikroRaporMetni(r: MikroRapor): string {
   if (k.length) s.push("", `⚠️ ${k.length} fiyat %30'dan fazla değişmiş, Fiyat Listesi'nde onayınızı bekliyor: ${k.slice(0, 5).map(x => html(x.urun)).join(", ")}`);
   return s.join("\n");
 }
+
+// ── Faturadan stok girişi: "stoğa işlensin mi?" ──
+export interface IrsaliyeEslesme {
+  belge: string; belge_no: string | null; tarih: string | null; teslim: boolean;
+  satirlar: { oneri_id: string; kalem: string; urun: string; birim: string; irsaliye_kalem_id: string; irsaliye_miktar: number; fatura_miktar: number; fark: number; teslim: boolean }[];
+  faturada_olmayan: { irsaliye_kalem_id: string; urun: string; miktar: number; birim: string | null }[];
+  irsaliyede_olmayan: { oneri_id: string; kalem: string; miktar: number; birim: string | null; eslesmis: boolean }[];
+}
+export interface StokFatura {
+  gib_no: string; tarih: string; tedarikci: string | null; iade: boolean; irsaliye?: IrsaliyeEslesme | null;
+  kalemler: { id: string; kalem: string; miktar: number | null; birim: string | null; urun: string | null; urun_birim: string | null; stok_miktar: number | null; durum: string }[];
+}
+
+export function stokFaturaMetni(f: StokFatura): { metin: string; eslesen: number; eslesmeyen: number; irsaliye: number; fark: boolean } {
+  const irs = f.irsaliye && f.irsaliye.satirlar.length ? f.irsaliye : null;
+  if (irs) {
+    const kisa = (u: string) => html(u.replace(/\s*\(.*$/, ""));
+    const s = [`🧾 <b>Fatura geldi — irsaliyesi bulundu</b>`, `${html(kisaAd(f.tedarikci || ""))} · fatura ${fmtTarih(f.tarih)} · ${html(f.gib_no)}`,
+      `İrsaliye: ${html(irs.belge_no || "numarasız")} · ${irs.tarih ? fmtTarih(irs.tarih) : ""}${irs.teslim ? " (teslim alındı, stokta)" : " (henüz teslim alınmadı)"}`, "",
+      "<i>Ürün: irsaliye / fatura</i>"];
+    irs.satirlar.forEach(x => s.push(`${Math.abs(x.fark) < 0.001 ? "✅" : "⚠️"} ${kisa(x.urun)}: ${sayi(x.irsaliye_miktar, 2)} / ${sayi(x.fatura_miktar, 2)} ${html(x.birim)}${Math.abs(x.fark) < 0.001 ? "" : ` (<b>${x.fark > 0 ? "+" : ""}${sayi(x.fark, 2)}</b>)`}`));
+    if (irs.irsaliyede_olmayan.length) s.push("", `❓ Faturada olup irsaliyede olmayan: ${irs.irsaliyede_olmayan.map(x => `${sayi(x.miktar, 2)} ${html((x.birim || "").toLowerCase())} ${html(x.kalem)}`).join(", ")}`);
+    if (irs.faturada_olmayan.length) s.push("", `❓ İrsaliyede olup faturada olmayan: ${irs.faturada_olmayan.map(x => `${kisa(x.urun)} ${sayi(x.miktar, 2)} ${html(x.birim || "")}`).join(", ")}`);
+    const fark = irs.satirlar.some(x => Math.abs(x.fark) >= 0.001);
+    s.push("", irs.teslim ? "Eşleştirince stoğa tekrar girmez." : "Eşleştirince fatura miktarıyla stoğa girer.");
+    return { metin: s.join("\n"), eslesen: 0, eslesmeyen: irs.irsaliyede_olmayan.length, irsaliye: irs.satirlar.length, fark };
+  }
+  const bekleyen = f.kalemler.filter(k => k.durum === "bekliyor");
+  const eslesen = bekleyen.filter(k => k.urun), eslesmeyen = bekleyen.filter(k => !k.urun);
+  const s = [`📦 <b>${f.iade ? "İade faturası — stoktan düşülsün mü?" : "Fatura geldi — stoğa işlensin mi?"}</b>`,
+    `${html(kisaAd(f.tedarikci || ""))} · ${fmtTarih(f.tarih)} · ${html(f.gib_no)}`, ""];
+  eslesen.forEach(k => s.push(`• ${sayi(Number(k.miktar), 2)} ${html((k.birim || "").toLowerCase())} ${html(k.kalem)} → <b>${sayi(Number(k.stok_miktar), 2)} ${html(k.urun_birim || "")} ${html((k.urun || "").replace(/\s*\(.*$/, ""))}</b>`));
+  if (eslesmeyen.length) {
+    s.push("", `❓ Stok ürünüyle eşleşmemiş ${eslesmeyen.length} kalem (panelden bir kez eşleştirin, sonra otomatik gelir):`);
+    eslesmeyen.slice(0, 8).forEach(k => s.push(`• ${sayi(Number(k.miktar), 2)} ${html((k.birim || "").toLowerCase())} ${html(k.kalem)}`));
+  }
+  if (!bekleyen.length) s.push("Bu faturanın kalemleri işlendi.");
+  return { metin: s.join("\n"), eslesen: eslesen.length, eslesmeyen: eslesmeyen.length, irsaliye: 0, fark: false };
+}
+
+// ── İrsaliye ↔ fatura sorgusu ──
+export interface BelgeEslesmesi {
+  belge: string | null; irsaliye_no: string | null; tedarikci: string | null; irsaliye_tarihi: string | null; teslim: boolean | null; kalemler: string | null;
+  gib_no: string | null; fatura_tarihi: string | null; toplam: number | null; fatura_tedarikci: string | null;
+}
+export function belgeSatiri(b: BelgeEslesmesi): string {
+  const irs = b.belge ? `🧾 İrsaliye ${html(b.irsaliye_no || "numarasız")} (${b.irsaliye_tarihi ? fmtTarih(b.irsaliye_tarihi) : "?"}${b.teslim ? "" : ", teslim alınmadı"})` : "🧾 İrsaliyesi yok";
+  const fat = b.gib_no ? `📄 Fatura ${html(b.gib_no)} (${b.fatura_tarihi ? fmtTarih(b.fatura_tarihi) : "?"}${b.toplam != null ? `, ${tl(Number(b.toplam))}` : ""})` : "📄 Faturası henüz gelmedi";
+  return `<b>${html(kisaAd(b.tedarikci || b.fatura_tedarikci || ""))}</b>\n${irs} ↔ ${fat}${b.kalemler ? `\n<i>${html(b.kalemler.slice(0, 200))}</i>` : ""}`;
+}

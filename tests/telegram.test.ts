@@ -202,3 +202,32 @@ describe("mikro raporu", () => {
       .toContain("başarısız");
   });
 });
+
+describe("faturadan stok girişi mesajı", () => {
+  it("irsaliyesi bulunan faturada karşılaştırma ve fark gösterilir", async () => {
+    const { stokFaturaMetni } = await import("@/lib/telegram/ozet");
+    const { stokFaturaButonlari } = await import("@/lib/telegram/asistan");
+    const m = stokFaturaMetni({ gib_no: "KME2026000000001", tarih: "2026-10-27", tedarikci: "Kalem Meşrubat Gıda", iade: false, kalemler: [],
+      irsaliye: { belge: "b", belge_no: "IRS-55", tarih: "2026-10-25", teslim: true,
+        satirlar: [
+          { oneri_id: "1", kalem: "AYRAN", urun: "AYRAN (1 KOLİ 20 ADET)", birim: "adet", irsaliye_kalem_id: "i1", irsaliye_miktar: 20, fatura_miktar: 24, fark: 4, teslim: true },
+          { oneri_id: "2", kalem: "KOLA", urun: "KOLA", birim: "adet", irsaliye_kalem_id: "i2", irsaliye_miktar: 12, fatura_miktar: 12, fark: 0, teslim: true }],
+        faturada_olmayan: [], irsaliyede_olmayan: [] } });
+    expect(m.metin).toContain("IRS-55");
+    expect(m.metin).toContain("20 / 24");
+    expect(m.metin).toContain("+4");
+    expect(m.fark).toBe(true);
+    const b = stokFaturaButonlari("KME2026000000001", m.eslesen, m.eslesmeyen, m.irsaliye, m.fark);
+    expect(b[0].map(x => x.callback_data)).toEqual(["sgi:f:KME2026000000001", "sgi:i:KME2026000000001"]);
+  });
+
+  it("irsaliyesi olmayan faturada eşleşen/eşleşmeyen kalemler", async () => {
+    const { stokFaturaMetni } = await import("@/lib/telegram/ozet");
+    const m = stokFaturaMetni({ gib_no: "X1", tarih: "2026-10-27", tedarikci: "Sütaş", iade: false, irsaliye: null, kalemler: [
+      { id: "a", kalem: "AYRAN 200ML", miktar: 20, birim: "ADET", urun: "AYRAN", urun_birim: "adet", stok_miktar: 20, durum: "bekliyor" },
+      { id: "b", kalem: "YOĞURT 9KG", miktar: 2, birim: "KOVA", urun: null, urun_birim: null, stok_miktar: 2, durum: "bekliyor" }] });
+    expect(m.metin).toContain("stoğa işlensin mi");
+    expect(m.eslesen).toBe(1);
+    expect(m.eslesmeyen).toBe(1);
+  });
+});

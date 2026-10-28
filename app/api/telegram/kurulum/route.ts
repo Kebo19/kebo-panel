@@ -25,6 +25,8 @@ export async function POST(req: Request) {
       { command: "stok", description: "Bitmek üzere olan ürünler" },
       { command: "robot", description: "Mikro faturaları ve zamlar" },
       { command: "mikro", description: "Mikro faturalarını şimdi çek" },
+      { command: "stokgiris", description: "Stoğa işlenmeyi bekleyen faturalar" },
+      { command: "belge", description: "İrsaliyenin faturası / faturanın irsaliyesi" },
       { command: "bildirim", description: "Bildirim ayarları" },
       { command: "yardim", description: "Neler yapabilirim?" },
     ] });

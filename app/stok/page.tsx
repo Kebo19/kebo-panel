@@ -14,6 +14,8 @@ import {
 import VakitSecici from "@/components/VakitSecici";
 import IrsaliyePaneli, { type IrsaliyeKalemi } from "@/components/IrsaliyePaneli";
 import SayimKagidiTara from "@/components/SayimKagidiTara";
+import StokGirisOnay from "@/components/StokGirisOnay";
+import BelgeAra from "@/components/BelgeAra";
 import { listedeMi, type SayimPeriyodu } from "@/lib/kasaFormu";
 
 // Ekran tercihleri bu tarayıcıda hatırlanır (tarayıcı izin vermezse varsayılanlar kullanılır).
@@ -633,6 +635,9 @@ export default function StokPage() {
           )}
         </div>
 
+        {/* FATURADAN GELEN MAL (onay bekleyen stok girişleri) */}
+        <StokGirisOnay urunler={urunler.map(u => ({ id: u.id, urun_adi: u.urun_adi, birim: u.birim }))} onDegisti={veriCek} />
+
         {/* İRSALİYE / YOLDAKİ MAL */}
         <IrsaliyePaneli
           urunler={urunler.map(u => ({ id: u.id, urun_adi: u.urun_adi, birim: u.birim, son_fiyat: u.son_fiyat }))}
@@ -641,6 +646,8 @@ export default function StokPage() {
           kullanici={yetki.kullaniciAdi}
           onDegisti={veriCek}
         />
+
+        <BelgeAra />
 
         {/* BULK SEÇİM BAR */}
         {seciliUrunIds.size > 0 && (

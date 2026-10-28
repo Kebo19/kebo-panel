@@ -198,7 +198,7 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
     setKdvOrani(vk === null || vk === undefined ? "" : String(Number(vk)));
     setKdvCariyeKaydet(true);
     setMevcutFatura(null);
-    setFaturaIsle(!!cid && cariYetkisi);
+    setFaturaIsle(false); // Fatura Mikro'dan gelince otomatik eşleşir; elle cariye işlemek çift fatura yapabilir
     setTeslimTarihi(bugun()); setTeslimBelge(belgeId);
     if (cariYetkisi) {
       const mevcut = await belgeFaturasi(belgeId);
@@ -346,7 +346,7 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
               <div>
                 <label className="block text-[10px] text-gray-600 uppercase mb-1">Tedarikçi (cari)</label>
                 <CariSecici cariler={cariler} deger={cariId} onSec={c => { setCariId(c?.id || ""); if (c) setTedarikci(c.unvan); }} />
-                <p className="text-[10px] text-gray-500 mt-0.5 px-1">Cari seçilirse teslim alırken irsaliye tek tıkla cariye fatura olarak işlenebilir.</p>
+                <p className="text-[10px] text-gray-500 mt-0.5 px-1">Cariyi seçin: e-fatura Mikro&apos;dan gelince bu irsaliyeyle otomatik karşılaştırılır.</p>
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                 <div><label className="block text-[10px] text-gray-600 uppercase mb-1">Tedarikçi adı</label><input value={tedarikci} onChange={e => setTedarikci(e.target.value)} className={inputCls}/></div>
@@ -432,6 +432,7 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
                     <input type="checkbox" checked={faturaIsle} onChange={e => setFaturaIsle(e.target.checked)} className="w-4 h-4 accent-blue-600" />
                     <Receipt size={13} className="text-blue-400" /> Cariye fatura olarak işle
                   </label>
+                  <p className="text-[10px] text-gray-500">Gerek yok: e-fatura Mikro&apos;dan gelince bu irsaliyeyle otomatik eşleşir ve cariye işlenir. Sadece e-fatura gelmeyecekse (kağıt fatura) işaretleyin.</p>
                   {mevcutFatura && (
                     <p className="text-[11px] text-amber-200 flex items-center gap-1.5"><AlertTriangle size={12} className="shrink-0" /> Bu irsaliye için zaten fatura var (No {mevcutFatura}); tekrar oluşturulmaz.</p>
                   )}

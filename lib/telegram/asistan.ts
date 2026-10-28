@@ -9,7 +9,7 @@ import { geminiIstek } from "@/lib/gemini";
 import { bugun, gunEkle, fmtTarih } from "@/lib/tarih";
 import { grupUrunleri, PERIYOT_ADI, type SayimPeriyodu } from "@/lib/kasaFormu";
 import { sayimKagidiOku, type SayimOkunanSatir } from "@/lib/sayimOku";
-import { sabahOzeti, odemeBolumu, odemeOzeti, stokBolumu, robotBolumu, asistanBaglami, html, type TgVeri } from "@/lib/telegram/ozet";
+import { sabahOzeti, odemeBolumu, odemeOzeti, stokBolumu, robotBolumu, asistanBaglami, html, stokFaturaMetni, belgeSatiri, type TgVeri, type StokFatura, type BelgeEslesmesi } from "@/lib/telegram/ozet";
 import { rpc, mesajGonder, mesajDuzenle, tg, yaziyor, dosyaIndir, panelAdresi, type Buton } from "@/lib/telegram/sunucu";
 
 interface TgKullanici { user_id: string; ad: string; kisa_ad: string; rol: string; yetkiler: string[]; onayci: boolean }
@@ -40,6 +40,8 @@ const YARDIM = `<b>Neler yapabilirim?</b>
 /stok — bitmek üzere olanlar
 /robot — Mikro faturaları ve zamlar
 /mikro — dükkân bilgisayarından Mikro faturalarını şimdi çek
+/stokgiris — stoğa işlenmeyi bekleyen faturalar
+/belge <no ya da firma> — irsaliyenin faturası / faturanın irsaliyesi
 /bildirim — sabah özeti / öğlen uyarısı aç-kapat
 /ayril — bu Telegram'ı panelden ayır`;
 
@@ -76,6 +78,21 @@ export async function guncellemeIsle(g: TgGuncelleme): Promise<unknown> {
     return mesajGonder(chat, "Bu Telegram hesabı panelden ayrıldı. Tekrar bağlamak için panelden yeni kod alın.");
   }
   if (komut === "/bildirim") return bildirimMenusu(chat);
+  if (komut === "/belge") {
+    if (!izin(k, "stok") && !izin(k, "cari")) return mesajGonder(chat, "Bu işlem için stok ya da cari yetkiniz olmalı.");
+    const q = metin.split(/\s+/).slice(1).join(" ").trim();
+    const r = await rpc<BelgeEslesmesi[]>("tg_belge_eslesme_ara", { p_chat: chat, p_q: q || null });
+    if (!r.length) return mesajGonder(chat, q ? `"${html(q)}" için irsaliye ya da fatura bulunamadı.` : "Son 6 ayda irsaliye kaydı yok.");
+    return mesajGonder(chat, (q ? "" : "Son irsaliyeler (aramak için: /belge Kalem ya da /belge GİB no)\n\n") + r.slice(0, 10).map(belgeSatiri).join("\n\n"));
+  }
+  if (komut === "/stokgiris") {
+    if (!izin(k, "stok")) return mesajGonder(chat, "Stok yetkiniz yok.");
+    const liste = await rpc<StokFatura[]>("tg_stok_giris_bekleyen", { p_chat: chat });
+    if (!liste.length) return mesajGonder(chat, "✅ Stoğa işlenmeyi bekleyen fatura yok.");
+    if (liste.length > 8) await mesajGonder(chat, `${liste.length} fatura bekliyor; en eski 8 tanesi aşağıda, tamamı panelde Stok sayfasında.`);
+    for (const f of liste.slice(0, 8)) { const m = stokFaturaMetni(f); await mesajGonder(chat, m.metin, stokFaturaButonlari(f.gib_no, m.eslesen, m.eslesmeyen, m.irsaliye, m.fark)); }
+    return;
+  }
   if (komut === "/mikro") {
     if (!izin(k, "stok") && !izin(k, "cari")) return mesajGonder(chat, "Bu işlem için panelde stok ya da cari yetkiniz olmalı.");
     const r = await rpc<{ yeni: boolean; pc_son_gorulme: string | null }>("tg_mikro_talep", { p_chat: chat });
@@ -113,7 +130,12 @@ function odemeMetni(v: TgVeri, b: string): string {
 async function soruCevapla(chat: number, k: TgKullanici, soru: string) {
   await yaziyor(chat);
   const v = await rpc<TgVeri>("tg_veri", { p_chat: chat });
-  const baglam = asistanBaglami(v, bugun());
+  let baglam = asistanBaglami(v, bugun());
+  if (izin(k, "stok") || izin(k, "cari")) {
+    const b = (await rpc<BelgeEslesmesi[] | null>("tg_belge_eslesme_ara", { p_chat: chat, p_q: null }).catch(() => null)) || [];
+    if (b.length) baglam += "\n\n## İrsaliye ↔ fatura eşleşmeleri (irsaliye no | irsaliye tarihi | tedarikçi | fatura GİB no | fatura tarihi | tutar | kalemler)\n" +
+      b.map(x => `${x.irsaliye_no || "-"} | ${x.irsaliye_tarihi || "-"} | ${x.tedarikci || x.fatura_tedarikci || ""} | ${x.gib_no || "faturası gelmedi"} | ${x.fatura_tarihi || "-"} | ${x.toplam ?? "-"} | ${x.kalemler || ""}`).join("\n");
+  }
   const sonuc = await geminiIstek({
     system: `Sen Çorum'daki BCM Restoran'ın (markalar: Kebo, Chick'N Fride, Kıraloğlu) yönetim paneli asistanısın.
 Konuştuğun kişi: ${k.ad} (${k.rol}). Sadece aşağıdaki VERİ'ye dayanarak cevap ver; veride olmayan bir şeyi uydurma,
@@ -273,6 +295,26 @@ async function butonIsle(q: NonNullable<TgGuncelleme["callback_query"]>) {
     }
   }
 
+  if (data.startsWith("sgi:")) {
+    const [, fark, gib] = data.split(":");
+    if (!izin(k, "stok")) return mesajGonder(chat, "Stok yetkiniz yok.");
+    const r = await rpc<{ baglanan: number; duzeltme?: number; kalan?: number }>("tg_irsaliye_bagla", { p_chat: chat, p_gib: gib, p_fark: fark === "f" ? "fatura" : "irsaliye" });
+    const sonuc = `✅ ${r.baglanan} kalem irsaliyeye bağlandı${r.duzeltme ? `, ${r.duzeltme} fark faturaya göre düzeltildi` : ""}.` +
+      (r.kalan ? `\n${r.kalan} kalem bekliyor (irsaliyede olmayanlar) — /stokgiris ya da panel → Stok.` : "");
+    if (mesajId) await tg("editMessageReplyMarkup", { chat_id: chat, message_id: mesajId, reply_markup: { inline_keyboard: [] } }).catch(() => {});
+    return mesajGonder(chat, sonuc);
+  }
+  if (data.startsWith("sg:")) {
+    const [, karar, gib] = data.split(":");
+    if (!izin(k, "stok")) return mesajGonder(chat, "Stok yetkiniz yok.");
+    const r = await rpc<{ onaylanan: number; reddedilen: number; kalan: number }>("tg_stok_giris_onayla", { p_chat: chat, p_gib: gib, p_karar: karar === "no" ? "reddet" : "onayla" });
+    const f = await rpc<StokFatura>("tg_stok_fatura", { p_chat: chat, p_gib: gib });
+    const m = stokFaturaMetni(f);
+    const sonuc = karar === "no" ? `✖️ ${r.reddedilen} kalem stoğa işlenmedi.` : `✅ ${r.onaylanan} kalem stoğa işlendi${r.kalan ? `; ${r.kalan} kalem eşleştirilmeyi bekliyor (panel → Stok)` : ""}.`;
+    if (mesajId) return mesajDuzenle(chat, mesajId, `${m.metin}\n\n${sonuc}`, r.kalan ? [[{ text: "Panelde eşleştir", url: `${panelAdresi()}/stok` }]] : []);
+    return mesajGonder(chat, sonuc);
+  }
+
   if (data.startsWith("bil:")) {
     const [, alan, deger] = data.split(":");
     await rpc("tg_bildirim_ayarla", { p_chat: chat, p_sabah: alan === "sabah" ? deger === "1" : null, p_oglen: alan === "oglen" ? deger === "1" : null });
@@ -289,4 +331,19 @@ async function bildirimMenusu(chat: number, mesajId: number | null = null) {
     { text: oglen ? "🕛 Öğleni kapat" : "🕛 Öğleni aç", callback_data: `bil:oglen:${oglen ? 0 : 1}` },
   ]];
   return mesajId ? mesajDuzenle(chat, mesajId, t, btn) : mesajGonder(chat, t, btn);
+}
+
+/** Fatura bildirimi butonları: eşleşen kalemler tek tuşla işlenir, eşleşmeyenler panelde. */
+export function stokFaturaButonlari(gib: string, eslesen: number, eslesmeyen: number, irsaliye = 0, fark = false): Buton[][] {
+  const b: Buton[][] = [];
+  if (irsaliye) {
+    b.push(fark
+      ? [{ text: "✅ Eşleştir, faturaya göre düzelt", callback_data: `sgi:f:${gib}` }, { text: "✅ Eşleştir, irsaliye doğru", callback_data: `sgi:i:${gib}` }]
+      : [{ text: "✅ İrsaliyeyle eşleştir", callback_data: `sgi:i:${gib}` }]);
+    b.push([{ text: "Panelde incele", url: `${panelAdresi()}/stok` }]);
+    return b;
+  }
+  if (eslesen) b.push([{ text: `✅ Stoğa işle (${eslesen})`, callback_data: `sg:ok:${gib}` }, { text: "✖️ İşleme", callback_data: `sg:no:${gib}` }]);
+  if (eslesmeyen || !eslesen) b.push([{ text: "Panelde aç", url: `${panelAdresi()}/stok` }]);
+  return b;
 }
