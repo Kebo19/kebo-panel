@@ -41,7 +41,7 @@ const YARDIM = `<b>Neler yapabilirim?</b>
 /robot — Mikro faturaları ve zamlar
 /mikro — dükkân bilgisayarından Mikro faturalarını şimdi çek
 /stokgiris — stoğa işlenmeyi bekleyen faturalar
-/belge <no ya da firma> — irsaliyenin faturası / faturanın irsaliyesi
+/belge &lt;no ya da firma&gt; — irsaliyenin faturası / faturanın irsaliyesi
 /bildirim — sabah özeti / öğlen uyarısı aç-kapat
 /ayril — bu Telegram'ı panelden ayır`;
 
