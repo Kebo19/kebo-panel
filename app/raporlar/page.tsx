@@ -226,20 +226,19 @@ function EksikRaporBanner({enSonRaporTarihi, onEkle}: {enSonRaporTarihi:string|n
   }, [enSonRaporTarihi]);
   if (eksik.length===0) return null;
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-red-500/20 bg-red-500/10 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-      <div className="absolute inset-0 bg-gradient-to-r from-red-100/60 to-transparent pointer-events-none"/>
-      <div className="relative flex items-start gap-3">
-        <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 shrink-0">
-          <Bell className="h-4 w-4 text-red-400 animate-pulse"/>
+    <div className="rounded-2xl border-2 border-red-500/60 bg-red-950/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex items-start gap-3">
+        <div className="p-2 rounded-xl bg-red-500/20 border border-red-400/40 shrink-0">
+          <Bell className="h-5 w-5 text-red-300"/>
         </div>
         <div>
-          <p className="text-xs font-bold text-red-400 uppercase tracking-widest">{eksik.length} Günlük Rapor Eksik</p>
-          <p className="text-[11px] text-gray-500 mt-0.5">
+          <p className="text-[15px] font-black text-red-100">{eksik.length} günlük kasa raporu eksik</p>
+          <p className="text-[13px] font-medium text-red-200/90 mt-0.5">
             {eksik.slice(0,4).join(" · ")}{eksik.length>4 ? ` · +${eksik.length-4} gün` : ""}
           </p>
         </div>
       </div>
-      <button onClick={onEkle} className="relative shrink-0 text-xs font-bold text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-xl transition-colors">
+      <button onClick={onEkle} className="shrink-0 text-[14px] font-bold text-white bg-red-600 hover:bg-red-500 px-5 py-2.5 rounded-xl transition-colors">
         Hemen Ekle
       </button>
     </div>
@@ -1026,6 +1025,7 @@ export default function RaporlarPage() {
   const [mpFormaYazildi, setMpFormaYazildi] = useState(false);
   // Adım adım giriş: 1 Kasa → 2 Gider → 3 Kurye → 4 Kontrol ve kaydet
   const [adim, setAdim] = useState(1);
+  const [ayrinti, setAyrinti] = useState(false); // 4. adımda satış / kasa / nakit kasa ayrıntıları
   // O günün Roket (Roadrunner) özeti — Kurye Kontrol sayfasından yüklenen Excel; varsa kurye adımı ondan dolar
   const [roketGun, setRoketGun] = useState<RoketGun | null>(null);
   const [roketNotu, setRoketNotu] = useState<string[]>([]);
@@ -2780,7 +2780,80 @@ export default function RaporlarPage() {
             </section>}
 
             {goster(4) && <section id="adim-4" className="space-y-3 scroll-mt-14">
-            {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">4 · Kontrol <span className="font-medium text-[12px] text-gray-500">satışlar, kasa özeti, notlar ve kaydet</span></h2>}
+            {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">4 · Kontrol <span className="font-medium text-[12px] text-gray-500">her satır ✓ ise kaydedin</span></h2>}
+            {/* ── KONTROL LİSTESİ: her şey tek bakışta; ayrıntılar aşağıda kapalı ── */}
+            {!isReadOnly && (() => {
+              const pk = (...l: PlatformGiris[]) => l.reduce((t, x) => t + sayi(x.paket), 0);
+              const paket = pk(osKeboYs, osKeboTrendyol, osKeboMigros, osKeboAlo, koKeboYs, koKeboTrendyol, koKeboMigrosYemek, koKeboAlo,
+                osCnfYs, osCnfTrendyol, osCnfMigrosYemek, koCnfYs, koCnfTrendyol, koCnfMigrosYemek, koCnfAlo,
+                osKirYs, osKirTrendyol, osKirMigrosYemek, koKirYs, koKirTrendyol, koKirMigrosYemek, koKirAlo);
+              const yemekKarti = YEMEK_KARTLARI.reduce((t, k) => t + tv(kartlar[k.alan]), 0) + kuryeler.reduce((t, k) => t + tv(k.tokenflex) + tv(k.paye), 0);
+              // Biriken nakit sayımı (isteğe bağlı) — ayrıntısı "Nakit kasa" bölümünde
+              const cikis = nakitHareketleri.reduce((t, h) => t + tv(h.tutar), 0);
+              const beklenen = nakitDevredenSistem == null ? null
+                : nakitDevredenSistem + tv(kasaNakit) + kuryeTahsilati({ tarih, kurye_raporlari: kuryeler }).nakit - cikis;
+              const sayim = nakitSayim.trim() ? tv(nakitSayim) : null;
+              const sayimFark = beklenen != null && sayim != null ? Math.round((sayim - beklenen) * 100) / 100 : null;
+              const indirimSorun = ch.indirimUyari || indirimFarklari.length > 0 || mpIndirimDurum === "hata";
+              type Durum = "tamam" | "uyari" | "bos";
+              const satir = (durum: Durum, baslik: string, deger: React.ReactNode, aciklama?: string, git?: () => void, gitAd?: string) => (
+                <div className={`flex items-start gap-3 px-4 py-3 border-b border-cizgi last:border-b-0 ${durum === "uyari" ? "bg-amber-500/5" : ""}`}>
+                  <span className={`mt-0.5 shrink-0 ${durum === "tamam" ? "text-emerald-400" : durum === "uyari" ? "text-amber-400" : "text-gray-600"}`}>
+                    {durum === "uyari" ? <AlertTriangle size={18}/> : <CheckCircle2 size={18}/>}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                      <span className="text-[14px] font-bold text-yazi">{baslik}</span>
+                      <span className="text-[14px] font-black text-yazi">{deger}</span>
+                    </div>
+                    {aciklama && <p className={`text-[12px] mt-0.5 ${durum === "uyari" ? "text-amber-300" : "text-gray-500"}`}>{aciklama}</p>}
+                  </div>
+                  {git && <button type="button" onClick={git} className="shrink-0 text-[12px] font-semibold text-altin hover:underline mt-0.5">{gitAd}</button>}
+                </div>
+              );
+              const ayrintiAc = () => { setAyrinti(true); setTimeout(() => document.getElementById("adim-4-ayrinti")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); };
+              return (<>
+                <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
+                  {satir(mpDoldurma ? "tamam" : "uyari", "Satışlar", `₺${fmt(ch.tOnline + ch.tKapida)}`,
+                    `${mpDoldurma ? "MagicPay'den geldi" : "MagicPay'den gelmedi — ayrıntılardan elle girin"} · Online ₺${fmt(ch.tOnline)} · Kapıda ₺${fmt(ch.tKapida)} · ${paket} paket`,
+                    mpDoldurma ? undefined : ayrintiAc, "Aç")}
+                  {satir(indirimSorun ? "uyari" : "tamam", "Platform indirimi", `₺${fmt(ch.tIndirim)}`,
+                    mpIndirimDurum === "hata" ? "MagicPay'den alınamadı — elle girin"
+                      : indirimFarklari.length > 0 ? "MagicPay'deki değerden farklı girildi"
+                      : ch.indirimUyari ? `Online cironun %${ch.indirimOrani.toFixed(1)}'i — %15'i geçti, kontrol edin`
+                      : `Online cironun %${ch.indirimOrani.toFixed(1)}'i`,
+                    indirimSorun ? ayrintiAc : undefined, "Bak")}
+                  {satir("tamam", "Kasa", `₺${fmt(ch.tKasa)}`, `Nakit ₺${fmt(tv(kasaNakit))} · POS ₺${fmt(tv(kasaPos))}`, () => adimaGit(1), "Düzelt")}
+                  {satir("tamam", "Gider", `₺${fmt(ch.tGider)}`, undefined, () => adimaGit(2), "Düzelt")}
+                  {satir(ch.kuryeFark === 0 ? "tamam" : "uyari", "Kurye", ch.kuryeFark === 0 ? "Dengede" : ch.kuryeFark > 0 ? `₺${fmt(ch.kuryeFark)} eksik` : `₺${fmt(Math.abs(ch.kuryeFark))} fazla`,
+                    ch.kuryeFark === 0 ? "Kapıda toplanan para kuryelerin teslim ettiğiyle aynı" : "Kapıda satış ile kuryelerin getirdiği tutmuyor",
+                    () => adimaGit(3), ch.kuryeFark === 0 ? "Düzelt" : "Kuryeye git")}
+                  {yemekKarti > 0 && satir("tamam", "Yemek kartı", `₺${fmt(yemekKarti)}`, "Dükkân + kuryelerin aldığı kartlar · bankaya yatar")}
+                  {satir(sayimFark == null ? "bos" : Math.abs(sayimFark) < 1 || oncekiSayimVar === false ? "tamam" : "uyari", "Biriken nakit sayımı",
+                    sayim == null ? "—" : `₺${fmt(sayim)}`,
+                    sayim == null ? "Sayılmadıysa boş bırakın (isteğe bağlı)"
+                      : sayimFark == null ? "" : oncekiSayimVar === false ? "İlk sayım: kasa bu tutarla başlatılır"
+                      : Math.abs(sayimFark) < 1 ? "Kasa tuttu" : sayimFark < 0 ? `Kasa açığı ₺${fmt(Math.abs(sayimFark))}` : `Kasa fazlası ₺${fmt(sayimFark)}`,
+                    ayrintiAc, sayim == null ? "Gir" : "Bak")}
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="rounded-xl bg-blue-500/10 border border-blue-500/25 px-4 py-4">
+                    <p className="text-[12px] font-bold text-blue-300 uppercase tracking-wide">Brüt ciro</p>
+                    <p className="text-2xl md:text-3xl font-black text-blue-300 mt-1">₺{fmt(ch.brutCiro)}</p>
+                  </div>
+                  <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/25 px-4 py-4">
+                    <p className="text-[12px] font-bold text-emerald-300 uppercase tracking-wide">Net ciro</p>
+                    <p className="text-2xl md:text-3xl font-black text-emerald-300 mt-1">₺{fmt(ch.netCiro)}</p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setAyrinti(a => !a)}
+                  className="w-full flex items-center justify-between rounded-xl border border-cizgi bg-kart px-4 py-3 text-[13px] font-semibold text-gray-400 hover:text-yazi">
+                  <span>Ayrıntılar <span className="font-normal text-gray-500">— satış tablosu, POS ve yemek kartları, nakit kasa</span></span>
+                  {ayrinti ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                </button>
+              </>);
+            })()}
+            {(isReadOnly || ayrinti) && <div id="adim-4-ayrinti" className="space-y-3 scroll-mt-14">
             {/* ── SATIŞLAR (4. adım; MagicPay'den dolar) ── */}
             <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
               <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
@@ -2951,7 +3024,7 @@ export default function RaporlarPage() {
               <div className="mx-3 mb-2 flex flex-wrap items-center justify-between gap-2 text-[13px] text-gray-600 border-t border-cizgi pt-2.5">
                 <span>Kasa ₺<b className="text-yazi">{fmt(ch.tKasa)}</b> + Giderler ₺<b className="text-red-300">{fmt(ch.tGider)}</b>{ch.kapidaKasada ? "" : <> + Kapıda ₺<b className="text-purple-300">{fmt(ch.tKapida)}</b></>} + Online ₺<b className="text-blue-300">{fmt(ch.tOnline)}</b></span>
               </div>
-              <div className="mx-3 mb-3 grid grid-cols-2 gap-2.5">
+              {isReadOnly && <div className="mx-3 mb-3 grid grid-cols-2 gap-2.5">
                 <div className="rounded-xl bg-blue-500/10 border border-blue-500/25 px-5 py-5">
                   <p className="text-[13px] font-bold text-blue-300 uppercase tracking-wide">Brüt ciro</p>
                   <p className="text-3xl md:text-4xl font-black text-blue-300 mt-1">₺{fmt(ch.brutCiro)}</p>
@@ -2960,7 +3033,7 @@ export default function RaporlarPage() {
                   <p className="text-[13px] font-bold text-emerald-300 uppercase tracking-wide">Net ciro</p>
                   <p className="text-3xl md:text-4xl font-black text-emerald-300 mt-1">₺{fmt(ch.netCiro)}</p>
                 </div>
-              </div>
+              </div>}
             </div>
 
             {/* ── 7. NAKİT KASA (önceki günlerden kalan nakit) — günlük ciroya karışmaz ── */}
@@ -3039,11 +3112,12 @@ export default function RaporlarPage() {
                 </div>
               );
             })()}
+            </div>}
 
                 {/* Notlar */}
                 <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
                   <div className="px-3 py-2 border-b border-cizgi">
-                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5"><StickyNote size={11}/>8. Notlar</span>
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5"><StickyNote size={11}/>Notlar</span>
                   </div>
                   <div className="p-3">
                     <textarea value={notlar} disabled={isReadOnly} onChange={e=>setNotlar(e.target.value)}
@@ -3070,8 +3144,22 @@ export default function RaporlarPage() {
               </div>
             )}
 
-            {/* ÖZET BANT */}
-            <div className="rounded-xl border border-cizgi bg-alan px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1">
+            {/* Düzenlerken: kağıt onayı + kayıt engeli + İptal (Kaydet alttaki çubukta) */}
+            {!isReadOnly && (
+              <div className="flex flex-wrap items-center gap-3">
+                {taramaIleDoldu && (
+                  <label className="flex items-center gap-2 text-[13px] font-semibold text-indigo-200 bg-indigo-500/10 border border-indigo-500/25 rounded-xl px-3 py-2.5 cursor-pointer select-none">
+                    <input type="checkbox" checked={kontrolOnay} onChange={e=>setKontrolOnay(e.target.checked)} className="w-4 h-4 accent-indigo-600"/>
+                    Kağıt formla karşılaştırdım, değerler doğru
+                  </label>
+                )}
+                {kayitEngeli && <span className="text-[12px] font-semibold text-amber-300">{kayitEngeli}</span>}
+                <button type="button" onClick={()=>{formuTemizle();setFormAcik(false);}}
+                  className="ml-auto text-[12px] font-semibold text-gray-500 hover:text-yazi">Kaydetmeden çık</button>
+              </div>
+            )}
+            {/* ÖZET BANT (salt okunur görünüm) */}
+            {isReadOnly && <div className="rounded-xl border border-cizgi bg-alan px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1">
               <div className="flex flex-wrap items-center gap-4 text-xs">
                 <div>
                   <p className="text-[9px] text-gray-600 uppercase tracking-widest">Online</p>
@@ -3133,7 +3221,7 @@ export default function RaporlarPage() {
                   </button>
                 )}
               </div>
-            </div>
+            </div>}
             </section>}
 
             {/* ── Adımlar arası geçiş: 1–3'te Geri / İleri, 4'te Geri / Kaydet ── */}
