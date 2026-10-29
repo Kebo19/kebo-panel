@@ -31,6 +31,14 @@ describe("Roket Paket Raporu", () => {
     expect(g.toplamPaket).toBe(8);
     expect(g.iptal).toBe(1);
   });
+  it("Roket'e elle girilen siparişin ayrıntısını tutar (müşteri bilgisi olmadan)", () => {
+    const d = roketExcelOku([B, s("16.10.2026 22:05", "Kerim BAYRAK", "358,00", "Nakit", "Fiş Tarandı"), s("17.10.2026 00:40", "Kerim BAYRAK", "100,00", "Pos", "Roket Adisyon")]).gunler[0];
+    expect(d.digerPaket).toBe(2);
+    expect(d.digerSiparisler?.map(x => x.saat)).toEqual(["22:05", "00:40"]); // gece sona
+    expect(d.digerSiparisler?.slice(0, 1)).toEqual([{ saat: "22:05", kurye: "Kerim BAYRAK", tutar: 358, odeme: "Nakit", kaynak: "Fiş Tarandı", isletme: "KEBO", km: 1.5 }]);
+    expect(JSON.stringify(d)).not.toContain("GİZLİ MÜŞTERİ");
+    expect(JSON.stringify(d)).not.toContain("5550000000");
+  });
   it("kuryenin kapıda topladığını ödeme türüne göre ayırır", () => {
     const m = g.kuryeler.find(k => k.ad === "MUSTAFA ÇETİN")!;
     expect(m).toMatchObject({ paket: 3, nakit: 359, pos: 0, yemek: 0 }); // platform yemek kartı online
@@ -85,11 +93,17 @@ describe("paket kontrolü: Roket ↔ MagicPay + Kıraloğlu Migros", () => {
   it("Kıraloğlu Migros elle eklenir, farklı kanal ve Roket'in kendi girişleri gösterilir", async () => {
     const { paketKontrolu } = await import("../lib/roket");
     const g = { kanallar: { kebo_ys: 10, alo: 5, kir_migros: 2 }, digerPaket: 1, toplamPaket: 18 };
+    // Fiş Tarandı'nın MagicPay'de karşılığı yok → eşleşmeyen 1
     const k = paketKontrolu(g, { kebo_ys: 10, alo: 5, kir_migros: 2 });
-    expect(k).toMatchObject({ roket: 18, bizde: 17, kirMigros: 2, fark: 1, rokettenEk: 1 });
+    expect(k).toMatchObject({ roket: 18, bizde: 17, kirMigros: 2, fark: 1, rokettenEk: 1, eslesmeyenFis: 1, fisEslesme: [] });
     expect(k.farkliKanallar).toEqual([]);
-    const k2 = paketKontrolu(g, { kebo_ys: 9, alo: 5 });
-    expect(k2.fark).toBe(4);
-    expect(k2.farkliKanallar.map(s => s.kanal)).toEqual(["kebo_ys", "kir_migros"]);
+    // MagicPay'de Alo 1 fazla → Fiş Tarandı aslında Alo Paket siparişi; fark yok
+    const k2 = paketKontrolu(g, { kebo_ys: 10, alo: 6, kir_migros: 2 });
+    expect(k2).toMatchObject({ fark: 0, eslesmeyenFis: 0, fisEslesme: [{ kanal: "alo", adet: 1 }] });
+    expect(k2.farkliKanallar).toEqual([]);
+    // gerçek fark: kebo_ys eksik, kir_migros girilmemiş
+    const k3 = paketKontrolu(g, { kebo_ys: 9, alo: 5 });
+    expect(k3.fark).toBe(4);
+    expect(k3.farkliKanallar.map(s => s.kanal)).toEqual(["kebo_ys", "kir_migros"]);
   });
 });

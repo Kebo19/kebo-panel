@@ -23,6 +23,7 @@ import {
 import { useYetki } from "@/lib/useYetki";
 import { slotToplami, atamaBul, adEslesir, paketKontrolu, type RoketGun } from "@/lib/roket";
 import RoketCek from "@/components/RoketCek";
+import { esitPaylas, bankoCalisanlari } from "@/lib/kasaAcigi";
 import { IADE_FIS, IADE_MARKA, IADE_KANAL_AD, IADE_ODEME_AD, MARKA_KANALLARI, iadeOdemeSecenekleri, iadeDetayDuzelt, iadeEksikAdim, iadeEtiketi, iadeAciklamaYaz, iadeAciklamaOku, type IadeDetay } from "@/lib/iade";
 import { indirimFarkliAlanlar, INDIRIM_ALAN_ADLARI, ESKI_KAPIDA_INDIRIM_ALANLARI, mpKanalPaketleri, type PanelRaporu, type MpRaporDoldurma, type Kanal } from "@/lib/magicpay";
 import { RAPOR_ONAYCI_ADLARI } from "@/lib/yetki";
@@ -36,8 +37,14 @@ import { PUANTAJ_DURUMLARI, DURUM_ETIKET, DURUM_KISA, DURUM_RENK, durumGecerliMi
 
 interface PuantajSatiri { durum: PuantajDurum; fazla: string; aciklama: string; }
 
+/** Sabit satırda birden çok kurye çalıştıysa (biri gitti, başkası devam etti) her birinin payı. */
+interface KuryeParcasi { isim: string; paket: string; nakit: string; pos: string; tokenflex?: string; paye?: string; }
+
 interface KuryeRaporu {
   id: number; isim: string; nakit: string; pos: string; paketSayisi: string;
+  /** 29.10.2026: sabit satırda çalışan kuryeler ayrı ayrı (paket = o kuryenin toplam paketi, uzak dahil).
+   *  Varsa satırın isim/paket/nakit/pos/kart alanları bunların toplamıdır; hesaplar satır toplamıyla yapılır. */
+  parcalar?: KuryeParcasi[];
   // 02.09.2026: Roadrunner bazı paketleri farklı ücretlendiriyor — uzak paketler 1.5 kat,
   // 9km üzeri paketler 2 kat. paketSayisi = normal (1x) ücretli paket sayısı; bu ikisi ayrı tutulur.
   uzakPaket?: string; paket9km?: string;
@@ -191,7 +198,10 @@ interface Cari {
 // rapor MagicPay değerleriyle kaydedilir, elle girilen indirim onaya gider.
 interface PersonelKisa { id: string; isim: string; }
 /** Puantaj listesi için personel (ayrılanlar dahil; tarihe göre süzülür). */
-interface PuantajPersoneli extends PersonelKisa { durum: string | null; ise_giris_tarihi: string | null; isten_cikis_tarihi: string | null; }
+interface PuantajPersoneli extends PersonelKisa { durum: string | null; ise_giris_tarihi: string | null; isten_cikis_tarihi: string | null; departman?: string | null; }
+
+/** Kasa açığından personele yansıtılan kesintinin açıklaması bununla başlar (yeniden dağıtırken bulunur). */
+const KASA_ACIGI_ONEK = "Kasa açığı";
 interface DegisiklikTalebi {
   id: string; rapor_id: string; rapor_tarihi: string;
   talep_eden: string; talep_tarihi: string;
@@ -776,6 +786,19 @@ function kuryeYapisiHesapla(tarihStr: string): KuryeRaporu[] {
   ];
 }
 /** Tarih değişince kurye yapısını yeni döneme uyarlar ama girilmiş/taranmış verileri korur. */
+/** Parçalı sabit satırın toplamlarını parçalardan yeniden hesaplar (paket = parçalar − uzak − 9 km+). */
+function parcaliToplam(k: KuryeRaporu): KuryeRaporu {
+  if (!k.parcalar?.length) return k;
+  const top = (alan: "nakit" | "pos" | "tokenflex" | "paye") => paraYaz(k.parcalar!.reduce((t, p) => t + tv(p[alan]), 0));
+  const paket = k.parcalar.reduce((t, p) => t + (parseInt(p.paket, 10) || 0), 0);
+  const uzak = (parseInt(k.uzakPaket || "", 10) || 0) + (parseInt(k.paket9km || "", 10) || 0);
+  return {
+    ...k, isim: k.parcalar.map(p => p.isim.trim()).filter(Boolean).join(" + "),
+    paketSayisi: paket ? String(Math.max(0, paket - uzak)) : "",
+    nakit: top("nakit"), pos: top("pos"), tokenflex: top("tokenflex"), paye: top("paye"),
+  };
+}
+
 function kuryeleriUyarla(mevcut: KuryeRaporu[], tarihStr: string): KuryeRaporu[] {
   const dolu = mevcut.filter(k => k.nakit || k.pos || k.tokenflex || k.paye || k.paketSayisi || k.uzakPaket || k.paket9km ||
     (k.isim && !/^(Kurye \d|Havuz Kurye)$/.test(k.isim)));
@@ -1063,6 +1086,8 @@ export default function RaporlarPage() {
   const [roketGun, setRoketGun] = useState<RoketGun | null>(null);
   /** Kurye kartında açılan ek satırlar (yemek kartı, uzak paket) */
   const [kuryeAcik, setKuryeAcik] = useState<Record<number, { kart?: boolean; uzak?: boolean }>>({});
+  /** "+ Kurye ekle" seçim listesi açık olan sabit satır */
+  const [kuryeEkleAcik, setKuryeEkleAcik] = useState<number | null>(null);
   const [roketNotu, setRoketNotu] = useState<string[]>([]);
   // Hangi tarih için MagicPay indirimleri forma yazıldı (geç gelen cevap kullanıcının girdiğini ezmesin)
   const mpDolduruldu = useRef("");
@@ -1104,14 +1129,14 @@ export default function RaporlarPage() {
         .gte("tarih", `${secilenYil}-${secilenAy}-01`)
         .lte("tarih", aySonu(secilenYil, secilenAy))
         .order("tarih",{ascending:false}),
-      supabase.from("personeller").select("id, isim, durum, ise_giris_tarihi, isten_cikis_tarihi").order("isim"),
+      supabase.from("personeller").select("id, isim, durum, ise_giris_tarihi, isten_cikis_tarihi, departman").order("isim"),
     ]);
     setEnSonRaporTarihi(sonRaporRes.data?.[0]?.tarih ?? null);
     setMevcutTarihler(new Set((tumTarihlerRes.data||[]).map((r:{tarih:string})=>r.tarih)));
     setAvansPersonelListesi((personelRes.data||[]).map((p:{id:number|string; isim:string})=>({id:String(p.id), isim:p.isim})));
     if (cariRes.data) setCariListesi(cariRes.data as Cari[]);
-    if (tumPersonelRes.data) setTumPersonel(tumPersonelRes.data.map((p: {id:number|string; isim:string; durum:string|null; ise_giris_tarihi:string|null; isten_cikis_tarihi:string|null}) => ({
-      id: String(p.id), isim: p.isim, durum: p.durum, ise_giris_tarihi: p.ise_giris_tarihi, isten_cikis_tarihi: p.isten_cikis_tarihi,
+    if (tumPersonelRes.data) setTumPersonel(tumPersonelRes.data.map((p: {id:number|string; isim:string; durum:string|null; ise_giris_tarihi:string|null; isten_cikis_tarihi:string|null; departman?:string|null}) => ({
+      id: String(p.id), isim: p.isim, durum: p.durum, ise_giris_tarihi: p.ise_giris_tarihi, isten_cikis_tarihi: p.isten_cikis_tarihi, departman: p.departman ?? null,
     })));
 
     if (!raporRes.error && raporRes.data) {
@@ -1295,12 +1320,23 @@ export default function RaporlarPage() {
         const t = slotToplami(g, slot);
         const eski = sabitSatirlar[indeks[i]];
         const adlar = g.kuryeler.filter(k => atamaBul(g, k) === slot).map(k => ilkAd(k.ad));
-        return {
+        const slotKuryeleri = g.kuryeler.filter(k => atamaBul(g, k) === slot);
+        const satir = {
           ...(eski || { id: Date.now() + i, uzakPaket: "", paket9km: "" }), tip: (eski?.tip || "sabit") as KuryeRaporu["tip"],
           isim: adlar.length ? adlar.join(" + ") : (eski?.isim || `Kurye ${i + 1}`),
           paketSayisi: t.paket ? yeniPaket(t.paket, eski) : "",
           nakit: s(t.nakit + t.bilinmeyen), pos: s(t.pos), paye: s(t.paye), tokenflex: eski?.tokenflex || "",
+          parcalar: undefined,
         } as KuryeRaporu;
+        // Sabit satırda birden çok kurye çalıştıysa her biri ayrı görünür (elle düzeltilebilir).
+        if (slotKuryeleri.length > 1) {
+          satir.parcalar = slotKuryeleri.map((k, j) => ({
+            isim: ilkAd(k.ad), paket: String(k.paket), nakit: s(k.nakit + k.bilinmeyen), pos: s(k.pos), paye: s(k.paye),
+            tokenflex: j === 0 ? (eski?.tokenflex || "") : "",
+          }));
+          return parcaliToplam(satir);
+        }
+        return satir;
       });
       const h = slotToplami(g, "havuz");
       const eskiHavuz = onceki.find(k => k.tip === "havuz");
@@ -1755,7 +1791,55 @@ export default function RaporlarPage() {
   const kuryeSil = (id:number)=>setKuryeler(kuryeler.filter(k=>k.id!==id));
   const kuryeDegistir = (id:number,field:keyof KuryeRaporu,val:string)=>{
     const v=(field==="nakit"||field==="pos"||field==="tokenflex"||field==="paye")?paraGirdisi(val):val;
-    setKuryeler(kuryeler.map(k=>k.id===id?{...k,[field]:v}:k));
+    setKuryeler(kuryeler.map(k=>k.id===id?parcaliToplam({...k,[field]:v}):k));
+  };
+  const parcaDegistir = (id: number, i: number, alan: keyof KuryeParcasi, val: string) => {
+    const v = alan === "isim" || alan === "paket" ? val : paraGirdisi(val);
+    setKuryeler(l => l.map(k => k.id === id && k.parcalar
+      ? parcaliToplam({ ...k, parcalar: k.parcalar.map((p, j) => j === i ? { ...p, [alan]: v } : p) }) : k));
+  };
+  const parcaSil = (id: number, i: number) => setKuryeler(l => l.map(k => {
+    if (k.id !== id || !k.parcalar) return k;
+    const kalan = k.parcalar.filter((_, j) => j !== i);
+    const yeni = parcaliToplam({ ...k, parcalar: kalan });
+    if (kalan.length > 1) return yeni;
+    const { parcalar: _p, ...tek } = yeni; void _p;
+    return tek;
+  }));
+  /** Sabit satıra kurye ekler. Roket'teki bir havuz kuryesi seçildiyse paketi/parasıyla gelir, havuz satırından düşülür
+   *  ve Roket kaydında o sabite atanır (Kurye Kontrol de aynı görsün). */
+  const sabiteKuryeEkle = (id: number, slot: "s1" | "s2", roketKurye?: RoketGun["kuryeler"][number]) => {
+    const s2 = (v: number) => (v ? paraYaz(v) : "");
+    const yeniParca: KuryeParcasi = roketKurye
+      ? { isim: roketKurye.ad.trim().split(/\s+/)[0].charAt(0).toLocaleUpperCase("tr-TR") + roketKurye.ad.trim().split(/\s+/)[0].slice(1).toLocaleLowerCase("tr-TR"),
+          paket: String(roketKurye.paket), nakit: s2(roketKurye.nakit + roketKurye.bilinmeyen), pos: s2(roketKurye.pos), paye: s2(roketKurye.paye), tokenflex: "" }
+      : { isim: "", paket: "", nakit: "", pos: "", tokenflex: "", paye: "" };
+    setKuryeler(l => {
+      let havuzDustu = false;
+      return l.map(k => {
+        if (k.id === id) {
+          const ilk: KuryeParcasi[] = k.parcalar?.length ? k.parcalar : [{
+            isim: k.isim, paket: String((parseInt(k.paketSayisi, 10) || 0) + (parseInt(k.uzakPaket || "", 10) || 0) + (parseInt(k.paket9km || "", 10) || 0) || ""),
+            nakit: k.nakit, pos: k.pos, tokenflex: k.tokenflex || "", paye: k.paye || "" }];
+          return parcaliToplam({ ...k, parcalar: [...ilk, yeniParca] });
+        }
+        if (roketKurye && !havuzDustu && k.tip === "havuz") {
+          havuzDustu = true;
+          const eksi = (a: string | undefined, b: number) => s2(Math.max(0, Math.round((tv(a) - b) * 100) / 100));
+          return { ...k, paketSayisi: String(Math.max(0, (parseInt(k.paketSayisi, 10) || 0) - roketKurye.paket)),
+            nakit: eksi(k.nakit, roketKurye.nakit + roketKurye.bilinmeyen), pos: eksi(k.pos, roketKurye.pos), paye: eksi(k.paye, roketKurye.paye) };
+        }
+        return k;
+      });
+    });
+    if (roketKurye && roketGun) {
+      const yeni: RoketGun = { ...roketGun, kuryeler: roketGun.kuryeler.map(k => ({ ...k, atama: k.ad === roketKurye.ad ? slot : atamaBul(roketGun, k) })) };
+      setRoketGun(yeni);
+      void supabase.from("roket_gunluk").update({ veri: yeni }).eq("tarih", yeni.tarih).then(({ error }) => {
+        if (error) setRoketNotu(n => [...n, `${roketKurye.ad} Roket kaydında sabite atanamadı (${error.message}); Kurye Kontrol'den atayın.`]);
+      });
+    }
+    setKuryeEkleAcik(null);
   };
   // ── Fişten Doldur: kağıt raporu fotoğraflayıp/yükleyip AI'ye okutma ──
   const nToStr = (n:number|undefined) => (n && n>0) ? paraYaz(n) : "";
@@ -2103,6 +2187,23 @@ export default function RaporlarPage() {
   const nakitFarki = nakitBeklenen == null ? null : Math.round((tv(kasaNakit) - nakitBeklenen) * 100) / 100;
   const nakitFarkVar = !(selectedRapor && !isEditMode) && nakitFarki != null && Math.abs(nakitFarki) > NAKIT_FARK_SINIRI;
 
+  // Kasa açığı → bugün çalışan banko personeline eşit kesinti (2. seçenek)
+  const acikKesintileri = kesintiSatirlari.filter(k => k.aciklama.startsWith(KASA_ACIGI_ONEK));
+  const acikKesintiToplam = Math.round(acikKesintileri.reduce((t, k) => t + tv(k.tutar), 0) * 100) / 100;
+  const kasaAcigi = nakitFarki != null && nakitFarki < 0 ? Math.abs(nakitFarki) : 0;
+  const acikDagitildi = nakitFarkVar && kasaAcigi > 0 && Math.abs(acikKesintiToplam - kasaAcigi) < 0.01;
+  const bankodakiler = bankoCalisanlari(puantajPersonelleri, id => puantajSatiri(id).durum);
+  const acigiDagit = () => {
+    const paylar = esitPaylas(kasaAcigi, bankodakiler.length);
+    const aciklama = `${KASA_ACIGI_ONEK} ${fmtTarih(tarih)} — ₺${fmt(kasaAcigi)}, ${bankodakiler.length} banko personeline eşit`;
+    setKesintiSatirlari(l => [
+      ...l.filter(k => !k.aciklama.startsWith(KASA_ACIGI_ONEK) && (k.personelIsim || tv(k.tutar) > 0)),
+      ...bankodakiler.map((p, i) => ({ id: Date.now() + i, personelId: p.id, personelIsim: p.isim, tutar: paraYaz(paylar[i]), aciklama })),
+    ]);
+    setNakitFarkOnay(false);
+  };
+  const acikKesintisiniKaldir = () => setKesintiSatirlari(l => l.filter(k => !k.aciklama.startsWith(KASA_ACIGI_ONEK)));
+
   // Form her zaman açıktır; bu değer sadece kaydetmeyi engeller ve nedenini söyler.
   const kayitEngeli: string =
     !tarih ? "Rapor tarihini seçin"
@@ -2110,7 +2211,7 @@ export default function RaporlarPage() {
     : tarihHataVarMi && !adminOnayliGecis ? (isAdmin ? "Tarih uyarısını onaylayın" : "Tarihi düzeltin")
     : uyumsuzluklar.length && !farkOnay ? "Toplamlar uyuşmuyor — düzeltin"
     : taramaIleDoldu && !kontrolOnay ? "Kağıtla karşılaştırıp onay kutusunu işaretleyin"
-    : nakitFarkVar && !nakitFarkOnay ? "Kasa nakdi farkını onaylayın"
+    : nakitFarkVar && !nakitFarkOnay && !acikDagitildi ? (kasaAcigi > 0 ? "Kasa açığı için bir seçenek seçin" : "Kasa nakdi farkını onaylayın")
     : "";
   const isReadOnly = !!(selectedRapor && !isEditMode);
 
@@ -2708,12 +2809,26 @@ export default function RaporlarPage() {
                       Roket <b className="text-yazi">{pkK.roket}</b> · {mpDoldurma ? "MagicPay" : "Satış tablosu"} <b className="text-yazi">{pkK.bizde - pkK.kirMigros}</b>
                       {" + "}Kıraloğlu Migros <b className="text-yazi">{pkK.kirMigros}</b> = <b className="text-yazi">{pkK.bizde}</b>
                     </p>
-                    {pkK.fark !== 0 && (
+                    {pkK.rokettenEk > 0 && (
+                      <div className="rounded-lg border border-cizgi bg-alan/40 px-3 py-2 text-[13px] space-y-1">
+                        <p className="font-semibold text-gray-300">Roket&apos;e elle girilen {pkK.rokettenEk} sipariş <span className="font-normal text-gray-500">(fiş tarandı / Roket Adisyon — Roket&apos;te platformu görünmez)</span></p>
+                        {(roketGun?.digerSiparisler || []).map((d, i) => (
+                          <p key={i} className="text-gray-400">· {d.saat || "—"} · {d.kaynak}{d.isletme ? ` · ${d.isletme}` : ""} · {d.kurye} · <b className="text-yazi">₺{fmt(d.tutar)}</b> {d.odeme.toLocaleLowerCase("tr-TR")}{d.no ? ` · no ${d.no}` : ""}</p>
+                        ))}
+                        {!roketGun?.digerSiparisler && <p className="text-gray-500">Ayrıntı yok: bu gün eski yöntemle yüklenmiş. &quot;Roket&apos;ten çek&quot; ile yeniden çekince saat, kurye ve tutar görünür.</p>}
+                        {pkK.fisEslesme.length > 0 && (
+                          <p className="text-emerald-300">→ Platformlara göre büyük olasılıkla: {pkK.fisEslesme.map(e => `${e.ad}${e.adet > 1 ? ` (${e.adet})` : ""}`).join(", ")} <span className="text-gray-500">— MagicPay&apos;de o kanalda Roket&apos;ten fazla sipariş var.</span></p>
+                        )}
+                        {pkK.eslesmeyenFis > 0 && (
+                          <p className="text-amber-300">→ {pkK.eslesmeyenFis} tanesi hiçbir platformda karşılık bulmadı: MagicPay&apos;de yok, adisyona girilmemiş satış olabilir.</p>
+                        )}
+                      </div>
+                    )}
+                    {pkK.farkliKanallar.length > 0 && (
                       <div className="text-[13px] text-gray-400 space-y-0.5">
                         {pkK.farkliKanallar.map(k => (
-                          <p key={k.kanal}>· {k.ad}: Roket {k.roket}, {k.kanal === "kir_migros" ? "elle girilen" : "MagicPay"} {k.bizde}</p>
+                          <p key={k.kanal}>· {k.ad}: Roket {k.roket}{pkK.fisEslesme.some(e => e.kanal === k.kanal) ? " (fiş dahil)" : ""}, {k.kanal === "kir_migros" ? "elle girilen" : "MagicPay"} {k.bizde}</p>
                         ))}
-                        {pkK.rokettenEk > 0 && <p>· Roket&apos;e elle girilen (Roket Adisyon / fiş tarandı): {pkK.rokettenEk} — bunlar MagicPay&apos;de yoksa adisyona girilmemiş satış olabilir.</p>}
                         {pkK.farkliKanallar.some(k => k.kanal === "kir_migros") && <p>· Kıraloğlu Migros paket sayısı 1 · Kasa adımında girilir.</p>}
                       </div>
                     )}
@@ -2738,23 +2853,66 @@ export default function RaporlarPage() {
                       const kartGoster = kartVar || (!isReadOnly && acik.kart);
                       const uzakGoster = uzakVar || (!isReadOnly && acik.uzak);
                       const para = tv(k.nakit) + tv(k.pos) + tv(k.tokenflex) + tv(k.paye);
+                      const parcali = !!h.parcalar?.length;
+                      const slot: "s1" | "s2" | null = k.tip === "sabit" ? (sabitNo === 1 ? "s1" : "s2") : null;
+                      const adaylar = roketGun && slot ? roketGun.kuryeler.filter(x => atamaBul(roketGun, x) === "havuz") : [];
+                      const parcaPara = (i: number, alan: "nakit" | "pos" | "tokenflex" | "paye") => (
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[14px] font-semibold">₺</span>
+                          <input type="text" inputMode="decimal" placeholder="0" disabled={isReadOnly} value={h.parcalar![i][alan] || ""}
+                            onChange={e => parcaDegistir(k.id, i, alan, e.target.value)} className={`${kutu} pl-7 text-right font-bold`}/>
+                        </div>
+                      );
                       return (
                         <div key={k.id} className={`rounded-lg border p-3 space-y-2.5 ${havuz ? "border-purple-500/25" : "border-amber-500/25"}`}>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className={`shrink-0 text-[13px] font-black px-2.5 py-1 rounded-md ${havuz ? "bg-purple-500/15 text-purple-200" : "bg-amber-500/15 text-amber-200"}`}>{ad}</span>
-                            <input type="text" placeholder={havuz ? "İsim (isteğe bağlı)" : "Kurye adı"} disabled={isReadOnly} value={k.isim}
-                              onChange={e => kuryeDegistir(k.id, "isim", e.target.value)} className={`${kutu} h-9 flex-1 min-w-[140px]`}/>
+                            {parcali
+                              ? <span className="flex-1 min-w-[140px] text-[14px] font-semibold text-yazi">{k.isim || "—"} <span className="text-[12px] font-normal text-gray-500">· {h.parcalar!.length} kurye</span></span>
+                              : <input type="text" placeholder={havuz ? "İsim (isteğe bağlı)" : "Kurye adı"} disabled={isReadOnly} value={k.isim}
+                                  onChange={e => kuryeDegistir(k.id, "isim", e.target.value)} className={`${kutu} h-9 flex-1 min-w-[140px]`}/>}
                             <span className="text-[12px] text-gray-500">{havuz ? "parası Roadrunner'da kalır" : yeniDuzen ? "parayı kasaya teslim eder" : ""}</span>
                             {!isReadOnly && k.tip !== "sabit" && (
                               <button type="button" onClick={() => kuryeSil(k.id)} aria-label="Kuryeyi sil" className="ml-auto text-gray-500 hover:text-red-400"><Trash2 size={15}/></button>
                             )}
                           </div>
+                          {parcali ? (
+                            <div className="space-y-2">
+                              <div className="hidden sm:grid grid-cols-[1fr_90px_130px_130px_24px] gap-2 text-[12px] font-semibold text-gray-400">
+                                <span>Kurye</span><span className="text-center">Paket</span><span>Nakit aldı</span><span>POS ile aldı</span><span/>
+                              </div>
+                              {h.parcalar!.map((pc, i) => (
+                                <div key={i} className="space-y-1.5">
+                                  <div className="grid grid-cols-[1fr_70px_24px] sm:grid-cols-[1fr_90px_130px_130px_24px] gap-2 items-center">
+                                    <input type="text" placeholder="Kurye adı" disabled={isReadOnly} value={pc.isim}
+                                      onChange={e => parcaDegistir(k.id, i, "isim", e.target.value)} className={`${kutu} h-10`}/>
+                                    <input type="number" inputMode="numeric" min={0} placeholder="0" disabled={isReadOnly} value={pc.paket}
+                                      onChange={e => parcaDegistir(k.id, i, "paket", e.target.value)} className={`${kutu} text-center font-bold`}/>
+                                    <span className="sm:hidden"/>
+                                    <div className="col-span-1 sm:col-span-1">{parcaPara(i, "nakit")}</div>
+                                    <div className="col-span-1 sm:col-span-1">{parcaPara(i, "pos")}</div>
+                                    {!isReadOnly
+                                      ? <button type="button" onClick={() => parcaSil(k.id, i)} aria-label="Kuryeyi çıkar" className="text-gray-500 hover:text-red-400 flex justify-center"><Trash2 size={15}/></button>
+                                      : <span/>}
+                                  </div>
+                                  {kartGoster && (
+                                    <div className="grid grid-cols-[1fr_130px_130px_24px] gap-2 items-center sm:pl-[calc(90px+0.5rem)]">
+                                      <span className="text-[12px] text-pink-300/90 text-right">Token Flex / Paye</span>
+                                      {parcaPara(i, "tokenflex")}{parcaPara(i, "paye")}<span/>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                              <p className="text-[12px] text-gray-500">Paket: her kuryenin attığı toplam paket (uzak dahil). Garanti {KURYE_GARANTI_PAKET} paket, bu satırın toplamına uygulanır.</p>
+                            </div>
+                          ) : (
                           <div className="grid grid-cols-3 gap-2">
                             <label><span className={etiket}>Paket</span>{sayiKutusu(h, "paketSayisi")}</label>
                             <label><span className={etiket}>Nakit aldı</span>{paraKutusu(h, "nakit")}</label>
                             <label><span className={etiket}>POS ile aldı</span>{paraKutusu(h, "pos")}</label>
                           </div>
-                          {kartGoster && (
+                          )}
+                          {kartGoster && !parcali && (
                             <div className="grid grid-cols-3 gap-2">
                               <span className="self-end pb-2.5 text-[12px] text-pink-300/90">Yemek kartı alacağı</span>
                               <label><span className={etiket}>Token Flex</span>{paraKutusu(h, "tokenflex")}</label>
@@ -2768,7 +2926,28 @@ export default function RaporlarPage() {
                               <label><span className={etiket}>9 km üzeri (2 kat)</span>{sayiKutusu(h, "paket9km")}</label>
                             </div>
                           )}
+                          {!isReadOnly && slot && kuryeEkleAcik === k.id && (
+                            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 space-y-1.5">
+                              <p className="text-[13px] font-semibold text-amber-200">{ad}&apos;e hangi kurye eklensin?</p>
+                              {adaylar.length > 0 ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {adaylar.map(x => (
+                                    <button key={x.ad} type="button" onClick={() => sabiteKuryeEkle(k.id, slot, x)}
+                                      className="text-[13px] px-3 py-1.5 rounded-lg border border-cizgi-guclu hover:border-amber-400/60 text-gray-200">
+                                      <b>{x.ad}</b> · {x.paket} paket · ₺{fmt(x.nakit + x.pos + x.paye + x.bilinmeyen)}
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : <p className="text-[12px] text-gray-500">{roketGun ? "Roket'te havuzda başka kurye yok." : "Roket verisi yok; elle ekleyin."}</p>}
+                              <p className="text-[12px] text-gray-500">Roket&apos;ten seçilen kurye paketi ve parasıyla gelir, havuzdan düşülür; sonra düzeltebilirsiniz.</p>
+                              <div className="flex gap-3 text-[13px]">
+                                <button type="button" onClick={() => sabiteKuryeEkle(k.id, slot)} className="text-altin hover:underline">Elle ekle (boş satır)</button>
+                                <button type="button" onClick={() => setKuryeEkleAcik(null)} className="text-gray-500 hover:underline">Vazgeç</button>
+                              </div>
+                            </div>
+                          )}
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
+                            {!isReadOnly && slot && kuryeEkleAcik !== k.id && <button type="button" onClick={() => setKuryeEkleAcik(k.id)} className="text-amber-300 hover:underline">+ Kurye ekle (yerine gelen)</button>}
                             {!isReadOnly && !kartGoster && <button type="button" onClick={() => setKuryeAcik(o => ({ ...o, [k.id]: { ...o[k.id], kart: true } }))} className="text-pink-300/90 hover:underline">+ Yemek kartı (Token Flex / Paye)</button>}
                             {!isReadOnly && !uzakGoster && <button type="button" onClick={() => setKuryeAcik(o => ({ ...o, [k.id]: { ...o[k.id], uzak: true } }))} className="text-orange-300/90 hover:underline">+ Uzak paket</button>}
                             <span className="ml-auto text-gray-400">
@@ -3268,11 +3447,37 @@ export default function RaporlarPage() {
                     Kağıt formla karşılaştırdım, değerler doğru
                   </label>
                 )}
-                {nakitFarkVar && nakitFarki != null && (
+                {nakitFarkVar && nakitFarki != null && nakitFarki > 0 && (
                   <label className="flex items-center gap-2 text-[13px] font-semibold text-amber-100 bg-amber-500/10 border border-amber-500/40 rounded-xl px-3 py-2.5 cursor-pointer select-none">
                     <input type="checkbox" checked={nakitFarkOnay} onChange={e => setNakitFarkOnay(e.target.checked)} className="w-4 h-4 accent-amber-500"/>
-                    Kasa nakdi ₺{fmt(Math.abs(nakitFarki))} {nakitFarki < 0 ? "eksik" : "fazla"}; biliyorum, yine de kaydet
+                    Kasa nakdi ₺{fmt(nakitFarki)} fazla; biliyorum, yine de kaydet
                   </label>
+                )}
+                {nakitFarkVar && kasaAcigi > 0 && (
+                  <div className="w-full rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 space-y-2">
+                    <p className="text-[14px] font-bold text-amber-100">Kasa nakdi ₺{fmt(kasaAcigi)} eksik. Ne yapılsın?</p>
+                    <label className="flex items-center gap-2.5 text-[14px] text-amber-50 cursor-pointer select-none">
+                      <input type="radio" name="kasa-acigi" checked={nakitFarkOnay && !acikDagitildi}
+                        onChange={() => { acikKesintisiniKaldir(); setNakitFarkOnay(true); }} className="w-4 h-4 accent-amber-500"/>
+                      Biliyorum, yine de kaydet <span className="text-[12px] text-amber-200/70">(açık kimseye yansıtılmaz)</span>
+                    </label>
+                    <label className={`flex items-start gap-2.5 text-[14px] text-amber-50 select-none ${bankodakiler.length ? "cursor-pointer" : "opacity-60"}`}>
+                      <input type="radio" name="kasa-acigi" disabled={!bankodakiler.length} checked={acikDagitildi}
+                        onChange={acigiDagit} className="w-4 h-4 mt-0.5 accent-amber-500"/>
+                      <span>
+                        Bugün çalışan banko personelinden eşit kesinti yap
+                        <span className="block text-[12px] text-amber-200/80">
+                          {bankodakiler.length
+                            ? (() => { const pay = esitPaylas(kasaAcigi, bankodakiler.length); return bankodakiler.map((p, i) => `${p.isim} ₺${fmt(pay[i])}`).join(" · "); })()
+                            : "Bugün puantajda \"Çalıştı\" görünen banko personeli yok (Kurye adımında “Bugün çalışanlar”a bakın)."}
+                        </span>
+                        {acikDagitildi && <span className="block text-[12px] text-emerald-300">Gider adımındaki “Personel kesintisi”ne eklendi; kaydedince maaşlarından düşülür.</span>}
+                        {!acikDagitildi && acikKesintileri.length > 0 && (
+                          <span className="block text-[12px] text-red-300">Daha önce ₺{fmt(acikKesintiToplam)} dağıtılmıştı, açık değişti — yeniden seçin.</span>
+                        )}
+                      </span>
+                    </label>
+                  </div>
                 )}
                 {kayitEngeli && <span className="text-[12px] font-semibold text-amber-300">{kayitEngeli}</span>}
                 <button type="button" onClick={()=>{formuTemizle();setFormAcik(false);}}

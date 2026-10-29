@@ -62,6 +62,23 @@ export function varsayilanAtama(kuryeler: RoketKurye[], oncekiSabit: Partial<Rec
   return sonuc;
 }
 
+/** Roket'e elle girilen (MagicPay kanalı olmayan) bir teslim edilmiş sipariş. */
+export interface RoketDigerSiparis {
+  /** "21:14" */
+  saat: string;
+  kurye: string;
+  tutar: number;
+  /** Roket'teki ödeme yöntemi, olduğu gibi ("Nakit", "Pos"...) */
+  odeme: string;
+  /** Yönlendiren: "Fiş Tarandı", "Roket Adisyon"... */
+  kaynak: string;
+  /** Roket'teki "İşletme Adı" (KEBO, CHİKN...) */
+  isletme?: string;
+  /** Sipariş / fiş numarası (Excel'de varsa) */
+  no?: string;
+  km?: number;
+}
+
 export interface RoketGun {
   tarih: string; // YYYY-AA-GG
   kuryeler: RoketKurye[];
@@ -69,6 +86,8 @@ export interface RoketGun {
   kanallar: Partial<Record<Kanal, number>>;
   /** Roket'in kendi girişleri (Fiş Tarandı, Roket Adisyon) */
   digerPaket: number;
+  /** Bu girişlerin ayrıntısı (29.10.2026'dan önce yüklenen günlerde yok). Müşteri bilgisi yok. */
+  digerSiparisler?: RoketDigerSiparis[];
   iptal: number;
   toplamPaket: number;
 }
@@ -82,6 +101,8 @@ const tl = (v: unknown): number => {
 };
 const kurus = (x: number) => Math.round(x * 100) / 100;
 const sade = (s: string) => s.replace(/\s+/g, " ").trim();
+/** İş günü 05:00'te başlar: gece 00:00–04:59 en sona sıralanır. */
+const sirala = (saat: string) => (saat && saat < "05:00" ? "2" : "1") + saat;
 
 /** "16.10.2026 23:36" → iş günü "2026-10-16" (gece 05:00'ten önceki sipariş bir önceki güne yazılır). */
 export function isGunu(sipTarihi: unknown): string | null {
@@ -113,16 +134,18 @@ export function roketExcelOku(satirlar: unknown[][]): RoketOkuma {
   const sutun = (ad: string) => baslik.indexOf(ad.toLocaleLowerCase("tr-TR"));
   const iTarih = sutun("Sipariş Tarihi"), iKurye = sutun("Kurye"), iDurum = sutun("Durum"), iTutar = sutun("Tutar"),
     iOdeme = sutun("Ödeme Yöntemi"), iMesafe = sutun("Mesafe"), iYon = sutun("Yönlendiren");
+  const iIsletme = sutun("İşletme Adı");
+  const iNo = ["Sipariş No", "Sipariş Numarası", "Sipariş Kodu", "Fiş No", "Adisyon No"].map(sutun).find(i => i >= 0) ?? -1;
   if ([iTarih, iKurye, iDurum, iTutar, iOdeme].some(i => i < 0)) {
     return { gunler: [], satir: 0, hatali: 0, uyari: ["Bu dosya Roket Paket Raporu'na benzemiyor (Sipariş Tarihi / Kurye / Durum / Tutar / Ödeme Yöntemi sütunları bulunamadı)."] };
   }
-  const gunler = new Map<string, { kurye: Map<string, RoketKurye>; kanallar: Partial<Record<Kanal, number>>; diger: number; iptal: number }>();
+  const gunler = new Map<string, { kurye: Map<string, RoketKurye>; kanallar: Partial<Record<Kanal, number>>; diger: number; iptal: number; digerler: RoketDigerSiparis[] }>();
   let satir = 0, hatali = 0;
   for (const r of satirlar.slice(1)) {
     const tarih = isGunu(r[iTarih]);
     if (!tarih) continue; // toplam / özet satırları
     satir++;
-    const g = gunler.get(tarih) ?? { kurye: new Map<string, RoketKurye>(), kanallar: {} as Partial<Record<Kanal, number>>, diger: 0, iptal: 0 };
+    const g = gunler.get(tarih) ?? { kurye: new Map<string, RoketKurye>(), kanallar: {} as Partial<Record<Kanal, number>>, diger: 0, iptal: 0, digerler: [] as RoketDigerSiparis[] };
     gunler.set(tarih, g);
     const durum = sade(String(r[iDurum] ?? "")).toLocaleLowerCase("tr-TR");
     if (/iptal/.test(durum)) { g.iptal++; continue; }
@@ -132,10 +155,21 @@ export function roketExcelOku(satirlar: unknown[][]): RoketOkuma {
     const k = g.kurye.get(ad) ?? { ad, paket: 0, nakit: 0, pos: 0, paye: 0, yemek: 0, bilinmeyen: 0, km: 0, atama: "havuz" as RoketAtama };
     g.kurye.set(ad, k);
     k.paket++;
-    k.km += tl(String(r[iMesafe] ?? "").replace(/km/i, "").replace(".", ","));
+    const km = tl(String(r[iMesafe] ?? "").replace(/km/i, "").replace(".", ","));
+    k.km += km;
     const kanal = iYon >= 0 ? roketKanali(r[iYon]) : null;
-    if (kanal) g.kanallar[kanal] = (g.kanallar[kanal] || 0) + 1; else g.diger++;
     const tutar = tl(r[iTutar]);
+    if (kanal) g.kanallar[kanal] = (g.kanallar[kanal] || 0) + 1;
+    else {
+      g.diger++;
+      const no = iNo >= 0 ? sade(String(r[iNo] ?? "")) : "";
+      g.digerler.push({
+        saat: /\s(\d{2}:\d{2})/.exec(String(r[iTarih] ?? ""))?.[1] || "", kurye: ad, tutar: kurus(tutar),
+        odeme: sade(String(r[iOdeme] ?? "")) || "—", kaynak: (iYon >= 0 ? sade(String(r[iYon] ?? "")) : "") || "Roket",
+        ...(iIsletme >= 0 && sade(String(r[iIsletme] ?? "")) ? { isletme: sade(String(r[iIsletme])) } : {}),
+        ...(no ? { no } : {}), ...(km ? { km: kurus(km) } : {}),
+      });
+    }
     const odeme = sade(String(r[iOdeme] ?? "")).toLocaleLowerCase("tr-TR");
     if (/nakit/.test(odeme)) k.nakit += tutar;
     else if (/^pos|kredi|kart[ıi]? ?ile/.test(odeme)) k.pos += tutar;
@@ -148,7 +182,8 @@ export function roketExcelOku(satirlar: unknown[][]): RoketOkuma {
     const kuryeler: RoketKurye[] = [...g.kurye.values()].map(k => ({
       ...k, nakit: kurus(k.nakit), pos: kurus(k.pos), paye: kurus(k.paye), yemek: kurus(k.yemek), bilinmeyen: kurus(k.bilinmeyen), km: kurus(k.km),
     })).sort((a, b) => b.paket - a.paket || a.ad.localeCompare(b.ad, "tr"));
-    return { tarih, kuryeler: varsayilanAtama(kuryeler), kanallar: g.kanallar, digerPaket: g.diger, iptal: g.iptal, toplamPaket: kuryeler.reduce((t, k) => t + k.paket, 0) };
+    return { tarih, kuryeler: varsayilanAtama(kuryeler), kanallar: g.kanallar, digerPaket: g.diger,
+      digerSiparisler: [...g.digerler].sort((a, b) => sirala(a.saat).localeCompare(sirala(b.saat))), iptal: g.iptal, toplamPaket: kuryeler.reduce((t, k) => t + k.paket, 0) };
   });
   if (hatali) uyari.push(`${hatali} teslim edilmiş paketin kuryesi belli değil (Kurye Yok / Planlandı); hesaba katılmadı.`);
   return { gunler: sonuc, satir, hatali, uyari };
@@ -234,6 +269,7 @@ export function kuryeKarsilastir(gun: RoketGun, kasaKuryeleri: KasaKuryeSatiri[]
 // Roket bazen fazla olur: Roket'e elle girilen siparişler ("Roket Adisyon", "Fiş Tarandı").
 
 export interface PaketKontrolSatiri { kanal: Exclude<Kanal, "diger">; ad: string; roket: number; bizde: number }
+export interface FisEslesmesi { kanal: Exclude<Kanal, "diger">; ad: string; adet: number }
 export interface PaketKontrolu {
   roket: number;
   /** MagicPay + Kıraloğlu Migros */
@@ -242,18 +278,36 @@ export interface PaketKontrolu {
   kirMigros: number;
   /** roket − bizde: artı = Roket'te fazla */
   fark: number;
-  /** Roket'in kendi girişleri (MagicPay'de karşılığı olmayabilir) */
+  /** Roket'in kendi girişleri (Fiş Tarandı, Roket Adisyon) */
   rokettenEk: number;
-  /** Sadece farklı olan kanallar */
+  /** Bu girişler aslında hangi kanalın siparişi: MagicPay'de Roket'ten fazla olan kanallarla eşleştirilir. */
+  fisEslesme: FisEslesmesi[];
+  /** Hiçbir kanala oturmayan Roket girişi (MagicPay'de karşılığı yok → adisyona girilmemiş olabilir) */
+  eslesmeyenFis: number;
+  /** Fiş eşleştirmesinden sonra hâlâ farklı olan kanallar */
   farkliKanallar: PaketKontrolSatiri[];
 }
 
+/**
+ * Roket'in "Fiş Tarandı" / "Roket Adisyon" girişleri aslında bir Alo Paket ya da platform siparişidir;
+ * Roket'te kanalı görünmez. MagicPay'de Roket'ten fazla görünen kanallar bu girişlerle doldurulur
+ * (önce en büyük açık); kalan fark gerçek farktır.
+ */
 export function paketKontrolu(g: Pick<RoketGun, "kanallar" | "digerPaket" | "toplamPaket">, bizdeKanal: Partial<Record<Kanal, number>>): PaketKontrolu {
   const satirlar = KANALLAR.map(k => ({ kanal: k.kanal, ad: k.ad, roket: g.kanallar[k.kanal] || 0, bizde: bizdeKanal[k.kanal] || 0 }));
   const bizde = satirlar.reduce((t, k) => t + k.bizde, 0);
+  let kalan = g.digerPaket;
+  const fisEslesme: FisEslesmesi[] = [];
+  for (const k of [...satirlar].filter(x => x.bizde > x.roket).sort((a, b) => (b.bizde - b.roket) - (a.bizde - a.roket))) {
+    const adet = Math.min(kalan, k.bizde - k.roket);
+    if (adet <= 0) continue;
+    fisEslesme.push({ kanal: k.kanal, ad: k.ad, adet });
+    k.roket += adet;
+    kalan -= adet;
+  }
   return {
     roket: g.toplamPaket, bizde, kirMigros: bizdeKanal.kir_migros || 0,
-    fark: g.toplamPaket - bizde, rokettenEk: g.digerPaket,
+    fark: g.toplamPaket - bizde, rokettenEk: g.digerPaket, fisEslesme, eslesmeyenFis: kalan,
     farkliKanallar: satirlar.filter(k => k.roket !== k.bizde),
   };
 }

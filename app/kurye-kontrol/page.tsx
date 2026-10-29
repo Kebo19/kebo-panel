@@ -13,7 +13,7 @@ import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import { useYetki } from "@/lib/useYetki";
 import { fmtTarih } from "@/lib/tarih";
-import { roketExcelOku, kuryeKarsilastir, roketTahsilat, varsayilanAtama, atamaBul, ATAMA_ADI, type RoketGun, type RoketAtama, type KuryeKarsilastirma } from "@/lib/roket";
+import { roketExcelOku, kuryeKarsilastir, paketKontrolu, roketTahsilat, varsayilanAtama, atamaBul, ATAMA_ADI, type RoketGun, type RoketAtama, type KuryeKarsilastirma } from "@/lib/roket";
 import { KANALLAR, mpKanalPaketleri, type MpRaporDoldurma, type Kanal } from "@/lib/magicpay";
 import { Lock, Loader2, Upload, AlertTriangle, CheckCircle2, Truck } from "lucide-react";
 
@@ -50,7 +50,9 @@ function GunKarti({ gun, kasa, kirMigros, mp, onAtama, kaydediliyor }: { gun: Ro
   const kuryeFark = satirlar.some(s => s.roket && s.kasa && (
     Math.abs(s.roket.paket - s.kasa.paket) > 0 || Math.abs(s.roket.nakit - s.kasa.nakit) >= 1 ||
     Math.abs(s.roket.pos - s.kasa.pos) >= 1 || Math.abs(s.roket.kart - s.kasa.kart) >= 1));
-  const kanalFark = kanalSatirlari.some(k => k.mp !== undefined && k.roket !== k.mp);
+  // Fiş tarandı / Roket Adisyon girişleri, MagicPay'de fazla görünen kanallarla eşleştirilir.
+  const pkK = bizde ? paketKontrolu(gun, bizde) : null;
+  const kanalFark = pkK ? pkK.farkliKanallar.length > 0 || pkK.eslesmeyenFis > 0 : false;
   // Kapıda toplam: Roket (kuryelerin topladığı) ↔ MagicPay (Alo Paket + platform kapıda ödemesi)
   const roketKapida = gun.kuryeler.reduce((t, k) => t + roketTahsilat(k), 0);
   const mpKapida = mp ? mp.alo.nakit + mp.alo.pos + mp.kapidaKebo.ys + mp.kapidaKebo.trendyol + mp.kapidaKebo.migros
@@ -148,6 +150,16 @@ function GunKarti({ gun, kasa, kirMigros, mp, onAtama, kaydediliyor }: { gun: Ro
             {gun.digerPaket > 0 && <tr><td className="px-3 py-1.5 text-gray-500">Roket&apos;in kendi girişleri (fiş tarandı vb.)</td><td className="px-2 py-1.5 text-right">{gun.digerPaket}</td></tr>}
           </tbody>
         </table>
+        {gun.digerPaket > 0 && (
+          <div className="px-3 py-2 border-t border-cizgi text-[12px] space-y-0.5">
+            {(gun.digerSiparisler || []).map((d, i) => (
+              <p key={i} className="text-gray-400">· {d.saat || "—"} · {d.kaynak}{d.isletme ? ` · ${d.isletme}` : ""} · {d.kurye} · <b className="text-yazi">{tl(d.tutar)}</b> {d.odeme.toLocaleLowerCase("tr-TR")}</p>
+            ))}
+            {!gun.digerSiparisler && <p className="text-gray-500">Ayrıntı yok: bu gün eski yöntemle yüklenmiş; Roket&apos;ten yeniden çekince görünür.</p>}
+            {pkK && pkK.fisEslesme.length > 0 && <p className="text-emerald-300">→ Büyük olasılıkla: {pkK.fisEslesme.map(e => `${e.ad}${e.adet > 1 ? ` (${e.adet})` : ""}`).join(", ")} (MagicPay&apos;de o kanalda fazla sipariş var)</p>}
+            {pkK && pkK.eslesmeyenFis > 0 && <p className="text-amber-300">→ {pkK.eslesmeyenFis} tanesi hiçbir platformda karşılık bulmadı: adisyona girilmemiş satış olabilir.</p>}
+          </div>
+        )}
         <p className="px-3 pb-2 text-[11px] text-gray-500">Roket&apos;te sadece kuryeyle giden paketler var; MagicPay&apos;de gel-al siparişler de olabilir.</p>
       </details>
     </section>
