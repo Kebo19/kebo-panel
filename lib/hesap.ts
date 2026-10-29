@@ -83,6 +83,8 @@ export interface RaporVerisi {
   kasa_nakit?: number | null; kasa_pos?: number | null; kasa_edenred?: number | null; kasa_metropol?: number | null;
   kasa_setcard?: number | null; kasa_pluxee?: number | null; kasa_paye?: number | null; kasa_multinet?: number | null; kasa_tokenflex?: number | null;
   gunluk_gider?: number | null; iade_tutar?: number | null;
+  /** gunluk_gider'in bugünün kasasından ÖDENMEYEN kısmı (POS / kart, diğer). Brüt ciroya eklenmez. (29.10.2026) */
+  gider_nakit_disi?: number | null;
   kurye_raporlari?: KuryeSatiri[] | null;
 }
 
@@ -233,6 +235,8 @@ export const yemekKartiToplam = (r: Partial<Record<YemekKartiAlani, unknown>>): 
 export const kasaToplam = (r: RaporVerisi): number =>
   n(r.kasa_nakit) + n(r.kasa_pos) + yemekKartiToplam(r);
 export const giderToplam = (r: RaporVerisi): number => n(r.gunluk_gider);
+/** Bugünün kasasından nakit ödenen gider: kasa sayımından önce çıktığı için brüt ciroya geri eklenir. */
+export const nakitGiderToplam = (r: RaporVerisi): number => n(r.gunluk_gider) - n(r.gider_nakit_disi);
 export const iadeToplam = (r: RaporVerisi): number => n(r.iade_tutar);
 export const indirimToplam = (r: RaporVerisi): number =>
   n(r.os_kebo_ys_indirim) + n(r.os_kebo_trendyol_indirim) + n(r.os_cnf_ys_indirim) + n(r.os_cnf_trendyol_indirim)
@@ -242,12 +246,13 @@ export const indirimToplam = (r: RaporVerisi): number =>
   + n(r.ko_kir_ys_indirim) + n(r.ko_kir_trendyol_indirim);
 
 /**
- * BRÜT CİRO = Online + Kasa + Gider (+ Kapıda, eğer kapıda parası kasaya girmiyorsa)
+ * BRÜT CİRO = Online + Kasa + Nakit gider (+ Kapıda, eğer kapıda parası kasaya girmiyorsa)
+ * POS / diğer yolla ödenen gider satıştan gelmediği için brüte eklenmez, ama net ciroyu düşürür.
  * Bu değer rapor kaydedilirken `toplam_ciro` alanına da yazılır.
  */
 export function brutCiro(r: RaporVerisi): number {
   const kapida = kapidaKasadaMi(r.tarih) ? 0 : kapidaToplam(r);
-  return onlineToplam(r) + kapida + kasaToplam(r) + giderToplam(r);
+  return onlineToplam(r) + kapida + kasaToplam(r) + nakitGiderToplam(r);
 }
 
 /** NET CİRO = Brüt − Gider − İade − Platform indirimleri */

@@ -9,7 +9,7 @@ import {
   Calendar, Lock, Plus, User, Clock, ShieldAlert, Check, X, ArrowUpRight,
   Layers, Bell, Printer, ChevronDown, ChevronUp, PieChart, Activity,
   RefreshCw, Download, FileDown, StickyNote, DollarSign, Package,
-  RotateCcw, Save, Slash, TrendingDown, Hash, Building2, Search, Sparkles,
+  RotateCcw, Save, Slash, TrendingDown, Hash, Building2, Sparkles,
   Banknote, CreditCard, Percent, Truck, Users2, Camera, ImageUp
 } from "lucide-react";
 import { BarChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ComposedChart } from "recharts";
@@ -48,7 +48,20 @@ interface PlatformGiris { tutar: string; paket: string; }
 interface SatirRaporu {
   id: number; aciklama: string; tutar: string; tip?: "normal" | "firma" | "personel";
   firmaId?: string; firmaUnvan?: string; personelIsim?: string; personelId?: string;
+  /** Giderin nasıl ödendiği (yoksa nakit). Sadece "nakit" bugünün kasasından çıkar ve brüt ciroya eklenir. */
+  odeme?: GiderOdeme; odemeNot?: string;
 }
+
+/** Gider ödeme yöntemi:
+ *  nakit  = bugünün kasasından (kasa sayımından önce ödendi → brüt ciroya geri eklenir)
+ *  gecmis = geçmiş günlerin biriken nakdinden (nakit kasadan çıkış olarak kaydedilir; gunluk_gider'e girmez)
+ *  pos    = şirket / kendi kartımızla ödendi (gider, ama satıştan gelmedi → brüt ciroya eklenmez)
+ *  diger  = başka şekilde (havale vb., açıklamalı) — pos gibi */
+type GiderOdeme = "nakit" | "gecmis" | "pos" | "diger";
+const GIDER_ODEME: { v: GiderOdeme; ad: string }[] = [
+  { v: "nakit", ad: "Nakit" }, { v: "gecmis", ad: "Geçmiş günlerin nakiti" }, { v: "pos", ad: "POS / kart" }, { v: "diger", ad: "Diğer" },
+];
+const odemeOf = (g: Pick<SatirRaporu, "odeme" | "tip">): GiderOdeme => g.tip === "personel" ? "nakit" : (g.odeme || "nakit");
 
 /** Kasa raporu giriş adımları (sırasıyla). */
 const ADIMLAR = ["Kasa", "Gider", "Kurye", "Kontrol"] as const;
@@ -62,9 +75,12 @@ const yeniSatirId = () => Date.now() + Math.floor(Math.random() * 1000);
 // Açıklamalardaki "|" ve ": ₺" karakterleri bu biçimi bozduğu için yazarken temizlenir.
 const FIRMA_ONEK = "[Firma] ";
 const PERSONEL_ONEK = "[Personel Avans] ";
+// Ödeme yöntemi metinde başta etiketle saklanır: "{POS} Market: ₺1.250", "{Diğer: havale} Kira: ₺5.000".
+// Etiketsiz satır nakittir. "Geçmiş günlerin nakiti" metne yazılmaz (nakit kasa çıkışı olarak saklanır).
+const ODEME_ETIKET = /^\{(POS|Diğer)(?::\s*([^}]*))?\}\s*/;
 const temizMetin = (s?: string) => (s || "").replace(/\|/g, "/").replace(/:\s*₺/g, " ₺").replace(/\s+/g, " ").trim();
 
-interface AyrikGider { tip: "normal"|"firma"|"personel"; aciklama: string; tutar: string; personelIsim?: string; detay: string; }
+interface AyrikGider { tip: "normal"|"firma"|"personel"; aciklama: string; tutar: string; personelIsim?: string; detay: string; odeme?: GiderOdeme; odemeNot?: string; }
 
 function satirMetniniAyristir(metin?: string | null): { aciklama: string; tutar: string }[] {
   if (!metin) return [];
@@ -80,7 +96,12 @@ function giderMetniniAyristir(metin?: string | null): { giderler: AyrikGider[]; 
   const notIdx = ham.indexOf("|| NOT:");
   if (notIdx > -1) { govde = ham.substring(0, notIdx).trim(); not = ham.substring(notIdx + 7).trim(); }
   else if (ham.startsWith("NOT:")) { govde = ""; not = ham.substring(4).trim(); }
-  const giderler = satirMetniniAyristir(govde).map(({ aciklama, tutar }): AyrikGider => {
+  const giderler = satirMetniniAyristir(govde).map(({ aciklama: ham2, tutar }): AyrikGider => {
+    const et = ODEME_ETIKET.exec(ham2);
+    const odeme: GiderOdeme | undefined = et ? (et[1] === "POS" ? "pos" : "diger") : undefined;
+    const odemeNot = et?.[2]?.trim() || undefined;
+    const aciklama = et ? ham2.slice(et[0].length) : ham2;
+    const g = ((): AyrikGider => {
     if (aciklama.startsWith(FIRMA_ONEK)) return { tip: "firma", aciklama: aciklama.substring(FIRMA_ONEK.length), tutar, detay: "" };
     if (aciklama.startsWith(PERSONEL_ONEK)) {
       const govdeP = aciklama.substring(PERSONEL_ONEK.length);
@@ -90,17 +111,21 @@ function giderMetniniAyristir(metin?: string | null): { giderler: AyrikGider[]; 
       return { tip: "personel", aciklama, tutar, personelIsim, detay: detay === "Belirtilmemiş" ? "" : detay };
     }
     return { tip: "normal", aciklama, tutar, detay: "" };
+    })();
+    return odeme ? { ...g, odeme, odemeNot } : g;
   });
   return { giderler, not };
 }
 
 function giderMetniOlustur(giderler: SatirRaporu[], notlar: string): string {
   const govde = giderler
-    .filter(g => g.tutar || g.aciklama)
+    .filter(g => (g.tutar || g.aciklama) && odemeOf(g) !== "gecmis")
     .map(g => {
-      const ad = g.tip === "firma" && g.firmaUnvan ? `${FIRMA_ONEK}${temizMetin(g.firmaUnvan)}`
+      const od = odemeOf(g);
+      const etiket = od === "pos" ? "{POS} " : od === "diger" ? `{Diğer${g.odemeNot ? ": " + temizMetin(g.odemeNot).replace(/[{}]/g, "") : ""}} ` : "";
+      const ad = etiket + ( g.tip === "firma" && g.firmaUnvan ? `${FIRMA_ONEK}${temizMetin(g.firmaUnvan)}`
         : g.tip === "personel" && g.personelIsim ? `${PERSONEL_ONEK}${temizMetin(g.personelIsim)} — ${temizMetin(g.aciklama) || "Belirtilmemiş"}`
-        : (temizMetin(g.aciklama) || "Belirtilmemiş");
+        : (temizMetin(g.aciklama) || "Belirtilmemiş"));
       return `${ad}: ₺${g.tutar || "0"}`;
     })
     .join(" | ");
@@ -1026,6 +1051,8 @@ export default function RaporlarPage() {
   // Adım adım giriş: 1 Kasa → 2 Gider → 3 Kurye → 4 Kontrol ve kaydet
   const [adim, setAdim] = useState(1);
   const [ayrinti, setAyrinti] = useState(false); // 4. adımda satış / kasa / nakit kasa ayrıntıları
+  const [kayitOnay, setKayitOnay] = useState(false);
+  const [nakitFarkOnay, setNakitFarkOnay] = useState(false); // kasa nakdi MagicPay'den ±100 ₺'den fazla farklıysa // "Raporu Kaydet"ten sonra son bir kez "Evet, kaydet" sorulur
   // O günün Roket (Roadrunner) özeti — Kurye Kontrol sayfasından yüklenen Excel; varsa kurye adımı ondan dolar
   const [roketGun, setRoketGun] = useState<RoketGun | null>(null);
   const [roketNotu, setRoketNotu] = useState<string[]>([]);
@@ -1166,9 +1193,11 @@ export default function RaporlarPage() {
     setMpFormaYazildi(true);
   };
   const mpIndirimHazir = mpIndirimDurum === "hazir" && !!mpIndirim;
-  // Adım adım: ekranda tek adım görünür (salt okunur görünümde hepsi). Adım çubuğundan istenen adıma geçilir.
-  const goster = (n: number) => isReadOnly || adim === n;
+  // Adım adım: ekranda tek adım görünür. Kaydedilmiş raporu görüntülerken sade özet (4. adım) görünür,
+  // "Ayrıntılar" açılınca bütün bölümler. Adım çubuğundan istenen adıma geçilir.
+  const goster = (n: number) => isReadOnly ? (n === 4 || ayrinti) : adim === n;
   const adimaGit = (n: number) => {
+    setKayitOnay(false);
     setAdim(Math.min(4, Math.max(1, n)));
     setTimeout(() => formAlaniRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
   };
@@ -1332,7 +1361,7 @@ export default function RaporlarPage() {
     setNotlar("");setSelectedRapor(null);setIsEditMode(false);
     setTaramaHata(""); setTaramaBelirsizAlanlar([]);
     setTaramaIleDoldu(false); setTaramaTarihNotu(""); setKontrolOnay(false); setTarihOnaylandi(false); setTaramaKontrol({}); setFarkOnay(false);
-    mpDolduruldu.current = ""; setMpFormaYazildi(false); setAdim(1);
+    mpDolduruldu.current = ""; setMpFormaYazildi(false); setAdim(1); setAyrinti(false); setKayitOnay(false); setNakitFarkOnay(false);
   };
 
   /** Yeni rapor: formu temizler, tarih adımını sıradaki günle hazır açar. */
@@ -1501,11 +1530,15 @@ export default function RaporlarPage() {
     setNakitSayim(r.nakit_kasa_sayim != null ? paraYaz(Number(r.nakit_kasa_sayim)) : "");
     setNakitDevredenKagit(r.nakit_devreden_kagit != null ? paraYaz(Number(r.nakit_devreden_kagit)) : "");
     setNakitHareketleri([]); setNakitHareketYuklendi(false);
+    let gecmisGiderler: SatirRaporu[] = [];
     if (isAdmin && kasaOkur) {
       const { data: nh, error: nhHata } = await supabase.from("kasa_manuel_islemler")
         .select("id,aciklama,hedef_hesap,tutar").eq("rapor_id", r.id).eq("kaynak", "rapor_nakit").order("created_at");
       if (!nhHata) {
-        setNakitHareketleri((nh || []).map((h, i) => ({ id: Date.now() + i, aciklama: h.aciklama || "", banka: bankaBul(h.hedef_hesap || ""), tutar: paraYaz(Number(h.tutar)) })));
+        const hepsi = (nh || []).map((h, i) => ({ id: Date.now() + i, aciklama: h.aciklama || "", banka: bankaBul(h.hedef_hesap || ""), tutar: paraYaz(Number(h.tutar)) }));
+        // Bankaya yatırılanlar nakit kasada kalır; eski nakitten yapılan ödemeler gider satırı olarak görünür
+        setNakitHareketleri(hepsi.filter(h => h.banka));
+        gecmisGiderler = hepsi.filter(h => !h.banka).map((h, i) => ({ id: Date.now() + 700 + i, aciklama: h.aciklama, tutar: h.tutar, tip: "normal" as const, odeme: "gecmis" as const }));
         setNakitHareketYuklendi(true);
       }
     }
@@ -1568,19 +1601,22 @@ export default function RaporlarPage() {
       : kuryeYapisiHesapla(r.tarih));
     const ayrik = giderMetniniAyristir(r.gider_aciklama);
     setNotlar(ayrik.not);
-    setGiderler(ayrik.giderler.length
-      ? ayrik.giderler.map((g,i)=>{
+    const yuklenenGiderler: SatirRaporu[] = [
+      ...ayrik.giderler.map((g,i): SatirRaporu => {
+          const od = g.odeme ? { odeme: g.odeme, odemeNot: g.odemeNot } : {};
           if (g.tip === "firma") {
             const firma = cariListesi.find(c => c.unvan === g.aciklama);
-            return { id: Date.now()+i, aciklama: g.aciklama, tutar: g.tutar, tip: "firma" as const, firmaId: firma?.id, firmaUnvan: g.aciklama };
+            return { id: Date.now()+i, aciklama: g.aciklama, tutar: g.tutar, tip: "firma" as const, firmaId: firma?.id, firmaUnvan: g.aciklama, ...od };
           }
           if (g.tip === "personel") {
             return { id: Date.now()+i, aciklama: g.detay, tutar: g.tutar, tip: "personel" as const,
               personelIsim: g.personelIsim, personelId: personelIdBul(g.personelIsim) };
           }
-          return { id: Date.now()+i, aciklama: g.aciklama, tutar: g.tutar, tip: "normal" as const };
-        })
-      : [{id:Date.now(),aciklama:"",tutar:"",tip:"normal" as const}]);
+          return { id: Date.now()+i, aciklama: g.aciklama, tutar: g.tutar, tip: "normal" as const, ...od };
+        }),
+      ...gecmisGiderler,
+    ];
+    setGiderler(yuklenenGiderler.length ? yuklenenGiderler : [{id:Date.now(),aciklama:"",tutar:"",tip:"normal" as const}]);
     const iadeListesi = satirMetniniAyristir(r.iade_aciklama);
     setIadeler(iadeListesi.length
       ? iadeListesi.map((g,i)=>({id:Date.now()+i+1000, aciklama:g.aciklama, tutar:g.tutar}))
@@ -1632,9 +1668,14 @@ export default function RaporlarPage() {
     const indirimUyari = indirimOrani > 15;
     // ── Kasa ──
     const tKasa=tv(kasaNakit)+tv(kasaPos)+YEMEK_KARTLARI.reduce((t,k)=>t+tv(kartlar[k.alan]),0);
-    const tGider=giderler.reduce((a,g)=>a+tv(g.tutar),0);
+    // Gider: gunluk_gider = geçmiş günlerin nakdi hariç bütün giderler. Brüt ciroya sadece bugünün
+    // kasasından (nakit) ödenenler geri eklenir; POS / Diğer gider olarak net ciroyu düşürür.
+    const giderOdemeToplam = (o: GiderOdeme) => giderler.filter(g => odemeOf(g) === o).reduce((a, g) => a + tv(g.tutar), 0);
+    const tGiderNakit = giderOdemeToplam("nakit"), tGiderGecmis = giderOdemeToplam("gecmis");
+    const tGiderNakitDisi = giderOdemeToplam("pos") + giderOdemeToplam("diger");
+    const tGider = tGiderNakit + tGiderNakitDisi;
     const tIade=iadeler.reduce((a,i)=>a+tv(i.tutar),0);
-    const brutCiro = tOnline + (kapidaKasada ? 0 : tKapida) + tKasa + tGider;
+    const brutCiro = tOnline + (kapidaKasada ? 0 : tKapida) + tKasa + tGiderNakit;
     const netCiro  = brutCiro - tGider - tIade - tIndirim;
     // ── Kuryeler: SADECE tip==="sabit" (Roadrunner, 14.08.2026+) olan satırlarda min. 30 paket garantisi var.
     // Ödemeye esas paket: Kurye 1 ve Kurye 2 (havuz dışındaki ilk iki satır) 30'un altındaysa 30'a
@@ -1671,7 +1712,7 @@ export default function RaporlarPage() {
     const kapidaTuruBilinmeyen = Math.round((tKapida - aloNakit - aloPos - tKuryeKart)*100)/100;
     return {aloNakit,aloPos,kapidaTuruBilinmeyen,tKuryeNakit,tKuryePos,tKuryeTokenFlex,tKuryePaye,tKuryeKart,pkKebo,pkCnf,pkKir,tOnline,tOnlineKebo,tOnlineCnf,tOnlineKir,tOnlinePaket,tKapida,tKapidaKebo,tKapidaCnf,tKapidaKir,tKapidaPaket,kapidaKasada,
       tIndirimYS,tIndirimTrendyol,tIndirim,indirimOrani,indirimUyari,
-      tKasa,brutCiro,tGider,tIade,netCiro,kuryelerHesap,tKuryePaket,tKuryeGercekPaket,
+      tKasa,brutCiro,tGider,tGiderNakit,tGiderGecmis,tGiderNakitDisi,tIade,netCiro,kuryelerHesap,tKuryePaket,tKuryeGercekPaket,
       tKuryeUzakPaket,tKuryePaket9km,tKuryeTahsilat,paketOrt,kuryeFark};
   },[tarih,osKeboYs,osKeboYsIndirim,osKeboTrendyol,osKeboTrendyolIndirim,osKeboMigros,osKeboMigrosIndirim,osKeboAlo,osKeboAloIndirim,osCnfMigrosIndirim,
      osCnfYs,osCnfYsIndirim,osCnfTrendyol,osCnfTrendyolIndirim,osCnfMigrosYemek,
@@ -1689,7 +1730,7 @@ export default function RaporlarPage() {
 
   // ── Handlers ──
   const giderEkle = (tip: "normal"|"firma"|"personel" = "normal") =>
-    setGiderler([...giderler,{id:Date.now(),aciklama:tip==="personel"?"Personel tüketim (yemek/içecek)":"",tutar:"",tip}]);
+    setGiderler([...giderler,{id:Date.now(),aciklama:"",tutar:"",tip}]);
   const giderSil = (id:number)=>setGiderler(giderler.filter(g=>g.id!==id));
   const giderDegistir = (id:number, alanlar: Partial<SatirRaporu>) =>
     setGiderler(onceki => onceki.map(g=>g.id===id?{...g,...alanlar, ...(alanlar.tutar!==undefined?{tutar:paraGirdisi(alanlar.tutar)}:{})}:g));
@@ -1817,7 +1858,10 @@ export default function RaporlarPage() {
       const yeniNakit: NakitHareket[] = (Array.isArray(nk.hareketler) ? nk.hareketler : [])
         .filter((h: { tutar?: number }) => Number(h?.tutar) > 0)
         .map((h: { aciklama?: string; banka?: string; tutar?: number }, i: number) => ({ id: Date.now() + 500 + i, aciklama: h.aciklama || "", banka: bankaBul(h.banka), tutar: nToStr(h.tutar) }));
-      if (yeniNakit.length) setNakitHareketleri(onceki => ekle ? [...onceki.filter(h => h.tutar), ...yeniNakit] : yeniNakit);
+      const yeniYatan = yeniNakit.filter(h => h.banka);
+      const yeniGecmis = yeniNakit.filter(h => !h.banka).map((h): SatirRaporu => ({ id: h.id, aciklama: h.aciklama, tutar: h.tutar, tip: "normal", odeme: "gecmis" }));
+      if (yeniYatan.length) setNakitHareketleri(onceki => ekle ? [...onceki.filter(h => h.tutar), ...yeniYatan] : yeniYatan);
+      if (yeniGecmis.length) setGiderler(onceki => [...onceki.filter(g => g.tutar || g.aciklama), ...yeniGecmis]);
       if (veri.notlar) setNotlar(onceki => ekle && onceki ? `${onceki}\n${veri.notlar}` : veri.notlar);
       setTaramaBelirsizAlanlar(onceki => ekle ? [...new Set([...onceki, ...(veri.belirsiz_alanlar || [])])] : (veri.belirsiz_alanlar || []));
       setTaramaIleDoldu(true); setKontrolOnay(false);
@@ -1854,6 +1898,11 @@ export default function RaporlarPage() {
   // ── Save ──
   const handleRaporKaydet = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Kontrol adımına gelmeden (ör. bir kutuda Enter'a basınca) kayıt yapılmaz; bir sonraki adıma geçilir.
+    if (!isReadOnly && adim < 4) { adimaGit(adim + 1); return; }
+    // Son onay: önce "Raporu Kaydet", sonra "Evet, kaydet"
+    if (!kayitOnay) { setKayitOnay(true); return; }
+    setKayitOnay(false);
     if (duplikaTarihHata) { alert(`${fmtTarih(tarih)} tarihli rapor zaten mevcut!`); return; }
     if (uyumsuzluklar.length && !farkOnay) { alert("Toplamlar uyuşmuyor:\n• " + uyumsuzluklar.join("\n• ") + "\n\nDüzeltmeden kaydedilemez."); return; }
     if (taramaIleDoldu && !kontrolOnay) { alert("Fişten doldurulan değerleri kağıtla karşılaştırıp onay kutusunu işaretleyin."); return; }
@@ -1923,7 +1972,7 @@ export default function RaporlarPage() {
         kasa_nakit:tv(kasaNakit), kasa_pos:tv(kasaPos), ...Object.fromEntries(YEMEK_KARTLARI.map(k => [k.alan, tv(kartlar[k.alan])])),
         nakit_kasa_sayim: nakitSayim.trim() ? tv(nakitSayim) : null,
         nakit_devreden_kagit: nakitDevredenKagit.trim() ? tv(nakitDevredenKagit) : null,
-        gunluk_gider:ch.tGider, gider_aciklama:giderAciklamaFinal,
+        gunluk_gider:ch.tGider, gider_nakit_disi:ch.tGiderNakitDisi, gider_aciklama:giderAciklamaFinal,
         iade_tutar:ch.tIade, iade_aciklama:birlesikIade,
         kurye_raporlari:temizKuryeler,
         toplam_ciro:ch.brutCiro,
@@ -1952,9 +2001,11 @@ export default function RaporlarPage() {
               fazla_mesai_saat: Math.max(0, tv(x.fazla)), aciklama: x.aciklama || null,
             };
           }) } : {}),
-          ...(nakitHareketYuklendi ? { nakit_hareketleri: nakitHareketleri.filter(h => tv(h.tutar) > 0).map(h => ({
-            aciklama: h.aciklama, banka: h.banka, tutar: tv(h.tutar),
-          })) } : {}),
+          // Nakit kasa çıkışları: bankaya yatırılanlar + "geçmiş günlerin nakiti" ile ödenen giderler
+          ...(nakitHareketYuklendi ? { nakit_hareketleri: [
+            ...giderler.filter(g => odemeOf(g) === "gecmis" && tv(g.tutar) > 0).map(g => ({ aciklama: temizMetin(g.aciklama) || "Gider", banka: "", tutar: tv(g.tutar) })),
+            ...nakitHareketleri.filter(h => tv(h.tutar) > 0).map(h => ({ aciklama: h.aciklama, banka: h.banka, tutar: tv(h.tutar) })),
+          ] } : {}),
         },
       };
       // Murat / Bülent dışında: mevcut rapor doğrudan güncellenmez, onaya (değişiklik talebi) gider.
@@ -2035,6 +2086,13 @@ export default function RaporlarPage() {
     return l;
   })();
 
+  // Kasa nakdi kontrolü (ekranda gösterilmez): MagicPay'e göre masa nakdi − kasadan ödenen giderler.
+  // 100 ₺'den fazla fark varsa Kontrol adımında uyarılır, onay kutusu işaretlenmeden kaydedilmez.
+  const NAKIT_FARK_SINIRI = 100;
+  const nakitBeklenen = mpDoldurma ? Math.round((mpDoldurma.kasa.nakit - ch.tGiderNakit) * 100) / 100 : null;
+  const nakitFarki = nakitBeklenen == null ? null : Math.round((tv(kasaNakit) - nakitBeklenen) * 100) / 100;
+  const nakitFarkVar = !(selectedRapor && !isEditMode) && nakitFarki != null && Math.abs(nakitFarki) > NAKIT_FARK_SINIRI;
+
   // Form her zaman açıktır; bu değer sadece kaydetmeyi engeller ve nedenini söyler.
   const kayitEngeli: string =
     !tarih ? "Rapor tarihini seçin"
@@ -2042,6 +2100,7 @@ export default function RaporlarPage() {
     : tarihHataVarMi && !adminOnayliGecis ? (isAdmin ? "Tarih uyarısını onaylayın" : "Tarihi düzeltin")
     : uyumsuzluklar.length && !farkOnay ? "Toplamlar uyuşmuyor — düzeltin"
     : taramaIleDoldu && !kontrolOnay ? "Kağıtla karşılaştırıp onay kutusunu işaretleyin"
+    : nakitFarkVar && !nakitFarkOnay ? "Kasa nakdi farkını onaylayın"
     : "";
   const isReadOnly = !!(selectedRapor && !isEditMode);
 
@@ -2081,7 +2140,7 @@ export default function RaporlarPage() {
               {onayci && (
               <button type="button" onClick={()=>selectedRapor && handleRaporSil(selectedRapor)}
                 className="flex items-center gap-1.5 text-xs font-semibold text-red-400 bg-red-400/10 border border-red-400/20 px-3 py-1.5 rounded-lg hover:bg-red-400/15 transition-colors">
-                <Trash2 size={12}/> Sil
+                <Trash2 size={12}/> Raporu sil
               </button>
               )}
             </div>
@@ -2293,7 +2352,6 @@ export default function RaporlarPage() {
                     )}
                     <p>
                       Sizin girmeniz gerekenler: <b>kasa nakit sayımı</b>
-                      {mpDoldurma.kasa.nakit > 0 && <> (MagicPay&apos;e göre masa nakdi ₺{fmt(mpDoldurma.kasa.nakit)} − gider ₺{fmt(ch.tGider)} = <b>₺{fmt(mpDoldurma.kasa.nakit - ch.tGider)}</b> olmalı)</>}
                       , <b>giderler</b>, <b>kuryeler</b> ve <b>Kıraloğlu Migros</b> (MagicPay&apos;de yok).
                     </p>
                     {mpDoldurma.uyarilar.length > 0 && (
@@ -2315,17 +2373,6 @@ export default function RaporlarPage() {
                 <input type="text" inputMode="decimal" value={kasaNakit} onChange={e => setKasaNakit(paraGirdisi(e.target.value))} disabled={isReadOnly}
                   placeholder="0" className="w-full h-16 rounded-xl border-2 border-altin/60 bg-alan text-yazi text-3xl font-black px-4 outline-none focus:border-altin disabled:opacity-50"/>
               </label>
-              {mpDoldurma && mpDoldurma.kasa.nakit > 0 && (() => {
-                const beklenen = mpDoldurma.kasa.nakit - ch.tGider;
-                const fark = tv(kasaNakit) - beklenen;
-                return (
-                  <p className="text-[13px] text-gray-500">
-                    MagicPay&apos;e göre olması gereken: <b className="text-yazi">₺{fmt(beklenen)}</b>
-                    {kasaNakit.trim() && <> · fark <b className={Math.abs(fark) < 1 ? "text-emerald-300" : fark > 0 ? "text-emerald-300" : "text-red-300"}>{fark >= 0 ? "+" : "−"}₺{fmt(Math.abs(fark))}</b></>}
-                    {ch.tGider > 0 && <span className="text-[11px]"> (gider ₺{fmt(ch.tGider)} düşüldü)</span>}
-                  </p>
-                );
-              })()}
             </div>
             <div className="rounded-xl border border-teal-500/25 bg-kart p-3 space-y-1.5">
               <p className="text-[13px] font-bold text-teal-300">Kıraloğlu Migros <span className="font-medium text-[11px] text-gray-500">MagicPay&apos;de yok, elle girin (satış yoksa boş bırakın)</span></p>
@@ -2342,133 +2389,148 @@ export default function RaporlarPage() {
 
             {goster(2) && <section id="adim-2" className="space-y-3 scroll-mt-14">
             {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">2 · Gider <span className="font-medium text-[12px] text-gray-500">giderler, kesinti, iade</span></h2>}
-              {/* Giderler */}
-              <div className="rounded-xl border border-red-500/20 bg-kart overflow-hidden">
-                <div className="px-4 py-3 border-b border-red-500/15 flex flex-wrap items-center justify-between gap-2 bg-red-500/[0.03]">
-                  <span className="text-[13px] font-bold text-red-300 flex items-center gap-2">3. Giderler <span className="font-medium text-[11px] text-gray-500">(avans dahil · iade/iptal buraya değil 5. bölüme)</span></span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-black text-red-300">₺{fmt(ch.tGider)}</span>
+              {/* ── GİDERLER: Açıklama · Ödeme yöntemi · Tutar ── */}
+              {(() => {
+                const normalSatirlar = giderler.filter(g => g.tip !== "personel");
+                const personelSatirlar = giderler.filter(g => g.tip === "personel");
+                const personelToplam = personelSatirlar.reduce((t, g) => t + tv(g.tutar), 0);
+                const kutu = "w-full bg-alan border border-cizgi-guclu text-yazi text-[14px] h-10 px-3 rounded-lg outline-none focus:border-altin/50 disabled:opacity-50";
+                const tutarKutusu = (g: SatirRaporu) => (
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[14px] font-semibold">₺</span>
+                    <input type="text" inputMode="decimal" placeholder="0" disabled={isReadOnly} value={g.tutar}
+                      onChange={e => giderDegistir(g.id, { tutar: e.target.value })}
+                      className={`${kutu} pl-7 text-right font-bold`}/>
+                  </div>
+                );
+                const silDugmesi = (g: SatirRaporu) => !isReadOnly && (
+                  <button type="button" onClick={() => giderSil(g.id)} aria-label="Satırı sil" className="h-10 text-gray-500 hover:text-red-400 flex items-center justify-center"><Trash2 size={15}/></button>
+                );
+                return (<>
+                <div className="rounded-xl border border-red-500/20 bg-kart overflow-hidden">
+                  <div className="px-4 py-3 border-b border-red-500/15 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[15px] font-bold text-red-200">Giderler</span>
                     {!isReadOnly && (
-                      <>
-                        <button type="button" onClick={()=>giderEkle("normal")}
-                          className="text-[11px] font-semibold text-gray-700 hover:text-red-300 bg-white/[0.04] hover:bg-red-500/10 border border-cizgi-guclu hover:border-red-500/30 px-2.5 py-1 rounded-lg transition-colors">
-                          + Normal
-                        </button>
-                        <button type="button" onClick={()=>giderEkle("firma")}
-                          className="text-[11px] font-semibold text-gray-700 hover:text-blue-300 bg-white/[0.04] hover:bg-blue-500/10 border border-cizgi-guclu hover:border-blue-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
-                          <Building2 size={11}/> Firma
-                        </button>
-                        <button type="button" onClick={()=>giderEkle("personel")}
-                          className="text-[11px] font-semibold text-gray-700 hover:text-teal-300 bg-white/[0.04] hover:bg-teal-500/10 border border-cizgi-guclu hover:border-teal-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1">
-                          <Users2 size={11}/> Personel
-                        </button>
-                      </>
+                      <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => giderEkle("normal")}
+                          className="text-[12px] font-semibold text-red-200 border border-red-500/30 hover:bg-red-500/10 px-3 py-1.5 rounded-lg">+ Gider</button>
+                        <button type="button" onClick={() => giderEkle("firma")}
+                          className="text-[12px] font-semibold text-blue-200 border border-blue-500/30 hover:bg-blue-500/10 px-3 py-1.5 rounded-lg flex items-center gap-1"><Building2 size={12}/> Firma ödemesi</button>
+                      </div>
                     )}
                   </div>
-                </div>
-                <div className="p-3 space-y-2">
-                  {giderler.map((item, idx) => (
-                    <div key={item.id} className="space-y-1.5">
-                      {item.tip === "firma" ? (
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <Building2 size={11} className="text-blue-400"/>
-                          <span className="text-[11px] font-semibold text-blue-300">Firma Ödemesi</span>
-                        </div>
-                      ) : item.tip === "personel" ? (
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <Users2 size={11} className="text-teal-400"/>
-                          <span className="text-[11px] font-semibold text-teal-300">Personel Tüketimi — kasadan fiş çıkar, otomatik avans olarak işlenir</span>
-                        </div>
-                      ) : null}
-
-                      {item.tip === "firma" ? (
-                        isReadOnly ? (
-                          <div className="w-full bg-alan border border-blue-500/20 text-blue-300 text-xs h-7 px-2.5 rounded-lg flex items-center gap-1.5">
-                            <Building2 size={9}/> {item.firmaUnvan || item.aciklama}
-                          </div>
-                        ) : (
-                          <div className="relative">
-                            <Search size={9} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-600"/>
-                            <select
-                              disabled={isReadOnly}
-                              value={item.firmaId || ""}
-                              onChange={e => {
-                                const firma = cariListesi.find(c => c.id === e.target.value);
-                                giderDegistir(item.id, firma
-                                  ? { firmaId: firma.id, firmaUnvan: firma.unvan, aciklama: firma.unvan }
-                                  : { firmaId: undefined, firmaUnvan: undefined, aciklama: "" });
-                              }}
-                              className="w-full bg-alan border border-blue-500/20 text-yazi text-xs h-7 pl-6 pr-2 rounded-lg outline-none focus:border-altin/50 disabled:opacity-40 appearance-none"
-                            >
-                              <option value="">Firma seçiniz...</option>
-                              {cariListesi.map(c => (
-                                <option key={c.id} value={c.id} className="bg-kart">
-                                  {c.unvan} {c.cari_kodu ? `(${c.cari_kodu})` : ""}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )
-                      ) : item.tip === "personel" ? (
-                        <div className="space-y-1.5">
-                          <select disabled={isReadOnly} value={item.personelId || personelIdBul(item.personelIsim) || ""}
-                            onChange={e => { const p = avansPersonelListesi.find(x => x.id === e.target.value); giderDegistir(item.id, { personelId: p?.id, personelIsim: p?.isim || "" }); }}
-                            className="w-full bg-alan border border-teal-500/20 text-yazi text-xs h-7 px-2.5 rounded-lg outline-none focus:border-teal-500/40 disabled:opacity-40 appearance-none">
-                            <option value="">Personel seçiniz...</option>
-                            {item.personelIsim && !personelIdBul(item.personelIsim) && <option value="">{item.personelIsim} (listede yok)</option>}
-                            {avansPersonelListesi.map(p=>(<option key={p.id} value={p.id} className="bg-kart">{p.isim}</option>))}
-                          </select>
-                          <input type="text" placeholder="Ne tüketti? (örn: 1 adet kola)" disabled={isReadOnly} value={item.aciklama}
-                            onChange={e=>giderDegistir(item.id, { aciklama: e.target.value })}
-                            className="w-full bg-alan border border-cizgi hover:border-cizgi-guclu focus:border-teal-500/40 text-yazi text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
-                        </div>
-                      ) : (
-                        <AkilliGiderInput
-                          value={item.aciklama}
-                          onChange={v => giderDegistir(item.id, { aciklama: v })}
-                          disabled={isReadOnly}
-                          oneriListesi={giderOnerileri}
-                        />
-                      )}
-
-                      <div className="flex gap-1.5">
-                        <div className="relative flex-1">
-                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 text-[13px] font-semibold">₺</span>
-                          <input
-                            type="text" inputMode="decimal" placeholder="0" disabled={isReadOnly} value={item.tutar}
-                            onChange={e=>giderDegistir(item.id,{ tutar: e.target.value })}
-                            className="w-full bg-alan border border-cizgi-guclu text-yazi text-[14px] font-bold h-9 pl-7 pr-2 rounded-lg outline-none focus:border-altin/50 focus:ring-2 focus:ring-altin/40 disabled:opacity-40"
-                          />
-                        </div>
-                        {!isReadOnly && giderler.length>1 && (
-                          <button type="button" onClick={()=>giderSil(item.id)} className="text-gray-500 hover:text-red-400 px-1.5"><Trash2 size={13}/></button>
-                        )}
-                      </div>
-                      {idx < giderler.length-1 && <div className="border-t border-cizgi mt-1"/>}
+                  <div className="p-3 space-y-2.5">
+                    <div className="hidden md:grid grid-cols-[1fr_200px_150px_28px] gap-2 text-[11px] font-bold text-gray-500 px-0.5">
+                      <span>Açıklama</span><span>Ödeme yöntemi</span><span className="text-right pr-1">Tutar</span><span/>
                     </div>
-                  ))}
+                    {normalSatirlar.length === 0 && <p className="text-[12px] text-gray-500 py-1">Gider yok.</p>}
+                    {normalSatirlar.map(g => {
+                      const od = odemeOf(g);
+                      return (
+                        <div key={g.id} className="space-y-1.5 pb-2.5 border-b border-cizgi last:border-b-0 last:pb-0">
+                          <div className="grid grid-cols-[1fr_120px_28px] md:grid-cols-[1fr_200px_150px_28px] gap-2 items-center">
+                            <div className="col-span-3 md:col-span-1 min-w-0">
+                              {g.tip === "firma" ? (
+                                isReadOnly ? (
+                                  <div className={`${kutu} flex items-center gap-1.5 text-blue-200`}><Building2 size={12}/> {g.firmaUnvan || g.aciklama}</div>
+                                ) : (
+                                  <select value={g.firmaId || ""}
+                                    onChange={e => {
+                                      const firma = cariListesi.find(c => c.id === e.target.value);
+                                      giderDegistir(g.id, firma ? { firmaId: firma.id, firmaUnvan: firma.unvan, aciklama: firma.unvan } : { firmaId: undefined, firmaUnvan: undefined, aciklama: "" });
+                                    }}
+                                    className={`${kutu} border-blue-500/30`}>
+                                    <option value="">Firma seçin (cari hesaba ödeme)…</option>
+                                    {cariListesi.map(c => <option key={c.id} value={c.id} className="bg-kart">{c.unvan} {c.cari_kodu ? `(${c.cari_kodu})` : ""}</option>)}
+                                  </select>
+                                )
+                              ) : (
+                                <AkilliGiderInput value={g.aciklama} onChange={v => giderDegistir(g.id, { aciklama: v })} disabled={isReadOnly} oneriListesi={giderOnerileri}/>
+                              )}
+                            </div>
+                            <select disabled={isReadOnly} value={od}
+                              onChange={e => giderDegistir(g.id, { odeme: e.target.value as GiderOdeme })}
+                              className={`${kutu} col-span-3 md:col-span-1 ${od === "nakit" ? "" : "border-sky-500/40 text-sky-200"}`}>
+                              {GIDER_ODEME.filter(o => g.tip !== "firma" || o.v !== "gecmis").map(o => <option key={o.v} value={o.v}>{o.ad}</option>)}
+                            </select>
+                            <div className="col-span-2 md:col-span-1">{tutarKutusu(g)}</div>
+                            {silDugmesi(g)}
+                          </div>
+                          {od === "diger" && (
+                            <input type="text" placeholder="Nasıl ödendi? (örn: havale, ortak cebinden)" disabled={isReadOnly} value={g.odemeNot || ""}
+                              onChange={e => giderDegistir(g.id, { odemeNot: e.target.value })}
+                              className={`${kutu} h-9 text-[13px]`}/>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                {/* Toplam gider — kağıt formdaki "TOPLAM GİDER" satırının karşılığı; satırlardan otomatik hesaplanır */}
-                <div className="mx-3 mb-3 rounded-lg border-2 border-altin/60 px-3.5 py-2.5 flex items-center justify-between">
-                  <span className="text-[13px] font-bold text-yazi">Toplam gider <span className="font-medium text-[11px] text-gray-500">(avanslar dahil)</span></span>
-                  <span className="text-[17px] font-black text-red-300">₺{fmt(ch.tGider)}</span>
-                </div>
-              </div>
 
-                {/* Personel Kesintisi — kasayı/gideri etkilemez, sadece ay sonu maaştan düşülür */}
+                {/* ── PERSONEL YEMEĞİ / ISMARLAMA: fiş çıktı, para kasaya girmedi → maaştan düşülür (avans) ── */}
+                <div className="rounded-xl border border-teal-500/25 bg-kart overflow-hidden">
+                  <div className="px-4 py-3 border-b border-teal-500/15 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[15px] font-bold text-teal-200 flex items-center gap-2"><Users2 size={15}/> Personel yemeği / ısmarlama
+                      {personelToplam > 0 && <span className="text-[13px] font-black">₺{fmt(personelToplam)}</span>}</span>
+                    {!isReadOnly && (
+                      <button type="button" onClick={() => giderEkle("personel")}
+                        className="text-[12px] font-semibold text-teal-200 border border-teal-500/30 hover:bg-teal-500/10 px-3 py-1.5 rounded-lg">+ Personel</button>
+                    )}
+                  </div>
+                  <div className="p-3 space-y-2.5">
+                    <p className="text-[12px] text-gray-500">Personel yedi ya da arkadaşına ısmarladı, fiş çıktı ama ödemedi: buraya yazın. Kasadan nakit çıkmış gibi sayılır, personelin hesabına <b className="text-teal-300">avans</b> olarak işlenir ve ay sonu maaşından düşülür.</p>
+                    {personelSatirlar.map(g => (
+                      <div key={g.id} className="grid grid-cols-[1fr_120px_28px] md:grid-cols-[200px_1fr_150px_28px] gap-2 items-center">
+                        <select disabled={isReadOnly} value={g.personelId || personelIdBul(g.personelIsim) || ""}
+                          onChange={e => { const p = avansPersonelListesi.find(x => x.id === e.target.value); giderDegistir(g.id, { personelId: p?.id, personelIsim: p?.isim || "" }); }}
+                          className={`${kutu} col-span-3 md:col-span-1 border-teal-500/30`}>
+                          <option value="">Personel seçin…</option>
+                          {g.personelIsim && !personelIdBul(g.personelIsim) && <option value="">{g.personelIsim} (listede yok)</option>}
+                          {avansPersonelListesi.map(p => <option key={p.id} value={p.id} className="bg-kart">{p.isim}</option>)}
+                        </select>
+                        <input type="text" placeholder="Ne yedi / kime ısmarladı? (örn: 2 dürüm, arkadaşına)" disabled={isReadOnly} value={g.aciklama}
+                          onChange={e => giderDegistir(g.id, { aciklama: e.target.value })}
+                          className={`${kutu} col-span-3 md:col-span-1`}/>
+                        <div className="col-span-2 md:col-span-1">{tutarKutusu(g)}</div>
+                        {silDugmesi(g)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Toplam gider ve ödeme yöntemine göre dağılımı */}
+                <div className="rounded-xl border-2 border-altin/60 bg-kart px-4 py-3 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[14px] font-bold text-yazi">Toplam gider</span>
+                    <span className="text-[19px] font-black text-red-300">₺{fmt(ch.tGider + ch.tGiderGecmis)}</span>
+                  </div>
+                  <p className="text-[12px] text-gray-500">
+                    Bugünün kasasından (nakit) ₺{fmt(ch.tGiderNakit)}
+                    {ch.tGiderGecmis > 0 && <> · geçmiş günlerin nakitinden ₺{fmt(ch.tGiderGecmis)}</>}
+                    {ch.tGiderNakitDisi > 0 && <> · POS / diğer ₺{fmt(ch.tGiderNakitDisi)}</>}
+                  </p>
+                </div>
+                </>);
+              })()}
+
+                {/* Personel Kesintisi (ceza vb.) — kasayı/gideri etkilemez, sadece ay sonu maaştan düşülür. Boşken tek satır. */}
+                {kesintiSatirlari.length === 0 ? (
+                  !isReadOnly && (
+                    <button type="button" onClick={()=>setKesintiSatirlari([{id:Date.now(),personelIsim:"",tutar:"",aciklama:""}])}
+                      className="w-full text-left rounded-xl border border-dashed border-cizgi px-4 py-3 text-[13px] text-gray-500 hover:text-rose-300 hover:border-rose-500/30">
+                      + Personel kesintisi <span className="text-[12px]">(ceza: eksik ürün gönderimi, kırılan malzeme vb. — para/ürün çıkmadı, sadece maaştan düşülür)</span>
+                    </button>
+                  )
+                ) : (
                 <div className="rounded-xl border border-rose-500/15 bg-kart overflow-hidden">
                   <div className="px-3 py-2 border-b border-rose-500/15 flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-rose-400 uppercase tracking-wider flex items-center gap-1.5"><Users2 size={11}/>4. Personel Kesintisi</span>
+                    <span className="text-[13px] font-bold text-rose-300 flex items-center gap-1.5"><Users2 size={13}/>Personel kesintisi <span className="font-normal text-[11px] text-gray-500">ceza · kasayı etkilemez, maaştan düşülür</span></span>
                     {!isReadOnly && (
                       <button type="button" onClick={()=>setKesintiSatirlari([...kesintiSatirlari,{id:Date.now(),personelIsim:"",tutar:"",aciklama:""}])}
-                        className="text-[10px] text-gray-600 hover:text-rose-400 border border-cizgi hover:border-rose-500/30 px-2 py-0.5 rounded transition-colors">+ Kesinti</button>
+                        className="text-[11px] text-gray-500 hover:text-rose-400 border border-cizgi hover:border-rose-500/30 px-2 py-0.5 rounded transition-colors">+ Kesinti</button>
                     )}
                   </div>
                   <div className="p-3 space-y-2">
-                    <p className="text-[9px] text-gray-600">Kasayı / gideri etkilemez (örn. eksik ürün gönderimi cezası) — sadece ay sonu maaştan düşülür.</p>
-                    {kesintiSatirlari.length===0 && (
-                      <p className="text-[10px] text-gray-600 text-center py-1">Bu raporda kesinti girilmedi.</p>
-                    )}
                     {kesintiSatirlari.map(k=>(
                       <div key={k.id} className="space-y-1">
                         <div className="grid grid-cols-12 gap-1.5">
@@ -2492,13 +2554,14 @@ export default function RaporlarPage() {
                           className="w-full bg-alan border border-cizgi text-yazi text-[11px] h-6 px-2 rounded-lg outline-none focus:border-rose-500/40 disabled:opacity-40 placeholder:text-gray-700"/>
                       </div>
                     ))}
-                    <p className="text-[9px] text-gray-600">Kaydedince ilgili personelin profilindeki Kesinti geçmişine işlenir; ay sonu maaş hesabında oradan görünür.</p>
+                    <p className="text-[11px] text-gray-500">Kaydedince personelin profilindeki Kesinti geçmişine işlenir; ay sonu maaş hesabında görünür.</p>
                   </div>
                 </div>
+                )}
                 {/* İadeler */}
                 <div className="rounded-xl border border-orange-500/15 bg-kart overflow-hidden">
                   <div className="px-3 py-2 border-b border-orange-500/15 flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider flex items-center gap-1.5"><RotateCcw size={11}/>5. İptal / İade</span>
+                    <span className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider flex items-center gap-1.5"><RotateCcw size={11}/>İptal / İade</span>
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-black text-orange-400">₺{fmt(ch.tIade)}</span>
                       {!isReadOnly && <button type="button" onClick={iadeEkle} className="text-[10px] text-gray-600 hover:text-orange-400 border border-cizgi hover:border-orange-500/30 w-5 h-5 rounded flex items-center justify-center transition-colors">+</button>}
@@ -2782,19 +2845,19 @@ export default function RaporlarPage() {
             {goster(4) && <section id="adim-4" className="space-y-3 scroll-mt-14">
             {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">4 · Kontrol <span className="font-medium text-[12px] text-gray-500">her satır ✓ ise kaydedin</span></h2>}
             {/* ── KONTROL LİSTESİ: her şey tek bakışta; ayrıntılar aşağıda kapalı ── */}
-            {!isReadOnly && (() => {
+            {(() => {
               const pk = (...l: PlatformGiris[]) => l.reduce((t, x) => t + sayi(x.paket), 0);
               const paket = pk(osKeboYs, osKeboTrendyol, osKeboMigros, osKeboAlo, koKeboYs, koKeboTrendyol, koKeboMigrosYemek, koKeboAlo,
                 osCnfYs, osCnfTrendyol, osCnfMigrosYemek, koCnfYs, koCnfTrendyol, koCnfMigrosYemek, koCnfAlo,
                 osKirYs, osKirTrendyol, osKirMigrosYemek, koKirYs, koKirTrendyol, koKirMigrosYemek, koKirAlo);
               const yemekKarti = YEMEK_KARTLARI.reduce((t, k) => t + tv(kartlar[k.alan]), 0) + kuryeler.reduce((t, k) => t + tv(k.tokenflex) + tv(k.paye), 0);
               // Biriken nakit sayımı (isteğe bağlı) — ayrıntısı "Nakit kasa" bölümünde
-              const cikis = nakitHareketleri.reduce((t, h) => t + tv(h.tutar), 0);
+              const cikis = nakitHareketleri.reduce((t, h) => t + tv(h.tutar), 0) + ch.tGiderGecmis;
               const beklenen = nakitDevredenSistem == null ? null
                 : nakitDevredenSistem + tv(kasaNakit) + kuryeTahsilati({ tarih, kurye_raporlari: kuryeler }).nakit - cikis;
               const sayim = nakitSayim.trim() ? tv(nakitSayim) : null;
               const sayimFark = beklenen != null && sayim != null ? Math.round((sayim - beklenen) * 100) / 100 : null;
-              const indirimSorun = ch.indirimUyari || indirimFarklari.length > 0 || mpIndirimDurum === "hata";
+              const indirimSorun = ch.indirimUyari || (!isReadOnly && (indirimFarklari.length > 0 || mpIndirimDurum === "hata"));
               type Durum = "tamam" | "uyari" | "bos";
               const satir = (durum: Durum, baslik: string, deger: React.ReactNode, aciklama?: string, git?: () => void, gitAd?: string) => (
                 <div className={`flex items-start gap-3 px-4 py-3 border-b border-cizgi last:border-b-0 ${durum === "uyari" ? "bg-amber-500/5" : ""}`}>
@@ -2808,23 +2871,28 @@ export default function RaporlarPage() {
                     </div>
                     {aciklama && <p className={`text-[12px] mt-0.5 ${durum === "uyari" ? "text-amber-300" : "text-gray-500"}`}>{aciklama}</p>}
                   </div>
-                  {git && <button type="button" onClick={git} className="shrink-0 text-[12px] font-semibold text-altin hover:underline mt-0.5">{gitAd}</button>}
+                  {git && !isReadOnly && <button type="button" onClick={git} className="shrink-0 text-[12px] font-semibold text-altin hover:underline mt-0.5">{gitAd}</button>}
                 </div>
               );
-              const ayrintiAc = () => { setAyrinti(true); setTimeout(() => document.getElementById("adim-4-ayrinti")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); };
+              const ayrintiAc = () => { setAyrinti(true); setTimeout(() => document.getElementById(isReadOnly ? "adim-1" : "adim-4-ayrinti")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); };
               return (<>
                 <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
-                  {satir(mpDoldurma ? "tamam" : "uyari", "Satışlar", `₺${fmt(ch.tOnline + ch.tKapida)}`,
-                    `${mpDoldurma ? "MagicPay'den geldi" : "MagicPay'den gelmedi — ayrıntılardan elle girin"} · Online ₺${fmt(ch.tOnline)} · Kapıda ₺${fmt(ch.tKapida)} · ${paket} paket`,
+                  {satir(mpDoldurma || isReadOnly ? "tamam" : "uyari", "Satışlar", `₺${fmt(ch.tOnline + ch.tKapida)}`,
+                    `${isReadOnly ? "" : mpDoldurma ? "MagicPay'den geldi · " : "MagicPay'den gelmedi — ayrıntılardan elle girin · "}Online ₺${fmt(ch.tOnline)} · Kapıda ₺${fmt(ch.tKapida)} · ${paket} paket`,
                     mpDoldurma ? undefined : ayrintiAc, "Aç")}
                   {satir(indirimSorun ? "uyari" : "tamam", "Platform indirimi", `₺${fmt(ch.tIndirim)}`,
-                    mpIndirimDurum === "hata" ? "MagicPay'den alınamadı — elle girin"
-                      : indirimFarklari.length > 0 ? "MagicPay'deki değerden farklı girildi"
+                    !isReadOnly && mpIndirimDurum === "hata" ? "MagicPay'den alınamadı — elle girin"
+                      : !isReadOnly && indirimFarklari.length > 0 ? "MagicPay'deki değerden farklı girildi"
                       : ch.indirimUyari ? `Online cironun %${ch.indirimOrani.toFixed(1)}'i — %15'i geçti, kontrol edin`
                       : `Online cironun %${ch.indirimOrani.toFixed(1)}'i`,
                     indirimSorun ? ayrintiAc : undefined, "Bak")}
-                  {satir("tamam", "Kasa", `₺${fmt(ch.tKasa)}`, `Nakit ₺${fmt(tv(kasaNakit))} · POS ₺${fmt(tv(kasaPos))}`, () => adimaGit(1), "Düzelt")}
-                  {satir("tamam", "Gider", `₺${fmt(ch.tGider)}`, undefined, () => adimaGit(2), "Düzelt")}
+                  {satir(nakitFarkVar ? "uyari" : "tamam", "Kasa", `₺${fmt(ch.tKasa)}`,
+                    `Nakit ₺${fmt(tv(kasaNakit))} · POS ₺${fmt(tv(kasaPos))}` + (nakitFarkVar && nakitFarki != null
+                      ? ` · Nakit, MagicPay'e göre ₺${fmt(Math.abs(nakitFarki))} ${nakitFarki < 0 ? "EKSİK" : "FAZLA"} (nakit giderler düşüldü)` : ""),
+                    () => adimaGit(1), nakitFarkVar ? "Nakde git" : "Düzelt")}
+                  {satir("tamam", "Gider", `₺${fmt(ch.tGider + ch.tGiderGecmis)}`,
+                    [`Nakit ₺${fmt(ch.tGiderNakit)}`, ch.tGiderGecmis > 0 ? `geçmiş günlerin nakiti ₺${fmt(ch.tGiderGecmis)}` : "", ch.tGiderNakitDisi > 0 ? `POS / diğer ₺${fmt(ch.tGiderNakitDisi)}` : ""].filter(Boolean).join(" · "),
+                    () => adimaGit(2), "Düzelt")}
                   {satir(ch.kuryeFark === 0 ? "tamam" : "uyari", "Kurye", ch.kuryeFark === 0 ? "Dengede" : ch.kuryeFark > 0 ? `₺${fmt(ch.kuryeFark)} eksik` : `₺${fmt(Math.abs(ch.kuryeFark))} fazla`,
                     ch.kuryeFark === 0 ? "Kapıda toplanan para kuryelerin teslim ettiğiyle aynı" : "Kapıda satış ile kuryelerin getirdiği tutmuyor",
                     () => adimaGit(3), ch.kuryeFark === 0 ? "Düzelt" : "Kuryeye git")}
@@ -2846,14 +2914,14 @@ export default function RaporlarPage() {
                     <p className="text-2xl md:text-3xl font-black text-emerald-300 mt-1">₺{fmt(ch.netCiro)}</p>
                   </div>
                 </div>
-                <button type="button" onClick={() => setAyrinti(a => !a)}
+                <button type="button" onClick={() => ayrinti ? setAyrinti(false) : ayrintiAc()}
                   className="w-full flex items-center justify-between rounded-xl border border-cizgi bg-kart px-4 py-3 text-[13px] font-semibold text-gray-400 hover:text-yazi">
-                  <span>Ayrıntılar <span className="font-normal text-gray-500">— satış tablosu, POS ve yemek kartları, nakit kasa</span></span>
+                  <span>Ayrıntılar <span className="font-normal text-gray-500">— {isReadOnly ? "kasa, giderler, kuryeler, satış tablosu, nakit kasa" : "satış tablosu, POS ve yemek kartları, nakit kasa"}</span></span>
                   {ayrinti ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
                 </button>
               </>);
             })()}
-            {(isReadOnly || ayrinti) && <div id="adim-4-ayrinti" className="space-y-3 scroll-mt-14">
+            {ayrinti && <div id="adim-4-ayrinti" className="space-y-3 scroll-mt-14">
             {/* ── SATIŞLAR (4. adım; MagicPay'den dolar) ── */}
             <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
               <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
@@ -3024,21 +3092,11 @@ export default function RaporlarPage() {
               <div className="mx-3 mb-2 flex flex-wrap items-center justify-between gap-2 text-[13px] text-gray-600 border-t border-cizgi pt-2.5">
                 <span>Kasa ₺<b className="text-yazi">{fmt(ch.tKasa)}</b> + Giderler ₺<b className="text-red-300">{fmt(ch.tGider)}</b>{ch.kapidaKasada ? "" : <> + Kapıda ₺<b className="text-purple-300">{fmt(ch.tKapida)}</b></>} + Online ₺<b className="text-blue-300">{fmt(ch.tOnline)}</b></span>
               </div>
-              {isReadOnly && <div className="mx-3 mb-3 grid grid-cols-2 gap-2.5">
-                <div className="rounded-xl bg-blue-500/10 border border-blue-500/25 px-5 py-5">
-                  <p className="text-[13px] font-bold text-blue-300 uppercase tracking-wide">Brüt ciro</p>
-                  <p className="text-3xl md:text-4xl font-black text-blue-300 mt-1">₺{fmt(ch.brutCiro)}</p>
-                </div>
-                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/25 px-5 py-5">
-                  <p className="text-[13px] font-bold text-emerald-300 uppercase tracking-wide">Net ciro</p>
-                  <p className="text-3xl md:text-4xl font-black text-emerald-300 mt-1">₺{fmt(ch.netCiro)}</p>
-                </div>
-              </div>}
             </div>
 
             {/* ── 7. NAKİT KASA (önceki günlerden kalan nakit) — günlük ciroya karışmaz ── */}
             {(() => {
-              const cikis = nakitHareketleri.reduce((t, h) => t + tv(h.tutar), 0);
+              const cikis = nakitHareketleri.reduce((t, h) => t + tv(h.tutar), 0) + ch.tGiderGecmis;
               const devreden = nakitDevredenSistem;
               // 28.09'dan itibaren Kurye 1 ve 2'nin kapıda topladığı nakit kasaya girer; havuz kuryelerininki Roadrunner'da kalır
               const kuryeNakit = kuryeTahsilati({ tarih, kurye_raporlari: kuryeler }).nakit;
@@ -3060,7 +3118,7 @@ export default function RaporlarPage() {
                     )}
                     {nakitHareketYuklendi && (
                       <div className="space-y-2">
-                        <p className="text-[12px] font-semibold text-gray-700">Eski nakitten ödemeler / bankaya yatırılan</p>
+                        <p className="text-[12px] font-semibold text-gray-700">Bankaya yatırılan <span className="font-normal text-gray-500">(eski nakitten ödemeler Gider adımında &quot;Geçmiş günlerin nakiti&quot; ile girilir{ch.tGiderGecmis > 0 ? `: ₺${fmt(ch.tGiderGecmis)}` : ""})</span></p>
                         {nakitHareketleri.map(h => (
                           <div key={h.id} className="grid grid-cols-[1fr_110px] md:grid-cols-[1fr_150px_140px_28px] gap-2 items-center">
                             <input type="text" placeholder="Kime / ne için" disabled={isReadOnly} value={h.aciklama}
@@ -3068,7 +3126,7 @@ export default function RaporlarPage() {
                               className="col-span-2 md:col-span-1 w-full bg-alan border border-cizgi-guclu text-[13px] h-9 px-3 rounded-lg outline-none focus:border-altin/50 disabled:opacity-50"/>
                             <select disabled={isReadOnly} value={h.banka} onChange={e => hareketDegistir(h.id, { banka: e.target.value as NakitHareket["banka"] })}
                               className="w-full bg-alan border border-cizgi-guclu text-[13px] h-9 px-2 rounded-lg outline-none disabled:opacity-50">
-                              <option value="">Ödeme (kasadan çıktı)</option>
+                              {!h.banka && <option value="">Banka seçin</option>}
                               {NAKIT_BANKALAR.map(b => <option key={b} value={b}>Bankaya yatırıldı: {b}</option>)}
                             </select>
                             <input type="text" inputMode="decimal" placeholder="₺ 0" disabled={isReadOnly} value={h.tutar}
@@ -3078,8 +3136,8 @@ export default function RaporlarPage() {
                           </div>
                         ))}
                         {!isReadOnly && (
-                          <button type="button" onClick={() => setNakitHareketleri(l => [...l, { id: Date.now(), aciklama: "", banka: "", tutar: "" }])}
-                            className="text-[12px] font-semibold text-blue-300 hover:underline">+ Ödeme / bankaya yatırma ekle</button>
+                          <button type="button" onClick={() => setNakitHareketleri(l => [...l, { id: Date.now(), aciklama: "", banka: "TEB", tutar: "" }])}
+                            className="text-[12px] font-semibold text-blue-300 hover:underline">+ Bankaya yatırma ekle</button>
                         )}
                       </div>
                     )}
@@ -3153,96 +3211,62 @@ export default function RaporlarPage() {
                     Kağıt formla karşılaştırdım, değerler doğru
                   </label>
                 )}
+                {nakitFarkVar && nakitFarki != null && (
+                  <label className="flex items-center gap-2 text-[13px] font-semibold text-amber-100 bg-amber-500/10 border border-amber-500/40 rounded-xl px-3 py-2.5 cursor-pointer select-none">
+                    <input type="checkbox" checked={nakitFarkOnay} onChange={e => setNakitFarkOnay(e.target.checked)} className="w-4 h-4 accent-amber-500"/>
+                    Kasa nakdi ₺{fmt(Math.abs(nakitFarki))} {nakitFarki < 0 ? "eksik" : "fazla"}; biliyorum, yine de kaydet
+                  </label>
+                )}
                 {kayitEngeli && <span className="text-[12px] font-semibold text-amber-300">{kayitEngeli}</span>}
                 <button type="button" onClick={()=>{formuTemizle();setFormAcik(false);}}
                   className="ml-auto text-[12px] font-semibold text-gray-500 hover:text-yazi">Kaydetmeden çık</button>
               </div>
             )}
-            {/* ÖZET BANT (salt okunur görünüm) */}
-            {isReadOnly && <div className="rounded-xl border border-cizgi bg-alan px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1">
-              <div className="flex flex-wrap items-center gap-4 text-xs">
-                <div>
-                  <p className="text-[9px] text-gray-600 uppercase tracking-widest">Online</p>
-                  <p className="text-sm font-black text-blue-400">₺{fmt(ch.tOnline)}</p>
-                </div>
-                {!ch.kapidaKasada && ch.tKapida>0 && (<>
-                  <span className="text-gray-800 hidden sm:block">+</span>
-                  <div>
-                    <p className="text-[9px] text-gray-600 uppercase tracking-widest">Kapıda</p>
-                    <p className="text-sm font-black text-purple-400">₺{fmt(ch.tKapida)}</p>
-                  </div>
-                </>)}
-                <span className="text-gray-800 hidden sm:block">+</span>
-                <div>
-                  <p className="text-[9px] text-gray-600 uppercase tracking-widest">Kasa</p>
-                  <p className="text-sm font-black text-emerald-400">₺{fmt(ch.tKasa)}</p>
-                </div>
-                <span className="text-gray-800 hidden sm:block">+</span>
-                <div>
-                  <p className="text-[9px] text-gray-600 uppercase tracking-widest">Gider</p>
-                  <p className="text-sm font-black text-red-300">₺{fmt(ch.tGider)}</p>
-                </div>
-                <span className="text-gray-800 hidden sm:block">=</span>
-                <div>
-                  <p className="text-[9px] text-blue-400 uppercase tracking-widest font-bold">Brüt</p>
-                  <p className="text-sm font-black text-blue-300">₺{fmt(ch.brutCiro)}</p>
-                </div>
-                <span className="text-gray-800 hidden sm:block">−</span>
-                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">Gider</p><p className="text-sm font-black text-red-400">₺{fmt(ch.tGider)}</p></div>
-                <span className="text-gray-800 hidden sm:block">−</span>
-                <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">İade</p><p className="text-sm font-black text-orange-400">₺{fmt(ch.tIade)}</p></div>
-                {ch.tIndirim>0 && (<>
-                  <span className="text-gray-800 hidden sm:block">−</span>
-                  <div><p className="text-[9px] text-gray-600 uppercase tracking-widest">İndirim</p><p className="text-sm font-black text-orange-300">₺{fmt(ch.tIndirim)}</p></div>
-                </>)}
-                <span className="text-gray-800 hidden sm:block">=</span>
-                <div><p className="text-[9px] text-emerald-300 uppercase tracking-widest font-bold">Net Ciro</p><p className="text-base font-black text-emerald-400">₺{fmt(ch.netCiro)}</p></div>
-              </div>
-              <div className="flex items-center gap-2">
+            {isReadOnly && (
+              <div className="flex justify-end">
                 <button type="button" onClick={()=>{formuTemizle();setFormAcik(false);}}
-                  className="text-xs font-semibold text-gray-500 hover:text-yazi border border-cizgi hover:border-cizgi-guclu px-4 py-2 rounded-xl transition-colors">
-                  İptal
-                </button>
-                {!isReadOnly && taramaIleDoldu && (
-                  <label className="flex items-center gap-2 text-[12px] font-semibold text-indigo-200 bg-indigo-500/10 border border-indigo-500/25 rounded-xl px-3 py-2 cursor-pointer select-none">
-                    <input type="checkbox" checked={kontrolOnay} onChange={e=>setKontrolOnay(e.target.checked)} className="w-4 h-4 accent-indigo-600"/>
-                    Kağıt formla karşılaştırdım, değerler doğru
-                  </label>
-                )}
-                {!isReadOnly && kayitEngeli && (
-                  <span className="text-[11px] font-semibold text-amber-300">{kayitEngeli}</span>
-                )}
-                {!isReadOnly && (
-                  <button type="submit" disabled={saving||!!kayitEngeli}
-                    title={kayitEngeli||undefined}
-                    className="text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 disabled:opacity-40 px-6 py-2 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-altin/20">
-                    {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>}
-                    {selectedRapor ? "Kaydet" : "Raporu Kaydet"}
-                  </button>
-                )}
+                  className="text-[13px] font-semibold text-gray-400 hover:text-yazi border border-cizgi px-5 py-2.5 rounded-xl">Kapat</button>
               </div>
-            </div>}
+            )}
             </section>}
 
-            {/* ── Adımlar arası geçiş: 1–3'te Geri / İleri, 4'te Geri / Kaydet ── */}
+            {/* ── Adımlar arası geçiş: 1–3'te Geri / İleri, 4'te Geri / Kaydet (+ son onay) ──
+                 Düğmelerin key'i ayrı: "İleri" ile "Kaydet" aynı yerde olduğu için tarayıcı tıklamayı
+                 kayıt sanmasın (Kurye → Kontrol'e geçerken rapor kendiliğinden kaydediliyordu). */}
             {!isReadOnly && (
-              <div className="sticky bottom-0 z-30 flex gap-2.5 bg-zemin/95 backdrop-blur py-3">
-                {adim > 1 && (
-                  <button type="button" onClick={() => adimaGit(adim - 1)}
-                    className="flex-1 h-14 rounded-xl border border-cizgi text-gray-400 hover:text-yazi text-[15px] font-semibold">← Geri: {ADIMLAR[adim - 2]}</button>
+              <div className="sticky bottom-0 z-30 bg-zemin/95 backdrop-blur py-3 space-y-2">
+                {adim === 4 && kayitOnay && (
+                  <div key="onay" className="rounded-xl border-2 border-altin/60 bg-kart px-4 py-3">
+                    <p className="text-[15px] font-black text-yazi">{fmtTarih(tarih)} raporu kaydedilsin mi?</p>
+                    <p className="text-[13px] text-gray-400 mt-0.5">Net ciro <b className="text-emerald-300">₺{fmt(ch.netCiro)}</b> · Kasa ₺{fmt(ch.tKasa)} · Gider ₺{fmt(ch.tGider)}. Emin değilseniz Vazgeç deyip kontrol edin.</p>
+                  </div>
                 )}
-                {adim < 4 ? (
-                  <button type="button" onClick={() => adimaGit(adim + 1)}
-                    className="flex-[2] h-14 rounded-xl kebo-btn-altin text-[#1a1408] text-[16px] font-black hover:brightness-110">
-                    İleri: {ADIMLAR[adim]}
-                  </button>
-                ) : (
-                  <button type="submit" disabled={saving || !!kayitEngeli} title={kayitEngeli || undefined}
-                    className="flex-[2] h-14 rounded-xl kebo-btn-altin text-[#1a1408] text-[16px] font-black hover:brightness-110 disabled:opacity-40 flex items-center justify-center gap-2">
-                    {saving ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>}
-                    {selectedRapor ? "Kaydet" : "Raporu Kaydet"}
-                  </button>
-                )}
+                <div className="flex gap-2.5">
+                  {adim === 4 && kayitOnay ? (<>
+                    <button key="vazgec" type="button" onClick={() => setKayitOnay(false)}
+                      className="flex-1 h-14 rounded-xl border border-cizgi text-gray-300 hover:text-yazi text-[15px] font-semibold">Vazgeç</button>
+                    <button key="evet" type="submit" disabled={saving || !!kayitEngeli}
+                      className="flex-[2] h-14 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[16px] font-black disabled:opacity-40 flex items-center justify-center gap-2">
+                      {saving ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>} Evet, kaydet
+                    </button>
+                  </>) : (<>
+                    {adim > 1 && (
+                      <button key="geri" type="button" onClick={() => adimaGit(adim - 1)}
+                        className="flex-1 h-14 rounded-xl border border-cizgi text-gray-400 hover:text-yazi text-[15px] font-semibold">← Geri: {ADIMLAR[adim - 2]}</button>
+                    )}
+                    {adim < 4 ? (
+                      <button key={`ileri-${adim}`} type="button" onClick={() => adimaGit(adim + 1)}
+                        className="flex-[2] h-14 rounded-xl kebo-btn-altin text-[#1a1408] text-[16px] font-black hover:brightness-110">
+                        İleri: {ADIMLAR[adim]}
+                      </button>
+                    ) : (
+                      <button key="kaydet" type="button" onClick={() => setKayitOnay(true)} disabled={saving || !!kayitEngeli} title={kayitEngeli || undefined}
+                        className="flex-[2] h-14 rounded-xl kebo-btn-altin text-[#1a1408] text-[16px] font-black hover:brightness-110 disabled:opacity-40 flex items-center justify-center gap-2">
+                        <Save size={16}/> {selectedRapor ? "Kaydet" : "Raporu Kaydet"}
+                      </button>
+                    )}
+                  </>)}
+                </div>
               </div>
             )}
 

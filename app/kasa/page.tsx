@@ -287,7 +287,7 @@ export default function KasaPage() {
     filtreliRaporlar.forEach(r => {
       r.gider_aciklama?.split(" | ").forEach(g => {
         const idx=g.lastIndexOf(": ₺");
-        const kat=idx>-1?g.substring(0,idx):g;
+        const kat=(idx>-1?g.substring(0,idx):g).replace(/^\{[^}]*\}\s*/,""); // "{POS} Market" → "Market" (ödeme yöntemi etiketi)
         const t=idx>-1?tv(g.substring(idx+3)):0;
         if(kat&&t>0) map[kat]=(map[kat]||0)+t;
       });

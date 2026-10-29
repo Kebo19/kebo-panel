@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { brutCiro, netCiro, paketToplam, platformKirilimi, kapidaKasadaMi, roadrunnerKuryesiMi, roadrunnerKuryeUcreti, type RaporVerisi } from "@/lib/hesap";
+import { brutCiro, netCiro, nakitGiderToplam, paketToplam, platformKirilimi, kapidaKasadaMi, roadrunnerKuryesiMi, roadrunnerKuryeUcreti, type RaporVerisi } from "@/lib/hesap";
 
 // Veritabanındaki 01.06.2026 raporunun rakamları (eski, tek platform yapısı)
 const eskiRapor: RaporVerisi = {
@@ -130,5 +130,19 @@ describe("kurye kapıda tahsilatı", () => {
   });
   it("13.08 öncesi kendi kuryeler: Roadrunner yok", () => {
     expect(roadrunnerTahsilati({ tarih: "2026-08-01", kurye_raporlari: [{ tip: "kendi", nakit: 100 }] as never })).toEqual({ nakit: 0, pos: 0 });
+  });
+});
+
+describe("gider ödeme yöntemi (gider_nakit_disi)", () => {
+  it("POS / diğer ile ödenen gider brüt ciroya eklenmez ama net ciroyu düşürür", () => {
+    const r = { tarih: "2026-10-20", kasa_nakit: 1000, gunluk_gider: 300, gider_nakit_disi: 100 };
+    expect(nakitGiderToplam(r)).toBe(200);
+    expect(brutCiro(r)).toBe(1200);
+    expect(netCiro(r)).toBe(900);
+  });
+  it("eski raporlarda (alan yok) bütün gider nakit sayılır", () => {
+    const r = { tarih: "2026-10-20", kasa_nakit: 1000, gunluk_gider: 300 };
+    expect(brutCiro(r)).toBe(1300);
+    expect(netCiro(r)).toBe(1000);
   });
 });

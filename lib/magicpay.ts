@@ -289,7 +289,8 @@ export function gunuKarsilastir(mp: MpGun, rapor: PanelRaporu | null): GunKarsil
   // 2) Kasa (masa ödemeleri)
   const masa: Record<KasaKalemi, number> = { nakit: 0, pos: 0, kasa_edenred: 0, kasa_metropol: 0, kasa_setcard: 0, kasa_pluxee: 0, kasa_paye: 0, kasa_multinet: 0, kasa_tokenflex: 0, yemek_tanimsiz: 0 };
   for (const [k, v] of Object.entries(mp.masaOdeme)) masa[masaOdemeKalemi(k)] += v;
-  const gider = rapor ? n(rapor.gunluk_gider) : 0;
+  // Sadece bugünün kasasından nakit ödenen gider (POS / diğer ile ödenen kasadan çıkmadı)
+  const gider = rapor ? n(rapor.gunluk_gider) - n(rapor.gider_nakit_disi) : 0;
   const kasaSatirlari: Satir[] = [
     satir("Nakit", rapor ? n(rapor.kasa_nakit) + gider : null, masa.nakit, "para",
       { aciklama: rapor && gider ? `Kasa sayımı ₺${Math.round(n(rapor.kasa_nakit)).toLocaleString("tr-TR")} + günlük gider ₺${Math.round(gider).toLocaleString("tr-TR")} (gider kasadan ödendiği için eklenir)` : "Kasa sayımı + günlük gider" }),
