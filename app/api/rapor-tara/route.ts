@@ -9,7 +9,24 @@ import { geminiIstek } from "@/lib/gemini";
 
 const SISTEM_PROMPT = `Sen KEBO ERP için bir kağıt rapor okuma asistanısın. Sana KEBO'nun kağıt günlük kasa
 formunun fotoğrafları verilecek (bir veya birkaç görsel; birden fazlaysa aynı günün sayfalarıdır, hepsini birlikte
-oku ve TEK JSON üret). Form üç düzenden biri olabilir:
+oku ve TEK JSON üret). Form dört düzenden biri olabilir. Hangisi olduğunu "duzen" alanına yaz ("G", "K", "A" ya da "B").
+G) GİDERLER FORMU (29.10.2026'dan itibaren; başlık "KEBO Günlük Giderler Formu"). Satış, kasa nakdi, Kıraloğlu
+  Migros, kurye paket/nakit/POS ve nakit kasa bölümü YOKTUR: online, kapida, kasa, kuryeSabit, kuryeHavuz,
+  nakitKasa ve kontrol (gider hariç) alanlarını 0 / boş bırak. "Kasayı kapatan" → giren.
+  Kutulara ✓, X ya da karalama konmuşsa o seçenek SEÇİLİDİR.
+  1. GİDERLER: Ne alındı / kime ödendi | Nasıl ödendi (kutular: Kasadan, Eski nakit, Kart, Diğer) | Tutar →
+     "giderler" {aciklama, odeme, tutar}. odeme: Kasadan → "nakit", Eski nakit → "gecmis", Kart → "pos",
+     Diğer → "diger" (Diğer'in yanına yazılan açıklamayı aciklama'nın sonuna " (…)" olarak ekle).
+     Hiçbir kutu işaretli değilse "nakit" yaz ve "giderler.N.odeme" alanını belirsiz_alanlar'a ekle.
+     "TOPLAM GİDER" kutusu → kontrol.gider.
+  2. PERSONEL YEMEĞİ: Personel | Ne yedi | Tutar → "avanslar" {personel, aciklama, tutar}.
+  3. İPTAL / İADE FİŞİ: her satırda kutular Fiş (Masa, Paket) | Marka (Kebo, CNF, Kır.) | Kanal (Alo, YS, TY,
+     Mig., Getir) | Ödeme (Onl., Nakit, POS, Y.K.) | Neden | Tutar → "iadeler" {fis, marka, kanal, odeme, aciklama, tutar}.
+     fis: "masa" | "paket"; marka: "kebo" | "cnf" | "kir"; kanal: "alo" | "ys" | "trendyol" | "migros" | "getir";
+     odeme: "online" | "nakit" | "pos" | "yemek_karti". İşaretlenmemiş sütun için "" yaz. aciklama = Neden.
+  4. PERSONEL KESİNTİSİ: Personel | Sebep | Tutar → "kesintiler".
+  5. KURYE YEMEK KARTI: Kurye | Token Flex | Paye → "kuryeKart" {isim, tokenflex, paye}.
+  6. NOTLAR → "notlar".
 
 K) KISA FORM (28.10.2026'dan itibaren; başlık "KEBO Günlük Kasa Formu (kısa)"). Satış tablosu YOKTUR:
   platform satışları, Alo Paket, POS ve yemek kartları otomatik geldiği için kağıtta yazılmaz.
@@ -109,6 +126,7 @@ KURALLAR:
 
 JSON ŞEMASI (tam olarak bu anahtarları kullan, eksik bırakma):
 {
+  "duzen": "G" | "K" | "A" | "B",
   "tarih": "YYYY-AA-GG" | null,
   "giren": "string",
   "online": {
@@ -150,10 +168,11 @@ JSON ŞEMASI (tam olarak bu anahtarları kullan, eksik bırakma):
   },
   "kasa": {"nakit": number, "pos": number, "edenred": number, "metropol": number, "setcard": number, "pluxee": number, "paye": number, "multinet": number, "tokenflex": number},
   "kontrol": {"paketKebo": number, "paketCnf": number, "paketKir": number, "paketToplam": number, "gider": number, "brut": number, "net": number},
-  "giderler": [{"aciklama": "string", "tutar": number}],
+  "giderler": [{"aciklama": "string", "odeme": "nakit" | "gecmis" | "pos" | "diger" | "", "tutar": number}],
   "avanslar": [{"personel": "string", "aciklama": "string", "tutar": number}],
   "kesintiler": [{"personel": "string", "aciklama": "string", "tutar": number}],
-  "iadeler": [{"aciklama": "string", "tutar": number}],
+  "iadeler": [{"fis": "masa" | "paket" | "", "marka": "kebo" | "cnf" | "kir" | "", "kanal": "alo" | "ys" | "trendyol" | "migros" | "getir" | "", "odeme": "online" | "nakit" | "pos" | "yemek_karti" | "", "aciklama": "string", "tutar": number}],
+  "kuryeKart": [{"isim": "string", "tokenflex": number, "paye": number}],
   "kuryeSabit": [{"isim": "string", "nakit": number, "pos": number, "tokenflex": number, "paye": number, "paket": number}],
   "kuryeHavuz": [{"isim": "string", "nakit": number, "pos": number, "tokenflex": number, "paye": number, "paket": number}],
   "nakitKasa": {"devreden": number, "hareketler": [{"aciklama": "string", "banka": "string", "tutar": number}], "sayim": number},
@@ -161,7 +180,8 @@ JSON ŞEMASI (tam olarak bu anahtarları kullan, eksik bırakma):
   "belirsiz_alanlar": ["dot.path.gibi.anahtarlar"]
 }
 
-Boş satırları (giderler, avanslar, kesintiler, iadeler, kuryeHavuz) dizilere hiç ekleme —
+G dışındaki düzenlerde "odeme", "fis", "marka", "kanal" için "" yaz ve "kuryeKart" boş dizi olsun.
+Boş satırları (giderler, avanslar, kesintiler, iadeler, kuryeHavuz, kuryeKart) dizilere hiç ekleme —
 sadece gerçekten bir şey yazılmış satırları diziye koy.`;
 
 export async function POST(req: Request) {

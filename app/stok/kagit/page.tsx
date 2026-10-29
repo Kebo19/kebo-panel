@@ -13,7 +13,7 @@ type Urun = { id: string; urun_adi: string; birim: string; kategori: string | nu
 
 type Secim = "kasa" | SayimPeriyodu;
 const SECENEKLER: { v: Secim; l: string; a: string }[] = [
-  { v: "kasa", l: "Kasa formu + günlük sayım", a: "Çift taraflı: ön yüz kasa raporu, arka yüz günlük sayım" },
+  { v: "kasa", l: "Giderler formu + günlük sayım", a: "Çift taraflı: ön yüz günlük giderler formu, arka yüz günlük sayım" },
   { v: "gunluk", l: "Günlük sayım", a: "Sadece günlükler" },
   { v: "haftalik", l: "Haftalık sayım", a: "Günlük + haftalık" },
   { v: "aylik", l: "Aylık sayım", a: "Günlük + haftalık + aylık" },

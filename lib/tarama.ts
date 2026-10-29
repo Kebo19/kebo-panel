@@ -81,7 +81,7 @@ const ETIKET: Record<string, string> = {
   tutar: "Tutar", paket: "Paket", indirim: "İndirim", kasa: "Kasa", nakit: "Nakit", pos: "POS",
   edenred: "Edenred", metropol: "Metropol", setcard: "Setcard", pluxee: "Pluxee", paye: "Paye", multinet: "Multinet", tokenflex: "Token Flex",
   kontrol: "Kontrol", gider: "Toplam gider", nakitKasa: "Nakit kasa", devreden: "Devreden", sayim: "Gün sonu sayım", hareketler: "Ödeme/banka", brut: "Brüt ciro", net: "Net ciro", paketKebo: "KEBO toplam paket", paketCnf: "Chick'n Fride toplam paket", paketKir: "Kıraloğlu toplam paket", paketToplam: "Dükkân toplam paket", giderler: "Gider", avanslar: "Avans", kesintiler: "Kesinti",
-  iadeler: "İade", kuryeSabit: "Sabit kurye", kuryeHavuz: "Havuz kurye", isim: "İsim", personel: "Personel",
+  iadeler: "İade", kuryeKart: "Kurye yemek kartı", odeme: "Ödeme", fis: "Fiş", marka: "Marka", kanal: "Kanal", kuryeSabit: "Sabit kurye", kuryeHavuz: "Havuz kurye", isim: "İsim", personel: "Personel",
   aciklama: "Açıklama", tarih: "Tarih", giren: "Giren", notlar: "Notlar",
 };
 

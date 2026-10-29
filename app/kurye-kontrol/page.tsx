@@ -153,7 +153,7 @@ function GunKarti({ gun, kasa, kirMigros, mp, onAtama, kaydediliyor }: { gun: Ro
         {gun.digerPaket > 0 && (
           <div className="px-3 py-2 border-t border-cizgi text-[12px] space-y-0.5">
             {(gun.digerSiparisler || []).map((d, i) => (
-              <p key={i} className="text-gray-400">· {d.saat || "—"} · {d.kaynak}{d.isletme ? ` · ${d.isletme}` : ""} · {d.kurye} · <b className="text-yazi">{tl(d.tutar)}</b> {d.odeme.toLocaleLowerCase("tr-TR")}</p>
+              <p key={i} className="text-gray-400">· {d.saat || "—"} · {d.kaynak}{d.musteri ? <> · <b className="text-gray-200">{d.musteri}</b></> : null}{d.isletme ? ` · ${d.isletme}` : ""} · {d.kurye} · <b className="text-yazi">{tl(d.tutar)}</b> {d.odeme.toLocaleLowerCase("tr-TR")}</p>
             ))}
             {!gun.digerSiparisler && <p className="text-gray-500">Ayrıntı yok: bu gün eski yöntemle yüklenmiş; Roket&apos;ten yeniden çekince görünür.</p>}
             {pkK && pkK.fisEslesme.length > 0 && <p className="text-emerald-300">→ Büyük olasılıkla: {pkK.fisEslesme.map(e => `${e.ad}${e.adet > 1 ? ` (${e.adet})` : ""}`).join(", ")} (MagicPay&apos;de o kanalda fazla sipariş var)</p>}

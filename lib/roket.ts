@@ -2,7 +2,8 @@
 // Roket Adisyon → Raporlama → Paket Raporu → "Excel olarak indir" dosyası.
 // Roket'in sunucusu robot korumalı olduğu için veri otomatik çekilemiyor; dosya
 // Kurye Kontrol sayfasına yüklenir, burada GÜNLÜK ÖZETE çevrilir ve sadece özet
-// kaydedilir. Müşteri adı, telefon ve adres hiçbir yere yazılmaz.
+// kaydedilir. Telefon ve adres hiçbir yere yazılmaz; müşteri adı sadece Roket'e elle girilen
+// (Fiş Tarandı / Roket Adisyon) siparişlerde, siparişi bulabilmek için tutulur.
 //
 // Kuryenin kapıda topladığı para: Nakit, Pos, Paye Kod, Bilinmeyen ve sadece
 // Alo Paket (LOCAL) siparişlerindeki "Yemek Karti". Trendyol / Yemeksepeti / Migros
@@ -72,6 +73,8 @@ export interface RoketDigerSiparis {
   odeme: string;
   /** Yönlendiren: "Fiş Tarandı", "Roket Adisyon"... */
   kaynak: string;
+  /** Roket'teki "Alıcı Adı" — siparişi Roket'te / adisyonda bulmak için */
+  musteri?: string;
   /** Roket'teki "İşletme Adı" (KEBO, CHİKN...) */
   isletme?: string;
   /** Sipariş / fiş numarası (Excel'de varsa) */
@@ -86,7 +89,7 @@ export interface RoketGun {
   kanallar: Partial<Record<Kanal, number>>;
   /** Roket'in kendi girişleri (Fiş Tarandı, Roket Adisyon) */
   digerPaket: number;
-  /** Bu girişlerin ayrıntısı (29.10.2026'dan önce yüklenen günlerde yok). Müşteri bilgisi yok. */
+  /** Bu girişlerin ayrıntısı (29.10.2026'dan önce yüklenen günlerde yok). Telefon/adres yok. */
   digerSiparisler?: RoketDigerSiparis[];
   iptal: number;
   toplamPaket: number;
@@ -134,7 +137,7 @@ export function roketExcelOku(satirlar: unknown[][]): RoketOkuma {
   const sutun = (ad: string) => baslik.indexOf(ad.toLocaleLowerCase("tr-TR"));
   const iTarih = sutun("Sipariş Tarihi"), iKurye = sutun("Kurye"), iDurum = sutun("Durum"), iTutar = sutun("Tutar"),
     iOdeme = sutun("Ödeme Yöntemi"), iMesafe = sutun("Mesafe"), iYon = sutun("Yönlendiren");
-  const iIsletme = sutun("İşletme Adı");
+  const iIsletme = sutun("İşletme Adı"), iMusteri = sutun("Alıcı Adı");
   const iNo = ["Sipariş No", "Sipariş Numarası", "Sipariş Kodu", "Fiş No", "Adisyon No"].map(sutun).find(i => i >= 0) ?? -1;
   if ([iTarih, iKurye, iDurum, iTutar, iOdeme].some(i => i < 0)) {
     return { gunler: [], satir: 0, hatali: 0, uyari: ["Bu dosya Roket Paket Raporu'na benzemiyor (Sipariş Tarihi / Kurye / Durum / Tutar / Ödeme Yöntemi sütunları bulunamadı)."] };
@@ -166,6 +169,7 @@ export function roketExcelOku(satirlar: unknown[][]): RoketOkuma {
       g.digerler.push({
         saat: /\s(\d{2}:\d{2})/.exec(String(r[iTarih] ?? ""))?.[1] || "", kurye: ad, tutar: kurus(tutar),
         odeme: sade(String(r[iOdeme] ?? "")) || "—", kaynak: (iYon >= 0 ? sade(String(r[iYon] ?? "")) : "") || "Roket",
+        ...(iMusteri >= 0 && sade(String(r[iMusteri] ?? "")) ? { musteri: sade(String(r[iMusteri])) } : {}),
         ...(iIsletme >= 0 && sade(String(r[iIsletme] ?? "")) ? { isletme: sade(String(r[iIsletme])) } : {}),
         ...(no ? { no } : {}), ...(km ? { km: kurus(km) } : {}),
       });

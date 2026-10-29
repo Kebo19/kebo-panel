@@ -31,12 +31,12 @@ describe("Roket Paket Raporu", () => {
     expect(g.toplamPaket).toBe(8);
     expect(g.iptal).toBe(1);
   });
-  it("Roket'e elle girilen siparişin ayrıntısını tutar (müşteri bilgisi olmadan)", () => {
+  it("Roket'e elle girilen siparişin ayrıntısını tutar (müşteri adı var, telefon yok)", () => {
     const d = roketExcelOku([B, s("16.10.2026 22:05", "Kerim BAYRAK", "358,00", "Nakit", "Fiş Tarandı"), s("17.10.2026 00:40", "Kerim BAYRAK", "100,00", "Pos", "Roket Adisyon")]).gunler[0];
     expect(d.digerPaket).toBe(2);
     expect(d.digerSiparisler?.map(x => x.saat)).toEqual(["22:05", "00:40"]); // gece sona
-    expect(d.digerSiparisler?.slice(0, 1)).toEqual([{ saat: "22:05", kurye: "Kerim BAYRAK", tutar: 358, odeme: "Nakit", kaynak: "Fiş Tarandı", isletme: "KEBO", km: 1.5 }]);
-    expect(JSON.stringify(d)).not.toContain("GİZLİ MÜŞTERİ");
+    expect(d.digerSiparisler?.slice(0, 1)).toEqual([{ saat: "22:05", kurye: "Kerim BAYRAK", tutar: 358, odeme: "Nakit", kaynak: "Fiş Tarandı", musteri: "GİZLİ MÜŞTERİ", isletme: "KEBO", km: 1.5 }]);
+    expect(JSON.stringify(g)).not.toContain("GİZLİ MÜŞTERİ"); // platform siparişlerinde ad tutulmaz
     expect(JSON.stringify(d)).not.toContain("5550000000");
   });
   it("kuryenin kapıda topladığını ödeme türüne göre ayırır", () => {

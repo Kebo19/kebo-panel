@@ -95,7 +95,7 @@ function roketExcelOku(satirlar) {
   const baslik = satirlar[0].map((h) => sade2(String(h ?? "")).toLocaleLowerCase("tr-TR"));
   const sutun = (ad) => baslik.indexOf(ad.toLocaleLowerCase("tr-TR"));
   const iTarih = sutun("Sipari\u015F Tarihi"), iKurye = sutun("Kurye"), iDurum = sutun("Durum"), iTutar = sutun("Tutar"), iOdeme = sutun("\xD6deme Y\xF6ntemi"), iMesafe = sutun("Mesafe"), iYon = sutun("Y\xF6nlendiren");
-  const iIsletme = sutun("\u0130\u015Fletme Ad\u0131");
+  const iIsletme = sutun("\u0130\u015Fletme Ad\u0131"), iMusteri = sutun("Al\u0131c\u0131 Ad\u0131");
   const iNo = ["Sipari\u015F No", "Sipari\u015F Numaras\u0131", "Sipari\u015F Kodu", "Fi\u015F No", "Adisyon No"].map(sutun).find((i) => i >= 0) ?? -1;
   if ([iTarih, iKurye, iDurum, iTutar, iOdeme].some((i) => i < 0)) {
     return { gunler: [], satir: 0, hatali: 0, uyari: ["Bu dosya Roket Paket Raporu'na benzemiyor (Sipari\u015F Tarihi / Kurye / Durum / Tutar / \xD6deme Y\xF6ntemi s\xFCtunlar\u0131 bulunamad\u0131)."] };
@@ -136,6 +136,7 @@ function roketExcelOku(satirlar) {
         tutar: kurus(tutar),
         odeme: sade2(String(r[iOdeme] ?? "")) || "\u2014",
         kaynak: (iYon >= 0 ? sade2(String(r[iYon] ?? "")) : "") || "Roket",
+        ...iMusteri >= 0 && sade2(String(r[iMusteri] ?? "")) ? { musteri: sade2(String(r[iMusteri])) } : {},
         ...iIsletme >= 0 && sade2(String(r[iIsletme] ?? "")) ? { isletme: sade2(String(r[iIsletme])) } : {},
         ...no ? { no } : {},
         ...km ? { km: kurus(km) } : {}

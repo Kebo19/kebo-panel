@@ -106,88 +106,86 @@ const CSS = `
   table.sayim td.no { text-align: center; font-weight: bold; font-size: 9pt; }
   table.sayim td.ad { font-size: 8.5pt; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; }
   table.sayim td.br { text-align: center; color: #444; font-size: 8.5pt; }
+  .kt { display: inline-block; width: 10px; height: 10px; border: 1.3px solid #111; margin: 0 2px 0 6px; vertical-align: -1px; background: #fff; }
+  td.sec { font-size: 8pt; white-space: nowrap; padding: 0 3px; }
+  td.sec .kt:first-child { margin-left: 1px; }
+  table.iade td { height: 27px; }
+  table.yaz td { height: 24px; }
+  table.iade td.sec { font-size: 7.5pt; }
+  table.iade .kt { margin: 0 1px 0 4px; }
+  .aciklama { font-size: 7.5pt; color: #333; margin: 2px 0 0; }
   .kod { font-size: 7pt; color: #555; letter-spacing: 1px; text-align: right; margin-top: 2px; }
 `;
 
 const ON_YUZ = `
   <div class="ust">
-    <h1>KEBO <small>Günlük Kasa Formu (kısa)</small></h1>
+    <h1>KEBO <small>Günlük Giderler Formu</small></h1>
     <div class="alanlar">
       <div>Tarih: <span class="cizgi" style="width:32px"></span> / <span class="cizgi" style="width:32px"></span> / 2026</div>
-      <div>Giren: <span class="cizgi" style="width:150px"></span></div>
+      <div>Kasayı kapatan: <span class="cizgi" style="width:140px"></span></div>
     </div>
   </div>
 
-  <p class="bilgi">Platform satışları, Alo Paket, POS, yemek kartları ve indirimler <b>MagicPay'den otomatik gelir</b> — buraya yazmayın.</p>
+  <p class="bilgi">Satışlar, paketler, POS, yemek kartları <b>MagicPay'den</b>; kuryeler <b>Roket'ten</b> gelir. Kasadaki nakit ve Kıraloğlu Migros <b>doğrudan ekrana</b> yazılır. Buraya sadece gün içinde olanları yazın · kutuya ✓ koyun.</p>
 
-  <h2>1. KASA SAYIMI <small>Gün sonu</small></h2>
-  <table class="nk">
-    <tr><td class="et b" style="width:70%">Kasadaki NAKİT ₺ <small style="font-weight:normal">(gün sonu sayılan para; giderler ödendikten sonra)</small></td><td class="kutu" style="height:30px"></td></tr>
+  <h2>1. GİDERLER <small>Kasadan / eski nakitten / kartla ödenen her şey · firma ödemesi de buraya</small></h2>
+  <table class="yaz">
+    <tr><th>Ne alındı / kime ödendi</th><th style="width:40%">Nasıl ödendi</th><th style="width:15%">Tutar ₺</th></tr>
+    <tr><td></td><td class="sec"><span class="kt"></span>Kasadan <span class="kt"></span>Eski nakit <span class="kt"></span>Kart <span class="kt"></span>Diğer</td><td></td></tr>
+    <tr><td></td><td class="sec"><span class="kt"></span>Kasadan <span class="kt"></span>Eski nakit <span class="kt"></span>Kart <span class="kt"></span>Diğer</td><td></td></tr>
+    <tr><td></td><td class="sec"><span class="kt"></span>Kasadan <span class="kt"></span>Eski nakit <span class="kt"></span>Kart <span class="kt"></span>Diğer</td><td></td></tr>
+    <tr><td></td><td class="sec"><span class="kt"></span>Kasadan <span class="kt"></span>Eski nakit <span class="kt"></span>Kart <span class="kt"></span>Diğer</td><td></td></tr>
+    <tr><td></td><td class="sec"><span class="kt"></span>Kasadan <span class="kt"></span>Eski nakit <span class="kt"></span>Kart <span class="kt"></span>Diğer</td><td></td></tr>
+    <tr><td></td><td class="sec"><span class="kt"></span>Kasadan <span class="kt"></span>Eski nakit <span class="kt"></span>Kart <span class="kt"></span>Diğer</td><td></td></tr>
+    <tr><td></td><td class="sec"><span class="kt"></span>Kasadan <span class="kt"></span>Eski nakit <span class="kt"></span>Kart <span class="kt"></span>Diğer</td><td></td></tr>
+    <tr><td></td><td class="sec"><span class="kt"></span>Kasadan <span class="kt"></span>Eski nakit <span class="kt"></span>Kart <span class="kt"></span>Diğer</td><td></td></tr>
+    <tr><td></td><td class="sec"><span class="kt"></span>Kasadan <span class="kt"></span>Eski nakit <span class="kt"></span>Kart <span class="kt"></span>Diğer</td><td></td></tr>
+    <tr><td></td><td class="sec"><span class="kt"></span>Kasadan <span class="kt"></span>Eski nakit <span class="kt"></span>Kart <span class="kt"></span>Diğer</td><td></td></tr>
+    <tr><td></td><td class="sec"><span class="kt"></span>Kasadan <span class="kt"></span>Eski nakit <span class="kt"></span>Kart <span class="kt"></span>Diğer</td><td></td></tr>
+    <tr><td></td><td class="sec"><span class="kt"></span>Kasadan <span class="kt"></span>Eski nakit <span class="kt"></span>Kart <span class="kt"></span>Diğer</td><td></td></tr>
+    <tr class="gtop"><td colspan="2" class="et">TOPLAM GİDER ₺</td><td class="kutu"></td></tr>
+  </table>
+  <p class="aciklama"><b>Kasadan</b>: bugünün kasasından · <b>Eski nakit</b>: önceki günlerden biriken paradan · <b>Kart</b>: şirket kartı / POS · <b>Diğer</b>: havale, cepten vb. (yanına yazın)</p>
+
+  <h2>2. PERSONEL YEMEĞİ <small>Fiş çıktı, ödemedi → maaşından düşülür</small></h2>
+  <table class="yaz">
+    <tr><th style="width:32%">Personel</th><th>Ne yedi</th><th style="width:15%">Tutar ₺</th></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
   </table>
 
-  <h2>2. KIRALOĞLU MİGROS <small>MagicPay'de yok, elle yazılır</small></h2>
-  <table class="esit">
-    <tr><th>Online ₺</th><th>Online Paket</th><th>İndirim ₺</th><th>Kapıda ₺</th><th>Kapıda Paket</th></tr>
-    <tr><td></td><td></td><td></td><td></td><td></td></tr>
-  </table>
-
-  <h2>3. GİDERLER <small>Kasadan çıkan her şey · avansa personel adı yazın · iade/iptal buraya değil</small></h2>
-  <table>
-    <tr><th>Açıklama</th><th style="width:26%">Personel (avans ise)</th><th style="width:17%">Tutar ₺</th></tr>
-    <tr><td></td><td></td><td></td></tr>
-    <tr><td></td><td></td><td></td></tr>
-    <tr><td></td><td></td><td></td></tr>
-    <tr><td></td><td></td><td></td></tr>
-    <tr><td></td><td></td><td></td></tr>
-    <tr><td></td><td></td><td></td></tr>
-    <tr><td></td><td></td><td></td></tr>
-    <tr><td></td><td></td><td></td></tr>
-    <tr><td></td><td></td><td></td></tr>
-<tr class="gtop"><td colspan="2" class="et">TOPLAM GİDER ₺ <small>(avanslar dahil)</small></td><td class="kutu"></td></tr>
+  <h2>3. İPTAL / İADE FİŞİ <small>Her sütundan bir kutu · masa fişinde marka/kanal boş</small></h2>
+  <table class="iade">
+    <tr><th style="width:12%">Fiş</th><th style="width:17%">Marka</th><th style="width:25%">Kanal</th><th style="width:22%">Ödeme</th><th>Neden</th><th style="width:11%">Tutar ₺</th></tr>
+    <tr><td class="sec"><span class="kt"></span>Masa <span class="kt"></span>Paket</td><td class="sec"><span class="kt"></span>Kebo <span class="kt"></span>CNF <span class="kt"></span>Kır.</td><td class="sec"><span class="kt"></span>Alo <span class="kt"></span>YS <span class="kt"></span>TY <span class="kt"></span>Mig. <span class="kt"></span>Getir</td><td class="sec"><span class="kt"></span>Onl. <span class="kt"></span>Nakit <span class="kt"></span>POS <span class="kt"></span>Y.K.</td><td></td><td></td></tr>
+    <tr><td class="sec"><span class="kt"></span>Masa <span class="kt"></span>Paket</td><td class="sec"><span class="kt"></span>Kebo <span class="kt"></span>CNF <span class="kt"></span>Kır.</td><td class="sec"><span class="kt"></span>Alo <span class="kt"></span>YS <span class="kt"></span>TY <span class="kt"></span>Mig. <span class="kt"></span>Getir</td><td class="sec"><span class="kt"></span>Onl. <span class="kt"></span>Nakit <span class="kt"></span>POS <span class="kt"></span>Y.K.</td><td></td><td></td></tr>
+    <tr><td class="sec"><span class="kt"></span>Masa <span class="kt"></span>Paket</td><td class="sec"><span class="kt"></span>Kebo <span class="kt"></span>CNF <span class="kt"></span>Kır.</td><td class="sec"><span class="kt"></span>Alo <span class="kt"></span>YS <span class="kt"></span>TY <span class="kt"></span>Mig. <span class="kt"></span>Getir</td><td class="sec"><span class="kt"></span>Onl. <span class="kt"></span>Nakit <span class="kt"></span>POS <span class="kt"></span>Y.K.</td><td></td><td></td></tr>
+    <tr><td class="sec"><span class="kt"></span>Masa <span class="kt"></span>Paket</td><td class="sec"><span class="kt"></span>Kebo <span class="kt"></span>CNF <span class="kt"></span>Kır.</td><td class="sec"><span class="kt"></span>Alo <span class="kt"></span>YS <span class="kt"></span>TY <span class="kt"></span>Mig. <span class="kt"></span>Getir</td><td class="sec"><span class="kt"></span>Onl. <span class="kt"></span>Nakit <span class="kt"></span>POS <span class="kt"></span>Y.K.</td><td></td><td></td></tr>
   </table>
 
   <div class="iki">
     <div>
-      <h2>4. PERSONEL KESİNTİSİ <small>Kasayı etkilemez</small></h2>
-      <table>
-        <tr><th style="width:36%">Personel</th><th>Sebep</th><th style="width:28%">Tutar ₺</th></tr>
-        <tr><td></td><td></td><td></td></tr>
-        <tr><td></td><td></td><td></td></tr>
+      <h2>4. PERSONEL KESİNTİSİ <small>Ceza · kasayı etkilemez</small></h2>
+      <table class="yaz">
+        <tr><th style="width:34%">Personel</th><th>Sebep</th><th style="width:26%">Tutar ₺</th></tr>
         <tr><td></td><td></td><td></td></tr>
         <tr><td></td><td></td><td></td></tr>
       </table>
     </div>
     <div>
-      <h2>5. İPTAL / İADE</h2>
-      <table>
-        <tr><th>Açıklama</th><th style="width:30%">Tutar ₺</th></tr>
-        <tr><td></td><td></td></tr>
-        <tr><td></td><td></td></tr>
-        <tr><td></td><td></td></tr>
-        <tr><td></td><td></td></tr>
+      <h2>5. KURYE YEMEK KARTI <small>Kapıda aldıysa</small></h2>
+      <table class="yaz">
+        <tr><th>Kurye</th><th style="width:28%">Token Flex ₺</th><th style="width:28%">Paye ₺</th></tr>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
       </table>
     </div>
   </div>
 
-  <h2>6. KURYE <small>Sabit kuryede günlük 30 paket garantisi var</small></h2>
-  <table>
-    <tr><th style="width:11%"></th><th>Kurye adı</th><th style="width:9%">Paket</th><th style="width:14%">Nakit ₺</th><th style="width:14%">POS ₺</th><th style="width:13%">Token Flex ₺</th><th style="width:13%">Paye Kart ₺</th></tr>
-    <tr><td class="ad">Sabit 1</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td class="ad">Sabit 2</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-    <tr><td class="ad">Havuz</td><td class="yok" style="font-size:8pt;color:#777;text-align:center">isim yazılmaz</td><td></td><td></td><td></td><td></td><td></td></tr>
-  </table>
-
-  <h2>7. NAKİT KASA <small>Sadece eski nakitten ödeme / bankaya yatırma olduysa · giderlere yazmayın</small></h2>
-  <table>
-    <tr><th>Eski nakitten ödeme — kime / ne için</th><th style="width:26%">Bankaya yatırıldıysa: banka</th><th style="width:17%">Tutar ₺</th></tr>
-    <tr><td></td><td></td><td></td></tr>
-    <tr><td></td><td></td><td></td></tr>
-  </table>
-  <table class="nk" style="margin-top:3px">
-    <tr><td class="bos"></td><td class="et b" style="width:60%; white-space:nowrap">Biriken nakit sayıldıysa: TOPLAM ₺ <small style="font-weight:normal">(isteğe bağlı)</small></td><td class="kutu" style="width:17%"></td></tr>
-  </table>
-
-  <h2>8. NOTLAR <small>Nokta koymadan yazın (9413) · kuruş için virgül (12,50) · toplamlar kontrol içindir</small></h2>
+  <h2>6. NOTLAR <small>Nokta koymadan yazın (9413) · kuruş için virgül (12,50)</small></h2>
   <div class="not"></div>
 
 `;

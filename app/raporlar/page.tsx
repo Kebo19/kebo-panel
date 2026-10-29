@@ -1876,6 +1876,11 @@ export default function RaporlarPage() {
       };
       const sYaz = (setter: (v: string) => void, n: number|undefined) => { const v = nToStr(n); yaz(setter, v, !!v); };
       const pg = (o:{tutar?:number;paket?:number}|undefined): PlatformGiris => ({ tutar: nToStr(o?.tutar), paket: o?.paket ? String(o.paket) : "" });
+      // G = "Günlük Giderler Formu" (29.10.2026): kağıtta sadece gider, personel yemeği, iade, kesinti, kurye yemek kartı
+      // ve notlar var. Satışlar, kasa nakdi, Kıraloğlu Migros, kuryeler ve nakit kasa ekrandan / MagicPay / Roket'ten
+      // gelir: bunlara hiç dokunulmaz.
+      const gForm = veri.duzen === "G";
+      if (!gForm) {
       const ok = veri.online?.kebo || {}; const oc = veri.online?.cnf || {};
       pgYaz(setOsKeboYs, ok.ys); sYaz(setOsKeboYsIndirim, ok.ys?.indirim);
       pgYaz(setOsKeboTrendyol, ok.trendyol); sYaz(setOsKeboTrendyolIndirim, ok.trendyol?.indirim);
@@ -1909,10 +1914,13 @@ export default function RaporlarPage() {
         sYaz(setKasaNakit, veri.kasa.nakit); sYaz(setKasaPos, veri.kasa.pos);
         YEMEK_KARTLARI.forEach(k => { const anahtar = k.alan.replace("kasa_", ""); sYaz(v => kartYaz(k.alan, v), veri.kasa[anahtar]); });
       }
-      type TaramaSatiri = { tutar?: number; aciklama?: string; personel?: string; isim?: string; nakit?: number; pos?: number; tokenflex?: number; paye?: number; paket?: number };
+      } // !gForm
+      type TaramaSatiri = { tutar?: number; aciklama?: string; personel?: string; isim?: string; nakit?: number; pos?: number; tokenflex?: number; paye?: number; paket?: number;
+        odeme?: string; fis?: string; marka?: string; kanal?: string };
+      const giderOdemesi = (o?: string): GiderOdeme | undefined => o === "gecmis" || o === "pos" || o === "diger" ? o : undefined;
       const yeniGiderler: SatirRaporu[] = [];
       (veri.giderler||[]).forEach((g:TaramaSatiri,i:number) => {
-        if (g.tutar || g.aciklama) yeniGiderler.push({ id: Date.now()+i, aciklama: g.aciklama||"", tutar: nToStr(g.tutar), tip: "normal" });
+        if (g.tutar || g.aciklama) yeniGiderler.push({ id: Date.now()+i, aciklama: g.aciklama||"", tutar: nToStr(g.tutar), tip: "normal", odeme: giderOdemesi(g.odeme) });
       });
       (veri.avanslar||[]).forEach((a:TaramaSatiri,i:number) => {
         if (a.tutar || a.personel) yeniGiderler.push({ id: Date.now()+100+i, aciklama: a.aciklama||"", tutar: nToStr(a.tutar), tip: "personel",
@@ -1924,7 +1932,15 @@ export default function RaporlarPage() {
         .map((k:TaramaSatiri,i:number)=>({ id: Date.now()+200+i, personelId: personelIdBul(k.personel), personelIsim: k.personel||"", tutar: nToStr(k.tutar), aciklama: k.aciklama||"" }));
       if (yeniKesintiler.length) setKesintiSatirlari(onceki => ekle ? [...onceki.filter(k => k.tutar || k.personelIsim), ...yeniKesintiler] : yeniKesintiler);
       const yeniIadeler = (veri.iadeler||[]).filter((i:TaramaSatiri)=>i.tutar||i.aciklama)
-        .map((i:TaramaSatiri,idx:number)=>{ const o = iadeAciklamaOku(i.aciklama||""); return { id: Date.now()+300+idx, aciklama: o.not, iade: o.detay, tutar: nToStr(i.tutar) }; });
+        .map((i:TaramaSatiri,idx:number)=>{
+          const o = iadeAciklamaOku(i.aciklama||"");
+          const kagittan: IadeDetay = iadeDetayDuzelt({
+            fis: i.fis === "masa" || i.fis === "paket" ? i.fis : undefined,
+            marka: i.marka === "kebo" || i.marka === "cnf" || i.marka === "kir" ? i.marka : undefined,
+            kanal: (["alo", "ys", "trendyol", "migros", "getir"] as const).find(k => k === i.kanal),
+            odeme: (["online", "nakit", "pos", "yemek_karti"] as const).find(k => k === i.odeme),
+          });
+          return { id: Date.now()+300+idx, aciklama: o.not, iade: kagittan.fis ? kagittan : o.detay, tutar: nToStr(i.tutar) }; });
       if (yeniIadeler.length) setIadeler(onceki => ekle ? [...onceki.filter(i => i.aciklama || i.tutar), ...yeniIadeler] : yeniIadeler);
       const sabitler: TaramaSatiri[] = (veri.kuryeSabit||[]);
       const havuzlar: TaramaSatiri[] = (veri.kuryeHavuz||[]).filter((k:TaramaSatiri)=>k.isim||k.paket||k.nakit||k.pos||k.tokenflex||k.paye);
@@ -1933,7 +1949,23 @@ export default function RaporlarPage() {
         tokenflex: k?.tokenflex ? nToStr(k.tokenflex) : "", paye: k?.paye ? nToStr(k.paye) : "",
         paketSayisi: k?.paket ? String(k.paket) : "", uzakPaket:"", paket9km:"", tip });
       const kuryeOkundu = [...sabitler, ...havuzlar].some(k => k.isim || k.paket || k.nakit || k.pos || k.tokenflex || k.paye);
-      if (ekle && !kuryeOkundu) {
+      if (gForm) {
+        // Kurye satırlarına sadece yemek kartı (Token Flex / Paye) yazılır; eşleşmeyen kurye notlara düşer.
+        const kartlar: TaramaSatiri[] = (veri.kuryeKart || []).filter((k: TaramaSatiri) => (k.tokenflex || 0) + (k.paye || 0) > 0);
+        const eslesmeyen: string[] = [];
+        if (kartlar.length) setKuryeler(onceki => {
+          const yeni = onceki.map(k => ({ ...k }));
+          kartlar.forEach(kk => {
+            const hedef = yeni.find(k => kk.isim && (adEslesir(k.isim, kk.isim) || k.parcalar?.some(p => adEslesir(p.isim, kk.isim!))))
+              ?? (kartlar.length === 1 && !kk.isim ? yeni.find(k => k.tip !== "havuz") : undefined);
+            if (!hedef) { eslesmeyen.push(`${kk.isim || "?"}: Token Flex ₺${fmt(kk.tokenflex || 0)} · Paye ₺${fmt(kk.paye || 0)}`); return; }
+            if (kk.tokenflex) hedef.tokenflex = nToStr(tv(hedef.tokenflex) + kk.tokenflex);
+            if (kk.paye) hedef.paye = nToStr(tv(hedef.paye) + kk.paye);
+          });
+          return yeni;
+        });
+        setTimeout(() => { if (eslesmeyen.length) setRoketNotu(n => [...n, ...eslesmeyen.map(e => `Kağıttaki kurye yemek kartı eşleşmedi — elle yazın: ${e}`)]); }, 0);
+      } else if (ekle && !kuryeOkundu) {
         // Bu sayfada kurye bölümü yok; mevcut kurye satırları korunur.
       } else if (hedefTarih && hedefTarih < ROADRUNNER_GECIS_GUNU) {
         // Roadrunner öncesi: fişteki tüm kuryeler kendi personel kuryemiz.
@@ -1947,8 +1979,8 @@ export default function RaporlarPage() {
              : [satir(undefined, Date.now()+400, "havuz", "Havuz Kurye")]),
         ]);
       }
-      const nk = veri.nakitKasa || {};
-      sYaz(setNakitDevredenKagit, nk.devreden); sYaz(setNakitSayim, nk.sayim);
+      const nk = gForm ? {} : (veri.nakitKasa || {});
+      if (!gForm) { sYaz(setNakitDevredenKagit, nk.devreden); sYaz(setNakitSayim, nk.sayim); }
       const yeniNakit: NakitHareket[] = (Array.isArray(nk.hareketler) ? nk.hareketler : [])
         .filter((h: { tutar?: number }) => Number(h?.tutar) > 0)
         .map((h: { aciklama?: string; banka?: string; tutar?: number }, i: number) => ({ id: Date.now() + 500 + i, aciklama: h.aciklama || "", banka: bankaBul(h.banka), tutar: nToStr(h.tutar) }));
@@ -2356,7 +2388,7 @@ export default function RaporlarPage() {
             </div>
             <div>
               <p className="text-xs font-bold text-indigo-300">Fişten Doldur</p>
-              <p className="text-[10px] text-gray-500">Formun fotoğrafını seçin. Eski önlü arkalı formda iki yüzü birlikte seçin ya da sonra &quot;Sayfa ekle&quot; deyin. <a href="/stok/kagit" target="_blank" rel="noopener" className="text-indigo-400 font-semibold hover:underline">Boş formu yazdır</a> (arka yüzde güncel günlük sayım listesi) · <a href="/kebo-gunluk-kasa-formu.pdf" target="_blank" rel="noopener" className="text-indigo-400 hover:underline">PDF</a></p>
+              <p className="text-[12px] text-gray-500">Giderler formunun fotoğrafını seçin: giderler, personel yemeği, iptal/iade, kesinti ve kurye yemek kartı doldurulur; nakit, satışlar ve kuryelere dokunulmaz. <a href="/stok/kagit" target="_blank" rel="noopener" className="text-indigo-400 font-semibold hover:underline">Boş formu yazdır</a> (arka yüzde güncel günlük sayım listesi) · <a href="/kebo-gunluk-kasa-formu.pdf" target="_blank" rel="noopener" className="text-indigo-400 hover:underline">PDF</a></p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -2813,7 +2845,7 @@ export default function RaporlarPage() {
                       <div className="rounded-lg border border-cizgi bg-alan/40 px-3 py-2 text-[13px] space-y-1">
                         <p className="font-semibold text-gray-300">Roket&apos;e elle girilen {pkK.rokettenEk} sipariş <span className="font-normal text-gray-500">(fiş tarandı / Roket Adisyon — Roket&apos;te platformu görünmez)</span></p>
                         {(roketGun?.digerSiparisler || []).map((d, i) => (
-                          <p key={i} className="text-gray-400">· {d.saat || "—"} · {d.kaynak}{d.isletme ? ` · ${d.isletme}` : ""} · {d.kurye} · <b className="text-yazi">₺{fmt(d.tutar)}</b> {d.odeme.toLocaleLowerCase("tr-TR")}{d.no ? ` · no ${d.no}` : ""}</p>
+                          <p key={i} className="text-gray-400">· {d.saat || "—"} · {d.kaynak}{d.musteri ? <> · <b className="text-gray-200">{d.musteri}</b></> : null}{d.isletme ? ` · ${d.isletme}` : ""} · {d.kurye} · <b className="text-yazi">₺{fmt(d.tutar)}</b> {d.odeme.toLocaleLowerCase("tr-TR")}{d.no ? ` · no ${d.no}` : ""}</p>
                         ))}
                         {!roketGun?.digerSiparisler && <p className="text-gray-500">Ayrıntı yok: bu gün eski yöntemle yüklenmiş. &quot;Roket&apos;ten çek&quot; ile yeniden çekince saat, kurye ve tutar görünür.</p>}
                         {pkK.fisEslesme.length > 0 && (
