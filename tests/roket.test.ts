@@ -80,3 +80,16 @@ describe("Roket Paket Raporu", () => {
     expect(k[2].kasa).toMatchObject({ paket: 2, nakit: 0 });
   });
 });
+
+describe("paket kontrolü: Roket ↔ MagicPay + Kıraloğlu Migros", () => {
+  it("Kıraloğlu Migros elle eklenir, farklı kanal ve Roket'in kendi girişleri gösterilir", async () => {
+    const { paketKontrolu } = await import("../lib/roket");
+    const g = { kanallar: { kebo_ys: 10, alo: 5, kir_migros: 2 }, digerPaket: 1, toplamPaket: 18 };
+    const k = paketKontrolu(g, { kebo_ys: 10, alo: 5, kir_migros: 2 });
+    expect(k).toMatchObject({ roket: 18, bizde: 17, kirMigros: 2, fark: 1, rokettenEk: 1 });
+    expect(k.farkliKanallar).toEqual([]);
+    const k2 = paketKontrolu(g, { kebo_ys: 9, alo: 5 });
+    expect(k2.fark).toBe(4);
+    expect(k2.farkliKanallar.map(s => s.kanal)).toEqual(["kebo_ys", "kir_migros"]);
+  });
+});

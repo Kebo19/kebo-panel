@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useYetki } from "@/lib/useYetki";
 import { fmtTarih } from "@/lib/tarih";
 import { roketExcelOku, kuryeKarsilastir, roketTahsilat, varsayilanAtama, atamaBul, ATAMA_ADI, type RoketGun, type RoketAtama, type KuryeKarsilastirma } from "@/lib/roket";
-import { KANALLAR, ONLINE_ALANI, type MpRaporDoldurma, type Kanal } from "@/lib/magicpay";
+import { KANALLAR, mpKanalPaketleri, type MpRaporDoldurma, type Kanal } from "@/lib/magicpay";
 import { Lock, Loader2, Upload, AlertTriangle, CheckCircle2, Truck } from "lucide-react";
 
 const tl = (v: number) => "₺" + new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(v || 0);
@@ -40,15 +40,12 @@ function Hucre({ r, k, para = true, kim = "kasada" }: { r: number | undefined; k
   );
 }
 
-function GunKarti({ gun, kasa, mp, onAtama, kaydediliyor }: { gun: RoketGun; kasa: KasaKurye[] | null; mp: MpRaporDoldurma | null | undefined; onAtama: (ad: string, atama: RoketAtama) => void; kaydediliyor: boolean }) {
+function GunKarti({ gun, kasa, kirMigros, mp, onAtama, kaydediliyor }: { gun: RoketGun; kasa: KasaKurye[] | null; kirMigros: number | null; mp: MpRaporDoldurma | null | undefined; onAtama: (ad: string, atama: RoketAtama) => void; kaydediliyor: boolean }) {
   const satirlar: KuryeKarsilastirma[] = useMemo(() => kuryeKarsilastir(gun, kasa), [gun, kasa]);
-  const mpPaket = (kanal: Kanal): number | undefined => {
-    if (!mp) return undefined;
-    if (kanal === "alo") return mp.alo.paket;
-    const alan = ONLINE_ALANI[kanal as keyof typeof ONLINE_ALANI];
-    return alan ? (mp.platform[alan]?.paket ?? 0) : undefined;
-  };
-  const kanalSatirlari = KANALLAR.map(k => ({ ...k, roket: gun.kanallar[k.kanal] || 0, mp: mpPaket(k.kanal) }))
+  // Kıraloğlu Migros MagicPay'de yok: kasa raporuna elle girilen paket sayısı eklenir.
+  const bizde: Partial<Record<Kanal, number>> | undefined = mp ? { ...mpKanalPaketleri(mp), kir_migros: kirMigros ?? 0 } : undefined;
+  const mpPaket = (kanal: Kanal): number | undefined => bizde ? (bizde[kanal] ?? 0) : undefined;
+  const kanalSatirlari = KANALLAR.map(k => ({ ...k, ad: k.kanal === "kir_migros" ? `${k.ad} (kasa raporundan)` : k.ad, roket: gun.kanallar[k.kanal] || 0, mp: mpPaket(k.kanal) }))
     .filter(k => k.roket || k.mp);
   const kuryeFark = satirlar.some(s => s.roket && s.kasa && (
     Math.abs(s.roket.paket - s.kasa.paket) > 0 || Math.abs(s.roket.nakit - s.kasa.nakit) >= 1 ||
@@ -58,8 +55,8 @@ function GunKarti({ gun, kasa, mp, onAtama, kaydediliyor }: { gun: RoketGun; kas
   const roketKapida = gun.kuryeler.reduce((t, k) => t + roketTahsilat(k), 0);
   const mpKapida = mp ? mp.alo.nakit + mp.alo.pos + mp.kapidaKebo.ys + mp.kapidaKebo.trendyol + mp.kapidaKebo.migros
     + Object.entries(mp.platform).filter(([a]) => a.startsWith("ko_")).reduce((t, [, v]) => t + v.tutar, 0) : undefined;
-  const roketPaketPlatform = kanalSatirlari.reduce((t, k) => t + k.roket, 0) + gun.digerPaket;
-  const mpPaketToplam = mp ? kanalSatirlari.reduce((t, k) => t + (k.mp || 0), 0) : undefined;
+  const roketPaketPlatform = gun.toplamPaket;
+  const mpPaketToplam = bizde ? KANALLAR.reduce((t, k) => t + (bizde[k.kanal] || 0), 0) : undefined;
 
   return (
     <section className="kebo-kart p-4 space-y-3">
@@ -130,7 +127,7 @@ function GunKarti({ gun, kasa, mp, onAtama, kaydediliyor }: { gun: RoketGun; kas
         <table className="w-full text-[12px]">
           <thead className="bg-alan text-gray-500"><tr><th className="px-3 py-1.5 text-left font-semibold">Roket / MagicPay</th><th className="px-2 py-1.5 text-right font-semibold">Değer</th></tr></thead>
           <tbody className="divide-y divide-cizgi">
-            <tr><td className="px-3 py-1.5">Paket sayısı</td><Hucre r={roketPaketPlatform} k={mpPaketToplam} para={false} kim="MagicPay'de" /></tr>
+            <tr><td className="px-3 py-1.5">Paket sayısı <span className="text-gray-500">(MagicPay + Kıraloğlu Migros)</span></td><Hucre r={roketPaketPlatform} k={mpPaketToplam} para={false} kim="MagicPay'de" /></tr>
             <tr><td className="px-3 py-1.5">Kapıda toplanan para <span className="text-gray-500">(nakit + POS + kart)</span></td><Hucre r={roketKapida} k={mpKapida} kim="MagicPay'de" /></tr>
           </tbody>
         </table>
@@ -164,6 +161,7 @@ export default function KuryeKontrolPage() {
 
   const [gunler, setGunler] = useState<RoketGun[]>([]);
   const [kasa, setKasa] = useState<Record<string, KasaKurye[] | null>>({});
+  const [kirMigros, setKirMigros] = useState<Record<string, number | null>>({});
   const [mp, setMp] = useState<Record<string, MpRaporDoldurma | null>>({});
   const [yukleniyor, setYukleniyor] = useState(true);
   const [isleniyor, setIsleniyor] = useState(false);
@@ -192,12 +190,16 @@ export default function KuryeKontrolPage() {
     if (liste.length) {
       const bas = liste[liste.length - 1].tarih, bit = liste[0].tarih;
       const [{ data: raporlar }, mpCevap] = await Promise.all([
-        supabase.from("gunluk_raporlar").select("tarih, kurye_raporlari").gte("tarih", bas).lte("tarih", bit),
+        supabase.from("gunluk_raporlar").select("tarih, kurye_raporlari, os_kir_migros_yemek_paket, ko_kir_migros_yemek_paket").gte("tarih", bas).lte("tarih", bit),
         fetch(`/api/magicpay-karsilastirma?kapsam=indirim&start=${bas}&end=${bit}`, { cache: "no-store" }).then(r => r.ok ? r.json() : null).catch(() => null),
       ]);
       setKasa(Object.fromEntries(liste.map(g => {
         const r = (raporlar || []).find(x => x.tarih === g.tarih);
         return [g.tarih, r ? ((r.kurye_raporlari as KasaKurye[]) || []) : null];
+      })));
+      setKirMigros(Object.fromEntries(liste.map(g => {
+        const r = (raporlar || []).find(x => x.tarih === g.tarih);
+        return [g.tarih, r ? (Number(r.os_kir_migros_yemek_paket) || 0) + (Number(r.ko_kir_migros_yemek_paket) || 0) : null];
       })));
       const mpGunler = ((mpCevap?.gunler || []) as { tarih: string; doldurma?: MpRaporDoldurma }[]);
       setMp(Object.fromEntries(liste.map(g => [g.tarih, mpGunler.find(x => x.tarih === g.tarih)?.doldurma ?? null])));
@@ -292,7 +294,7 @@ export default function KuryeKontrolPage() {
         ) : gunler.length === 0 ? (
           <p className="text-[13px] text-gray-500 text-center py-10">Henüz Roket dosyası yüklenmedi.</p>
         ) : (
-          gunler.map(g => <GunKarti key={g.tarih} gun={g} kasa={kasa[g.tarih] ?? null} mp={g.tarih in mp ? mp[g.tarih] : undefined}
+          gunler.map(g => <GunKarti key={g.tarih} gun={g} kasa={kasa[g.tarih] ?? null} kirMigros={kirMigros[g.tarih] ?? null} mp={g.tarih in mp ? mp[g.tarih] : undefined}
             onAtama={(ad, atama) => atamaDegistir(g.tarih, ad, atama)} kaydediliyor={atamaKaydi === g.tarih} />)
         )}
       </main>

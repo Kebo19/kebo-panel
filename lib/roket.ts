@@ -9,7 +9,7 @@
 // siparişinde "Yemek Karti" platformda online ödenmiştir (MagicPay'de TRENDYOL_PLUXEE
 // vb.), kurye para almaz. "Online Ödeme" de kurye tahsilatı değildir.
 
-import { kanalBul, type Kanal } from "@/lib/magicpay";
+import { kanalBul, KANALLAR, type Kanal } from "@/lib/magicpay";
 
 export interface RoketKurye {
   ad: string;
@@ -227,4 +227,33 @@ export function kuryeKarsilastir(gun: RoketGun, kasaKuryeleri: KasaKuryeSatiri[]
       kasa: kasaKuryeleri ? kasaOzet(kasaSatir) : null,
     };
   }).filter(s => s.roket || (s.kasa && (s.kasa.paket || s.kasa.nakit || s.kasa.pos || s.kasa.kart)));
+}
+
+// ─── PAKET SAYISI KONTROLÜ: Roket ↔ MagicPay + Kıraloğlu Migros ─────────────
+// Kıraloğlu Migros MagicPay'de yok; kasa raporuna elle girilen paket sayısı eklenir.
+// Roket bazen fazla olur: Roket'e elle girilen siparişler ("Roket Adisyon", "Fiş Tarandı").
+
+export interface PaketKontrolSatiri { kanal: Exclude<Kanal, "diger">; ad: string; roket: number; bizde: number }
+export interface PaketKontrolu {
+  roket: number;
+  /** MagicPay + Kıraloğlu Migros */
+  bizde: number;
+  /** Kıraloğlu Migros (elle) */
+  kirMigros: number;
+  /** roket − bizde: artı = Roket'te fazla */
+  fark: number;
+  /** Roket'in kendi girişleri (MagicPay'de karşılığı olmayabilir) */
+  rokettenEk: number;
+  /** Sadece farklı olan kanallar */
+  farkliKanallar: PaketKontrolSatiri[];
+}
+
+export function paketKontrolu(g: Pick<RoketGun, "kanallar" | "digerPaket" | "toplamPaket">, bizdeKanal: Partial<Record<Kanal, number>>): PaketKontrolu {
+  const satirlar = KANALLAR.map(k => ({ kanal: k.kanal, ad: k.ad, roket: g.kanallar[k.kanal] || 0, bizde: bizdeKanal[k.kanal] || 0 }));
+  const bizde = satirlar.reduce((t, k) => t + k.bizde, 0);
+  return {
+    roket: g.toplamPaket, bizde, kirMigros: bizdeKanal.kir_migros || 0,
+    fark: g.toplamPaket - bizde, rokettenEk: g.digerPaket,
+    farkliKanallar: satirlar.filter(k => k.roket !== k.bizde),
+  };
 }

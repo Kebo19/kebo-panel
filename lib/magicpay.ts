@@ -509,3 +509,13 @@ export function mpRaporDoldurma(gun: MpGun): MpRaporDoldurma {
     uyarilar,
   };
 }
+
+/** MagicPay'e göre kanal kanal paket sayısı (online + kapıda; Alo Paket dahil). Elle girilen kanallar (Kıraloğlu Migros) yok. */
+export function mpKanalPaketleri(mp: MpRaporDoldurma): Partial<Record<Kanal, number>> {
+  const s: Partial<Record<Kanal, number>> = { alo: mp.alo.paket };
+  for (const c of Object.keys(ONLINE_ALANI) as (keyof typeof ONLINE_ALANI)[]) {
+    if (ELLE_KANALLAR.includes(c)) continue;
+    s[c] = (mp.platform[ONLINE_ALANI[c]]?.paket || 0) + (mp.platform[KAPIDA_ALANI[c]]?.paket || 0);
+  }
+  return s;
+}
