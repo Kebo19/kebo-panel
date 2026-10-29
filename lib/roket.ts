@@ -202,12 +202,26 @@ export function kuryeKarsilastir(gun: RoketGun, kasaKuryeleri: KasaKuryeSatiri[]
   }), { paket: 0, nakit: 0, pos: 0, kart: 0 });
   const kasaSabit = (kasaKuryeleri || []).filter(k => k.tip !== "havuz");
   const kasaHavuz = (kasaKuryeleri || []).filter(k => k.tip === "havuz");
-  return (["s1", "s2", "havuz"] as const).map((slot, i) => {
+  // Sabit satırlar önce adla eşlenir ("Mustafa" ↔ MUSTAFA ÇETİN), eşleşmezse sırayla (1. sabit satır ↔ Sabit 1).
+  const kullanilan = new Set<number>();
+  const kasaIndeksi: Record<"s1" | "s2", number> = { s1: -1, s2: -1 };
+  for (const slot of ["s1", "s2"] as const) {
+    const adlar = slotToplami(gun, slot).adlar;
+    const j = kasaSabit.findIndex((k, idx) => !kullanilan.has(idx) && adlar.some(a => adEslesir(k.isim || "", a)));
+    if (j >= 0) { kasaIndeksi[slot] = j; kullanilan.add(j); }
+  }
+  for (const [i, slot] of (["s1", "s2"] as const).entries()) {
+    if (kasaIndeksi[slot] >= 0) continue;
+    const j = [i, 0, 1].find(idx => idx < kasaSabit.length && !kullanilan.has(idx));
+    if (j !== undefined) { kasaIndeksi[slot] = j; kullanilan.add(j); }
+  }
+  return (["s1", "s2", "havuz"] as const).map((slot) => {
     const r = slotToplami(gun, slot);
-    const kasaSatir = slot === "havuz" ? kasaHavuz : kasaSabit[i] ? [kasaSabit[i]] : [];
+    const i = slot === "havuz" ? -1 : kasaIndeksi[slot];
+    const kasaSatir = slot === "havuz" ? kasaHavuz : i >= 0 ? [kasaSabit[i]] : [];
     const roketVar = r.adlar.length > 0;
     return {
-      ad: ATAMA_ADI[slot] + (slot !== "havuz" && kasaSabit[i]?.isim ? ` (kasa: ${kasaSabit[i].isim})` : ""),
+      ad: ATAMA_ADI[slot] + (slot !== "havuz" && i >= 0 && kasaSabit[i]?.isim ? ` (kasa: ${kasaSabit[i].isim})` : ""),
       kuryeler: r.adlar, sabit: slot !== "havuz",
       roket: roketVar ? { paket: r.paket, nakit: r.nakit, pos: r.pos, kart: r.kart } : null,
       kasa: kasaKuryeleri ? kasaOzet(kasaSatir) : null,

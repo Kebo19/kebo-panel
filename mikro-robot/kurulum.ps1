@@ -3,7 +3,7 @@
 #  1) Node.js var mı bakar, robotun paketini kurar
 #  2) Mikro kullanıcı adı / parolasını sorar ve bu Windows kullanıcısına özel şifreleyip saklar
 #     (oturum kapanırsa robot yeniden giriş yapabilsin diye)
-#  3) Chrome'u açar: Mikro'ya bir kez giriş yaparsınız, oturum robotun profiline kaydedilir
+#  3) Chrome'u açar: Mikro'ya ve Roket Adisyon'a birer kez giriş yaparsınız, oturumlar robotun profiline kaydedilir
 #  4) Görev Zamanlayıcı'ya "Kebo Mikro Robotu" görevini ekler: 5 dakikada bir gizli kontrol
 #     (panelden "Mikro'dan çek" istenince hemen; istenmezse her gün 11:00'den sonra bir kez)
 #  5) Masaüstüne iki kısayol koyar: "Mikro robotu - şimdi çalıştır" ve "Mikro robotu - giriş"
@@ -38,8 +38,9 @@ if ($k) {
   Write-Host "Kaydedildi." -ForegroundColor Green
 } else { Write-Host "Atlandi (oturum kapanirsa robot kendisi giris yapamaz, kisayolla giris yaparsiniz)." }
 
-Baslik "3/5 Mikro'ya bir kez giris"
-Write-Host "Chrome acilacak. Mikro'ya giris yapin; Gelen e-Faturalar sayfasi acilinca pencere kendiliginden kapanir."
+Baslik "3/5 Mikro'ya ve Roket'e bir kez giris"
+Write-Host "Chrome acilacak. Once Mikro'ya giris yapin (Gelen e-Faturalar sayfasi acilinca devam eder)."
+Write-Host "Sonra ayni pencerede Roket Adisyon acilir: Roket'e giris yapin; Kontrol Paneli acilinca pencere kendiliginden kapanir."
 & $node (Join-Path $Klasor "robot.mjs") --kurulum
 
 Baslik "4/5 Gorev Zamanlayici"
@@ -60,7 +61,7 @@ $tetik2 = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME
 $tetik2.Delay = "PT3M"
 $ayarlar = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 Register-ScheduledTask -TaskName "Kebo Mikro Robotu" -Action $eylem -Trigger @($tetik1, $tetik2) -Settings $ayarlar `
-  -Description "Mikro e-Portal'dan gelen faturalari Kebo Panel'e aktarir (panelden istenince hemen, yoksa her gun 11:00'den sonra)" -Force | Out-Null
+  -Description "Mikro faturalarini ve Roket paket raporunu Kebo Panel'e aktarir (panelden istenince hemen, yoksa her gun 11:00'den sonra)" -Force | Out-Null
 Write-Host "Gorev eklendi: 5 dakikada bir kontrol; panelden istenince hemen, istenmezse her gun 11:00'den sonra bir kez." -ForegroundColor Green
 
 Baslik "5/5 Masaustu kisayollari ve ilk calistirma"
@@ -72,6 +73,6 @@ foreach ($k2 in @(@{ ad = "Mikro robotu - simdi calistir"; arg = "--zorla" }, @{
 }
 & $node (Join-Path $Klasor "robot.mjs") --zorla
 Write-Host ""
-Write-Host "Kurulum tamam. Sonuclar panelde Fiyat Listesi sayfasinda ve Faturalar'da gorunur." -ForegroundColor Green
+Write-Host "Kurulum tamam. Faturalar panelde Faturalar / Fiyat Listesi'nde, Roket verisi Kurye Kontrol'de gorunur." -ForegroundColor Green
 Write-Host "Robot kaydi: $Veri\robot.log"
 Read-Host "Kapatmak icin Enter"

@@ -278,7 +278,8 @@ export default function KuryeKontrolPage() {
       <main className="max-w-screen-lg mx-auto px-4 sm:px-6 py-5 space-y-4">
         <div className="kebo-kart p-4 text-[12px] text-gray-500 space-y-1">
           <p className="font-semibold text-yazi flex items-center gap-2"><Truck size={14} className="text-altin" />Nasıl kullanılır</p>
-          <p>Roket Adisyon → Raporlama → <b>Paket Raporu</b>: başlangıç ve bitiş tarihini seçin, Filtrele, <b>Excel olarak indir</b>. İnen dosyayı buraya yükleyin. Aynı günü yeniden yüklerseniz eskisinin yerine geçer.</p>
+          <p><b>Dükkân robotu</b> kuruluysa Roket verisi her gün kendiliğinden gelir (Faturalar&apos;daki &quot;Faturaları şimdi çek&quot; ile hemen de çekilir; son 7 gün yenilenir).</p>
+          <p>Elle yüklemek için: Roket Adisyon → Raporlama → <b>Paket Raporu</b>: tarihleri seçin, Filtrele, <b>Excel olarak indir</b>, dosyayı buraya yükleyin. Aynı günü yeniden yüklerseniz eskisinin yerine geçer (sabit kurye seçimleri korunur).</p>
           <p>Panelde sadece kurye kurye günlük toplamlar tutulur; müşteri adı, telefon ve adres kaydedilmez.</p>
         </div>
 

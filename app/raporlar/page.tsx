@@ -22,7 +22,7 @@ import {
   ROADRUNNER_GECIS_GUNU, KENDI_POS_GECIS_GUNU, kuryeTahsilati, roadrunnerTahsilati, KURYE_GARANTI_PAKET, YEMEK_KARTLARI, type YemekKartiAlani,
 } from "@/lib/hesap";
 import { useYetki } from "@/lib/useYetki";
-import { slotToplami, atamaBul, type RoketGun } from "@/lib/roket";
+import { slotToplami, atamaBul, adEslesir, type RoketGun } from "@/lib/roket";
 import { indirimFarkliAlanlar, INDIRIM_ALAN_ADLARI, ESKI_KAPIDA_INDIRIM_ALANLARI, type PanelRaporu, type MpRaporDoldurma } from "@/lib/magicpay";
 import { RAPOR_ONAYCI_ADLARI } from "@/lib/yetki";
 import { RaporMagicpayPaneli } from "@/components/MagicpayKarsilastirma";
@@ -1241,9 +1241,22 @@ export default function RaporlarPage() {
       String(Math.max(0, toplam - (parseInt(eski?.uzakPaket || "") || 0) - (parseInt(eski?.paket9km || "") || 0)));
     setKuryeler(onceki => {
       const sabitSatirlar = onceki.filter(k => k.tip !== "havuz");
+      // Kasa raporundaki sabit satır önce adla bulunur (Furkan Kurye 1'deyse orada kalır), yoksa sırayla.
+      const kullanilan = new Set<number>();
+      const indeks = (["s1", "s2"] as const).map(slot => {
+        const adlar = g.kuryeler.filter(k => atamaBul(g, k) === slot).map(k => k.ad);
+        const j = sabitSatirlar.findIndex((k, idx) => !kullanilan.has(idx) && adlar.some(a => adEslesir(k.isim, a)));
+        if (j >= 0) kullanilan.add(j);
+        return j;
+      }).map((j, i) => {
+        if (j >= 0) return j;
+        const bos = [i, 0, 1].find(idx => !kullanilan.has(idx));
+        if (bos !== undefined) kullanilan.add(bos);
+        return bos ?? i;
+      });
       const yeniSabit = (["s1", "s2"] as const).map((slot, i) => {
         const t = slotToplami(g, slot);
-        const eski = sabitSatirlar[i];
+        const eski = sabitSatirlar[indeks[i]];
         const adlar = g.kuryeler.filter(k => atamaBul(g, k) === slot).map(k => ilkAd(k.ad));
         return {
           ...(eski || { id: Date.now() + i, uzakPaket: "", paket9km: "" }), tip: (eski?.tip || "sabit") as KuryeRaporu["tip"],
@@ -1258,7 +1271,9 @@ export default function RaporlarPage() {
         ...(eskiHavuz || { id: Date.now() + 99, uzakPaket: "", paket9km: "" }), tip: "havuz", isim: "Havuz",
         paketSayisi: yeniPaket(h.paket, eskiHavuz), nakit: s(h.nakit + h.bilinmeyen), pos: s(h.pos), paye: s(h.paye), tokenflex: eskiHavuz?.tokenflex || "",
       } as KuryeRaporu;
-      return [...yeniSabit, havuz];
+      // Satır sırası korunur: hangi slot hangi kasa satırına yazıldıysa o sırada
+      const sirali = [...yeniSabit].sort((a, b) => indeks[yeniSabit.indexOf(a)] - indeks[yeniSabit.indexOf(b)]);
+      return [...sirali, havuz];
     });
     setRoketNotu(notlar);
   };

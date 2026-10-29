@@ -7,14 +7,22 @@
 //   4) Panele gönderir: faturalar carilere işlenir, stok fiyatları güncellenir. Sonuç panelde Fiyat Listesi'nde görünür.
 // Mikro, sunuculardan (Vercel/Supabase) gelen girişleri engellediği için bu iş dükkânın kendi bilgisayarından yapılır.
 //
+// ROKET (29.10.2026): Aynı çalışmada Roket Adisyon'dan (Roadrunner kurye sistemi) son 7 günün Paket Raporu
+// Excel'i indirilir, BU BİLGİSAYARDA okunur (roket-oku.mjs = panelin lib/roket.ts'i) ve panele sadece
+// günlük kurye özetleri gönderilir; müşteri adı / telefon / adres gönderilmez, indirilen dosya hemen silinir.
+// Roket de sunucudan girişe izin vermiyor (görünmez robot doğrulaması); bu yüzden dükkânın kendi Chrome'u kullanılır.
+//
 // Kullanım:  node robot.mjs --bekle   → Görev Zamanlayıcı 5 dakikada bir çağırır: panele "buradayım" der;
 //                                       panelden/Telegram'dan "Mikro'dan çek" istenmişse hemen çalışır,
 //                                       istenmemişse saat 11:00'den sonra günde bir kez çalışır. Yoksa hemen çıkar.
 //            node robot.mjs            → günlük aktarım (bugün başarıyla çalıştıysa tekrar çalışmaz)
 //            node robot.mjs --zorla    → bugün çalışmış olsa da çalıştır
-//            node robot.mjs --kurulum  → Chrome'u açar, Mikro'ya bir kez elle giriş yapılır (oturum kaydedilir)
+//            node robot.mjs --kurulum  → Chrome'u açar, Mikro'ya ve Roket'e bir kez elle giriş yapılır (oturumlar kaydedilir)
+//            node robot.mjs --roket    → sadece Roket raporunu çek (deneme için)
 
 import { chromium } from "playwright-core";
+import xlsx from "xlsx";
+import { roketExcelOku, varsayilanAtama, atamaBul } from "./roket-oku.mjs";
 import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync, statSync, unlinkSync } from "node:fs";
 import { hostname } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -34,6 +42,8 @@ const SON_HATA = join(VERI, "son-hata.txt");    // günlük çalışma hata verd
 const MIKRO = process.env.KEBO_MIKRO_ADRES || "https://eportal.mikrogrup.com"; // ortam değişkeni sadece test içindir
 const FIRMA = "9351d4b5-c397-48da-a383-d9da89b5dc9d"; // BCM Restoran firma kodu (lib/fiyatListesi.ts ile aynı)
 const GELEN = `${MIKRO}/cp/${FIRMA}/inbox/newinbox`;
+const ROKET = "https://www.roketadisyon.com/RoketAdisyon";
+const ROKET_GUN = 7; // her çalışmada son kaç gün yeniden çekilir (Roket'te sonradan yapılan düzeltmeler de gelsin)
 
 const argv = new Set(process.argv.slice(2));
 const log = (m) => { const s = `${new Date().toLocaleString("tr-TR")}  ${m}`; console.log(s); appendFileSync(LOG, s + "\n"); };
@@ -74,7 +84,9 @@ function kimlikOku() {
 }
 
 async function tarayiciAc(gorunur) {
-  const ortak = { headless: false, viewport: { width: 1280, height: 860 }, args: gorunur ? [] : ["--start-minimized"] };
+  // Roket'in ekran yazıları Türkçe aranır (Tamam, Önceki ay…): tarayıcı Türkçe açılır.
+  const ortak = { headless: false, viewport: { width: 1280, height: 860 }, locale: "tr-TR", acceptDownloads: true,
+    args: gorunur ? ["--lang=tr-TR"] : ["--start-minimized", "--lang=tr-TR"] };
   for (const channel of ["chrome", "msedge"]) {
     try { return await chromium.launchPersistentContext(PROFIL, { ...ortak, channel }); }
     catch (e) { log(`${channel} açılamadı: ${String(e.message || e).split("\n")[0]}`); }
@@ -179,6 +191,152 @@ async function faturalariOku(sayfa, baslangic) {
   }, { baslangic, firma: FIRMA });
 }
 
+// ─── ROKET ─────────────────────────────────────────────────────────────────────
+// Roket Adisyon bir Flutter uygulaması: ekran çizim olarak gelir. Erişilebilirlik (ekran okuyucu) katmanı
+// açılınca her düğme ve yazı <flt-semantics> olarak görünür; robot düğmeleri bu yazılarla bulur.
+const AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+
+async function roketEtiketler(sayfa) {
+  return sayfa.evaluate(() => [...document.querySelectorAll("flt-semantics")].map((e) => (e.getAttribute("aria-label") || e.textContent || "").trim()));
+}
+
+/** Erişilebilirlik katmanını açar ve uygulamanın yüklenmesini bekler. Giriş ekranındaysa false. */
+async function roketHazirla(sayfa, sure = 90000) {
+  const bas = Date.now();
+  while (Date.now() - bas < sure) {
+    const d = await sayfa.evaluate(() => {
+      const p = document.querySelector("flt-semantics-placeholder");
+      if (p) p.click();
+      const et = [...document.querySelectorAll("flt-semantics")].map((e) => (e.getAttribute("aria-label") || e.textContent || "").trim());
+      return { menu: et.includes("Menü"), giris: !!document.querySelector('input[type="password"]') || et.some((t) => /^Giriş yap$/.test(t)) };
+    }).catch(() => ({ menu: false, giris: false }));
+    if (d.menu) return true;
+    if (d.giris) return false;
+    await sayfa.waitForTimeout(1500);
+  }
+  throw new Error("Roket Adisyon açılmadı (internet bağlantısını kontrol edin).");
+}
+
+/** Yazısı tam (ya da düzenli ifadeyle) eşleşen ilk düğmeye tıklar; çıkana kadar bekler. */
+async function roketTikla(sayfa, aranan, { duzenli = false, sure = 20000 } = {}) {
+  const bas = Date.now();
+  while (Date.now() - bas < sure) {
+    const ok = await sayfa.evaluate(({ aranan, duzenli }) => {
+      const re = duzenli ? new RegExp(aranan) : null;
+      const e = [...document.querySelectorAll("flt-semantics")].find((x) => {
+        const t = (x.getAttribute("aria-label") || x.textContent || "").trim();
+        return re ? re.test(t) : t === aranan;
+      });
+      if (!e) return false;
+      e.click();
+      return true;
+    }, { aranan, duzenli });
+    if (ok) { await sayfa.waitForTimeout(600); return; }
+    await sayfa.waitForTimeout(500);
+  }
+  throw new Error(`Roket ekranında "${aranan}" bulunamadı (Roket'in ekranı değişmiş olabilir).`);
+}
+
+/** Açık tarih seçicide günü seçer (gerekirse önceki aya geçer), sonra tarih ve saat için "Tamam". */
+async function roketTarihSec(sayfa, iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const ay = `${AYLAR[m - 1]} ${y}`;
+  for (let i = 0; i < 13; i++) {
+    const baslik = (await roketEtiketler(sayfa)).find((t) => t.startsWith("Yılı seçin"));
+    if (!baslik || baslik.includes(ay)) break;
+    await roketTikla(sayfa, "Önceki ay");
+  }
+  await roketTikla(sayfa, `^${d}, ${d} ${AYLAR[m - 1]} ${y}`, { duzenli: true });
+  await roketTikla(sayfa, "Tamam");      // tarih
+  await roketTikla(sayfa, "Tamam");      // saat (o anki saat kalır)
+}
+
+/** Roket'ten son ROKET_GUN günün Paket Raporu'nu indirir, okur, panele gönderir. Sonuç mesajını döner. */
+async function roketAktar(tarayici, ayar) {
+  const sayfa = await tarayici.newPage();
+  const dosya = join(VERI, "roket-paket-raporu.xlsx");
+  try {
+    await sayfa.goto(ROKET, { waitUntil: "domcontentloaded", timeout: 60000 });
+    if (!(await roketHazirla(sayfa))) {
+      throw new Error("Roket oturumu kapalı. Masaüstündeki \"Mikro robotu - giriş\" kısayoluyla Roket'e bir kez giriş yapın.");
+    }
+    // Menü → Raporlama → Paket Raporu
+    await roketTikla(sayfa, "Menü");
+    if (!(await roketEtiketler(sayfa)).includes("Paket Raporu")) await roketTikla(sayfa, "Raporlama");
+    await roketTikla(sayfa, "Paket Raporu");
+    await sayfa.waitForTimeout(2000);
+
+    const bugunIso = bugun();
+    const basIso = new Date(Date.parse(bugunIso + "T12:00:00Z") - ROKET_GUN * 86400000).toISOString().slice(0, 10);
+    // Başlangıç tarihi kutusu gerçek bir <input>: fareyle tıklanınca tarih seçici açılır
+    const kutu = async (ad) => {
+      const r = await sayfa.evaluate((ad) => {
+        const i = [...document.querySelectorAll("input")].find((e) => (e.getAttribute("aria-label") || "").includes(ad));
+        if (!i) return null;
+        const b = i.getBoundingClientRect();
+        return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+      }, ad);
+      if (!r) throw new Error(`Roket Paket Raporu'nda "${ad}" kutusu bulunamadı.`);
+      await sayfa.mouse.click(r.x, r.y);
+      await sayfa.waitForTimeout(800);
+    };
+    await kutu("Başlangıç");
+    await roketTarihSec(sayfa, basIso);
+    await sayfa.waitForTimeout(800);
+    // Bitiş seçicisi genelde kendiliğinden açılır; açılmadıysa kutuya tıkla
+    if (!(await roketEtiketler(sayfa)).some((t) => t.startsWith("Tarih seçin"))) await kutu("Bitiş");
+    await roketTarihSec(sayfa, bugunIso);
+
+    await roketTikla(sayfa, "Filtrele");
+    // "Toplam Paket: N" yazısı 3 saniye değişmeyene kadar bekle (veriler canlı geliyor)
+    let onceki = "", ayni = 0;
+    for (let i = 0; i < 40 && ayni < 3; i++) {
+      await sayfa.waitForTimeout(1000);
+      const t = (await roketEtiketler(sayfa)).find((x) => /^Toplam Paket: \d+/.test(x)) || "";
+      ayni = t && t === onceki ? ayni + 1 : 0;
+      onceki = t;
+    }
+    log(`Roket: ${basIso} – ${bugunIso} ${onceki || "(paket sayısı okunamadı)"}`);
+
+    const [indirme] = await Promise.all([
+      sayfa.waitForEvent("download", { timeout: 60000 }),
+      roketTikla(sayfa, "Excel olarak indir"),
+    ]);
+    await indirme.saveAs(dosya);
+    const wb = xlsx.read(readFileSync(dosya), { type: "buffer" });
+    const satirlar = xlsx.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: null, blankrows: false });
+    const okuma = roketExcelOku(satirlar);
+    // İlk gün yarım (başlangıç saati o anki saat) → gönderilmez; bugün yarım ama gönderilir, yarın düzelir.
+    const gunler = okuma.gunler.filter((g) => g.tarih > basIso);
+    if (!gunler.length) return "Roket: bu aralıkta teslim edilmiş paket yok.";
+
+    // Sabit kurye seçimleri: aynı gün daha önce seçildiyse korunur; yoksa bir önceki günün sabitleri.
+    const { mevcut = {}, onceki: oncekiGun = null } = await rpc(ayar, "roket_pc_atamalar",
+      { p_anahtar: ayar.anahtar, p_bas: gunler[0].tarih, p_bit: gunler[gunler.length - 1].tarih }) || {};
+    const sabitAdlari = (g) => g ? {
+      s1: g.kuryeler.filter((k) => atamaBul(g, k) === "s1").map((k) => k.ad),
+      s2: g.kuryeler.filter((k) => atamaBul(g, k) === "s2").map((k) => k.ad),
+    } : {};
+    let ref = sabitAdlari(oncekiGun);
+    const gonder = gunler.map((g) => {
+      const eski = mevcut[g.tarih];
+      const kuryeler = varsayilanAtama(g.kuryeler, eski ? sabitAdlari(eski) : ref).map((k) => {
+        const e = eski?.kuryeler?.find((x) => x.ad === k.ad);
+        return e ? { ...k, atama: atamaBul(eski, e) } : k;
+      });
+      const yeni = { ...g, kuryeler };
+      ref = sabitAdlari(yeni);
+      return yeni;
+    });
+    const n = await rpc(ayar, "roket_pc_yukle", { p_anahtar: ayar.anahtar, p_gunler: gonder });
+    const paket = gonder.reduce((t, g) => t + g.toplamPaket, 0);
+    return `Roket: ${n} gün güncellendi (${paket} paket).${okuma.uyari.length ? " " + okuma.uyari.join(" ") : ""}`;
+  } finally {
+    try { unlinkSync(dosya); } catch { /* yok */ }   // müşteri bilgisi içeren dosya bilgisayarda kalmasın
+    await sayfa.close().catch(() => {});
+  }
+}
+
 async function kurulum() {
   log("Kurulum: Chrome açılıyor. Mikro'ya giriş yapın, Gelen e-Faturalar sayfası açılınca bu pencere kendiliğinden kapanır.");
   const tarayici = await tarayiciAc(true);
@@ -187,7 +345,24 @@ async function kurulum() {
   await sayfa.waitForURL((u) => mikrodaMi(String(u)), { timeout: 10 * 60 * 1000 });
   await sayfa.waitForTimeout(3000);
   log("Mikro oturumu kaydedildi.");
+  log("Şimdi Roket Adisyon açılıyor. Roket'e giriş yapın; Kontrol Paneli açılınca pencere kendiliğinden kapanır.");
+  await sayfa.goto(ROKET, { waitUntil: "domcontentloaded" }).catch(() => {});
+  const bas = Date.now();
+  while (Date.now() - bas < 10 * 60 * 1000) {
+    if (await roketHazirla(sayfa, 15000).catch(() => false)) break;
+    await sayfa.waitForTimeout(2000);
+  }
+  await sayfa.waitForTimeout(3000);
+  log("Roket oturumu kaydedildi.");
   await tarayici.close();
+}
+
+async function sadeceRoket() {
+  const ayar = ayarOku();
+  const tarayici = await tarayiciAc(false);
+  try { log(await roketAktar(tarayici, ayar)); }
+  catch (e) { log("HATA: Roket: " + (e?.message || e)); process.exitCode = 1; }
+  finally { await tarayici.close().catch(() => {}); }
 }
 
 const bugunCalisti = () => existsSync(SON_CALISMA) && readFileSync(SON_CALISMA, "utf8").trim() === bugun();
@@ -210,9 +385,18 @@ async function aktarim({ zorla = argv.has("--zorla"), talep = null } = {}) {
     log(`${toplam} fatura bulundu, ${faturalar.length} tanesi okundu${hatali ? `, ${hatali} tanesi okunamadı` : ""}. Panele gönderiliyor…`);
     const sonuc = await rpc(ayar, "mikro_pc_aktar", { p_anahtar: ayar.anahtar, p: faturalar });
     log(sonuc?.mesaj || "Aktarıldı.");
+    // Roket ayrı denenir: Roket'te sorun olsa da Mikro aktarımı başarılı sayılır.
+    let roketMesaj = "";
+    try { roketMesaj = await roketAktar(tarayici, ayar); log(roketMesaj); }
+    catch (e) {
+      roketMesaj = "Roket alınamadı: " + String(e?.message || e);
+      log("HATA: " + roketMesaj);
+      await rpc(ayar, "mikro_pc_hata", { p_anahtar: ayar.anahtar, p_mesaj: roketMesaj }).catch(() => {});
+    }
     writeFileSync(SON_CALISMA, bugun());
+    const mesaj = [sonuc?.mesaj || "Aktarıldı.", roketMesaj].filter(Boolean).join(" ");
     if (talep) await rpc(ayar, "mikro_pc_talep_bitir", { p_anahtar: ayar.anahtar, p_id: talep, p_durum: "bitti",
-      p_mesaj: sonuc?.mesaj || "Aktarıldı.", p_sonuc: { ...(sonuc || {}), bulunan: toplam, okunamayan: hatali } }).catch((e) => log("Talep kapatılamadı: " + e.message));
+      p_mesaj: mesaj, p_sonuc: { ...(sonuc || {}), bulunan: toplam, okunamayan: hatali } }).catch((e) => log("Talep kapatılamadı: " + e.message));
   } catch (e) {
     const mesaj = String(e?.message || e);
     log("HATA: " + mesaj);
@@ -242,5 +426,5 @@ async function bekle() {
   }
 }
 
-(argv.has("--kurulum") ? kurulum() : argv.has("--bekle") ? bekle() : aktarim())
+(argv.has("--kurulum") ? kurulum() : argv.has("--bekle") ? bekle() : argv.has("--roket") ? sadeceRoket() : aktarim())
   .catch((e) => { log("HATA: " + (e?.message || e)); process.exitCode = 1; });

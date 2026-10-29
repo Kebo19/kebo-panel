@@ -1,7 +1,11 @@
-KEBO MİKRO ROBOTU
-=================
-Mikro e-Portal'dan gelen faturaları okuyup Kebo Panel'e aktarır: faturalar ilgili carilere işlenir
-(Excel yüklemek gerekmez, yeni tedarikçiye cari açılır), stok fiyatları güncellenir, sonuç rapor edilir.
+KEBO DÜKKÂN ROBOTU (Mikro + Roket)
+==================================
+1) Mikro e-Portal'dan gelen faturaları okuyup Kebo Panel'e aktarır: faturalar ilgili carilere işlenir
+   (Excel yüklemek gerekmez, yeni tedarikçiye cari açılır), stok fiyatları güncellenir, sonuç rapor edilir.
+2) Roket Adisyon'dan (Roadrunner) son 7 günün Paket Raporu'nu indirir, bu bilgisayarda okur ve panele
+   sadece günlük kurye özetlerini gönderir (kurye, paket, kapıda nakit/POS/kart). Müşteri adı, telefon ve
+   adres panele gönderilmez; indirilen Excel hemen silinir. Sonuç panelde Kurye Kontrol sayfasında görünür
+   ve Kasa Raporu'nun Kurye adımında "Roket'ten doldur" ile kullanılır.
 
 NE ZAMAN ÇALIŞIR?
 - Panelde Faturalar ya da Fiyat Listesi sayfasındaki "Faturaları şimdi çek" butonuna basılınca
@@ -14,14 +18,16 @@ KURULUM (dükkân bilgisayarında bir kez)
 2) Bilgisayarda Google Chrome ve Node.js (https://nodejs.org, LTS) kurulu olmalı.
 3) KURULUM.bat dosyasına çift tıklayın ve ekrandaki adımları izleyin:
    - Mikro e-posta / parola sorulur (bu bilgisayarda, bu Windows kullanıcısına özel şifreli saklanır),
-   - Chrome açılır, Mikro'ya bir kez giriş yaparsınız (pencere kendiliğinden kapanır),
+   - Chrome açılır, Mikro'ya bir kez giriş yaparsınız; ardından aynı pencerede Roket Adisyon açılır,
+     Roket'e de bir kez giriş yaparsınız (pencere kendiliğinden kapanır),
    - Görev Zamanlayıcı'ya "Kebo Mikro Robotu" eklenir,
    - ilk aktarım hemen yapılır.
 4) Panelde Faturalar sayfasında "Dükkân bilgisayarı açık" yazısını görünce kurulum tamamdır.
 
 SONRASI
 - Masaüstündeki "Mikro robotu - şimdi çalıştır" kısayolu aktarımı elle hemen yapar.
-- Mikro parolası değişirse ya da oturum düşerse "Mikro robotu - giriş" kısayoluyla tekrar giriş yapın.
+- Mikro ya da Roket oturumu düşerse "Mikro robotu - giriş" kısayoluyla tekrar giriş yapın (ikisi de sorulur).
+- Sadece Roket'i denemek için bu klasörde: npm run roket
 - Robot çalışırken küçük bir Chrome penceresi açılıp kapanabilir; kapatmayın.
 - Kayıt dosyası: %LOCALAPPDATA%\kebo-mikro-robot\robot.log
 - Panelde: Faturalar / Fiyat Listesi sayfasındaki "Mikro'dan şimdi çek" kartı son çalışmayı ve hataları gösterir.
