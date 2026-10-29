@@ -27,9 +27,9 @@
 import { chromium } from "playwright-core";
 import xlsx from "xlsx";
 import { roketExcelOku, varsayilanAtama, atamaBul } from "./roket-oku.mjs";
-import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync, statSync, unlinkSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync, statSync, unlinkSync, cpSync } from "node:fs";
 import { hostname } from "node:os";
-import { createServer } from "node:net";
+import { createServer, connect } from "node:net";
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -41,6 +41,8 @@ const LOG = join(VERI, "robot.log");
 const SON_CALISMA = join(VERI, "son-basarili.txt");
 const KIMLIK = join(VERI, "mikro-kimlik.txt"); // Windows DPAPI ile şifreli (sadece bu Windows kullanıcısı çözebilir)
 const PROFIL = join(VERI, "chrome-profil");
+const ROKET_PROFIL = join(VERI, "roket-profil"); // Roket ayrı profilde: dinleyici tarayıcıyı hep açık tutar, Mikro'yu engellemez
+const DINLE_PORT = 47613;                        // aynı bilgisayarda tek dinleyici + "dur" komutu
 const KILIT = join(VERI, "calisiyor.kilit");   // aynı anda iki robot çalışmasın
 const SON_HATA = join(VERI, "son-hata.txt");    // günlük çalışma hata verdiyse 1 saat sonra tekrar dener
 
@@ -88,12 +90,23 @@ function kimlikOku() {
   }
 }
 
-async function tarayiciAc(gorunur) {
+/** Roket profili yoksa (eski kurulum) Roket oturumunun bulunduğu eski ortak profilden bir kez kopyalanır. */
+function roketProfilHazirla() {
+  if (existsSync(ROKET_PROFIL) || !existsSync(PROFIL)) return;
+  try {
+    cpSync(PROFIL, ROKET_PROFIL, { recursive: true, filter: (y) => !/(Singleton\w*|lockfile|LOCK)$/i.test(y) });
+    log("Roket oturumu yeni Roket profiline taşındı.");
+  } catch (e) { log("Roket profili kopyalanamadı: " + (e?.message || e)); }
+}
+
+async function tarayiciAc(gorunur, profil = PROFIL) {
+  if (profil === ROKET_PROFIL) roketProfilHazirla();
   // Roket'in ekran yazıları Türkçe aranır (Tamam, Önceki ay…): tarayıcı Türkçe açılır.
-  const ortak = { headless: false, viewport: { width: 1280, height: 860 }, locale: "tr-TR", acceptDownloads: true,
-    args: gorunur ? ["--lang=tr-TR"] : ["--start-minimized", "--lang=tr-TR"] };
+  // Görünmez çalışmada pencere ekranın dışında açılır (gerçek tarayıcı; Roket'in robot doğrulaması etkilenmez).
+  const ortak = { headless: false, chromiumSandbox: true, viewport: { width: 1280, height: 860 }, locale: "tr-TR", acceptDownloads: true,
+    args: gorunur ? ["--lang=tr-TR"] : ["--window-position=-32000,-32000", "--lang=tr-TR"] };
   for (const channel of ["chrome", "msedge"]) {
-    try { return await chromium.launchPersistentContext(PROFIL, { ...ortak, channel }); }
+    try { return await chromium.launchPersistentContext(profil, { ...ortak, channel }); }
     catch (e) { log(`${channel} açılamadı: ${String(e.message || e).split("\n")[0]}`); }
   }
   throw new Error("Bu bilgisayarda Google Chrome ya da Microsoft Edge bulunamadı.");
@@ -213,10 +226,12 @@ async function roketHazirla(sayfa, sure = 90000) {
       const p = document.querySelector("flt-semantics-placeholder");
       if (p) p.click();
       const et = [...document.querySelectorAll("flt-semantics")].map((e) => (e.getAttribute("aria-label") || e.textContent || "").trim());
-      return { menu: et.includes("Menü"), giris: !!document.querySelector('input[type="password"]') || et.some((t) => /^Giriş yap$/.test(t)) };
+      // Dar ekranda "Menü" düğmesi, geniş ekranda sol menü (Kontrol Paneli, Paket Raporu, Çıkış Yap) görünür
+      const menu = et.some((t) => t === "Menü" || /Paket Raporu|Çıkış Yap|Kontrol Paneli/.test(t));
+      return { menu, giris: !!document.querySelector('input[type="password"]') || et.some((t) => /^Giriş yap$/.test(t)) };
     }).catch(() => ({ menu: false, giris: false }));
-    if (d.menu) return true;
     if (d.giris) return false;
+    if (d.menu) return true;
     await sayfa.waitForTimeout(1500);
   }
   throw new Error("Roket Adisyon açılmadı (internet bağlantısını kontrol edin).");
@@ -236,8 +251,8 @@ async function roketTikla(sayfa, aranan, { duzenli = false, sure = 20000 } = {})
       e.click();
       return true;
     }, { aranan, duzenli });
-    if (ok) { await sayfa.waitForTimeout(600); return; }
-    await sayfa.waitForTimeout(500);
+    if (ok) { await sayfa.waitForTimeout(350); return; }
+    await sayfa.waitForTimeout(250);
   }
   throw new Error(`Roket ekranında "${aranan}" bulunamadı (Roket'in ekranı değişmiş olabilir).`);
 }
@@ -259,20 +274,32 @@ async function roketTarihSec(sayfa, iso) {
   await roketTikla(sayfa, "Tamam");      // saat (o anki saat kalır)
 }
 
-/** Roket'ten son ROKET_GUN günün Paket Raporu'nu indirir, okur, panele gönderir. Sonuç mesajını döner. */
-async function roketAktar(tarayici, ayar, { tarih = null } = {}) {
-  const sayfa = await tarayici.newPage();
+/** Sayfayı Roket → Paket Raporu ekranına getirir (zaten oradaysa hiçbir şey yapmaz). */
+async function roketPaketSayfasi(sayfa) {
+  const paketEkrani = () => sayfa.evaluate(() => {
+    document.querySelector("flt-semantics-placeholder")?.click();
+    return [...document.querySelectorAll("input")].some((e) => (e.getAttribute("aria-label") || "").includes("Başlangıç"));
+  }).catch(() => false);
+  if (sayfa.url().includes("roketadisyon") && await paketEkrani()) return;
+  await sayfa.goto(ROKET, { waitUntil: "domcontentloaded", timeout: 60000 });
+  if (!(await roketHazirla(sayfa))) {
+    throw new Error("Roket oturumu kapalı. Masaüstündeki \"Kebo robotu - giriş\" kısayoluyla Roket'e bir kez giriş yapın.");
+  }
+  // (Menü →) Raporlama → Paket Raporu. Geniş ekranda sol menü hep açık, dar ekranda "Menü" düğmesi var.
+  const var_ = async (re) => (await roketEtiketler(sayfa)).some((t) => re.test(t));
+  if (!(await var_(/^Paket Raporu$/)) && !(await var_(/^Raporlama$/))) await roketTikla(sayfa, "Menü");
+  if (!(await var_(/^Paket Raporu$/))) await roketTikla(sayfa, "Raporlama");
+  await roketTikla(sayfa, "Paket Raporu");
+  for (let i = 0; i < 40 && !(await paketEkrani()); i++) await sayfa.waitForTimeout(250);
+}
+
+/** Roket'ten Paket Raporu'nu indirir, okur, panele gönderir (tarih yoksa son ROKET_GUN gün). Sonuç mesajını döner.
+ *  hazirSayfa verilirse (dinleyicinin hep açık sayfası) o kullanılır ve kapatılmaz. */
+async function roketAktar(tarayici, ayar, { tarih = null, hazirSayfa = null } = {}) {
+  const sayfa = hazirSayfa || await tarayici.newPage();
   const dosya = join(VERI, "roket-paket-raporu.xlsx");
   try {
-    await sayfa.goto(ROKET, { waitUntil: "domcontentloaded", timeout: 60000 });
-    if (!(await roketHazirla(sayfa))) {
-      throw new Error("Roket oturumu kapalı. Masaüstündeki \"Kebo robotu - giriş\" kısayoluyla Roket'e bir kez giriş yapın.");
-    }
-    // Menü → Raporlama → Paket Raporu
-    await roketTikla(sayfa, "Menü");
-    if (!(await roketEtiketler(sayfa)).includes("Paket Raporu")) await roketTikla(sayfa, "Raporlama");
-    await roketTikla(sayfa, "Paket Raporu");
-    await sayfa.waitForTimeout(2000);
+    await roketPaketSayfasi(sayfa);
 
     // Roket'in tarih seçicisinde saat o anki saat kalır; bu yüzden istenen günün bir gün öncesinden bir gün
     // sonrasına kadar çekilir ve sadece istenen iş günü (09:45–23:59 dahil bütün gün) alınır.
@@ -289,21 +316,26 @@ async function roketAktar(tarayici, ayar, { tarih = null } = {}) {
       }, ad);
       if (!r) throw new Error(`Roket Paket Raporu'nda "${ad}" kutusu bulunamadı.`);
       await sayfa.mouse.click(r.x, r.y);
-      await sayfa.waitForTimeout(800);
+      await sayfa.waitForTimeout(400);
     };
     await kutu("Başlangıç");
     await roketTarihSec(sayfa, basIso);
-    await sayfa.waitForTimeout(800);
+    await sayfa.waitForTimeout(400);
     // Bitiş seçicisi genelde kendiliğinden açılır; açılmadıysa kutuya tıkla
     if (!(await roketEtiketler(sayfa)).some((t) => t.startsWith("Tarih seçin"))) await kutu("Bitiş");
     await roketTarihSec(sayfa, bugunIso);
 
+    const toplamYazisi = async () => (await roketEtiketler(sayfa)).find((x) => /^Toplam Paket: \d+/.test(x)) || "";
+    const eskiYazi = await toplamYazisi();   // açık kalan sayfada önceki sorgunun sonucu
     await roketTikla(sayfa, "Filtrele");
-    // "Toplam Paket: N" yazısı 3 saniye değişmeyene kadar bekle (veriler canlı geliyor)
-    let onceki = "", ayni = 0;
-    for (let i = 0; i < 40 && ayni < 3; i++) {
-      await sayfa.waitForTimeout(1000);
-      const t = (await roketEtiketler(sayfa)).find((x) => /^Toplam Paket: \d+/.test(x)) || "";
+    // "Toplam Paket: N" yazısı değişip 1,5 saniye sabit kalana kadar bekle (veriler canlı geliyor).
+    // Yazı değişmezse (iki sorgunun paket sayısı aynıysa) en az 3 saniye beklenir.
+    const filtreBas = Date.now();
+    let onceki = "", ayni = 0, degisti = !eskiYazi;
+    for (let i = 0; i < 80 && !(ayni >= 3 && (degisti || Date.now() - filtreBas > 3000)); i++) {
+      await sayfa.waitForTimeout(500);
+      const t = await toplamYazisi();
+      if (t && t !== eskiYazi) degisti = true;
       ayni = t && t === onceki ? ayni + 1 : 0;
       onceki = t;
     }
@@ -344,7 +376,7 @@ async function roketAktar(tarayici, ayar, { tarih = null } = {}) {
     return `Roket: ${n} gün güncellendi (${paket} paket).${okuma.uyari.length ? " " + okuma.uyari.join(" ") : ""}`;
   } finally {
     try { unlinkSync(dosya); } catch { /* yok */ }   // müşteri bilgisi içeren dosya bilgisayarda kalmasın
-    await sayfa.close().catch(() => {});
+    if (!hazirSayfa) await sayfa.close().catch(() => {});
   }
 }
 
@@ -357,22 +389,29 @@ async function kurulum() {
   await sayfa.waitForURL((u) => mikrodaMi(String(u)), { timeout: 10 * 60 * 1000 });
   await sayfa.waitForTimeout(3000);
   log("Mikro oturumu kaydedildi.");
-  log("Şimdi Roket Adisyon açılıyor. Roket'e giriş yapın; Kontrol Paneli açılınca pencere kendiliğinden kapanır.");
-  await sayfa.goto(ROKET, { waitUntil: "domcontentloaded" }).catch(() => {});
-  const bas = Date.now();
-  while (Date.now() - bas < 10 * 60 * 1000) {
-    if (await roketHazirla(sayfa, 15000).catch(() => false)) break;
-    await sayfa.waitForTimeout(2000);
-  }
-  await sayfa.waitForTimeout(3000);
-  log("Roket oturumu kaydedildi.");
   await tarayici.close();
+  return roketKurulum();
+}
+
+const dinleyiciAcikMi = () => new Promise((ok) => {
+  const c = connect(DINLE_PORT, "127.0.0.1", () => { c.end(); ok(true); });
+  c.on("error", () => ok(false));
+});
+
+/** Bu bilgisayarda çalışan dinleyiciye "dur" der (Roket profili boşalsın diye). Görev Zamanlayıcı 5 dk içinde yeniden açar. */
+async function dinleyiciyiDurdur() {
+  const vardi = await new Promise((ok) => {
+    const c = connect(DINLE_PORT, "127.0.0.1", () => { c.end("dur\n"); ok(true); });
+    c.on("error", () => ok(false));
+  });
+  if (vardi) await new Promise((r) => setTimeout(r, 4000));
 }
 
 /** Sadece Roket'e giriş (Mikro'suz bilgisayarlar, ör. ev bilgisayarı). */
 async function roketKurulum() {
+  await dinleyiciyiDurdur();
   log("Kurulum: Roket Adisyon açılıyor. Roket'e giriş yapın; Kontrol Paneli açılınca pencere kendiliğinden kapanır.");
-  const tarayici = await tarayiciAc(true);
+  const tarayici = await tarayiciAc(true, ROKET_PROFIL);
   const sayfa = tarayici.pages()[0] || await tarayici.newPage();
   await sayfa.goto(ROKET, { waitUntil: "domcontentloaded" }).catch(() => {});
   const bas = Date.now();
@@ -387,7 +426,8 @@ async function roketKurulum() {
 
 async function sadeceRoket() {
   const ayar = ayarOku();
-  const tarayici = await tarayiciAc(false);
+  await dinleyiciyiDurdur();
+  const tarayici = await tarayiciAc(false, ROKET_PROFIL);
   try { log(await roketAktar(tarayici, ayar)); }
   catch (e) { log("HATA: Roket: " + (e?.message || e)); process.exitCode = 1; }
   finally { await tarayici.close().catch(() => {}); }
@@ -413,10 +453,16 @@ async function aktarim({ zorla = argv.has("--zorla"), talep = null } = {}) {
     log(`${toplam} fatura bulundu, ${faturalar.length} tanesi okundu${hatali ? `, ${hatali} tanesi okunamadı` : ""}. Panele gönderiliyor…`);
     const sonuc = await rpc(ayar, "mikro_pc_aktar", { p_anahtar: ayar.anahtar, p: faturalar });
     log(sonuc?.mesaj || "Aktarıldı.");
+    await tarayici.close().catch(() => {});
+    tarayici = null;
     // Roket ayrı denenir: Roket'te sorun olsa da Mikro aktarımı başarılı sayılır.
+    // Bu bilgisayarda Roket dinleyicisi açıksa Roket'i o zaten düzenli çekiyor; burada atlanır.
     let roketMesaj = "";
-    try { roketMesaj = await roketAktar(tarayici, ayar); log(roketMesaj); }
-    catch (e) {
+    if (await dinleyiciAcikMi()) roketMesaj = "";
+    else try {
+      tarayici = await tarayiciAc(false, ROKET_PROFIL);
+      roketMesaj = await roketAktar(tarayici, ayar); log(roketMesaj);
+    } catch (e) {
       roketMesaj = "Roket alınamadı: " + String(e?.message || e);
       log("HATA: " + roketMesaj);
       await rpc(ayar, "mikro_pc_hata", { p_anahtar: ayar.anahtar, p_mesaj: roketMesaj }).catch(() => {});
@@ -454,44 +500,77 @@ async function bekle() {
   }
 }
 
-/** Hep açık kalır: 10 saniyede bir panelde "Roket'ten çek" isteği var mı bakar. */
+/** Hep açık kalır. Roket'i ekran dışında açık bir pencerede Paket Raporu ekranında hazır tutar:
+ *  - 3 saniyede bir panelde "Roket'ten çek" isteği var mı bakar; varsa o günü hemen çeker (~10-15 sn),
+ *  - 20 dakikada bir (09:00–03:00) son 7 günü kendiliğinden yeniler; böylece çoğu zaman veri panelde hazırdır. */
 async function dinle() {
-  // Aynı bilgisayarda ikinci dinleyici açılmasın
-  const tek = createServer();
-  try { await new Promise((ok, red) => { tek.once("error", red); tek.listen(47613, "127.0.0.1", ok); }); }
+  // Aynı bilgisayarda ikinci dinleyici açılmasın; "dur" gelirse (giriş kısayolu) tarayıcıyı kapatıp çık
+  let tarayici = null, sayfa = null, kapaniyor = false;
+  const kapat = async () => { const t = tarayici; tarayici = null; sayfa = null; await t?.close().catch(() => {}); };
+  const tek = createServer((c) => c.on("data", async (v) => {
+    if (String(v).trim() === "dur") { kapaniyor = true; log("Dinleyici durduruluyor (giriş yapılacak)."); await kapat(); process.exit(0); }
+  }));
+  try { await new Promise((ok, red) => { tek.once("error", red); tek.listen(DINLE_PORT, "127.0.0.1", ok); }); }
   catch { log("Dinleyici zaten çalışıyor."); return; }
   const ayar = ayarOku();
   const bilgisayar = hostname();
   log(`Roket dinleyicisi başladı (${bilgisayar}).`);
-  let hataSayisi = 0;
+
+  const hazirla = async () => {
+    if (!tarayici) {
+      tarayici = await tarayiciAc(false, ROKET_PROFIL);
+      tarayici.on("close", () => { tarayici = null; sayfa = null; });
+      sayfa = tarayici.pages()[0] || await tarayici.newPage();
+    }
+    await roketPaketSayfasi(sayfa);
+  };
+  /** İş yapar; hata olursa tarayıcıyı baştan açıp bir kez daha dener. */
+  const calistir = async (tarih) => {
+    try { await hazirla(); return await roketAktar(tarayici, ayar, { tarih, hazirSayfa: sayfa }); }
+    catch (e) {
+      if (/oturumu kapalı/.test(String(e?.message))) throw e;
+      log("Roket yeniden açılıyor: " + String(e?.message || e).split("\n")[0]);
+      await kapat();
+      await hazirla();
+      return await roketAktar(tarayici, ayar, { tarih, hazirSayfa: sayfa });
+    }
+  };
+
+  let hataSayisi = 0, sonYenileme = 0, oturumHatasi = 0;
+  const saat = () => Number(new Date().toLocaleTimeString("en-GB", { timeZone: "Europe/Istanbul", hour: "2-digit", hour12: false }));
   for (;;) {
-    await new Promise((r) => setTimeout(r, 10000));
-    // Mikro robotu bu bilgisayarda çalışıyorsa (aynı Chrome profili) bitmesini bekle
-    if (existsSync(KILIT) && Date.now() - statSync(KILIT).mtimeMs < 25 * 60 * 1000) continue;
+    await new Promise((r) => setTimeout(r, 3000));
+    if (kapaniyor) continue;
     let talep, tarih;
     try {
       ({ talep, tarih } = await rpc(ayar, "roket_pc_talep_al", { p_anahtar: ayar.anahtar, p_bilgisayar: bilgisayar }) || {});
       hataSayisi = 0;
     } catch (e) {
-      if (hataSayisi++ % 30 === 0) log("Panele ulaşılamadı: " + (e?.message || e));   // internet yoksa log dolmasın
+      if (hataSayisi++ % 100 === 0) log("Panele ulaşılamadı: " + (e?.message || e));   // internet yoksa log dolmasın
       continue;
     }
-    if (!talep) continue;
-    log(`Panelden "Roket'ten çek" istendi: ${tarih}`);
-    writeFileSync(KILIT, String(process.pid));
-    let tarayici;
-    try {
-      tarayici = await tarayiciAc(false);
-      const mesaj = await roketAktar(tarayici, ayar, { tarih });
-      log(mesaj);
-      await rpc(ayar, "roket_pc_talep_bitir", { p_anahtar: ayar.anahtar, p_id: talep, p_durum: "bitti", p_mesaj: mesaj }).catch((e) => log("İstek kapatılamadı: " + e.message));
-    } catch (e) {
-      const mesaj = String(e?.message || e);
-      log("HATA: Roket: " + mesaj);
-      await rpc(ayar, "roket_pc_talep_bitir", { p_anahtar: ayar.anahtar, p_id: talep, p_durum: "hata", p_mesaj: mesaj }).catch(() => {});
-    } finally {
-      await tarayici?.close().catch(() => {});
-      try { unlinkSync(KILIT); } catch { /* yok */ }
+    if (talep) {
+      const bas = Date.now();
+      log(`Panelden "Roket'ten çek" istendi: ${tarih}`);
+      try {
+        const mesaj = await calistir(tarih);
+        log(`${mesaj} (${Math.round((Date.now() - bas) / 1000)} sn)`);
+        oturumHatasi = 0;
+        await rpc(ayar, "roket_pc_talep_bitir", { p_anahtar: ayar.anahtar, p_id: talep, p_durum: "bitti", p_mesaj: mesaj }).catch((e) => log("İstek kapatılamadı: " + e.message));
+      } catch (e) {
+        const mesaj = String(e?.message || e);
+        log("HATA: Roket: " + mesaj);
+        await rpc(ayar, "roket_pc_talep_bitir", { p_anahtar: ayar.anahtar, p_id: talep, p_durum: "hata", p_mesaj: mesaj }).catch(() => {});
+      }
+      continue;
+    }
+    // Düzenli yenileme (oturum kapalıysa saatte bir dener)
+    const s = saat();
+    const bekleme = oturumHatasi ? 60 * 60 * 1000 : 20 * 60 * 1000;
+    if ((s >= 9 || s < 3) && Date.now() - sonYenileme > bekleme) {
+      sonYenileme = Date.now();
+      try { log(await calistir(null)); oturumHatasi = 0; }
+      catch (e) { oturumHatasi++; log("HATA: Roket (düzenli yenileme): " + (e?.message || e)); }
     }
   }
 }

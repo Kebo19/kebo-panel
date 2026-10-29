@@ -8,7 +8,9 @@ KEBO ROBOTU (Mikro + Roket)
    ve Kasa Raporu'nun Kurye adımında "Roket'ten doldur" ile kullanılır.
 
 3) "Roket'ten çek": Kasa Raporu'nun Kurye adımında bu düğmeye basınca, robotun açık olduğu bilgisayar
-   (dükkân ya da ev) 10 saniye içinde o günün raporunu Roket'ten çeker, yaklaşık 1 dakikada kuryeler dolar.
+   (dükkân ya da ev) o günün raporunu Roket'ten 10-20 saniyede çeker, kuryeler kendiliğinden dolar.
+   Bunun için robot Roket'i ekranın dışında açık bir pencerede hazır tutar (görev çubuğunda Chrome simgesi
+   görünebilir, kapatmayın) ve 20 dakikada bir son 7 günü kendiliğinden yeniler.
 
 HANGİ BİLGİSAYARA?
 - Dükkân bilgisayarı: KURULUM.bat'ta "1" seçin (Mikro + Roket).

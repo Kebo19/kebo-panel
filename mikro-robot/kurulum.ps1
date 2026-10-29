@@ -13,6 +13,11 @@ Set-Location $Klasor
 $Veri = Join-Path $env:LOCALAPPDATA "kebo-mikro-robot"
 New-Item -ItemType Directory -Force -Path $Veri | Out-Null
 
+# Eski surumden kalan Roket dinleyicisini kapat (Roket profili bos kalsin)
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+  Where-Object { $_.CommandLine -like '*robot.mjs*--dinle*' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
 function Baslik($m) { Write-Host ""; Write-Host "=== $m ===" -ForegroundColor Yellow }
 
 Write-Host ""
@@ -38,11 +43,12 @@ if ($LASTEXITCODE -ne 0) { Write-Host "Paket kurulamadi." -ForegroundColor Red; 
 
 if ($Dukkan) {
   Baslik "2/5 Mikro kullanici bilgisi"
-  Write-Host "Acilan pencereye Mikro e-Portal e-posta adresinizi ve parolanizi girin."
-  Write-Host "Bilgiler sadece bu bilgisayarda, bu Windows kullanicisina ozel sifreli olarak saklanir."
-  $k = Get-Credential -Message "Mikro e-Portal girisi (e-posta / parola)"
-  if ($k) {
-    @{ eposta = $k.UserName; parola = ($k.Password | ConvertFrom-SecureString) } | ConvertTo-Json | Set-Content -Encoding UTF8 (Join-Path $Veri "mikro-kimlik.txt")
+  Write-Host "Mikro e-Portal e-posta adresinizi ve parolanizi bu pencereye yazin (parola yazarken gorunmez)."
+  Write-Host "Bilgiler sadece bu bilgisayarda, bu Windows kullanicisina ozel sifreli olarak saklanir. Atlamak icin bos birakip Enter."
+  $eposta = Read-Host "Mikro e-posta"
+  $parola = if ($eposta) { Read-Host "Mikro parola" -AsSecureString } else { $null }
+  if ($eposta -and $parola -and $parola.Length -gt 0) {
+    @{ eposta = $eposta.Trim(); parola = ($parola | ConvertFrom-SecureString) } | ConvertTo-Json | Set-Content -Encoding UTF8 (Join-Path $Veri "mikro-kimlik.txt")
     Write-Host "Kaydedildi." -ForegroundColor Green
   } else { Write-Host "Atlandi (oturum kapanirsa robot kendisi giris yapamaz, kisayolla giris yaparsiniz)." }
 
@@ -73,7 +79,7 @@ function GizliBetik($ad, $arg) {
 }
 $kullanici = "$env:USERDOMAIN\$env:USERNAME"
 
-# Roket dinleyicisi: oturum acilinca baslar, hep acik kalir; kapanirsa 5 dakika icinde yeniden baslar
+# Roket dinleyicisi: oturum acilinca baslar, hep acik kalir (Roket ekran disinda acik bekler); kapanirsa 5 dakika icinde yeniden baslar
 $vbsD = GizliBetik "gizli-dinle.vbs" "--dinle"
 $eylemD = New-ScheduledTaskAction -Execute "wscript.exe" -Argument "`"$vbsD`"" -WorkingDirectory $Klasor
 $tD1 = New-ScheduledTaskTrigger -AtLogOn -User $kullanici

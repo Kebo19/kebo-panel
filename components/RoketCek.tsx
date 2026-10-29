@@ -106,8 +106,8 @@ export default function RoketCek({ tarih, roketGun, onYuklendi, onDoldur }: {
       {aktif && (
         <p className="text-sky-300">
           {talep!.durum === "calisiyor"
-            ? `${talep!.bilgisayar || "Bilgisayar"} Roket'ten bu günün raporunu indiriyor (yaklaşık 1 dakika). Bitince kuryeler kendiliğinden dolar.`
-            : pcAcik ? "İstek gönderildi; robot birkaç saniye içinde başlayacak."
+            ? `${talep!.bilgisayar || "Bilgisayar"} Roket'ten bu günün raporunu indiriyor (10-20 saniye). Bitince kuryeler kendiliğinden dolar.`
+            : pcAcik ? "İstek gönderildi; robot hemen başlıyor."
               : "İstek gönderildi. Robotun açık olduğu bilgisayar görünmüyor; dükkân ya da ev bilgisayarı açılınca çalışır (30 dakika bekler)."}
         </p>
       )}
