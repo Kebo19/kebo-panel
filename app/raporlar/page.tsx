@@ -23,6 +23,7 @@ import {
 import { useYetki } from "@/lib/useYetki";
 import { slotToplami, atamaBul, adEslesir, type RoketGun } from "@/lib/roket";
 import RoketCek from "@/components/RoketCek";
+import { IADE_FIS, IADE_MARKA, IADE_KANAL_AD, IADE_ODEME_AD, MARKA_KANALLARI, iadeOdemeSecenekleri, iadeDetayDuzelt, iadeEksikAdim, iadeEtiketi, iadeAciklamaYaz, iadeAciklamaOku, type IadeDetay } from "@/lib/iade";
 import { indirimFarkliAlanlar, INDIRIM_ALAN_ADLARI, ESKI_KAPIDA_INDIRIM_ALANLARI, type PanelRaporu, type MpRaporDoldurma } from "@/lib/magicpay";
 import { RAPOR_ONAYCI_ADLARI } from "@/lib/yetki";
 import { RaporMagicpayPaneli } from "@/components/MagicpayKarsilastirma";
@@ -50,6 +51,8 @@ interface SatirRaporu {
   firmaId?: string; firmaUnvan?: string; personelIsim?: string; personelId?: string;
   /** Giderin nasıl ödendiği (yoksa nakit). Sadece "nakit" bugünün kasasından çıkar ve brüt ciroya eklenir. */
   odeme?: GiderOdeme; odemeNot?: string;
+  /** Sadece iptal/iade satırında: fiş türü, marka, kanal, ödeme. */
+  iade?: IadeDetay;
 }
 
 /** Gider ödeme yöntemi:
@@ -826,13 +829,16 @@ function PlatformSatir({label, value, onChange, indirim, onIndirimChange, disabl
 // ─── AKILLI GİDER INPUT ───────────────────────────────────────────────────────
 
 function AkilliGiderInput({
-  value, onChange, disabled, oneriListesi, placeholder="Açıklama..."
+  value, onChange, disabled, oneriListesi, placeholder="Açıklama...", inputClassName, altBilgi = "Diğer: istediğinizi yazabilirsiniz"
 }: {
   value: string;
   onChange: (v: string) => void;
   disabled: boolean;
   oneriListesi: string[];
   placeholder?: string;
+  /** Verilirse kutunun varsayılan (küçük) görünümünün yerine geçer. */
+  inputClassName?: string;
+  altBilgi?: string;
 }) {
   const [acik, setAcik] = useState(false);
   const [arama, setArama] = useState("");
@@ -861,24 +867,24 @@ function AkilliGiderInput({
         value={value}
         onChange={e => { onChange(e.target.value); setArama(e.target.value); setAcik(true); }}
         onFocus={() => setAcik(true)}
-        className="w-full bg-alan border border-cizgi hover:border-cizgi-guclu focus:border-altin/50 text-yazi text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"
+        className={inputClassName || "w-full bg-alan border border-cizgi hover:border-cizgi-guclu focus:border-altin/50 text-yazi text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"}
       />
       {acik && !disabled && filtreli.length > 0 && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-kart border border-cizgi rounded-xl shadow-2xl overflow-hidden">
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-kart border border-cizgi-guclu rounded-xl shadow-2xl overflow-y-auto max-h-80">
           {filtreli.map((o, i) => (
             <button
               key={i}
               type="button"
               onMouseDown={() => { onChange(o); setAcik(false); setArama(""); }}
-              className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-500/10 hover:text-yazi transition-colors flex items-center gap-2"
+              className="w-full text-left px-3 py-2 text-[14px] text-gray-300 hover:bg-blue-500/10 hover:text-yazi transition-colors flex items-center gap-2"
             >
-              <Sparkles size={9} className="text-blue-700/50 shrink-0"/>
+              <Sparkles size={11} className="text-blue-400/60 shrink-0"/>
               {o}
             </button>
           ))}
-          <div className="border-t border-cizgi px-3 py-1 text-[10px] text-gray-700">
-            Diğer: istediğinizi yazabilirsiniz
-          </div>
+          {altBilgi && <div className="border-t border-cizgi px-3 py-1.5 text-[12px] text-gray-500">
+            {altBilgi}
+          </div>}
         </div>
       )}
     </div>
@@ -1619,7 +1625,7 @@ export default function RaporlarPage() {
     setGiderler(yuklenenGiderler.length ? yuklenenGiderler : [{id:Date.now(),aciklama:"",tutar:"",tip:"normal" as const}]);
     const iadeListesi = satirMetniniAyristir(r.iade_aciklama);
     setIadeler(iadeListesi.length
-      ? iadeListesi.map((g,i)=>({id:Date.now()+i+1000, aciklama:g.aciklama, tutar:g.tutar}))
+      ? iadeListesi.map((g,i)=>{ const o = iadeAciklamaOku(g.aciklama === "Belirtilmemiş" ? "" : g.aciklama); return {id:Date.now()+i+1000, aciklama:o.not, iade:o.detay, tutar:g.tutar}; })
       : [{id:Date.now()+1000,aciklama:"",tutar:""}]);
     // O günün puantajı (yoksa herkes varsayılan "Çalıştı").
     await puantajYukle(r.tarih);
@@ -1739,6 +1745,8 @@ export default function RaporlarPage() {
   const iadeSil = (id:number)=>setIadeler(iadeler.filter(i=>i.id!==id));
   const iadeDegistir = (id:number,field:"aciklama"|"tutar",val:string)=>
     setIadeler(iadeler.map(i=>i.id===id?{...i,[field]:field==="tutar"?paraGirdisi(val):val}:i));
+  const iadeDetayDegistir = (id:number, alan: Partial<IadeDetay>) =>
+    setIadeler(onceki => onceki.map(i => i.id===id ? {...i, iade: iadeDetayDuzelt({...(i.iade||{}), ...alan})} : i));
 
   const kuryeEkle = ()=>setKuryeler([...kuryeler,{id:Date.now(),isim:"",nakit:"",pos:"",paketSayisi:"",uzakPaket:"",paket9km:"",
     tip: tarih && tarih < ROADRUNNER_GECIS_GUNU ? "kendi" : "havuz"}]);
@@ -1830,7 +1838,7 @@ export default function RaporlarPage() {
         .map((k:TaramaSatiri,i:number)=>({ id: Date.now()+200+i, personelId: personelIdBul(k.personel), personelIsim: k.personel||"", tutar: nToStr(k.tutar), aciklama: k.aciklama||"" }));
       if (yeniKesintiler.length) setKesintiSatirlari(onceki => ekle ? [...onceki.filter(k => k.tutar || k.personelIsim), ...yeniKesintiler] : yeniKesintiler);
       const yeniIadeler = (veri.iadeler||[]).filter((i:TaramaSatiri)=>i.tutar||i.aciklama)
-        .map((i:TaramaSatiri,idx:number)=>({ id: Date.now()+300+idx, aciklama: i.aciklama||"", tutar: nToStr(i.tutar) }));
+        .map((i:TaramaSatiri,idx:number)=>{ const o = iadeAciklamaOku(i.aciklama||""); return { id: Date.now()+300+idx, aciklama: o.not, iade: o.detay, tutar: nToStr(i.tutar) }; });
       if (yeniIadeler.length) setIadeler(onceki => ekle ? [...onceki.filter(i => i.aciklama || i.tutar), ...yeniIadeler] : yeniIadeler);
       const sabitler: TaramaSatiri[] = (veri.kuryeSabit||[]);
       const havuzlar: TaramaSatiri[] = (veri.kuryeHavuz||[]).filter((k:TaramaSatiri)=>k.isim||k.paket||k.nakit||k.pos||k.tokenflex||k.paye);
@@ -1920,7 +1928,7 @@ export default function RaporlarPage() {
       const ilkGiren = (s: string) => (s || "").split(" | Düz:")[0];
 
       const giderAciklamaFinal = giderMetniOlustur(giderler, notlar);
-      const birlesikIade = iadeler.filter(i=>i.tutar||i.aciklama).map(i=>`${temizMetin(i.aciklama)||"Belirtilmemiş"}: ₺${i.tutar||"0"}`).join(" | ");
+      const birlesikIade = iadeler.filter(i=>i.tutar||i.aciklama||iadeEtiketi(i.iade||{})).map(i=>`${temizMetin(iadeAciklamaYaz(i.iade||{}, i.aciklama))||"Belirtilmemiş"}: ₺${i.tutar||"0"}`).join(" | ");
       const temizKuryeler = kuryeler.map(k=>({...k,nakit:tv(k.nakit).toString(),pos:tv(k.pos).toString(),
         tokenflex:tv(k.tokenflex).toString(),paye:tv(k.paye).toString()}));
       const pk = (p:PlatformGiris)=>parseInt(p.paket)||0;
@@ -2407,7 +2415,7 @@ export default function RaporlarPage() {
                   <button type="button" onClick={() => giderSil(g.id)} aria-label="Satırı sil" className="h-10 text-gray-500 hover:text-red-400 flex items-center justify-center"><Trash2 size={15}/></button>
                 );
                 return (<>
-                <div className="rounded-xl border border-red-500/20 bg-kart overflow-hidden">
+                <div className="rounded-xl border border-red-500/20 bg-kart">
                   <div className="px-4 py-3 border-b border-red-500/15 flex flex-wrap items-center justify-between gap-2">
                     <span className="text-[15px] font-bold text-red-200">Giderler</span>
                     {!isReadOnly && (
@@ -2445,7 +2453,7 @@ export default function RaporlarPage() {
                                   </select>
                                 )
                               ) : (
-                                <AkilliGiderInput value={g.aciklama} onChange={v => giderDegistir(g.id, { aciklama: v })} disabled={isReadOnly} oneriListesi={giderOnerileri}/>
+                                <AkilliGiderInput value={g.aciklama} onChange={v => giderDegistir(g.id, { aciklama: v })} disabled={isReadOnly} oneriListesi={giderOnerileri} inputClassName={kutu}/>
                               )}
                             </div>
                             <select disabled={isReadOnly} value={od}
@@ -2468,7 +2476,7 @@ export default function RaporlarPage() {
                 </div>
 
                 {/* ── PERSONEL YEMEĞİ / ISMARLAMA: fiş çıktı, para kasaya girmedi → maaştan düşülür (avans) ── */}
-                <div className="rounded-xl border border-teal-500/25 bg-kart overflow-hidden">
+                <div className="rounded-xl border border-teal-500/25 bg-kart">
                   <div className="px-4 py-3 border-b border-teal-500/15 flex flex-wrap items-center justify-between gap-2">
                     <span className="text-[15px] font-bold text-teal-200 flex items-center gap-2"><Users2 size={15}/> Personel yemeği / ısmarlama
                       {personelToplam > 0 && <span className="text-[13px] font-black">₺{fmt(personelToplam)}</span>}</span>
@@ -2478,23 +2486,29 @@ export default function RaporlarPage() {
                     )}
                   </div>
                   <div className="p-3 space-y-2.5">
-                    <p className="text-[12px] text-gray-500">Personel yedi ya da arkadaşına ısmarladı, fiş çıktı ama ödemedi: buraya yazın. Kasadan nakit çıkmış gibi sayılır, personelin hesabına <b className="text-teal-300">avans</b> olarak işlenir ve ay sonu maaşından düşülür.</p>
-                    {personelSatirlar.map(g => (
-                      <div key={g.id} className="grid grid-cols-[1fr_120px_28px] md:grid-cols-[200px_1fr_150px_28px] gap-2 items-center">
-                        <select disabled={isReadOnly} value={g.personelId || personelIdBul(g.personelIsim) || ""}
-                          onChange={e => { const p = avansPersonelListesi.find(x => x.id === e.target.value); giderDegistir(g.id, { personelId: p?.id, personelIsim: p?.isim || "" }); }}
-                          className={`${kutu} col-span-3 md:col-span-1 border-teal-500/30`}>
-                          <option value="">Personel seçin…</option>
-                          {g.personelIsim && !personelIdBul(g.personelIsim) && <option value="">{g.personelIsim} (listede yok)</option>}
-                          {avansPersonelListesi.map(p => <option key={p.id} value={p.id} className="bg-kart">{p.isim}</option>)}
-                        </select>
-                        <input type="text" placeholder="Ne yedi / kime ısmarladı? (örn: 2 dürüm, arkadaşına)" disabled={isReadOnly} value={g.aciklama}
+                    <p className="text-[12px] text-gray-500">Personel yedi ya da ısmarladı, fiş çıktı ama ödemedi: buraya yazın. Kasadan nakit çıkmış gibi sayılır, personelin hesabına <b className="text-teal-300">avans</b> olarak işlenir ve ay sonu maaşından düşülür.</p>
+                    {personelSatirlar.map(g => {
+                      const listedeYok = !!g.personelIsim?.trim() && !personelIdBul(g.personelIsim.trim());
+                      return (
+                      <div key={g.id} className="space-y-1">
+                      <div className="grid grid-cols-[1fr_120px_28px] md:grid-cols-[220px_1fr_150px_28px] gap-2 items-center">
+                        <div className="col-span-3 md:col-span-1 min-w-0">
+                          <AkilliGiderInput value={g.personelIsim || ""} disabled={isReadOnly}
+                            onChange={v => giderDegistir(g.id, { personelIsim: v, personelId: personelIdBul(v.trim()) })}
+                            oneriListesi={avansPersonelListesi.map(p => p.isim)}
+                            placeholder="Personel (yazın ya da seçin)" altBilgi="Listede yoksa adını yazın"
+                            inputClassName={`${kutu} border-teal-500/30`}/>
+                        </div>
+                        <input type="text" placeholder="Ne yedi? (örn: 2 dürüm, 1 ayran)" disabled={isReadOnly} value={g.aciklama}
                           onChange={e => giderDegistir(g.id, { aciklama: e.target.value })}
                           className={`${kutu} col-span-3 md:col-span-1`}/>
                         <div className="col-span-2 md:col-span-1">{tutarKutusu(g)}</div>
                         {silDugmesi(g)}
                       </div>
-                    ))}
+                      {listedeYok && <p className="text-[12px] text-amber-300/90 px-0.5">“{g.personelIsim}” personel listesinde yok — tutar bu adla avans olarak kaydedilir, kimsenin profiline bağlanmaz.</p>}
+                      </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -2558,35 +2572,75 @@ export default function RaporlarPage() {
                   </div>
                 </div>
                 )}
-                {/* İadeler */}
-                <div className="rounded-xl border border-orange-500/15 bg-kart overflow-hidden">
-                  <div className="px-3 py-2 border-b border-orange-500/15 flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider flex items-center gap-1.5"><RotateCcw size={11}/>İptal / İade</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-black text-orange-400">₺{fmt(ch.tIade)}</span>
-                      {!isReadOnly && <button type="button" onClick={iadeEkle} className="text-[10px] text-gray-600 hover:text-orange-400 border border-cizgi hover:border-orange-500/30 w-5 h-5 rounded flex items-center justify-center transition-colors">+</button>}
+                {/* İptal / İade — adım adım: Fiş → (paketse) Marka → Kanal → Ödeme → tutar */}
+                {(() => {
+                  const kutu = "w-full bg-alan border border-cizgi-guclu text-yazi text-[14px] h-10 px-3 rounded-lg outline-none focus:border-altin/50 disabled:opacity-50";
+                  const secim = <T extends string>(baslik: string, secenekler: { v: T; ad: string }[], secili: T | undefined, sec: (v: T) => void, siradaki: boolean) => (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={`w-16 shrink-0 text-[12px] font-bold ${siradaki ? "text-orange-300" : "text-gray-500"}`}>{baslik}</span>
+                      {secenekler.map(o => (
+                        <button key={o.v} type="button" onClick={() => sec(o.v)}
+                          className={`text-[13px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${secili === o.v
+                            ? "bg-orange-500/20 border-orange-400/60 text-orange-100"
+                            : "border-cizgi-guclu text-gray-300 hover:border-orange-500/40 hover:text-yazi"}`}>{o.ad}</button>
+                      ))}
                     </div>
+                  );
+                  const doluIade = iadeler.filter(i => tv(i.tutar) > 0);
+                  return (
+                <div className="rounded-xl border border-orange-500/20 bg-kart">
+                  <div className="px-4 py-3 border-b border-orange-500/15 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[15px] font-bold text-orange-200 flex items-center gap-2"><RotateCcw size={15}/> İptal / iade
+                      {ch.tIade > 0 && <span className="text-[13px] font-black">₺{fmt(ch.tIade)}</span>}</span>
+                    {!isReadOnly && (
+                      <button type="button" onClick={iadeEkle}
+                        className="text-[12px] font-semibold text-orange-200 border border-orange-500/30 hover:bg-orange-500/10 px-3 py-1.5 rounded-lg">+ İptal / iade</button>
+                    )}
                   </div>
-                  <div className="p-3 space-y-2">
-                    {iadeler.map((item,idx)=>(
-                      <div key={item.id} className="space-y-1.5">
-                        <input type="text" placeholder="İptal / iade fiş açıklaması..." disabled={isReadOnly} value={item.aciklama}
-                          onChange={e=>iadeDegistir(item.id,"aciklama",e.target.value)}
-                          className="w-full bg-alan border border-cizgi hover:border-cizgi-guclu focus:border-altin/50 text-yazi text-xs h-7 px-2.5 rounded-lg outline-none transition-all disabled:opacity-40 placeholder:text-gray-700"/>
-                        <div className="flex gap-1">
-                          <div className="relative flex-1">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-xs">₺</span>
-                            <input type="text" placeholder="0" disabled={isReadOnly} value={item.tutar}
-                              onChange={e=>iadeDegistir(item.id,"tutar",e.target.value)}
-                              className="w-full bg-alan border border-cizgi text-yazi text-xs font-bold h-7 pl-5 pr-2 rounded-lg outline-none focus:border-altin/50 disabled:opacity-40"/>
-                          </div>
-                          {!isReadOnly && iadeler.length>1 && <button type="button" onClick={()=>iadeSil(item.id)} className="text-gray-700 hover:text-red-400 px-1"><Trash2 size={11}/></button>}
+                  <div className="p-3 space-y-3">
+                    {isReadOnly ? (
+                      doluIade.length === 0 ? <p className="text-[12px] text-gray-500">İptal / iade yok.</p> :
+                      doluIade.map(i => (
+                        <div key={i.id} className="flex items-center justify-between gap-3 text-[14px]">
+                          <span className="text-yazi min-w-0"><b>{iadeEtiketi(i.iade || {}) || "Ayrıntı girilmemiş"}</b>{i.aciklama && <span className="text-gray-400"> · {i.aciklama}</span>}</span>
+                          <span className="font-bold text-orange-200 shrink-0">₺{fmt(tv(i.tutar))}</span>
                         </div>
-                        {idx < iadeler.length-1 && <div className="border-t border-cizgi mt-1"/>}
-                      </div>
-                    ))}
+                      ))
+                    ) : (<>
+                    <p className="text-[12px] text-gray-500">Fiş kesildi ama iptal edildi ya da para iade edildiyse girin. Sırayla seçin: hangi fiş, paketse hangi marka ve kanal, nasıl ödenmişti.</p>
+                    {iadeler.map((item, idx) => {
+                      const d = item.iade || {};
+                      const eksik = iadeEksikAdim(d);
+                      const kanallar = d.marka ? MARKA_KANALLARI[d.marka].map(k => ({ v: k, ad: IADE_KANAL_AD[k] })) : [];
+                      const odemeler = iadeOdemeSecenekleri(d).map(o => ({ v: o, ad: IADE_ODEME_AD[o] }));
+                      return (
+                        <div key={item.id} className={`rounded-lg border p-3 space-y-2 ${eksik && tv(item.tutar) > 0 ? "border-amber-500/40" : "border-cizgi"}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[13px] font-bold text-yazi">{idx + 1}. fiş{iadeEtiketi(d) && <span className="font-semibold text-orange-200"> · {iadeEtiketi(d)}</span>}</span>
+                            {iadeler.length > 1 && <button type="button" onClick={() => iadeSil(item.id)} aria-label="Satırı sil" className="text-gray-500 hover:text-red-400"><Trash2 size={15}/></button>}
+                          </div>
+                          {secim("Fiş", IADE_FIS, d.fis, v => iadeDetayDegistir(item.id, { fis: v }), eksik === "fis")}
+                          {d.fis === "paket" && secim("Marka", IADE_MARKA, d.marka, v => iadeDetayDegistir(item.id, { marka: v }), eksik === "marka")}
+                          {d.fis === "paket" && d.marka && secim("Kanal", kanallar, d.kanal, v => iadeDetayDegistir(item.id, { kanal: v }), eksik === "kanal")}
+                          {odemeler.length > 0 && secim("Ödeme", odemeler, d.odeme, v => iadeDetayDegistir(item.id, { odeme: v }), eksik === "odeme")}
+                          <div className="grid grid-cols-[1fr_150px] gap-2">
+                            <input type="text" placeholder="Neden? (isteğe bağlı, örn: müşteri vazgeçti)" value={item.aciklama}
+                              onChange={e => iadeDegistir(item.id, "aciklama", e.target.value)} className={kutu}/>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[14px] font-semibold">₺</span>
+                              <input type="text" inputMode="decimal" placeholder="0" value={item.tutar}
+                                onChange={e => iadeDegistir(item.id, "tutar", e.target.value)} className={`${kutu} pl-7 text-right font-bold`}/>
+                            </div>
+                          </div>
+                          {eksik && tv(item.tutar) > 0 && <p className="text-[12px] text-amber-300">Ayrıntı eksik: {eksik === "fis" ? "fiş türünü" : eksik === "marka" ? "markayı" : eksik === "kanal" ? "kanalı" : "ödeme türünü"} seçin.</p>}
+                        </div>
+                      );
+                    })}
+                    </>)}
                   </div>
                 </div>
+                  );
+                })()}
 
             </section>}
 
@@ -2896,6 +2950,14 @@ export default function RaporlarPage() {
                   {satir(ch.kuryeFark === 0 ? "tamam" : "uyari", "Kurye", ch.kuryeFark === 0 ? "Dengede" : ch.kuryeFark > 0 ? `₺${fmt(ch.kuryeFark)} eksik` : `₺${fmt(Math.abs(ch.kuryeFark))} fazla`,
                     ch.kuryeFark === 0 ? "Kapıda toplanan para kuryelerin teslim ettiğiyle aynı" : "Kapıda satış ile kuryelerin getirdiği tutmuyor",
                     () => adimaGit(3), ch.kuryeFark === 0 ? "Düzelt" : "Kuryeye git")}
+                  {ch.tIade > 0 && (() => {
+                    const dolu = iadeler.filter(i => tv(i.tutar) > 0);
+                    const eksikSayi = dolu.filter(i => iadeEksikAdim(i.iade || {}) !== null).length;
+                    const ozet = dolu.map(i => `${iadeEtiketi(i.iade || {}) || "ayrıntısız"} ₺${fmt(tv(i.tutar))}`).join(" · ");
+                    return satir(eksikSayi > 0 ? "uyari" : "tamam", "İptal / iade", `₺${fmt(ch.tIade)}`,
+                      eksikSayi > 0 ? `${eksikSayi} fişin ayrıntısı seçilmemiş (fiş / marka / kanal / ödeme) · ${ozet}` : ozet,
+                      () => adimaGit(2), "Düzelt");
+                  })()}
                   {yemekKarti > 0 && satir("tamam", "Yemek kartı", `₺${fmt(yemekKarti)}`, "Dükkân + kuryelerin aldığı kartlar · bankaya yatar")}
                   {satir(sayimFark == null ? "bos" : Math.abs(sayimFark) < 1 || oncekiSayimVar === false ? "tamam" : "uyari", "Biriken nakit sayımı",
                     sayim == null ? "—" : `₺${fmt(sayim)}`,

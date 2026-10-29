@@ -1,6 +1,6 @@
 # KEBO PANEL — DEVAM NOTU (yeni sohbete başlarken okunacak)
 
-Son güncelleme: 28.10.2026 (gece)
+Son güncelleme: 29.10.2026 (13:00)
 
 ## Proje
 - BCM Restoran (Kebo franchise + Chick'N Fride + Kıraloğlu, Çorum) yönetim paneli: https://kebo-panel.vercel.app
@@ -36,7 +36,12 @@ Son güncelleme: 28.10.2026 (gece)
 - **İrsaliye ↔ fatura sorgusu**: Stok ve Faturalar sayfasında "İrsaliye ↔ fatura" arama kutusu; Telegram'da `/belge <no ya da firma>` ve serbest soru.
 
 ## Bekleyenler / sıradaki işler
-1. **28.10 akşamı yazılan son değişiklikler (faturadan stok girişi, irsaliye eşleştirme, belge arama, kullanıcı yönetimi/şifreler) henüz yayınlanmadı** → `yayinla.bat` çalıştırılmalı, sonra Ayarlar → Telegram → "Kurulumu yenile" (yeni komutlar menüye gelsin). Yayından sonra kullanıcı yönetimi canlıda denenmeli (deneme kullanıcısı ekle → giriş → şifre değiştir → sil).
+0. **EN GÜNCEL DURUM (29.10, 13:00)**: 29.10 12:53'te `yayinla.bat` çalıştı ve push edildi (commit c662696) — bugünkü her şey yayında: Kontrol adımı/iki aşamalı kaydet, gider ödeme yöntemi, **Personel yemeği kartı** (personel kutusu yazınca listeden seçilir, kaydı olmayan kişinin adı da yazılabilir → avans kimsenin profiline bağlanmaz; ikinci kutu sadece "Ne yedi?", "kime ısmarladı" kaldırıldı), tek satırlık "+ Personel kesintisi" (ceza; kasayı etkilemez), **okunaklı yazılar** (`app/globals.css`: soluk griler açıldı, 9–11 px yazılar ~1,5–2 px büyüdü, ör. `text-[11px]` → 12.5px; bütün panel). Sıradaki:
+   - Kullanıcı canlıda yeni Gider adımını ve yazıları görecek; ekran görüntüleriyle düzeltme istekleri gelecek (eski görüntüler eski sürümdendi).
+   - **17, 18, 19 Ekim raporları** boş kaydedilmiş → açıp "Raporu sil" ile silinecek, yeniden girilecek.
+   - Robot kurulumu: kullanıcının bilgisayarına "2", dükkâna "1"; "Roket'ten çek" hızı denenecek.
+   - Kâğıt formun yeni adım sırasına (Kasa → Gider → Kurye) uyarlanması; geçmiş ayları dondurma konuşulacak.
+1. 28.10 değişiklikleri (faturadan stok girişi, irsaliye eşleştirme, belge arama, kullanıcı yönetimi/şifreler) artık yayında. Yapılmadıysa: Ayarlar → Telegram → "Kurulumu yenile" (yeni komutlar menüye gelsin) ve kullanıcı yönetimini canlıda dene (deneme kullanıcısı ekle → giriş → şifre değiştir → sil).
 2. Dükkân bilgisayarına robotu kurmak (`mikro-robot-kurulum.zip` v1.2 Mikro + Roket; kullanıcının kendi bilgisayarına da "2" ile → Chrome + Node.js LTS → `KURULUM.bat`; kurulumda Mikro ve Roket'e birer kez giriş).
 3. Kullanıcı: ürünlere sayım yeri ata, minimum stokları gözden geçir ('1' olanlar yer tutucu), envanter ürünlerini ve içecekleri (ayran, kola…) stok listesine ekle. `Stok-Sayim-Listeleri.xlsx` dolu gelirse panele toplu işlenecek.
 4. **Reçeteler** kullanıcıdan gelecek → `receteler` tablosuna gir (menü ürünü adı MagicPay'deki adla aynı olmalı).
