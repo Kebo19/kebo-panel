@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -23,6 +22,7 @@ import {
 } from "@/lib/hesap";
 import { useYetki } from "@/lib/useYetki";
 import { slotToplami, atamaBul, adEslesir, type RoketGun } from "@/lib/roket";
+import RoketCek from "@/components/RoketCek";
 import { indirimFarkliAlanlar, INDIRIM_ALAN_ADLARI, ESKI_KAPIDA_INDIRIM_ALANLARI, type PanelRaporu, type MpRaporDoldurma } from "@/lib/magicpay";
 import { RAPOR_ONAYCI_ADLARI } from "@/lib/yetki";
 import { RaporMagicpayPaneli } from "@/components/MagicpayKarsilastirma";
@@ -2542,18 +2542,14 @@ export default function RaporlarPage() {
                     </div>
                   </div>
                   <div className="p-3 space-y-3">
-                    {!isReadOnly && (roketGun ? (
-                      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 space-y-1.5 text-[12px]">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-amber-200">Roket&apos;te bu gün: <b>{roketGun.toplamPaket} paket</b>, {roketGun.kuryeler.length} kurye</span>
-                          <button type="button" onClick={() => roketleDoldur(roketGun)}
-                            className="text-[12px] font-bold px-3 py-1.5 rounded-lg kebo-btn-altin text-[#1a1408] hover:brightness-110">Roket&apos;ten doldur</button>
-                        </div>
-                        {roketNotu.length > 0 && <ul className="list-disc pl-4 text-amber-300 space-y-0.5">{roketNotu.map((n, i) => <li key={i}>{n}</li>)}</ul>}
+                    {!isReadOnly && (
+                      <div className="space-y-1.5">
+                        <RoketCek tarih={tarih} roketGun={roketGun}
+                          onYuklendi={(g) => { setRoketGun(g); if (g) roketleDoldur(g); }}
+                          onDoldur={() => roketGun && roketleDoldur(roketGun)} />
+                        {roketNotu.length > 0 && <ul className="list-disc pl-4 text-[12px] text-amber-300 space-y-0.5">{roketNotu.map((n, i) => <li key={i}>{n}</li>)}</ul>}
                       </div>
-                    ) : (
-                      <p className="text-[11px] text-gray-500">Roket Excel&apos;i yüklerseniz kuryeler otomatik dolar: <Link href="/kurye-kontrol" className="text-amber-300 underline">Kurye Kontrol</Link></p>
-                    ))}
+                    )}
                     <p className="text-[10px] text-gray-600">Kurye 1 ve Kurye 2&apos;de günlük en az <span className="text-amber-400 font-bold">30 paket</span> garantisi var — altında kalırsa ödemeye esas 30 alınır. Havuzda garanti ve isim yok.</p>
                     {(ch.tKapida > 0 || ch.tKuryeNakit + ch.tKuryePos + ch.tKuryeKart > 0) && (() => {
                       const fark = (x: number) => Math.round(x * 100) / 100;
