@@ -3070,9 +3070,6 @@ export default function RaporlarPage() {
               </div>
             )}
 
-            {!isReadOnly && (
-              <button type="button" onClick={() => adimaGit(3)} className="text-[13px] font-semibold text-gray-500 hover:text-yazi">← Geri: Kurye</button>
-            )}
             {/* ÖZET BANT */}
             <div className="rounded-xl border border-cizgi bg-alan px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 mt-1">
               <div className="flex flex-wrap items-center gap-4 text-xs">
@@ -3139,17 +3136,25 @@ export default function RaporlarPage() {
             </div>
             </section>}
 
-            {/* ── Adımlar arası geçiş (1–3) ── */}
-            {!isReadOnly && adim < 4 && (
+            {/* ── Adımlar arası geçiş: 1–3'te Geri / İleri, 4'te Geri / Kaydet ── */}
+            {!isReadOnly && (
               <div className="sticky bottom-0 z-30 flex gap-2.5 bg-zemin/95 backdrop-blur py-3">
                 {adim > 1 && (
                   <button type="button" onClick={() => adimaGit(adim - 1)}
-                    className="flex-1 h-14 rounded-xl border border-cizgi text-gray-400 text-[15px] font-semibold">Geri</button>
+                    className="flex-1 h-14 rounded-xl border border-cizgi text-gray-400 hover:text-yazi text-[15px] font-semibold">← Geri: {ADIMLAR[adim - 2]}</button>
                 )}
-                <button type="button" onClick={() => adimaGit(adim + 1)}
-                  className="flex-[2] h-14 rounded-xl kebo-btn-altin text-[#1a1408] text-[16px] font-black hover:brightness-110">
-                  İleri: {ADIMLAR[adim]}
-                </button>
+                {adim < 4 ? (
+                  <button type="button" onClick={() => adimaGit(adim + 1)}
+                    className="flex-[2] h-14 rounded-xl kebo-btn-altin text-[#1a1408] text-[16px] font-black hover:brightness-110">
+                    İleri: {ADIMLAR[adim]}
+                  </button>
+                ) : (
+                  <button type="submit" disabled={saving || !!kayitEngeli} title={kayitEngeli || undefined}
+                    className="flex-[2] h-14 rounded-xl kebo-btn-altin text-[#1a1408] text-[16px] font-black hover:brightness-110 disabled:opacity-40 flex items-center justify-center gap-2">
+                    {saving ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>}
+                    {selectedRapor ? "Kaydet" : "Raporu Kaydet"}
+                  </button>
+                )}
               </div>
             )}
 
