@@ -224,7 +224,7 @@ export default function KarZararPage() {
                   <Kalem ad="Sabit ve işletme giderleri" isaret="−" tutar={s.sabitIsletme} taban={taban} detay={s.sabitIsletmeDetay}
                     aciklama="Kira, elektrik, doğalgaz, su, internet, muhasebe, market/malzeme ve diğer kasa/banka giderleri." />
                   <Kalem ad="Komisyonlar" isaret="−" tutar={s.komisyon} taban={taban} detay={s.komisyonDetay}
-                    aciklama="Banka ve POS komisyonları (kasaya/ekstreden girilenler)." />
+                    aciklama="Banka komisyonları + POS %2 (dükkân + sabit kurye, otomatik) + havuz kurye POS %5 (Roadrunner kesiyor, otomatik)." />
                   {krediGider && (
                     <Kalem ad="Kredi taksitleri" isaret="−" tutar={s.krediTaksidi} taban={taban} aciklama="Anahtar açık: kredi taksitleri gider sayılıyor." />
                   )}

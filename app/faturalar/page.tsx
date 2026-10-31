@@ -13,6 +13,7 @@ import {
   ChevronDown, ChevronUp, Check, Square, CheckSquare, Percent, FileSpreadsheet, Edit2
 } from "lucide-react";
 import FaturaDuzenle from "@/components/FaturaDuzenle";
+import CariEkstreKarsilastir from "@/components/CariEkstreKarsilastir";
 import OdemeDetay, { type DetayOdeme, type DetayFatura } from "@/components/OdemeDetay";
 import { kdvOzeti, faturaKdvAyristir, csvMetni, csvIndir } from "@/lib/cariEkstre";
 import { hepsiniCek } from "@/lib/hepsiniCek";
@@ -151,6 +152,7 @@ function KdvOzetiBolumu({ faturalar, cariler }: { faturalar: Fatura[]; cariler: 
 }
 
 export default function FaturalarPage() {
+  const [firmaEkstre, setFirmaEkstre] = useState(false);
   const supabase = createClient();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -526,6 +528,10 @@ export default function FaturalarPage() {
               XLS Yükle
               <input ref={fileRef} type="file" accept=".xls,.xlsx" className="hidden" onChange={xlsYukle} disabled={xlsYukleniyor} />
             </label>
+            <button onClick={() => setFirmaEkstre(true)} title="Firmanın gönderdiği cari ekstre PDF'ini yükle, sistemle karşılaştır"
+              className="flex items-center gap-2 text-xs font-bold text-sky-300 border border-sky-500/30 hover:bg-sky-500/10 px-4 py-2 rounded-xl transition-colors">
+              <Upload size={14} /> Firma ekstresi (PDF)
+            </button>
             <button onClick={() => setModalAcik(true)} className="flex items-center gap-2 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 px-4 py-2 rounded-xl transition-colors">
               <Plus size={14} /> Fatura Ekle
             </button>
@@ -800,6 +806,7 @@ export default function FaturalarPage() {
           onKapat={() => setOdemeDetay(null)}
           onKaydedildi={mesaj => { setOdemeDetay(null); showToast("basari", mesaj); veriCek(); }} />
       )}
+      {firmaEkstre && <CariEkstreKarsilastir onKapat={() => setFirmaEkstre(false)} />}
     </div>
   );
 }

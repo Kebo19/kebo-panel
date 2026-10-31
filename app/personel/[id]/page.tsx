@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useYetki } from "@/lib/useYetki";
+import { PersonelAvatar, PersonelFotoYukle } from "@/components/PersonelFoto";
 import { tv, paraGirdisi, fmtEsnek } from "@/lib/para";
 import { bugun, fmtTarih as fmtTarihOrtak } from "@/lib/tarih";
 import { ayinGunleri, aylikOzet, type AylikOzet } from "@/lib/puantaj";
@@ -20,7 +21,7 @@ import {
 interface Personel {
   id: string; isim: string; telefon?: string;
   departman?: string; maas?: number; ise_giris_tarihi?: string; isten_cikis_tarihi?: string;
-  durum: "aktif" | "ayrildi"; notlar?: string; ekleyen_kullanici?: string; created_at?: string;
+  durum: "aktif" | "ayrildi"; notlar?: string; ekleyen_kullanici?: string; created_at?: string; foto_yolu?: string | null;
 }
 
 interface Avans { id: string; personel_id?: string | null; rapor_id?: string | null; personel_isim: string; tutar: number; tarih: string; odeme_yontemi: string; kasa_kaynagi: string; aciklama: string; created_at: string; }
@@ -28,7 +29,7 @@ interface Avans { id: string; personel_id?: string | null; rapor_id?: string | n
 interface Hassas { tc_kimlik: string; iban: string; }
 
 // personeller'den okunacak kolonlar — tc_kimlik/iban ve eski leave_date/role/aktif HARİÇ.
-const PERSONEL_KOLONLARI = "id,isim,telefon,departman,maas,ise_giris_tarihi,isten_cikis_tarihi,durum,notlar,ekleyen_kullanici,created_at";
+const PERSONEL_KOLONLARI = "id,isim,telefon,departman,maas,ise_giris_tarihi,isten_cikis_tarihi,durum,notlar,ekleyen_kullanici,created_at,foto_yolu";
 interface Kesinti { id: string; personel_id?: string | null; rapor_id?: string | null; personel_isim: string; tutar: number; tarih: string; aciklama: string; created_at: string; }
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -346,9 +347,7 @@ export default function PersonelDetayPage() {
         {/* ── KİŞİ KARTI ── */}
         <div className="bg-kart border border-cizgi rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-              <span className="text-xl font-black text-blue-400">{personel.isim.split(" ").map(n => n[0]).slice(0, 2).join("")}</span>
-            </div>
+            <PersonelAvatar yol={personel.foto_yolu} isim={personel.isim} boyut={64} />
             <div>
               <p className="text-xl font-black text-yazi">{personel.isim}</p>
               <p className="text-[11px] text-gray-600 mt-1 flex items-center gap-3 flex-wrap">
@@ -356,6 +355,7 @@ export default function PersonelDetayPage() {
                 {calismaSuresi !== null && <span>· {calismaSuresi} aydır çalışıyor</span>}
                 {personel.maas && <span className="text-emerald-300">· ₺{fmt(personel.maas)}</span>}
               </p>
+              {personelYetkisi && <div className="mt-2"><PersonelFotoYukle personelId={personel.id} yol={personel.foto_yolu} onDegisti={y => setPersonel({ ...personel, foto_yolu: y })} /></div>}
             </div>
           </div>
           {/* Finansal özet */}

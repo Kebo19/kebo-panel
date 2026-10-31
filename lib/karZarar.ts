@@ -19,8 +19,24 @@
 //   açılış bakiyeleri → nakit akışı.
 
 import {
-  donemOzeti, roadrunnerKuryesiMi, roadrunnerKuryeUcreti, type RaporVerisi,
+  donemOzeti, roadrunnerKuryesiMi, roadrunnerKuryeUcreti, kuryeTahsilati, roadrunnerGunOzeti, type RaporVerisi,
 } from "@/lib/hesap";
+import { POS_KOMISYON_ORANI } from "@/lib/mutabakat";
+
+// ── Otomatik komisyonlar (31.10.2026) ──
+// Dükkân + sabit kurye POS'u bankaya %2 düşülerek yatar; havuz kuryelerin POS'undan Roadrunner %5 keser.
+// Bu kesintiler hiçbir yere elle girilmediği için raporlardan hesaplanıp komisyon giderine eklenir.
+// Elle "POS Komisyonu" girildiyse (bankanın ayrıca kestiği) otomatik tutardan düşülür → çift sayılmaz.
+export const OTOMATIK_POS_KOMISYONU = "POS komisyonu (%2, otomatik)";
+export const HAVUZ_POS_KOMISYONU = "Havuz kurye POS komisyonu (%5, Roadrunner)";
+export function otomatikKomisyonlar(raporlar: RaporVerisi[]): { pos: number; havuz: number } {
+  let pos = 0, havuz = 0;
+  for (const r of raporlar) {
+    pos += ((Number(r.kasa_pos) || 0) + kuryeTahsilati(r).pos) * POS_KOMISYON_ORANI;
+    havuz += roadrunnerGunOzeti(r).havuzKomisyon;
+  }
+  return { pos: Math.round(pos * 100) / 100, havuz: Math.round(havuz * 100) / 100 };
+}
 
 // ─── KASA KATEGORİLERİ ─────────────────────────────────────────────────────
 export const KASA_GIDER_KATEGORILERI = [
@@ -197,6 +213,12 @@ export function karZararHesapla(g: KarZararGirdi): KarZararSonuc {
       ekle(digerGelirDetay, kat || "Diğer Gelir", t);
     }
   }
+
+  // Otomatik komisyonlar (POS %2, havuz POS %5)
+  const oto = otomatikKomisyonlar(raporlar);
+  const posOto = Math.max(0, oto.pos - (komisyonDetay["POS Komisyonu"] || 0));
+  if (posOto > 0) ekle(komisyonDetay, OTOMATIK_POS_KOMISYONU, posOto);
+  if (oto.havuz > 0) ekle(komisyonDetay, HAVUZ_POS_KOMISYONU, oto.havuz);
 
   // Gerçekten ödenen cari tutarı: cari_odemeler tablosu verildiyse oradan (hesapsız ödemeler de dahil)
   if (g.cariOdemeler) na.cariOdeme =g.cariOdemeler.filter(c => buAy(c.tarih)).reduce((s, c) => s + num(c.tutar), 0);

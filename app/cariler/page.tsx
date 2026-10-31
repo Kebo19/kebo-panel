@@ -12,6 +12,7 @@ import {
 import VadeTakvimi from "@/components/VadeTakvimi";
 import CariEkstre from "@/components/CariEkstre";
 import KeboEkstreYukle from "@/components/KeboEkstreYukle";
+import CariEkstreKarsilastir from "@/components/CariEkstreKarsilastir";
 import OdemeDetay from "@/components/OdemeDetay";
 import FaturaDuzenle from "@/components/FaturaDuzenle";
 import { keboCariMi, keboVadeOzeti, sonrakiCuma } from "@/lib/keboEkstre";
@@ -79,6 +80,7 @@ export default function CarilerPage() {
   const [duzenlenenCariId, setDuzenlenenCariId] = useState<string | null>(null);
   const [ekstreCari, setEkstreCari] = useState<Cari | null>(null);
   const [keboEkstreAcik, setKeboEkstreAcik] = useState(false);
+  const [firmaEkstre, setFirmaEkstre] = useState<{ cariId?: string } | null>(null);
   const [detayArama, setDetayArama] = useState("");
   const detayKelimeler = useMemo(() => aramaKelimeleri(detayArama), [detayArama]);
   const [odemeDetay, setOdemeDetay] = useState<Odeme | null>(null);
@@ -521,6 +523,10 @@ export default function CarilerPage() {
                     <FileUp size={14} /> <span className="hidden sm:inline">Ekstre PDF</span>
                   </button>
                 )}
+                <button onClick={() => setFirmaEkstre({ cariId: seciliCari.id })} title="Firmanın gönderdiği cari ekstre PDF'ini yükle, sistemle karşılaştır"
+                  className="flex items-center gap-2 text-xs font-bold text-sky-300 border border-sky-500/30 hover:bg-sky-500/10 px-3 py-2 rounded-xl transition-colors">
+                  <FileUp size={14} /> <span className="hidden sm:inline">Firma ekstresi karşılaştır</span>
+                </button>
                 <button onClick={() => setEkstreCari(seciliCari)} className="flex items-center gap-2 text-xs font-bold text-gray-700 border border-cizgi hover:bg-white/[0.03] px-3 py-2 rounded-xl transition-colors">
                   <ScrollText size={14} /> <span className="hidden sm:inline">Ekstre</span>
                 </button>
@@ -538,9 +544,15 @@ export default function CarilerPage() {
                 </button>
               </>
             ) : (
+              <>
+              <button onClick={() => setFirmaEkstre({})} title="Firmanın gönderdiği cari ekstre PDF'ini yükle, sistemle karşılaştır"
+                className="flex items-center gap-2 text-xs font-bold text-sky-300 border border-sky-500/30 hover:bg-sky-500/10 px-3 py-2 rounded-xl transition-colors">
+                <FileUp size={14} /> <span className="hidden sm:inline">Firma ekstresi karşılaştır</span>
+              </button>
               <button onClick={yeniCariAc} className="flex items-center gap-2 text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 px-4 py-2 rounded-xl transition-colors">
                 <Plus size={14} /> Cari Ekle
               </button>
+              </>
             )}
           </div>
         </div>
@@ -1237,6 +1249,7 @@ export default function CarilerPage() {
           onTamam={mesaj => { setKeboEkstreAcik(false); showToast("basari", mesaj); cariDetayAc(seciliCari); veriCek(); }} />
       )}
 
+      {firmaEkstre && <CariEkstreKarsilastir cariId={firmaEkstre.cariId} onKapat={() => setFirmaEkstre(null)} />}
       {ekstreCari && <CariEkstre cari={ekstreCari} onKapat={() => setEkstreCari(null)} />}
 
       {/* BU AY FATURA DÜZENLEME MODAL */}

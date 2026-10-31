@@ -72,14 +72,16 @@ describe("karZararHesapla", () => {
     expect(s.kurye).toBe(3700);
     expect(s.sabitIsletme).toBe(1750);
     expect(s.sabitIsletmeDetay["Diğer (eski nakitten ödeme)"]).toBe(100);
-    expect(s.komisyon).toBe(130);
+    // 50 banka + 80 elle POS + otomatik POS (8.000 × %2 = 160, elle girilen 80 düşülür → 80)
+    expect(s.komisyon).toBe(210);
+    expect(s.komisyonDetay["POS komisyonu (%2, otomatik)"]).toBe(80);
     expect(s.digerGelir).toBe(150);
     expect(s.kasaFarki).toBe(-30);
     expect(s.krediTaksidi).toBe(0);
     expect(s.raporCariOdeme).toBe(0);
-    // 19.600 − 4.500,5 − 3.500 − 3.700 − 1.750 − 130 + 150 − 30
-    expect(s.isletmeKari).toBe(6139.5);
-    expect(s.karMarji).toBe(31.3);
+    // 19.600 − 4.500,5 − 3.500 − 3.700 − 1.750 − 210 + 150 − 30
+    expect(s.isletmeKari).toBe(6059.5);
+    expect(s.karMarji).toBe(30.9);
   });
 
   it("nakit akışı kalemleri kâra girmez", () => {
@@ -93,7 +95,7 @@ describe("karZararHesapla", () => {
   it("kredi taksidi anahtarı açıkken gider sayılır", () => {
     const s = karZararHesapla({ ...girdi, krediTaksidiGider: true });
     expect(s.krediTaksidi).toBe(900);
-    expect(s.isletmeKari).toBe(6139.5 - 900);
+    expect(s.isletmeKari).toBe(6059.5 - 900);
   });
 
   it("cari ödemeler tablosu verilirse oradan hesaplanır", () => {
@@ -109,7 +111,7 @@ describe("karZararHesapla", () => {
     ] });
     expect(s.raporCariOdeme).toBe(400);
     expect(s.netCiro).toBe(19600 + 400);
-    expect(s.isletmeKari).toBe(6139.5 + 400);
+    expect(s.isletmeKari).toBe(6059.5 + 400);
     expect(s.nakitAkisi.cariOdeme).toBe(1400);
   });
 

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { tv, paraGirdisi } from "@/lib/para";
 import { bugun, buAyYil, gunEkle, fmtTarih as tarihYaz } from "@/lib/tarih";
 import { donemOzeti as raporDonemOzeti, yemekKartiToplam, kuryeTahsilati, type RaporVerisi } from "@/lib/hesap";
-import { KASA_GIDER_KATEGORILERI, TUM_KASA_GIDER_KATEGORILERI, KASA_GELIR_KATEGORILERI, TAHSILAT_KATS, TRANSFER_KATEGORISI, ACILIS_KATS, ACILIS_KATEGORISI } from "@/lib/karZarar";
+import { KASA_GIDER_KATEGORILERI, TUM_KASA_GIDER_KATEGORILERI, KASA_GELIR_KATEGORILERI, TAHSILAT_KATS, TRANSFER_KATEGORISI, ACILIS_KATS, ACILIS_KATEGORISI, otomatikKomisyonlar, OTOMATIK_POS_KOMISYONU, HAVUZ_POS_KOMISYONU } from "@/lib/karZarar";
 import { KASA_BASLANGIC } from "@/lib/devir";
 import KasaAcilisi from "@/components/KasaAcilisi";
 import { hepsiniCek } from "@/lib/hepsiniCek";
@@ -306,6 +306,13 @@ export default function KasaPage() {
     return {nakitToplam,posToplam,edenredToplam,giderToplam,manuelGider,sparkData};
   }, [filtreliRaporlar,filtreliGiderler,secilenAy,secilenYil]);
 
+  // ── Otomatik komisyon giderleri (Kâr/Zarar ile aynı hesap) ──
+  const otomatikKomisyon = useMemo(() => {
+    const o = otomatikKomisyonlar(filtreliRaporlar as unknown as RaporVerisi[]);
+    const elle = filtreliGiderler.filter(i => i.kategori === "POS Komisyonu").reduce((t, i) => t + Number(i.tutar), 0);
+    return { pos: Math.max(0, Math.round((o.pos - elle) * 100) / 100), havuz: o.havuz };
+  }, [filtreliRaporlar, filtreliGiderler]);
+
   // ── Gider kategori dağılımı ──
   const kategoriDagilim = useMemo(() => {
     const map: Record<string,number> = {};
@@ -318,8 +325,12 @@ export default function KasaPage() {
       });
     });
     filtreliGiderler.filter(i=>!karHaric(i)).forEach(i=>{map[i.kategori]=(map[i.kategori]||0)+i.tutar;});
+    // Otomatik komisyonlar (POS %2, havuz POS %5) — elle girilen POS Komisyonu kadarı düşülür
+    const oto = otomatikKomisyon;
+    if (oto.pos > 0) map[OTOMATIK_POS_KOMISYONU] = oto.pos;
+    if (oto.havuz > 0) map[HAVUZ_POS_KOMISYONU] = oto.havuz;
     return Object.entries(map).sort((a,b)=>b[1]-a[1]);
-  }, [filtreliRaporlar,filtreliGiderler]);
+  }, [filtreliRaporlar,filtreliGiderler,otomatikKomisyon]);
 
   // ── Hesap bazlı gider toplamı ──
   const hesapBaziGider = useMemo(() => {
@@ -435,7 +446,7 @@ export default function KasaPage() {
 
   const toplam = bakiyeler.Nakit+bakiyeler.TEB+bakiyeler.VakıfBank+bakiyeler.Enpara;
   const ayLabel = AYLAR.find(m=>m.v===secilenAy)?.l;
-  const donemGiderToplam = filtreliGiderler.reduce((s,i)=>s+i.tutar,0) + donemOzeti.giderToplam;
+  const donemGiderToplam = filtreliGiderler.reduce((s,i)=>s+i.tutar,0) + donemOzeti.giderToplam + otomatikKomisyon.pos + otomatikKomisyon.havuz;
 
   const inputCls = "w-full bg-alan border border-cizgi focus:border-altin/50 text-yazi text-xs h-10 px-3 rounded-xl outline-none transition-colors placeholder:text-gray-700";
 

@@ -17,6 +17,7 @@ import {
 import { baglamKur, duzReceteler, stokFiyati, type ReceteSatiriTam, type ReceteUrunu, type StokBilgi } from "@/lib/receteHesap";
 import UrunSatisYukle from "@/components/UrunSatisYukle";
 import ReceteDuzenleyici, { type MenuOzeti } from "@/components/ReceteDuzenleyici";
+import ReceteMalzemeleri from "@/components/ReceteMalzemeleri";
 import { hepsiniCek } from "@/lib/hepsiniCek";
 import {
   ArrowLeft, Loader2, AlertTriangle, RefreshCw, FileSpreadsheet,
@@ -34,7 +35,7 @@ const receteOku = (x: ReceteSatiriTam): ReceteSatiriTam => ({ ...x, miktar: Numb
 interface Satis { tarih: string; menu_urun: string; adet: number; tutar: number | null; }
 interface Fatura { fatura_tarihi: string; toplam_tutar: number | null; }
 
-type Sekme = "recete" | "tuketim" | "foodcost" | "yukle";
+type Sekme = "recete" | "malzeme" | "tuketim" | "foodcost" | "yukle";
 
 const inputCls = "w-full bg-alan border border-cizgi text-yazi text-xs h-9 px-3 rounded-xl outline-none";
 const kutu = "bg-kart border border-cizgi rounded-xl";
@@ -220,6 +221,7 @@ export default function ReceteMaliyetPage() {
 
   const SEKMELER: { k: Sekme; l: string; i: React.ReactNode }[] = [
     { k: "recete", l: "Reçeteler", i: <BookOpen size={13}/> },
+    { k: "malzeme", l: "Malzemeler", i: <Scale size={13}/> },
     { k: "tuketim", l: "Teorik / Gerçek", i: <Scale size={13}/> },
     { k: "foodcost", l: foodCostIzni ? "Food cost" : "Paket tüketimi", i: <Percent size={13}/> },
     { k: "yukle", l: "Satış yükle", i: <FileSpreadsheet size={13}/> },
@@ -260,6 +262,11 @@ export default function ReceteMaliyetPage() {
         {sekme === "recete" && (
           <ReceteDuzenleyici supabase={supabase} baglam={baglam} stok={stokBilgi} urunler={receteUrunleri} satirlar={receteler}
             satislar={satisOzeti} fiyatGorunur={fiyatGorunur} onDegisti={temelVeri}/>
+        )}
+
+        {/* ─── MALZEMELER: tek yerden giriş, bütün reçetelere işlenir ─── */}
+        {sekme === "malzeme" && (
+          <ReceteMalzemeleri supabase={supabase} stok={stokBilgi} satirlar={receteler} fiyatGorunur={fiyatGorunur} onDegisti={temelVeri}/>
         )}
 
         {/* ─── TEORİK / GERÇEK ─── */}

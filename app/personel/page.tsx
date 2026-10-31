@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { PersonelAvatar } from "@/components/PersonelFoto";
 import {
   ChefHat, Bike, Sparkles, Store, Plus, ChevronDown,
   Users, Search, RefreshCw, Loader2, UserCheck, UserX,
@@ -23,6 +24,7 @@ interface Personel {
   ise_giris_tarihi?: string;
   isten_cikis_tarihi?: string;
   durum: "aktif" | "ayrildi";
+  foto_yolu?: string | null;
 }
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -57,9 +59,7 @@ function PersonelKart({ personel }: { personel: Personel }) {
     <Link href={`/personel/${personel.id}`}>
       <div className="bg-alan border border-cizgi hover:border-cizgi-guclu rounded-xl p-4 flex items-center justify-between gap-3 transition-colors group cursor-pointer">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 text-xs font-bold text-blue-400">
-            {personel.isim.split(" ").map(n => n[0]).slice(0, 2).join("")}
-          </div>
+          <PersonelAvatar yol={personel.foto_yolu} isim={personel.isim} boyut={40} />
           <div className="min-w-0">
             <p className="text-sm font-bold text-yazi group-hover:text-blue-400 transition-colors truncate">
               {personel.isim}
@@ -164,7 +164,7 @@ function PersonellerPageInner() {
     setLoading(true);
     const { data, error } = await supabase
       .from("personeller")
-      .select("id,isim,telefon,departman,maas,ise_giris_tarihi,isten_cikis_tarihi,durum")
+      .select("id,isim,telefon,departman,maas,ise_giris_tarihi,isten_cikis_tarihi,durum,foto_yolu")
       .order("isim");
     if (!error && data) setPersoneller(data as Personel[]);
     setLoading(false);
