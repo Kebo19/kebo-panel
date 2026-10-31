@@ -5,7 +5,12 @@
 export function tv(val: string | number | null | undefined): number {
   if (val === null || val === undefined || val === "") return 0;
   if (typeof val === "number") return Number.isFinite(val) ? val : 0;
-  const s = val.toString().trim().replace(/\s/g, "").replace(/\./g, "").replace(/,/g, ".");
+  const ham = val.toString().trim().replace(/\s/g, "");
+  // Kayıtta JS sayısı olarak saklanan kuruşlu değer ("357.98"): virgül yok, tek nokta ve 1-2 basamak →
+  // ondalık noktasıdır (Türkçe binlik ayırıcıdan sonra her zaman 3 basamak gelir). 31.10.2026: kurye
+  // satırlarındaki "357.98" eskiden 35.798 okunuyordu.
+  if (/^-?\d+\.\d{1,2}$/.test(ham)) return parseFloat(ham);
+  const s = ham.replace(/\./g, "").replace(/,/g, ".");
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : 0;
 }

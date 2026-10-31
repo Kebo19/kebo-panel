@@ -157,6 +157,7 @@ function roketExcelOku(satirlar) {
     if (/nakit/.test(odeme)) k.nakit += tutar;
     else if (/^pos|kredi|kart[ıi]? ?ile/.test(odeme)) k.pos += tutar;
     else if (/paye/.test(odeme)) k.paye += tutar;
+    else if (/token/.test(odeme)) k.yemek += tutar;
     else if (/yemek/.test(odeme)) {
       if (kanal === "alo" || !kanal) k.yemek += tutar;
     } else if (/bilinmeyen/.test(odeme)) k.bilinmeyen += tutar;

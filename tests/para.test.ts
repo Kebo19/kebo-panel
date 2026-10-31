@@ -14,6 +14,9 @@ describe("para girişi", () => {
   it("metin → sayı", () => {
     expect(tv("1.234,50")).toBe(1234.5);
     expect(tv("12")).toBe(12);
+    expect(tv("357.98")).toBe(357.98);
+    expect(tv("1240.9")).toBe(1240.9);
+    expect(tv("1.234")).toBe(1234);
     expect(tv("")).toBe(0);
     expect(tv(15.25)).toBe(15.25);
   });

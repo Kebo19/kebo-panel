@@ -1311,7 +1311,7 @@ export default function RaporlarPage() {
     const ilkAd = (ad: string) => { const a = ad.trim().split(/\s+/)[0] || ad; return a.charAt(0).toLocaleUpperCase("tr-TR") + a.slice(1).toLocaleLowerCase("tr-TR"); };
     g.kuryeler.forEach(k => {
       if (k.bilinmeyen) notlar.push(`${k.ad}: ₺${fmt(k.bilinmeyen)} ödemenin türü Roket'te "Bilinmeyen"; nakde yazıldı.`);
-      if (k.yemek) notlar.push(`${k.ad}: Alo Paket'te ₺${fmt(k.yemek)} kapıda yemek kartı (türü belli değil); Token Flex ya da Paye ise ilgili kutuya yazın.`);
+      if (k.yemek) notlar.push(`${k.ad}: ₺${fmt(k.yemek)} kapıda yemek kartı / Token (Roket'te türü ayrı değil); Token Flex ya da Paye kutusuna yazın.`);
     });
     const yeniPaket = (toplam: number, eski?: KuryeRaporu) =>
       String(Math.max(0, toplam - (parseInt(eski?.uzakPaket || "") || 0) - (parseInt(eski?.paket9km || "") || 0)));
@@ -3278,11 +3278,53 @@ export default function RaporlarPage() {
                 {ch.tKuryeTokenFlex > 0 && dS("Kurye · Token Flex", ch.tKuryeTokenFlex)}
                 {ch.tKuryePaye > 0 && dS("Kurye · Paye", ch.tKuryePaye)}
               </>);
+              // ── Kapıda ödeme: MagicPay (olması gereken) ↔ Roket / kuryeler (toplanan), ödeme türüne göre (31.10) ──
+              // MagicPay ödeme türünü sadece Alo Paket için verir; Trendyol / YS / Migros kapıda tutarının türü
+              // bilinmez. Bu tutar POS + kart açığını tam kapatıyorsa fark nakittedir (ya da tersi).
+              const kapidaKarsilastirma = (() => {
+                if (ch.kapidaKasada || ch.tKapida + ch.tKuryeNakit + ch.tKuryePos + ch.tKuryeKart <= 0) return null;
+                const platformKapida = Math.max(0, Math.round((ch.tKapida - ch.aloNakit - ch.aloPos) * 100) / 100);
+                const yakin = (a: number, b: number) => Math.abs(a - b) < 1;
+                const nakitFark = ch.tKuryeNakit - ch.aloNakit, posFark = ch.tKuryePos - ch.aloPos;
+                const fark = ch.tKuryeNakit + ch.tKuryePos + ch.tKuryeKart - ch.tKapida;
+                const bilinmeyen = roketGun?.tarih === tarih ? roketGun.kuryeler.reduce((t, k) => t + (k.bilinmeyen || 0), 0) : 0;
+                const fz = (v: number) => `₺${fmt(Math.abs(v))} ${v > 0 ? "fazla" : "eksik"}`;
+                const teshis = yakin(fark, 0) ? "Kapıda satış ile kuryelerin getirdiği tutuyor."
+                  : yakin(ch.tKuryePos + ch.tKuryeKart, ch.aloPos + platformKapida) ? `POS ve kart tutuyor; fark NAKİTTE: kuryeler ${fz(nakitFark)} nakit getirmiş.`
+                  : yakin(ch.tKuryeNakit + ch.tKuryeKart, ch.aloNakit + platformKapida) ? `Nakit ve kart tutuyor; fark POS'TA: kuryeler ${fz(posFark)} POS çekmiş.`
+                  : yakin(nakitFark, 0) ? `Nakit tutuyor; fark POS / kartta (${fz(fark)}).`
+                  : yakin(posFark, 0) ? `POS tutuyor; fark nakit / kartta (${fz(fark)}).`
+                  : `Toplamda ${fz(fark)}. Platform kapıda ₺${fmt(platformKapida)}'nin türü MagicPay'de yok; Roket'te sipariş sipariş bakın.`;
+                const h = "grid grid-cols-[minmax(0,1fr)_80px_80px] gap-2";
+                const sat = (ad: string, mp: number | string, rk: number | string, k: string) => (
+                  <div key={k} className={`${h} border-b border-cizgi/40 py-0.5`}>
+                    <span>{ad}</span>
+                    <span className="text-right tabular-nums">{typeof mp === "number" ? fmt(mp) : mp}</span>
+                    <span className="text-right tabular-nums">{typeof rk === "number" ? fmt(rk) : rk}</span>
+                  </div>
+                );
+                return (
+                  <div className="mt-2 pt-2 border-t border-cizgi">
+                    <p className="font-bold text-yazi pb-1">Kapıda ödeme karşılaştırması</p>
+                    <div className={`${h} text-[12px] font-bold text-gray-500`}><span/><span className="text-right">MagicPay</span><span className="text-right">Kuryeler</span></div>
+                    {sat("Alo Paket nakit", ch.aloNakit, "", "n")}
+                    {sat("Alo Paket POS", ch.aloPos, "", "p")}
+                    {platformKapida > 0 && sat("Trendyol / YS / Migros kapıda (tür yok)", platformKapida, "", "pl")}
+                    {sat("Nakit", "", ch.tKuryeNakit, "rn")}
+                    {sat("POS", "", ch.tKuryePos, "rp")}
+                    {ch.tKuryeKart > 0 && sat("Paye / Token Flex", "", ch.tKuryeKart, "rk")}
+                    <div className={`${h} font-bold text-yazi pt-0.5`}><span>Toplam</span><span className="text-right tabular-nums">{fmt(ch.tKapida)}</span><span className="text-right tabular-nums">{fmt(ch.tKapida + fark)}</span></div>
+                    <p className={`pt-1 font-semibold ${yakin(fark, 0) ? "text-emerald-300" : "text-amber-300"}`}>{teshis}</p>
+                    {bilinmeyen > 0 && <p className="text-amber-300">Roket&apos;te türü seçilmemiş ₺{fmt(bilinmeyen)} var (nakit sayıldı).</p>}
+                  </div>
+                );
+              })();
               let sN = 0;
               const kuryeDetay = (<>
                 {ch.kuryelerHesap.filter(k => k.gercekPaket > 0 || tv(k.nakit) + tv(k.pos) > 0).map(k =>
                   dS(`${k.tip === "havuz" ? "Havuz" : `Sabit ${++sN}`}${k.isim ? " · " + k.isim : ""} — ${k.gercekPaket} pk`, `nakit ₺${fmt(tv(k.nakit))} · POS ₺${fmt(tv(k.pos))}${tv(k.tokenflex) + tv(k.paye) > 0 ? ` · kart ₺${fmt(tv(k.tokenflex) + tv(k.paye))}` : ""}`, `k${k.id}`))}
                 <div className="pt-1 font-semibold">{dS("Kapıda satış (MagicPay / tablo)", ch.tKapida, "ks")}{dS("Kuryelerin getirdiği", ch.tKuryeNakit + ch.tKuryePos + ch.tKuryeKart, "kg")}</div>
+                {kapidaKarsilastirma}
               </>);
               // ── İndirim: platform → marka; ciro, indirim, yüzde (en çok indirim yapılan üstte) ──
               const ip = (ad: string, l: [string, number, number][]) => {
@@ -3336,9 +3378,9 @@ export default function RaporlarPage() {
                   .filter(isValidElement) as React.ReactElement<{ "data-durum"?: string }>[];
                 const sorunlu = kalemler.filter(e => e.props["data-durum"] === "uyari");
                 const tamam = kalemler.filter(e => e.props["data-durum"] === "tamam");
-                const G = (ad: React.ReactNode, tutar: number, k: string) => (
+                const G = (ad: React.ReactNode, tutar: number, k: string, paketSayisi?: number) => (
                   <div key={k} className="flex justify-between gap-3 py-2 border-b border-cizgi/60 last:border-b-0 text-[15px]">
-                    <span className="min-w-0">{ad}</span><span className="font-semibold tabular-nums">{fmt(tutar)}</span>
+                    <span className="min-w-0">{ad}{paketSayisi ? <span className="text-[13px] text-gray-500"> · {paketSayisi} pk</span> : null}</span><span className="font-semibold tabular-nums">{fmt(tutar)}</span>
                   </div>
                 );
                 const ys = tv(osKeboYs.tutar) + tv(osCnfYs.tutar) + tv(osKirYs.tutar);
@@ -3361,11 +3403,11 @@ export default function RaporlarPage() {
                     <div className={`${kutu} flex flex-col`}>
                       <p className={`${baslik} text-blue-300`}>GELEN PARA</p>
                       <div className="px-4 py-1">
-                        {ys > 0 && G("Yemeksepeti", ys, "ys")}
-                        {ty > 0 && G("Trendyol", ty, "ty")}
-                        {mg > 0 && G("Migros", mg, "mg")}
-                        {alo > 0 && G("Alo Paket (online)", alo, "alo")}
-                        {!ch.kapidaKasada && ch.tKapida > 0 && G("Kapıda ödeme (kurye)", ch.tKapida, "kp")}
+                        {ys > 0 && G("Yemeksepeti", ys, "ys", pk(osKeboYs, osCnfYs, osKirYs))}
+                        {ty > 0 && G("Trendyol", ty, "ty", pk(osKeboTrendyol, osCnfTrendyol, osKirTrendyol))}
+                        {mg > 0 && G("Migros", mg, "mg", pk(osKeboMigros, osCnfMigrosYemek, osKirMigrosYemek))}
+                        {alo > 0 && G("Alo Paket (online)", alo, "alo", pk(osKeboAlo))}
+                        {!ch.kapidaKasada && ch.tKapida > 0 && G("Kapıda ödeme (kurye)", ch.tKapida, "kp", ch.tKapidaPaket)}
                         {G("Kasa nakit", tv(kasaNakit), "kn")}
                         {G("Kasa POS", tv(kasaPos), "kpos")}
                         {kartKasa > 0 && G("Kasa yemek kartı", kartKasa, "kk")}

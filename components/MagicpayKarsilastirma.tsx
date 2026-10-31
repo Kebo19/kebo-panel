@@ -132,7 +132,7 @@ export function RaporMagicpayPaneli({ rapor }: { rapor: PanelRaporu }) {
   const [mp, setMp] = useState<MpGun | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [hata, setHata] = useState("");
-  const [sadeceFark, setSadeceFark] = useState(false);
+  const [sadeceFark, setSadeceFark] = useState(true);
   const [yenile, setYenile] = useState(0);
   const tarih = rapor.tarih;
 
@@ -191,9 +191,10 @@ export function RaporMagicpayPaneli({ rapor }: { rapor: PanelRaporu }) {
               <p className={`text-[12px] font-bold ${k.farkSayisi ? "text-red-400" : "text-emerald-400"}`}>
                 {k.farkSayisi ? `${k.farkSayisi} kalemde fark var` : "Bütün kalemler tutuyor"}
               </p>
-              <label className="flex items-center gap-1.5 text-[11px] text-gray-600 cursor-pointer select-none">
-                <input type="checkbox" checked={sadeceFark} onChange={e => setSadeceFark(e.target.checked)} /> Sadece farklar
-              </label>
+              <button type="button" onClick={() => setSadeceFark(!sadeceFark)}
+                className="text-[12px] font-semibold text-gray-600 hover:text-yazi border border-cizgi rounded-lg px-2.5 py-1">
+                {sadeceFark ? "Hepsini göster" : "Sadece farklar"}
+              </button>
             </div>
             <GunDetayi k={k} sikisik sadeceFark={sadeceFark} />
           </>

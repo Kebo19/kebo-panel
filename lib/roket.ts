@@ -21,7 +21,7 @@ export interface RoketKurye {
   pos: number;
   /** kapıda Paye Kod */
   paye: number;
-  /** Alo Paket'te kapıda yemek kartı */
+  /** kapıda yemek kartı: Alo Paket'te "Yemek Karti", her kanalda "Token" (türü kasa raporunda seçilir) */
   yemek: number;
   /** ödeme türü "Bilinmeyen" (kapıda alındı ama türü seçilmemiş) */
   bilinmeyen: number;
@@ -205,6 +205,8 @@ export function roketExcelOku(satirlar: unknown[][]): RoketOkuma {
     if (/nakit/.test(odeme)) k.nakit += tutar;
     else if (/^pos|kredi|kart[ıi]? ?ile/.test(odeme)) k.pos += tutar;
     else if (/paye/.test(odeme)) k.paye += tutar;
+    // Token (Token Flex): kapıda yemek kartı — Trendyol kapıda da açık (31.10), her kanalda kurye tahsilatıdır
+    else if (/token/.test(odeme)) k.yemek += tutar;
     else if (/yemek/.test(odeme)) { if (kanal === "alo" || !kanal) k.yemek += tutar; }
     else if (/bilinmeyen/.test(odeme)) k.bilinmeyen += tutar;
     // "online ödeme" → kurye tahsilatı değil
