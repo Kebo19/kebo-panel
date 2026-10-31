@@ -326,3 +326,24 @@ export function roadrunnerKuryeUcreti(k: KuryeSatiri) {
     + km9 * RR_PAKET_UCRETI * RR_KM9_KATSAYI + garantiFarki * RR_PAKET_UCRETI;
   return { sabit, normal, uzak, km9, gercek, uygulanan, garantiFarki, ucret, nakit: tv(k.nakit), pos: tv(k.pos) };
 }
+
+/**
+ * Kapanış arşivi ve rapor detayı için günün Roadrunner özeti (31.10.2026):
+ *  • odenecekPaket: Roadrunner'a ödenecek paket (sabitlerde 30 garanti dahil, havuz olduğu gibi)
+ *  • havuzNakit / havuzPos: kapıda toplanıp Roadrunner'da kalan para (havuz kuryeler;
+ *    28.09 öncesi bütün Roadrunner kuryeleri)
+ *  • havuzTahsilat: borçtan düşülecek = nakit + POS − POS'un %5 komisyonu
+ */
+export function roadrunnerGunOzeti(r: Pick<RaporVerisi, "tarih" | "kurye_raporlari">): {
+  odenecekPaket: number; havuzNakit: number; havuzPos: number; havuzKomisyon: number; havuzTahsilat: number;
+} {
+  let odenecekPaket = 0, havuzNakit = 0, havuzPos = 0;
+  for (const k of r.kurye_raporlari || []) {
+    if (!roadrunnerKuryesiMi(r.tarih, k)) continue;
+    const u = roadrunnerKuryeUcreti(k);
+    if (u.gercek > 0 || u.nakit + u.pos > 0) odenecekPaket += u.uygulanan;
+    if (tahsilatRoadrunnerdaMi(r.tarih, k)) { havuzNakit += u.nakit; havuzPos += u.pos; }
+  }
+  const havuzKomisyon = Math.round(havuzPos * RR_POS_KOMISYON_ORANI * 100) / 100;
+  return { odenecekPaket, havuzNakit, havuzPos, havuzKomisyon, havuzTahsilat: Math.round((havuzNakit + havuzPos - havuzKomisyon) * 100) / 100 };
+}

@@ -64,7 +64,8 @@ describe("telegram özet", () => {
 
   it("yetkisi olmayan bölüm gösterilmez", () => {
     const t = sabahOzeti({ raporlar: veri().raporlar }, "Elif", "2026-10-27");
-    expect(t).toContain("Ciro");
+    expect(t).toContain("Dün (26.10)");
+    expect(t).toContain("Brüt");
     expect(t).not.toContain("Ödemeler");
     expect(t).not.toContain("Stok");
   });
@@ -229,5 +230,15 @@ describe("faturadan stok girişi mesajı", () => {
     expect(m.metin).toContain("stoğa işlensin mi");
     expect(m.eslesen).toBe(1);
     expect(m.eslesmeyen).toBe(1);
+  });
+
+  it("dünün raporu kısa: brüt/net, paket, kasa, uyarılar", () => {
+    const r = { ...(rapor("2026-10-26", 50000) as object), kasa_nakit: 7650, kasa_pos: 17816, os_kebo_trendyol: 22051, os_kebo_trendyol_indirim: 6490,
+      kurye_raporlari: [{ isim: "A", tip: "sabit", paketSayisi: "36", nakit: "1437", pos: "1816" }, { isim: "Havuz", tip: "havuz", paketSayisi: "27", nakit: "0", pos: "488" }] } as never;
+    const t = sabahOzeti({ raporlar: [r] }, "Murat", "2026-10-27");
+    expect(t).toContain("Roadrunner'a 63 pk");
+    expect(t).toContain("nakit 9.087 ₺");
+    expect(t).toContain("Havuzdan: 464 ₺");
+    expect(t).toContain("İndirim %");
   });
 });

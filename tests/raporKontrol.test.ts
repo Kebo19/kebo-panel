@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { eksikGunler, gunAraligiYaz, raporUyarilari } from "@/lib/raporKontrol";
-import type { RaporVerisi } from "@/lib/hesap";
+import { roadrunnerGunOzeti, type RaporVerisi } from "@/lib/hesap";
 
 const r = (tarih: string, kasa: number, gider: number, paket: number) =>
   ({ tarih, kasa_nakit: kasa, kasa_pos: 0, gunluk_gider: gider, iade_tutar: 0,
@@ -26,5 +26,20 @@ describe("rapor uyarıları", () => {
     expect(u.get("2026-10-13")).toEqual(["paket girilmemiş"]);
     expect(u.has("2026-10-08")).toBe(false);
     expect(u.has("2026-10-10")).toBe(false);
+  });
+});
+
+describe("roadrunnerGunOzeti", () => {
+  it("sabite 30 garanti, havuz olduğu gibi; havuz parası Roadrunner'da", () => {
+    const o = roadrunnerGunOzeti({ tarih: "2026-10-29", kurye_raporlari: [
+      { isim: "A", tip: "sabit", paketSayisi: "33", nakit: "1000", pos: "500" },
+      { isim: "B", tip: "sabit", paketSayisi: "12", nakit: "200", pos: "" },
+      { isim: "Havuz", tip: "havuz", paketSayisi: "40", nakit: "3000", pos: "700" },
+      { isim: "", tip: "sabit", paketSayisi: "", nakit: "", pos: "" },
+    ] as never });
+    expect(o.odenecekPaket).toBe(33 + 30 + 40);
+    expect(o.havuzNakit).toBe(3000);
+    expect(o.havuzPos).toBe(700);
+    expect(o.havuzTahsilat).toBe(3000 + 700 - 35);
   });
 });

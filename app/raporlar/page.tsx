@@ -1,7 +1,7 @@
 "use client";
 
 import SayfaSimgesi from "@/components/kabuk/SayfaSimgesi";
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, Children, isValidElement } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   FileText, PlusCircle, Loader2, TrendingUp, Wallet, CheckCircle2, Bike,
@@ -18,8 +18,9 @@ import { bugun, buAyYil, aySonu, gunEkle, gunFarki, fmtTarih } from "@/lib/tarih
 import {
   brutCiro as brutHesapla, netCiro as netHesapla, raporOzeti, donemOzeti, platformKirilimi, paketToplam,
   kapidaKasadaMi, kuryeGercekPaket, yeniYapiMi, PLATFORM_RENK, PLATFORMLAR,
-  ROADRUNNER_GECIS_GUNU, KENDI_POS_GECIS_GUNU, kuryeTahsilati, roadrunnerTahsilati, KURYE_GARANTI_PAKET, YEMEK_KARTLARI, type YemekKartiAlani,
+  ROADRUNNER_GECIS_GUNU, KENDI_POS_GECIS_GUNU, kuryeTahsilati, roadrunnerTahsilati, roadrunnerGunOzeti, RR_POS_KOMISYON_ORANI, KURYE_GARANTI_PAKET, YEMEK_KARTLARI, type YemekKartiAlani,
 } from "@/lib/hesap";
+import { POS_KOMISYON_ORANI } from "@/lib/mutabakat";
 import { useYetki } from "@/lib/useYetki";
 import { slotToplami, atamaBul, adEslesir, paketKontrolu, type RoketGun } from "@/lib/roket";
 import { eksikGunler, gunAraligiYaz, raporUyarilari } from "@/lib/raporKontrol";
@@ -1785,7 +1786,8 @@ export default function RaporlarPage() {
   const arsivUyari = useMemo(() => raporUyarilari(raporlar), [raporlar]);
   const tabloToplam = useMemo(()=>{
     const o = donemOzeti(raporlar);
-    return {brut:o.brut, net:o.net, paket:o.paket, giderIade:o.gider+o.iade, paketOrt:o.paket>0?o.platformCiro/o.paket:0};
+    const rr = raporlar.reduce((t, r) => { const x = roadrunnerGunOzeti(r); return { p: t.p + x.odenecekPaket, h: t.h + x.havuzTahsilat }; }, { p: 0, h: 0 });
+    return {brut:o.brut, net:o.net, paket:o.paket, giderIade:o.gider+o.iade, paketOrt:o.paket>0?o.platformCiro/o.paket:0, rrPaket: rr.p, havuz: rr.h};
   },[raporlar]);
 
   // ── Handlers ──
@@ -2415,7 +2417,7 @@ export default function RaporlarPage() {
           </div>
           )}
         </div>
-        {isReadOnly && [
+        {false && [
           {label:"Brüt Ciro", value:`₺${fmt(ch.brutCiro)}`, color:"text-blue-400", border:"border-blue-500/10 bg-blue-500/5"},
           {label:"Net Ciro",  value:`₺${fmt(ch.netCiro)}`,  color:"text-emerald-400", border:"border-emerald-500/10 bg-emerald-500/5"},
           {label:"Paket",     value:`${fmt(ch.tKuryeGercekPaket)}`, color:"text-amber-400", border:"border-amber-500/10 bg-amber-500/5"},
@@ -3233,7 +3235,7 @@ export default function RaporlarPage() {
                 const acik = kontrolAcik === baslik;
                 const tiklanir = !!(detay || aciklama);
                 return (
-                <div key={baslik} className={`border-b border-cizgi last:border-b-0 ${durum === "uyari" ? "bg-amber-500/5" : ""}`}>
+                <div key={baslik} data-durum={durum} className={`border-b border-cizgi last:border-b-0 ${durum === "uyari" ? "bg-amber-500/5" : ""}`}>
                 <div onClick={tiklanir ? () => setKontrolAcik(acik ? null : baslik) : undefined}
                   className={`flex items-start gap-3 px-4 py-3 ${tiklanir ? "cursor-pointer hover:bg-alan/60" : ""}`}>
                   <span className={`mt-0.5 shrink-0 ${durum === "tamam" ? "text-emerald-400" : durum === "uyari" ? "text-amber-400" : "text-gray-600"}`}>
@@ -3282,9 +3284,165 @@ export default function RaporlarPage() {
                   dS(`${k.tip === "havuz" ? "Havuz" : `Sabit ${++sN}`}${k.isim ? " · " + k.isim : ""} — ${k.gercekPaket} pk`, `nakit ₺${fmt(tv(k.nakit))} · POS ₺${fmt(tv(k.pos))}${tv(k.tokenflex) + tv(k.paye) > 0 ? ` · kart ₺${fmt(tv(k.tokenflex) + tv(k.paye))}` : ""}`, `k${k.id}`))}
                 <div className="pt-1 font-semibold">{dS("Kapıda satış (MagicPay / tablo)", ch.tKapida, "ks")}{dS("Kuryelerin getirdiği", ch.tKuryeNakit + ch.tKuryePos + ch.tKuryeKart, "kg")}</div>
               </>);
+              // ── İndirim: platform → marka; ciro, indirim, yüzde (en çok indirim yapılan üstte) ──
+              const ip = (ad: string, l: [string, number, number][]) => {
+                const satirlar = l.filter(([, c, i]) => c > 0 || i > 0);
+                return { ad, satirlar, ciro: satirlar.reduce((t, x) => t + x[1], 0), indirim: satirlar.reduce((t, x) => t + x[2], 0) };
+              };
+              const indirimPlatformlari = [
+                ip("Yemeksepeti", [["Kebo", tv(osKeboYs.tutar) + tv(koKeboYs.tutar), tv(osKeboYsIndirim) + tv(koKeboYsIndirim)],
+                  ["Chick'N", tv(osCnfYs.tutar) + tv(koCnfYs.tutar), tv(osCnfYsIndirim) + tv(koCnfYsIndirim)],
+                  ["Kıraloğlu", tv(osKirYs.tutar) + tv(koKirYs.tutar), tv(osKirYsIndirim) + tv(koKirYsIndirim)]]),
+                ip("Trendyol", [["Kebo", tv(osKeboTrendyol.tutar) + tv(koKeboTrendyol.tutar), tv(osKeboTrendyolIndirim) + tv(koKeboTrendyolIndirim)],
+                  ["Chick'N", tv(osCnfTrendyol.tutar) + tv(koCnfTrendyol.tutar), tv(osCnfTrendyolIndirim) + tv(koCnfTrendyolIndirim)],
+                  ["Kıraloğlu", tv(osKirTrendyol.tutar) + tv(koKirTrendyol.tutar), tv(osKirTrendyolIndirim) + tv(koKirTrendyolIndirim)]]),
+                ip("Migros", [["Kebo", tv(osKeboMigros.tutar) + tv(koKeboMigrosYemek.tutar), tv(osKeboMigrosIndirim)],
+                  ["Chick'N", tv(osCnfMigrosYemek.tutar) + tv(koCnfMigrosYemek.tutar), tv(osCnfMigrosIndirim)],
+                  ["Kıraloğlu", tv(osKirMigrosYemek.tutar) + tv(koKirMigrosYemek.tutar), tv(osKirMigrosIndirim)]]),
+                ip("Alo Paket", [["Kebo", tv(osKeboAlo.tutar) + tv(koKeboAlo.tutar), tv(osKeboAloIndirim)],
+                  ["Chick'N", tv(koCnfAlo.tutar), 0], ["Kıraloğlu", tv(koKirAlo.tutar), 0]]),
+              ].filter(x => x.satirlar.length).sort((a, b) => b.indirim - a.indirim);
+              const yuzde = (i: number, c: number) => c > 0 ? (i / c) * 100 : 0;
+              const yuzdeYaz = (i: number, c: number) => {
+                const y = yuzde(i, c);
+                return <span className={`tabular-nums ${y > 15 ? "text-amber-300 font-bold" : "text-gray-600"}`}>%{y.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}</span>;
+              };
+              const indirimTablosu = (
+                <div className="text-[14px]">
+                  <div className="grid grid-cols-[minmax(0,1fr)_90px_90px_60px] gap-2 text-[12px] font-bold text-gray-500 pb-1 border-b border-cizgi">
+                    <span>Platform</span><span className="text-right">Ciro</span><span className="text-right">İndirim</span><span className="text-right">%</span>
+                  </div>
+                  {indirimPlatformlari.map(pl => (
+                    <div key={pl.ad} className="border-b border-cizgi/60 py-1">
+                      <div className="grid grid-cols-[minmax(0,1fr)_90px_90px_60px] gap-2 font-bold text-yazi">
+                        <span>{pl.ad}</span><span className="text-right tabular-nums">{fmt(pl.ciro)}</span><span className="text-right tabular-nums">{fmt(pl.indirim)}</span><span className="text-right">{yuzdeYaz(pl.indirim, pl.ciro)}</span>
+                      </div>
+                      {pl.satirlar.length > 1 && pl.satirlar.map(([m, c, i]) => (
+                        <div key={m} className="grid grid-cols-[minmax(0,1fr)_90px_90px_60px] gap-2 text-gray-600">
+                          <span className="pl-3">{m}</span><span className="text-right tabular-nums">{fmt(c)}</span><span className="text-right tabular-nums">{fmt(i)}</span><span className="text-right">{yuzdeYaz(i, c)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                  <div className="grid grid-cols-[minmax(0,1fr)_90px_90px_60px] gap-2 font-black text-yazi pt-1">
+                    <span>Toplam</span><span className="text-right tabular-nums">{fmt(ch.tOnline + ch.tKapida)}</span><span className="text-right tabular-nums">{fmt(ch.tIndirim)}</span><span className="text-right">{yuzdeYaz(ch.tIndirim, ch.tOnline + ch.tKapida)}</span>
+                  </div>
+                  <p className="text-[12px] text-gray-500 pt-1">%15 üstü sarı. En çok indirim yapılan platform en üstte.</p>
+                </div>
+              );
+              // ── Kayıtlı rapor görünümü (31.10): solda gelen / düşen, sağda kontrol, altta paket · kasa · havuz ──
+              const raporOzetGorunumu = (satirlar: React.ReactElement, ayrintiDugmesi: React.ReactNode) => {
+                const kalemler = Children.toArray((satirlar.props as { children?: React.ReactNode }).children)
+                  .filter(isValidElement) as React.ReactElement<{ "data-durum"?: string }>[];
+                const sorunlu = kalemler.filter(e => e.props["data-durum"] === "uyari");
+                const tamam = kalemler.filter(e => e.props["data-durum"] === "tamam");
+                const G = (ad: React.ReactNode, tutar: number, k: string) => (
+                  <div key={k} className="flex justify-between gap-3 py-2 border-b border-cizgi/60 last:border-b-0 text-[15px]">
+                    <span className="min-w-0">{ad}</span><span className="font-semibold tabular-nums">{fmt(tutar)}</span>
+                  </div>
+                );
+                const ys = tv(osKeboYs.tutar) + tv(osCnfYs.tutar) + tv(osKirYs.tutar);
+                const ty = tv(osKeboTrendyol.tutar) + tv(osCnfTrendyol.tutar) + tv(osKirTrendyol.tutar);
+                const mg = tv(osKeboMigros.tutar) + tv(osCnfMigrosYemek.tutar) + tv(osKirMigrosYemek.tutar);
+                const alo = tv(osKeboAlo.tutar);
+                const kartKasa = YEMEK_KARTLARI.reduce((t, k) => t + tv(kartlar[k.alan]), 0);
+                const kt = kuryeTahsilati({ tarih, kurye_raporlari: kuryeler });
+                const rr = roadrunnerGunOzeti({ tarih, kurye_raporlari: kuryeler });
+                const posToplam = tv(kasaPos) + kt.pos;
+                const posKomisyon = Math.round(posToplam * POS_KOMISYON_ORANI * 100) / 100;
+                const rrVar = tarih >= ROADRUNNER_GECIS_GUNU;
+                let sNo = 0;
+                const kuryePaketleri = ch.kuryelerHesap.filter(k => k.gercekPaket > 0).map(k =>
+                  `${k.isim && !/^(Havuz|Kurye \d)/.test(k.isim) ? k.isim : k.tip === "havuz" ? "Havuz" : `Sabit ${++sNo}`} ${k.gercekPaket}${k.garantiUygulandi ? `→${k.uygulananPaket}` : ""}`).join(" · ");
+                const kutu = "rounded-xl border border-cizgi bg-kart";
+                const baslik = "px-4 py-3 border-b border-cizgi text-[13px] font-bold tracking-wide";
+                return (<>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch">
+                    <div className={`${kutu} flex flex-col`}>
+                      <p className={`${baslik} text-blue-300`}>GELEN PARA</p>
+                      <div className="px-4 py-1">
+                        {ys > 0 && G("Yemeksepeti", ys, "ys")}
+                        {ty > 0 && G("Trendyol", ty, "ty")}
+                        {mg > 0 && G("Migros", mg, "mg")}
+                        {alo > 0 && G("Alo Paket (online)", alo, "alo")}
+                        {!ch.kapidaKasada && ch.tKapida > 0 && G("Kapıda ödeme (kurye)", ch.tKapida, "kp")}
+                        {G("Kasa nakit", tv(kasaNakit), "kn")}
+                        {G("Kasa POS", tv(kasaPos), "kpos")}
+                        {kartKasa > 0 && G("Kasa yemek kartı", kartKasa, "kk")}
+                        {ch.tGiderNakit > 0 && G("Kasadan ödenen gider", ch.tGiderNakit, "gn")}
+                      </div>
+                      <div className="mt-auto px-4 py-3 border-t-2 border-blue-500/30 flex justify-between items-baseline">
+                        <span className="text-[16px] font-bold">Brüt ciro</span><span className="text-[26px] font-black text-blue-300">₺{fmt(ch.brutCiro)}</span>
+                      </div>
+                    </div>
+                    <div className={`${kutu} flex flex-col`}>
+                      <p className={`${baslik} text-red-300`}>DÜŞEN</p>
+                      <div className="px-4 py-1">
+                        {G(<>Platform indirimi {ch.indirimUyari && <span className="text-[13px] text-amber-300">· %{ch.indirimOrani.toFixed(0)}</span>}</>, ch.tIndirim, "ind")}
+                        {G("Gider", ch.tGider, "gd")}
+                        {G("İade", ch.tIade, "ia")}
+                        {ch.tGiderGecmis > 0 && (
+                          <div className="my-2 px-3 py-2 rounded-lg border border-dashed border-cizgi-guclu text-[13px] text-gray-600">
+                            <div className="flex justify-between"><span>Eski nakitten ödenen</span><span className="font-semibold text-yazi">{fmt(ch.tGiderGecmis)}</span></div>
+                            <span>{giderler.filter(g => odemeOf(g) === "gecmis" && tv(g.tutar) > 0).map(g => g.aciklama).filter(Boolean).join(", ")} · ciroya girmez</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-auto px-4 py-3 border-t-2 border-emerald-500/30 flex justify-between items-baseline">
+                        <span className="text-[16px] font-bold">Net ciro</span><span className="text-[26px] font-black text-emerald-300">₺{fmt(ch.netCiro)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {sorunlu.length > 0 ? (
+                    <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 overflow-hidden">
+                      <p className="px-4 py-3 text-[15px] font-black text-amber-300 border-b border-amber-500/20">KONTROL · {sorunlu.length} şeye bak <span className="text-[12px] font-normal text-gray-500">(tıklayınca ayrıntı açılır)</span></p>
+                      {sorunlu}
+                    </div>
+                  ) : (
+                    <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-[15px] font-bold text-emerald-300">Kontrol: her şey tamam</p>
+                  )}
+                  {tamam.length > 0 && (
+                    <details className="rounded-xl border border-emerald-500/25 bg-kart overflow-hidden">
+                      <summary className="px-4 py-3 cursor-pointer text-[14px] text-gray-700"><span className="font-bold text-emerald-300">TAMAM</span> · {tamam.map(e => String(e.key ?? "").replace(/^\.\$/, "")).join(" · ")}</summary>
+                      <div className="border-t border-cizgi">{tamam}</div>
+                    </details>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className={`${kutu} px-4 py-3 space-y-1.5`}>
+                      <p className="text-[13px] font-bold text-gray-500">PAKET</p>
+                      <div className="flex gap-6 items-baseline">
+                        <div><p className="text-[26px] font-black">{ch.tKuryeGercekPaket}</p><p className="text-[12px] text-gray-500">asıl paket</p></div>
+                        {rrVar && <div><p className="text-[26px] font-black text-sky-300">{rr.odenecekPaket}</p><p className="text-[12px] text-gray-500">Roadrunner&apos;a ödenecek</p></div>}
+                      </div>
+                      {kuryePaketleri && <p className="text-[12px] text-gray-500">{kuryePaketleri}</p>}
+                      <p className="text-[12px] text-gray-500">Ortalama sepet ₺{fmt(ch.paketOrt)}</p>
+                    </div>
+                    <div className={`${kutu} px-4 py-3 space-y-1`}>
+                      <p className="text-[13px] font-bold text-gray-500">KASADA OLMASI GEREKEN</p>
+                      <div className="flex justify-between items-baseline"><span className="text-[14px]">Toplam nakit</span><span className="text-[22px] font-black text-altin">₺{fmt(tv(kasaNakit) + kt.nakit)}</span></div>
+                      {kt.nakit > 0 && <p className="text-[12px] text-gray-500">Dükkân {fmt(tv(kasaNakit))} + kuryeler {fmt(kt.nakit)}</p>}
+                      <div className="flex justify-between items-baseline pt-1 border-t border-cizgi"><span className="text-[14px]">Toplam POS</span><span className="text-[22px] font-black text-sky-300">₺{fmt(posToplam)}</span></div>
+                      {kt.pos > 0 && <p className="text-[12px] text-gray-500">Kasa {fmt(tv(kasaPos))} + kuryeler {fmt(kt.pos)}</p>}
+                      <div className="flex justify-between text-[13px] text-gray-600"><span>POS komisyonu %{(POS_KOMISYON_ORANI * 100).toLocaleString("tr-TR")}</span><span>−{fmt(posKomisyon)}</span></div>
+                      <div className="flex justify-between text-[14px] font-bold"><span>Hesaba geçecek</span><span>₺{fmt(posToplam - posKomisyon)}</span></div>
+                    </div>
+                    <div className={`${kutu} px-4 py-3 space-y-1`}>
+                      <p className="text-[13px] font-bold text-gray-500">HAVUZDA BİRİKEN · Roadrunner&apos;da</p>
+                      {rrVar ? <>
+                        <div className="flex justify-between text-[14px]"><span>Nakit</span><span className="font-semibold">{fmt(rr.havuzNakit)}</span></div>
+                        <div className="flex justify-between text-[14px]"><span>POS</span><span className="font-semibold">{fmt(rr.havuzPos)}</span></div>
+                        <div className="flex justify-between text-[13px] text-gray-600"><span>POS komisyonu %{(RR_POS_KOMISYON_ORANI * 100).toLocaleString("tr-TR")}</span><span>−{fmt(rr.havuzKomisyon)}</span></div>
+                        <div className="flex justify-between text-[15px] pt-1 border-t border-cizgi"><span className="font-bold">Borçtan düşülecek</span><span className="font-black">₺{fmt(rr.havuzTahsilat)}</span></div>
+                      </> : <p className="text-[13px] text-gray-500">Bu tarihte Roadrunner yok.</p>}
+                    </div>
+                  </div>
+                  {ayrintiDugmesi}
+                </>);
+              };
               const ayrintiAc = () => { setAyrinti(true); setTimeout(() => document.getElementById(isReadOnly ? "adim-1" : "adim-4-ayrinti")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); };
-              return (<>
-                <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
+              const kontrolSatirlari = (<>
                   {satir(mpDoldurma || isReadOnly ? "tamam" : "uyari", "Satışlar", `₺${fmt(ch.tOnline + ch.tKapida)}`,
                     `${isReadOnly ? "" : mpDoldurma ? "MagicPay'den geldi · " : "MagicPay'den gelmedi — ayrıntılardan elle girin · "}Online ₺${fmt(ch.tOnline)} · Kapıda ₺${fmt(ch.tKapida)} · ${paket} paket`,
                     mpDoldurma ? undefined : ayrintiAc, "Aç",
@@ -3296,12 +3454,22 @@ export default function RaporlarPage() {
                       : ch.indirimUyari ? `Online cironun %${ch.indirimOrani.toFixed(1)}'i — %15'i geçti, kontrol edin`
                       : `Online cironun %${ch.indirimOrani.toFixed(1)}'i`,
                     indirimSorun ? ayrintiAc : undefined, "Bak",
-                    <>{dS("Yemeksepeti", ch.tIndirimYS)}{dS("Trendyol", ch.tIndirimTrendyol)}{dS("Diğer", Math.max(0, ch.tIndirim - ch.tIndirimYS - ch.tIndirimTrendyol))}</>)}
+                    indirimTablosu)}
                   {satir(nakitFarkVar ? "uyari" : "tamam", "Kasa", `₺${fmt(ch.tKasa)}`,
                     `Nakit ₺${fmt(tv(kasaNakit))} · POS ₺${fmt(tv(kasaPos))}` + (nakitFarkVar && nakitFarki != null
                       ? ` · Nakit, MagicPay'e göre ₺${fmt(Math.abs(nakitFarki))} ${nakitFarki < 0 ? "EKSİK" : "FAZLA"} (nakit giderler düşüldü)` : ""),
                     () => adimaGit(1), nakitFarkVar ? "Nakde git" : "Düzelt",
-                    <>{dS("Nakit (sayılan)", tv(kasaNakit))}{dS("POS", tv(kasaPos))}{kartDetay}</>)}
+                    (() => {
+                      const kt = kuryeTahsilati({ tarih, kurye_raporlari: kuryeler });
+                      return <>
+                        {dS("Dükkân nakit (sayılan)", tv(kasaNakit))}
+                        {kt.nakit > 0 && <>{dS("Sabit kuryelerin getirdiği nakit", kt.nakit)}{dS(<b>Kasadaki toplam nakit</b>, tv(kasaNakit) + kt.nakit, "ktn")}</>}
+                        {dS("POS", tv(kasaPos))}
+                        {kt.pos > 0 && dS("Sabit kuryelerin POS'u", kt.pos)}
+                        {kartDetay}
+                        {kt.nakit + kt.pos > 0 && <p className="text-[12px] text-gray-500 pt-1">Kuryelerin nakit/POS&apos;u Kasa toplamına değil Satışlar › kapıda&apos;ya girer (iki kez sayılmaz).</p>}
+                      </>;
+                    })())}
                   {satir("tamam", "Gider", `₺${fmt(ch.tGider)}`,
                     [`Nakit ₺${fmt(ch.tGiderNakit)}`, ch.tGiderNakitDisi > 0 ? `POS / diğer ₺${fmt(ch.tGiderNakitDisi)}` : ""].filter(Boolean).join(" · "),
                     () => adimaGit(2), "Düzelt", giderDetay)}
@@ -3326,7 +3494,17 @@ export default function RaporlarPage() {
                       : sayimFark == null ? "" : oncekiSayimVar === false ? "İlk sayım: kasa bu tutarla başlatılır"
                       : Math.abs(sayimFark) < 1 ? "Kasa tuttu" : sayimFark < 0 ? `Kasa açığı ₺${fmt(Math.abs(sayimFark))}` : `Kasa fazlası ₺${fmt(sayimFark)}`,
                     ayrintiAc, sayim == null ? "Gir" : "Bak")}
-                </div>
+              </>);
+              const ayrintiDugmesi = (
+                <button type="button" onClick={() => ayrinti ? setAyrinti(false) : ayrintiAc()}
+                  className="w-full flex items-center justify-between rounded-xl border border-cizgi bg-kart px-4 py-3 text-[13px] font-semibold text-gray-400 hover:text-yazi">
+                  <span>{isReadOnly ? "Tüm ayrıntılar (satış tablosu, kasa, kurye…)" : "Ayrıntılar"}</span>
+                  {ayrinti ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                </button>
+              );
+              if (isReadOnly) return raporOzetGorunumu(kontrolSatirlari, ayrintiDugmesi);
+              return (<>
+                <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">{kontrolSatirlari}</div>
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="rounded-xl bg-blue-500/10 border border-blue-500/25 px-4 py-4">
                     <p className="text-[12px] font-bold text-blue-300 uppercase tracking-wide">Brüt ciro</p>
@@ -3337,11 +3515,7 @@ export default function RaporlarPage() {
                     <p className="text-2xl md:text-3xl font-black text-emerald-300 mt-1">₺{fmt(ch.netCiro)}</p>
                   </div>
                 </div>
-                <button type="button" onClick={() => ayrinti ? setAyrinti(false) : ayrintiAc()}
-                  className="w-full flex items-center justify-between rounded-xl border border-cizgi bg-kart px-4 py-3 text-[13px] font-semibold text-gray-400 hover:text-yazi">
-                  <span>Ayrıntılar</span>
-                  {ayrinti ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-                </button>
+                {ayrintiDugmesi}
               </>);
             })()}
             {ayrinti && <div id="adim-4-ayrinti" className="space-y-3 scroll-mt-14">
@@ -3861,21 +4035,22 @@ export default function RaporlarPage() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-cizgi bg-alan">
-                    {["Tarih","Brüt Ciro","Net Ciro","Paket","Sepet Ort.","Gider+İade",""].map((h,i)=>(
+                    {["Tarih","Brüt Ciro","Net Ciro","Paket","Sepet Ort.","Gider+İade","RR Ödenecek Pk","Havuzdan Gelen",""].map((h,i)=>(
                       <th key={i} className={`px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest ${
-                        h==="Net Ciro"?"text-emerald-400":h==="Paket"?"text-amber-400":h==="Sepet Ort."?"text-purple-400":h==="Gider+İade"?"text-red-400":"text-gray-600"
+                        h==="Net Ciro"?"text-emerald-400":h==="Paket"?"text-amber-400":h==="Sepet Ort."?"text-purple-400":h==="Gider+İade"?"text-red-400":h==="RR Ödenecek Pk"?"text-sky-300":h==="Havuzdan Gelen"?"text-pink-300":"text-gray-600"
                       }`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-cizgi">
                   {raporlar.length===0 ? (
-                    <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-600 text-xs uppercase tracking-widest">Bu dönemde rapor bulunmuyor</td></tr>
+                    <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-600 text-xs uppercase tracking-widest">Bu dönemde rapor bulunmuyor</td></tr>
                   ) : raporlar.map((rapor)=>{
                     const o = raporOzeti(rapor);
                     const brutCiro = o.brut, net = o.net, paket = o.paket;
                     const ort = paket>0 ? o.platformCiro/paket : 0;
                     const gi = o.gider + o.iade;
+                    const rr = roadrunnerGunOzeti(rapor);
                     return (
                       <tr key={rapor.id}
                         onClick={()=>{setSelectedRapor(rapor);raporuFormaYukle(rapor);setIsEditMode(false);setFormAcik(true);}}
@@ -3890,6 +4065,8 @@ export default function RaporlarPage() {
                         <td className="px-4 py-3.5 text-amber-400 font-semibold">{paket}</td>
                         <td className="px-4 py-3.5 text-purple-400 font-bold">₺{fmt(ort)}</td>
                         <td className="px-4 py-3.5 text-red-400 font-medium">{gi>0?`-₺${fmt(gi)}`:"—"}</td>
+                        <td className="px-4 py-3.5 text-sky-300 font-semibold">{rr.odenecekPaket || "—"}</td>
+                        <td className="px-4 py-3.5 text-pink-300 font-semibold" title={rr.havuzNakit + rr.havuzPos > 0 ? `Nakit ₺${fmt(rr.havuzNakit)} + POS ₺${fmt(rr.havuzPos)} − %5 komisyon ₺${fmt(rr.havuzKomisyon)}` : undefined}>{rr.havuzNakit + rr.havuzPos > 0 ? `₺${fmt(rr.havuzTahsilat)}` : "—"}</td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <span className="text-[10px] text-gray-500 flex items-center gap-1"><Eye size={10}/> İncele</span>
@@ -3912,6 +4089,8 @@ export default function RaporlarPage() {
                       <td className="px-4 py-3 text-amber-400 font-black">{tabloToplam.paket}</td>
                       <td className="px-4 py-3 text-purple-400 font-black">₺{fmt(tabloToplam.paketOrt)}</td>
                       <td className="px-4 py-3 text-red-400 font-black">-₺{fmt(tabloToplam.giderIade)}</td>
+                      <td className="px-4 py-3 text-sky-300 font-black">{tabloToplam.rrPaket}</td>
+                      <td className="px-4 py-3 text-pink-300 font-black">₺{fmt(tabloToplam.havuz)}</td>
                       <td/>
                     </tr>
                   </tfoot>

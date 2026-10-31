@@ -2,7 +2,8 @@
 // tg_veri RPC'sinin döndürdüğü ham veriden (kullanıcının yetkisi olan bölümler) Telegram
 // mesajları üretir. Hesaplar panelle aynı kütüphanelerden gelir (hesap, cariEkstre, stok),
 // böylece Telegram'daki rakam paneldekiyle aynı olur. Saf fonksiyonlar: test edilebilir.
-import { raporOzeti, donemOzeti, type RaporVerisi } from "@/lib/hesap";
+import { raporOzeti, donemOzeti, platformKirilimi, kuryeTahsilati, kuryeKartToplami, roadrunnerGunOzeti, ROADRUNNER_GECIS_GUNU, type RaporVerisi } from "@/lib/hesap";
+import { POS_KOMISYON_ORANI } from "@/lib/mutabakat";
 import { vadeTakvimi, type TakvimFatura } from "@/lib/cariEkstre";
 import { stokDurumu, siparisPlani, sayimGecikti, VARSAYILAN_SIPARIS, type StokHareketi } from "@/lib/stok";
 import { gunEkle, fmtTarih } from "@/lib/tarih";
@@ -42,21 +43,50 @@ export function buCuma(bugunStr: string): string {
   return gunEkle(bugunStr, (5 - g + 7) % 7);
 }
 
-// ── Ciro ──
+// ── Ciro (31.10.2026: kısa, panelin rapor detayıyla aynı mantık) ──
+/** Raporda bakılması gerekenler: indirim %15 üstü (en yüksek platformla), kurye tutmuyor. */
+export function raporUyarilariKisa(r: RaporVerisi): string[] {
+  const out: string[] = [];
+  const o = raporOzeti(r);
+  const ciro = o.online + o.kapida;
+  if (ciro > 0 && o.indirim / ciro > 0.15) {
+    const k = platformKirilimi(r);
+    const rec = r as unknown as Record<string, unknown>;
+    const ind = (p: string) => Object.keys(rec).filter(x => new RegExp(`^(os|ko)_(kebo|cnf|kir)_${p}(_yemek)?_indirim$`).test(x)).reduce((t, x) => t + (Number(rec[x]) || 0), 0);
+    const pl = ([["Yemeksepeti", "ys"], ["Trendyol", "trendyol"], ["Migros", "migros"]] as const)
+      .map(([ad, kod]) => ({ ad, i: ind(kod), c: k.online[ad] + k.kapida[ad] })).filter(x => x.c > 0).sort((a, b) => b.i - a.i)[0];
+    out.push(`İndirim %${Math.round(o.indirim / ciro * 100)}${pl ? ` (en çok ${pl.ad} %${Math.round(pl.i / pl.c * 100)})` : ""}`);
+  }
+  if (r.tarih >= ROADRUNNER_GECIS_GUNU && (r.kurye_raporlari || []).length) {
+    const getirilen = (r.kurye_raporlari || []).reduce((t, x) => t + (Number(x.nakit) || 0) + (Number(x.pos) || 0) + kuryeKartToplami(x), 0);
+    const fark = Math.round(o.kapida - getirilen);
+    if (Math.abs(fark) >= 1) out.push(`Kurye ${tl(Math.abs(fark))} ${fark > 0 ? "eksik" : "fazla"}`);
+  }
+  if (o.brut > 0 && o.paket === 0) out.push("Paket girilmemiş");
+  return out;
+}
+
 export function ciroBolumu(v: TgVeri, bugunStr: string): string[] {
   const r = v.raporlar; if (!r) return [];
   const dun = gunEkle(bugunStr, -1);
   const harita = new Map(r.map(x => [x.tarih, x]));
-  const s: string[] = ["<b>💰 Ciro</b>"];
+  const s: string[] = [];
   const d = harita.get(dun);
   if (d) {
     const o = raporOzeti(d);
     const gecen = harita.get(gunEkle(dun, -7));
-    const og = gecen ? raporOzeti(gecen) : null;
-    s.push(`Dün (${fmtTarih(dun)}): <b>${tl(o.brut)}</b>${og ? ok(yuzde(o.brut, og.brut)) + " geçen haftaya göre" : ""}`);
-    s.push(`Online ${tl(o.online)} · Kasa ${tl(o.kasa)} · ${o.paket} paket`);
+    s.push(`<b>💰 Dün (${fmtTarih(dun).slice(0, 5)})</b>`);
+    s.push(`Brüt <b>${tl(o.brut)}</b>${gecen ? ok(yuzde(o.brut, raporOzeti(gecen).brut)) : ""} · Net <b>${tl(o.net)}</b>`);
+    const rr = roadrunnerGunOzeti(d);
+    s.push(`${o.paket} paket${d.tarih >= ROADRUNNER_GECIS_GUNU && rr.odenecekPaket ? ` · Roadrunner'a ${rr.odenecekPaket} pk` : ""}`);
+    const kt = kuryeTahsilati(d);
+    const pos = (Number(d.kasa_pos) || 0) + kt.pos;
+    s.push(`Kasada: nakit ${tl((Number(d.kasa_nakit) || 0) + kt.nakit)} · POS ${tl(pos)} (komisyon sonrası ${tl(pos * (1 - POS_KOMISYON_ORANI))})`);
+    if (rr.havuzNakit + rr.havuzPos > 0) s.push(`Havuzdan: ${tl(rr.havuzTahsilat)} (borçtan düşülür)`);
+    const u = raporUyarilariKisa(d);
+    if (u.length) s.push(`⚠️ Bak: ${u.join(" · ")}`);
   } else {
-    s.push(`⚠️ Dünün (${fmtTarih(dun)}) kasa raporu girilmemiş.`);
+    s.push(`<b>💰 Ciro</b>`, `⚠️ Dünün (${fmtTarih(dun)}) kasa raporu girilmemiş.`);
   }
   const son7 = r.filter(x => x.tarih >= gunEkle(bugunStr, -7) && x.tarih < bugunStr);
   const onceki7 = r.filter(x => x.tarih >= gunEkle(bugunStr, -14) && x.tarih < gunEkle(bugunStr, -7));
@@ -66,7 +96,7 @@ export function ciroBolumu(v: TgVeri, bugunStr: string): string[] {
   }
   const eksik: string[] = [];
   for (let i = 1; i <= 7; i++) { const t = gunEkle(bugunStr, -i); if (!harita.has(t)) eksik.push(fmtTarih(t).slice(0, 5)); }
-  if (eksik.length > 1) s.push(`Raporu girilmemiş günler: ${eksik.reverse().join(", ")}`);
+  if (eksik.length > 1) s.push(`Rapor yok: ${eksik.reverse().join(", ")}`);
   return s;
 }
 
