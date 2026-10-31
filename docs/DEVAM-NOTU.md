@@ -36,6 +36,8 @@ Son güncelleme: 31.10.2026 (13:00)
 - **İrsaliye ↔ fatura sorgusu**: Stok ve Faturalar sayfasında "İrsaliye ↔ fatura" arama kutusu; Telegram'da `/belge <no ya da firma>` ve serbest soru.
 
 ## Bekleyenler / sıradaki işler
+00000000. **31.10 14:15 — "Firma stokla ilgisiz" (YAYINLANMADI; MIGRATION UYGULANMADI!)**: Fatura başlığında yeni düğme → RPC `stok_tedarikci_takip(p_vkn, p_takip, p_tedarikci)`: tablo `stok_takipsiz_tedarikci` (vkn PK), bekleyen kalemler reddedilir, `_stok_giris_onerisi_olustur` tetikleyicisi bu VKN'leri atlar (gelecek faturalar sorulmaz); p_takip=true geri alır (henüz ekranı yok). Migration dosyası `20261031141500_stok_takipsiz_tedarikci.sql`; Supabase'e uygulama sırasında Supabase aracı onay sordu, cevap gelmedi → kullanıcı onaylayınca UYGULANMALI, yoksa düğme "fonksiyon yok" hatası verir. Bekleyenler: Kebo 22 fatura, İbocan 14, TYG (Trendyol) 18, Kalem 5, Sütaş 9, Saray 3, Kadir Sunel 1, AKA İSG 1, Ufuk 1.
+
 0000000. **31.10 14:10 — "Yeni ürün olarak ekle" (YAYINLANMADI)**: Ürün ekleniyordu ama `/stok` veriCek tam ekran "yükleniyor"a geçip StokGirisOnay'ı söküyordu → satırdaki seçim kayboluyordu; kullanıcı 5 kez denedi, 5 "AYSBERK MAROL" oluştu (4'ü silindi, f8b0c9b4… kaldı). Düzeltme: tam ekran bekleme sadece ilk yüklemede; aynı adlı ürün varsa yenisi açılmaz, o seçilir.
 
 000000. **31.10 14:10 — Faturadan stok girişi (YAYINLANMADI)**: "Eşleşenleri stoğa işle" eşleşen kalem yokken sessizce hiçbir şey yapmıyordu (İbocan sebze faturası: hiçbir kalemde ürün seçili değil). Artık düğmede sayı var ("(3)") ya da "Eşleşen kalem yok" (pasif); işleyince "N kalem işlendi, M bekliyor" mesajı; yeni "Seçilmeyenleri takip etme (N)" düğmesi (onaylı, kalem adları bir daha sorulmaz). Bekleyen 77 fatura / 226 kalem var.
