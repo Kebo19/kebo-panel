@@ -36,6 +36,8 @@ Son güncelleme: 31.10.2026 (13:00)
 - **İrsaliye ↔ fatura sorgusu**: Stok ve Faturalar sayfasında "İrsaliye ↔ fatura" arama kutusu; Telegram'da `/belge <no ya da firma>` ve serbest soru.
 
 ## Bekleyenler / sıradaki işler
+000000000000000000000000. **31.10 22:20 — Sayım kağıdı sayfaları ölçülerek doldurulur (YAYINLANMADI)**: kagitBelgesi (tek başına sayım listeleri) sayfaya küçük bir betik ekler (DOLDUR): her sayfa sonraki sayfanın satırlarıyla sayfa sonuna kadar doldurulur, boşalan ara sayfa silinir, son sayfada liste bittikten sonra boş satırlar sayfa sonuna kadar uzar (sadece kural + 72 px not alanı kalır), sayfa numaraları (.sayfano) yeniden yazılır. Satırlar tr.bos; not alanı sabit. 85 ürünlü aylık PDF'le kontrol edildi (3 sayfa, hepsi dolu). Kullanıcıya önizleme gönderildi.
+
 00000000000000000000000. **31.10 22:05 — Sayım kağıdı son sayfa boş satırlarla sayfa sonuna kadar uzar (YAYINLANMADI)**: sayimSayfalari son sayfayı SAYFA_SATIR − 3 satıra kadar boş satırla doldurur (kural + kısa not alanı kalır); 85 ürünlü aylıkta 3. sayfa sonuna kadar dolu (PDF'le kontrol edildi).
 
 0000000000000000000000. **31.10 21:55 — Sayım listesi kontrolü (YAYINLANMADI)**: Kod doğru (Liste düzenle stok_urunler'e yazar, kağıt her açılışta stoktan okur). islem_gecmisi: 30.10 14:00'ten sonra sayım listesinde (sayim_periyodu/sira_no/yer) HİÇ değişiklik kaydedilmemiş → kullanıcının bugünkü düzenlemeleri kaydedilmeden kaybolmuş (canlı sitede "Yazdır önce kaydeder" düzeltmesi henüz yok). Aktif: günlük 23, haftalık 59, aylık 3 → listeler: günlük 23, haftalık 82, aylık 85. Liste düzenle'ye kaydedilmemiş değişiklikle çıkışta tarayıcı uyarısı eklendi (beforeunload; Yazdır kaydedip çıkarken uyarmaz).

@@ -121,7 +121,9 @@ const CSS = `
   table.sayim.okunakli td.ad { font-size: 10pt; }
   table.sayim.okunakli td.br, table.sayim.okunakli td.no { font-size: 9.5pt; }
   table.sayim.okunakli tr.marka td { height: 18px; font-size: 8.5pt; }
-  @media screen { .sayfa.cok { border-bottom: 3px dashed #bbb; margin-bottom: 12px; } }
+  .sayfa.cok > * { flex-shrink: 0; }
+  .sayfa.cok .not { flex: 0 0 72px; min-height: 72px; }
+  @media screen { .sayfa.cok { outline: 1px dashed #bbb; margin-bottom: 12px; } }
 `;
 
 const ON_YUZ = `
@@ -267,14 +269,17 @@ export function sayimSayfalari(urunler: KagitUrunu[], periyot: SayimPeriyodu, to
   }
   const bos = Math.max(3, toplamSatir - urunler.length);
   if (bos) satirlar.push(`<tr class="marka"><td colspan="${sutun}">LİSTEDE OLMAYANLAR — adını ve birimini yazın</td></tr>`);
-  for (let i = 0; i < bos; i++) satirlar.push(`<tr><td class="no"></td><td class="ad"></td><td class="br"></td>${bosHucre}</tr>`);
+  for (let i = 0; i < bos; i++) satirlar.push(`<tr class="bos"><td class="no"></td><td class="ad"></td><td class="br"></td>${bosHucre}</tr>`);
   const sayfalar: string[][] = [];
   for (let i = 0; i < satirlar.length; i += SAYFA_SATIR) sayfalar.push(satirlar.slice(i, i + SAYFA_SATIR));
   // Son sayfada kural + notlar için yer kalsın
+  // Önce sondaki boş satırlar kırpılır (sayfa sonunda zaten ölçülerek yeniden doldurulur), yine sığmıyorsa yeni sayfa
+  const sonSf = sayfalar[sayfalar.length - 1];
+  while (sonSf && sonSf.length > SAYFA_SATIR - 6 && sonSf[sonSf.length - 1].startsWith('<tr class="bos"') && sonSf[sonSf.length - 2]?.startsWith('<tr class="bos"')) sonSf.pop();
   if (sayfalar.length && sayfalar[sayfalar.length - 1].length > SAYFA_SATIR - 6) sayfalar.push([]);
   // Son sayfa boş satırlarla sayfa sonuna kadar uzar (kural + kısa not alanına yer bırakır) — 31.10
   const son = sayfalar[sayfalar.length - 1];
-  const bosSatirHtml = `<tr><td class="no"></td><td class="ad"></td><td class="br"></td>${bosHucre}</tr>`;
+  const bosSatirHtml = `<tr class="bos"><td class="no"></td><td class="ad"></td><td class="br"></td>${bosHucre}</tr>`;
   if (son && !son.length) son.push(`<tr class="marka"><td colspan="${sutun}">LİSTEDE OLMAYANLAR (devam)</td></tr>`);
   while (son && son.length < SAYFA_SATIR - 3) son.push(bosSatirHtml);
   const ad = PERIYOT_ADI[periyot];
@@ -284,9 +289,9 @@ export function sayimSayfalari(urunler: KagitUrunu[], periyot: SayimPeriyodu, to
     : `<tr><th style="width:5%">No</th><th>Ürün</th><th style="width:7%">Birim</th><th style="width:12%">Sabah sayım<br><small>(gün başı)</small></th><th style="width:12%">Akşam sayım<br><small>(gün sonu)</small></th><th style="width:9%">Fire<br><small>(bozuk/SKT)</small></th><th style="width:11%">Not</th></tr>`;
   return sayfalar.map((sf, i) => {
     const son = i === sayfalar.length - 1;
-    return `<section class="sayfa arka cok${son ? "" : " ara"}">
+    return `<section class="sayfa arka cok${son ? " son" : " ara"}">
   <div class="ust">
-    <h1>KEBO <small>${ad} Sayım Listesi · Sayfa ${i + 1}/${sayfalar.length}</small></h1>
+    <h1>KEBO <small>${ad} Sayım Listesi · Sayfa <span class="sayfano">${i + 1}/${sayfalar.length}</span></small></h1>
     <div class="alanlar">
       <div>Tarih: <span class="cizgi" style="width:32px"></span> / <span class="cizgi" style="width:32px"></span> / 20<span class="cizgi" style="width:24px"></span></div>
       <div>Sayan: <span class="cizgi" style="width:150px"></span></div>
@@ -297,10 +302,51 @@ export function sayimSayfalari(urunler: KagitUrunu[], periyot: SayimPeriyodu, to
   ${son ? `<div class="kural">${kural}</div>
   <h2 style="margin-top:6px">NOTLAR <small>Eksik, bozuk, iade edilen ürünler</small></h2>
   <div class="not"></div>` : ""}
-  <div class="kod">KEBO-SAYIM · ${periyot.toLocaleUpperCase("tr-TR")} · ${urunler.length} ÜRÜN · SAYFA ${i + 1}/${sayfalar.length}</div>
+  <div class="kod">KEBO-SAYIM · ${periyot.toLocaleUpperCase("tr-TR")} · ${urunler.length} ÜRÜN · SAYFA <span class="sayfano">${i + 1}/${sayfalar.length}</span></div>
 </section>`;
   }).join("\n");
 }
+
+/** Son sayfadaki boşluğu, not alanına dokunmadan sayfa sonuna kadar boş satırla doldurur (ölçerek). 31.10 */
+const DOLDUR = `<script>(function(){
+  function sigiyor(sf){ return sf.scrollHeight <= sf.clientHeight + 1; }
+  function govde(sf){ var t = sf.querySelector("table.sayim"); return t ? (t.tBodies[0] || t) : null; }
+  function veriSatirlari(g){ return Array.prototype.filter.call(g.querySelectorAll("tr"), function(tr){ return !tr.querySelector("th"); }); }
+  function duzenle(){
+    var sayfalar = Array.prototype.slice.call(document.querySelectorAll(".sayfa.cok"));
+    // 1) Her sayfayı sonraki sayfanın satırlarıyla sayfa sonuna kadar doldur
+    for (var i = 0; i < sayfalar.length - 1; i++) {
+      var g = govde(sayfalar[i]); if (!g) continue;
+      for (var j = i + 1; j < sayfalar.length; j++) {
+        var gs = govde(sayfalar[j]); if (!gs) continue;
+        var dur = false;
+        while (true) {
+          var r = veriSatirlari(gs)[0]; if (!r) break;
+          g.appendChild(r);
+          if (!sigiyor(sayfalar[i])) { var f = veriSatirlari(gs)[0]; if (f) gs.insertBefore(r, f); else gs.appendChild(r); dur = true; break; }
+        }
+        if (dur) break;
+      }
+    }
+    // 2) Satırı kalmayan ara sayfaları kaldır (son sayfa kural + notlarla kalır)
+    sayfalar.forEach(function(sf, i){ var g = govde(sf); if (i < sayfalar.length - 1 && (!g || !veriSatirlari(g).length)) sf.remove(); });
+    sayfalar = Array.prototype.slice.call(document.querySelectorAll(".sayfa.cok"));
+    var son = sayfalar[sayfalar.length - 1];
+    if (son) {
+      var ornek = document.querySelector("tr.bos");
+      var g2 = govde(son);
+      if (ornek && g2) {
+        var n = 0;
+        while (sigiyor(son) && n++ < 120) g2.appendChild(ornek.cloneNode(true));
+        while (!sigiyor(son)) { var l = g2.querySelectorAll("tr.bos"); if (!l.length) break; l[l.length - 1].remove(); }
+      }
+      sayfalar.forEach(function(sf, i){ sf.classList.toggle("ara", i < sayfalar.length - 1); });
+    }
+    // 3) Sayfa numaraları
+    sayfalar.forEach(function(sf, i){ sf.querySelectorAll(".sayfano").forEach(function(e){ e.textContent = (i + 1) + "/" + sayfalar.length; }); });
+  }
+  if (document.readyState === "complete") duzenle(); else window.addEventListener("load", duzenle);
+})();</script>`;
 
 /** Yazdırılacak tam HTML belgesi. kasaFormu=true ise ön yüz kasa formu, arka yüz sayım listesi. */
 export function kagitBelgesi(urunler: KagitUrunu[], periyot: SayimPeriyodu, kasaFormu: boolean): string {
@@ -309,5 +355,5 @@ export function kagitBelgesi(urunler: KagitUrunu[], periyot: SayimPeriyodu, kasa
   // çok sayfalı; aylık sayım toplam AYLIK_TOPLAM_SATIR satır (eksikler elle yazılır).
   const sayim = kasaFormu ? sayimSayfasi(urunler, periyot)
     : sayimSayfalari(urunler, periyot, periyot === "aylik" ? AYLIK_TOPLAM_SATIR : urunler.length + 5);
-  return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><title>KEBO ${kasaFormu ? "Kasa Formu + " : ""}${PERIYOT_ADI[periyot]} Sayım</title><style>${CSS}</style></head><body>${on}${sayim}</body></html>`;
+  return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><title>KEBO ${kasaFormu ? "Kasa Formu + " : ""}${PERIYOT_ADI[periyot]} Sayım</title><style>${CSS}</style></head><body>${on}${sayim}${kasaFormu ? "" : DOLDUR}</body></html>`;
 }
