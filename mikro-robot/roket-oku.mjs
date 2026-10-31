@@ -1,5 +1,3 @@
-// OTOMATİK ÜRETİLDİ: lib/roket.ts (+ lib/magicpay.ts) — elle düzenlemeyin. Yeniden üretmek: npx esbuild lib/roket.ts --bundle --format=esm --platform=node --outfile=mikro-robot/roket-oku.mjs
-
 // lib/magicpay.ts
 var sade = (s) => s.toLocaleLowerCase("tr").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ı/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ç/g, "c").replace(/ö/g, "o").replace(/ü/g, "u").trim();
 var KANALLAR = [
@@ -48,20 +46,33 @@ function atamaBul(g, k) {
   const sabitler = g.kuryeler.filter((x) => !x.atama && x.sabit);
   return sabitler.indexOf(k) === 0 ? "s1" : "s2";
 }
-function varsayilanAtama(kuryeler, oncekiSabit = {}) {
-  const sonuc = kuryeler.map((k) => ({ ...k, atama: "havuz" }));
+var SABIT_ASGARI_PAKET = 10;
+function varsayilanAtama(kuryeler, oncekiSabit = {}, dolu = []) {
+  const sonuc = kuryeler.map((k) => ({ ...k, atama: "havuz", elle: void 0 }));
+  const enCok = Math.max(0, ...sonuc.map((k) => k.paket));
+  const yeterli = (k) => k.paket >= SABIT_ASGARI_PAKET && k.paket >= enCok / 2;
   for (const slot of ["s1", "s2"]) {
+    if (dolu.includes(slot)) continue;
     const adlar = (oncekiSabit[slot] || []).map((a) => sade2(a).toLocaleLowerCase("tr-TR"));
     sonuc.forEach((k) => {
-      if (k.atama === "havuz" && adlar.includes(sade2(k.ad).toLocaleLowerCase("tr-TR"))) k.atama = slot;
+      if (k.atama === "havuz" && yeterli(k) && adlar.includes(sade2(k.ad).toLocaleLowerCase("tr-TR"))) k.atama = slot;
     });
   }
   for (const slot of ["s1", "s2"]) {
-    if (sonuc.some((k) => k.atama === slot)) continue;
+    if (dolu.includes(slot) || sonuc.some((k) => k.atama === slot)) continue;
     const aday = sonuc.filter((k) => k.atama === "havuz").sort((a, b) => b.paket - a.paket)[0];
     if (aday) aday.atama = slot;
   }
   return sonuc;
+}
+function atamaBirlestir(kuryeler, eski, oncekiSabit = {}) {
+  const elle = /* @__PURE__ */ new Map();
+  (eski?.kuryeler || []).forEach((k) => {
+    if (k.elle) elle.set(k.ad, atamaBul(eski, k));
+  });
+  const dolu = Array.from(elle.values()).filter((a) => a !== "havuz");
+  const oto = varsayilanAtama(kuryeler.filter((k) => !elle.has(k.ad)), oncekiSabit, dolu);
+  return kuryeler.map((k) => elle.has(k.ad) ? { ...k, atama: elle.get(k.ad), elle: true } : oto.find((o) => o.ad === k.ad));
 }
 var tl = (v) => {
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
@@ -260,7 +271,9 @@ function paketKontrolu(g, bizdeKanal) {
 }
 export {
   ATAMA_ADI,
+  SABIT_ASGARI_PAKET,
   adEslesir,
+  atamaBirlestir,
   atamaBul,
   isGunu,
   kuryeKarsilastir,

@@ -1,0 +1,68 @@
+{
+  "_not": "29.10.2026 fotoğraflardan okunan reçeteler (ham). Birim: g = gram, ad = adet. Aralıklar (65-70) olduğu gibi.",
+  "ara_receteler_1kg": {
+    "Green Salata": {"Iceberg": 520, "Roka": 100, "Dereotu": 30, "Nane": 75, "Maydanoz": 125, "Kırmızı Lahana (hazır)": 150},
+    "Soğan Zerzevatı": {"Soğan (kabuksuz)": 480, "Maydanoz": 200, "Nane": 100, "Domates (kabuksuz)": 180, "Sumak": 40},
+    "Kırmızı Lahana": {"Kırmızı lahana": 700, "Elma sirkesi": 140, "Şeker": 4, "Tuz": 16, "Limon": 140}
+  },
+  "kebo_durum": {
+    "Kebo 90":   {"Döner g": 90, "Ekmek 100gr ad": 1, "Ekmek sosu g": 50, "Taze patates g": "65-70", "Turşu g": 15, "Mayonez g": 40, "Sos g": 40, "_bitmis": "400-420"},
+    "Kebabi 90": {"Döner g": 90, "Ekmek 100gr ad": 1, "Ekmek sosu g": 50, "Soğan zerzevatı g": 50, "Sos g": 40, "_bitmis": "330-350"},
+    "Green 90":  {"Döner g": 90, "Ekmek 100gr ad": 1, "Ekmek mayonezi g": 10, "Yeşil salata g": 50, "Mayonez g": 40, "_bitmis": "290-310"},
+    "Patron 90": {"Döner g": 90, "Ekmek 100gr ad": 1, "Ekmek mayonezi g": 10, "Mayonez g": 40, "_bitmis": "240-260"},
+    "Atom 90":   {"Döner g": 90, "Ekmek 100gr ad": 1, "Ekmek sosu g": 50, "Taze patates g": "65-70", "Turşu g": 15, "Soğan zerzevatı g": 40, "Yeşil salata g": 40, "Mayonez g": 40, "Sos g": 40, "_bitmis": "480-500"},
+    "Yummy":     {"Schnitzel ad": 1, "Ekmek 100gr ad": 1, "Ekmek sosu g": 50, "Taze patates g": 30, "Turşu g": 15, "Yeşil salata g": 30, "Yummy sosu g": 40, "_bitmis": "365-385"},
+    "Kebo 60":   {"Döner g": 60, "Ekmek 80gr ad": 1, "Ekmek sosu g": 45, "Taze patates g": "65-70", "Turşu g": 15, "Mayonez g": 35, "Sos g": 35, "_bitmis": "335-345"},
+    "Kebabi 60": {"Döner g": 60, "Ekmek 80gr ad": 1, "Ekmek sosu g": 45, "Soğan zerzevatı g": 50, "Sos g": 35, "_bitmis": "270-280"},
+    "Green 60":  {"Döner g": 60, "Ekmek 80gr ad": 1, "Ekmek mayonezi g": 9, "Yeşil salata g": 50, "Mayonez g": 35, "_bitmis": "234-244"},
+    "Patron 60": {"Döner g": 60, "Ekmek 80gr ad": 1, "Ekmek mayonezi g": 9, "Mayonez g": 35, "_bitmis": "184-194"},
+    "Atom 60":   {"Döner g": 60, "Ekmek 80gr ad": 1, "Ekmek sosu g": 45, "Taze patates g": "65-70", "Turşu g": 15, "Soğan zerzevatı g": 40, "Yeşil salata g": 40, "Mayonez g": 35, "Sos g": 35, "_bitmis": "415-425"},
+    "Tender's Dürüm": {"Çıtır bonfile g": 120, "Ekmek 100gr ad": 1, "Ekmek mayonezi g": 10, "Turşu g": 15, "Yeşil salata g": 50, "Mayonez g": 40, "_bitmis": "335-355"}
+  },
+  "ekmek_arasi": {"Baget ekmek ad": 1, "Tavuk döner g": 60, "Yoğurtlu mayonez g": 50, "Domates g": 30, "Iceberg g": 20, "Turşu g": 18, "Tepsi altlığı ad": 1, "Patates külahı ad": 1, "Islak havlu ad": 1, "Peçete ad": 2, "Soğan g (isteğe bağlı)": 10},
+  "kebo_citir": {
+    "_kolonlar": ["Combo Tabak*", "Combo Tabak XL", "Trio Tabak*", "Trio Tabak XL", "Quattro Tabak*", "Quattro Tabak XL", "İkili Çıtır", "Dörtlü Çıtır", "Çıtır Tenders", "Çıtır Mix", "Nugget 3/6/9", "Soğan Halkası 6/9/12", "Tavuk Topu 6/8/10/12", "Patates K. 80/100/140", "Hepsi Çıtır", "Hepsi Çıtır Double", "Çıtır Bonfile 90/120/150/180/210/300"],
+    "_yildiz": "* sütunlarında nugget/soğan halkası/tavuk topu/bonfile kalemle çizilmiş",
+    "Combo Tabak":       {"Donuk patates g": 100, "Nugget ad": "2 (çizik)", "Soğan halkası ad": "2 (çizik)", "Tavuk topu ad": "4 (çizik)", "Ketçap ad": 1, "Mayonez ad": 1, "Yuvarlak karton kase ad": 1},
+    "Combo Tabak XL":    {"Donuk patates g": 100, "Nugget ad": 2, "Soğan halkası ad": 4, "Tavuk topu ad": 4, "Çıtır bonfile g": 60, "Ketçap ad": 1, "Mayonez ad": 1, "Yummy sos g": 30, "Yuvarlak karton kase ad": 1},
+    "Trio Tabak":        {"Donuk patates g": 140, "Nugget ad": "3 (çizik)", "Soğan halkası ad": "3 (çizik)", "Tavuk topu ad": "6 (çizik)", "Ketçap ad": 2, "Mayonez ad": 2, "Yuvarlak karton kase ad": 1},
+    "Trio Tabak XL":     {"Donuk patates g": 140, "Nugget ad": 3, "Soğan halkası ad": 6, "Tavuk topu ad": 6, "Çıtır bonfile g": 60, "Ketçap ad": 2, "Mayonez ad": 2, "Yummy sos g": 45, "Yuvarlak karton kase ad": 1},
+    "Quattro Tabak":     {"Donuk patates g": 180, "Nugget ad": "4 (çizik)", "Soğan halkası ad": "4 (çizik)", "Tavuk topu ad": "8 (çizik)", "Ketçap ad": 3, "Mayonez ad": 3, "Kapaklı karton kase ad": 1},
+    "Quattro Tabak XL":  {"Donuk patates g": 180, "Nugget ad": 4, "Soğan halkası ad": 8, "Tavuk topu ad": 8, "Çıtır bonfile g": 60, "Ketçap ad": 3, "Mayonez ad": 3, "Yummy sos g": 60, "Kapaklı karton kase ad": 1},
+    "İkili Çıtır":       {"Donuk patates g": 60, "Soğan halkası ad": 4, "Ketçap ad": 1, "Mayonez ad": 1, "Küçük boy külah ad": 1},
+    "Dörtlü Çıtır":      {"Donuk patates g": 60, "Nugget ad": 1, "Soğan halkası ad": 2, "Tavuk topu ad": 4, "Ketçap ad": 1, "Mayonez ad": 1, "Küçük boy külah ad": 1},
+    "Çıtır Tenders":     {"Çıtır bonfile g": 120, "Ketçap ad": 1, "Mayonez ad": 1, "Yummy sos g": 15, "Küçük boy külah ad": 1},
+    "Çıtır Mix":         {"Nugget ad": 4, "Soğan halkası ad": 6, "Tavuk topu ad": 6, "Çıtır bonfile g": 120, "Ketçap ad": 2, "Mayonez ad": 2, "Yummy sos g": 30, "Yuvarlak karton kase ad": 1},
+    "Nugget (3/6/9)":    {"Nugget ad": "3/6/9", "Ketçap ad": 1, "Mayonez ad": 1, "Küçük boy külah ad": 1},
+    "Soğan Halkası (6/9/12)": {"Soğan halkası ad": "6/9/12", "Ketçap ad": 1, "Mayonez ad": 1, "Küçük boy külah ad": 1},
+    "Tavuk Topu (6/8/10/12)": {"Tavuk topu ad": "6/8/10/12", "Ketçap ad": 1, "Mayonez ad": 1, "Küçük boy külah ad": 1},
+    "Patates K. (80/100/140)": {"Donuk patates g": "80/100/140", "Ketçap ad": 1, "Mayonez ad": 1, "Küçük boy külah ad": 1},
+    "Hepsi Çıtır":        {"Donuk patates g": 60, "Nugget ad": 1, "Soğan halkası ad": 3, "Tavuk topu ad": 3, "Çıtır bonfile g": 30, "Ketçap ad": 1, "Mayonez ad": 1, "Yummy sos g": 15, "Yuvarlak karton kase ad": 1},
+    "Hepsi Çıtır Double": {"Donuk patates g": 60, "Nugget ad": 2, "Soğan halkası ad": 4, "Tavuk topu ad": 4, "Çıtır bonfile g": 60, "Ketçap ad": 1, "Mayonez ad": 1, "Yummy sos g": 15, "Yuvarlak karton kase ad": 1},
+    "Çıtır Bonfile 90":  {"Çıtır bonfile g": 90,  "Yummy sos g": 15, "Küçük boy külah ad": 1},
+    "Çıtır Bonfile 120": {"Çıtır bonfile g": 120, "Yummy sos g": 15, "Küçük boy külah ad": 1},
+    "Çıtır Bonfile 150": {"Çıtır bonfile g": 150, "Yummy sos g": 30, "Küçük boy külah ad": 1},
+    "Çıtır Bonfile 180": {"Çıtır bonfile g": 180, "Yummy sos g": 30, "Yuvarlak karton kase ad": 1},
+    "Çıtır Bonfile 210": {"Çıtır bonfile g": 210, "Yummy sos g": 30, "Yuvarlak karton kase ad": 1},
+    "Çıtır Bonfile 300": {"Çıtır bonfile g": 300, "Yummy sos g": 45, "Kapaklı karton kase ad": 1}
+  },
+  "chickn_menuler": {
+    "_ortak_1kisilik": {"Kutu içecek": 1, "Stick ketçap": 2, "Stick mayonez": 2, "Pipet": 1, "Islak mendil": 1, "Peçete": 2},
+    "_ortak_2kisilik": {"Litrelik içecek": 1, "Stick ketçap": 3, "Stick mayonez": 3, "Islak mendil": 2, "Peçete": 4},
+    "Kanat Menü (1K)":            {"Kanat yaprak": 2, "Kanat kök": 2, "Patates g": 150, "Küçük kova": 1, "Kraft çanta": 1, "+": "ortak_1"},
+    "Tenders Menü (1K)":          {"Tenders": 3, "Patates g": 150, "Küçük kova": 1, "Kraft çanta": 1, "+": "ortak_1"},
+    "Tavuk Döner Menü (1K)":      {"Tavuk Döner Dürüm": 1, "Hot Shots": 3, "Patates g": 120, "Küçük kova": 1, "Kraft çanta": 1, "+": "ortak_1"},
+    "Çıtır Tavuk Dürüm Menü (1K)": {"Çıtır Tavuk Dürüm": 1, "Soğan halkası": 4, "Patates kutusu": 1, "Kese kağıdı": 1, "+": "ortak_1"},
+    "Crispy Menü (1K)":           {"Kanat yaprak": 1, "Kanat kök": 1, "Nugget": 4, "Patates g": 150, "Küçük kova": 1, "Kraft çanta": 1, "+": "ortak_1"},
+    "Tavuk Döner Dürüm Menü (2K)": {"Tavuk Döner Dürüm": 2, "Patates g": 150, "Patates kutusu": 1, "Kese kağıdı": 1, "+": "ortak_2"},
+    "Kanat & Tenders Menü (2K)":  {"Kanat yaprak": 2, "Kanat kök": 2, "Tenders": 4, "Patates g": 150, "Büyük kova": 1, "Kraft çanta": 1, "+": "ortak_2"},
+    "Kanat & Nugget Menü (2K)":   {"Kanat yaprak": 3, "Kanat kök": 3, "Nugget": 10, "Patates g": 150, "Büyük kova": 1, "Kraft çanta": 1, "+": "ortak_2"},
+    "Mega Kanat & Nugget Menü (2K)": {"Kanat yaprak": 4, "Kanat kök": 4, "Nugget": 12, "Patates g": 200, "Büyük kova": 1, "Kraft çanta": 1, "+": "ortak_2"},
+    "Kanat & Patates K. Menü (2K)": {"Kanat yaprak": 4, "Kanat kök": 4, "Patates g": 200, "Büyük kova": 1, "Kraft çanta": 1, "+": "ortak_2"},
+    "Tenders & Hot Shots Menü (2K)": {"Tenders": 6, "Hot Shots": 8, "Patates g": 150, "Büyük kova": 1, "Kraft çanta": 1, "+": "ortak_2"},
+    "_dipnot": {
+      "Tavuk Döner Dürüm": "Soslu çıtır lavaş; 90 g tavuk döner, baharatlı domates sosu, sarımsaklı mayonez, patates kızartması, turşu, isteğe bağlı acı biber (miktar yok)",
+      "Çıtır Tavuk Dürüm": "Mayonezli çıtır lavaş; 7 adet hot shots, sarımsaklı mayonez, turşu, yeşil salata, isteğe bağlı acı biber (miktar yok)"
+    }
+  }
+}

@@ -30,6 +30,9 @@ export interface RoketKurye {
    *  Sabit kurye izinliyken / birkaç saatliğine yerine gelen kurye de o sabit satıra yazılır
    *  (aynı sabite birden çok kurye atanabilir, paketleri ve paraları toplanır). Kurye Kontrol'den seçilir. */
   atama: RoketAtama;
+  /** true = atamayı kullanıcı elle yaptı (Kurye Kontrol / Kasa raporu). Elle atama yeniden çekişte korunur;
+   *  otomatik atama her çekişte paket sayısına göre yeniden yapılır (31.10). */
+  elle?: boolean;
   /** eski kayıtlar için (atama yoksa): true = sabit */
   sabit?: boolean;
 }
@@ -45,22 +48,46 @@ export function atamaBul(g: Pick<RoketGun, "kuryeler">, k: RoketKurye): RoketAta
   return sabitler.indexOf(k) === 0 ? "s1" : "s2";
 }
 
+/** Dünkü sabit kuryenin bugün de sabit sayılması için en az paket (ve o günün en çok paket atanının yarısı). */
+export const SABIT_ASGARI_PAKET = 10;
+
 /**
- * Varsayılan atama: bir önceki günün sabit kuryeleri bu gün de geldiyse aynı sabite; boş kalan
- * sabite o günün en çok paket atan (henüz atanmamış) kuryesi. Kalanlar havuz.
+ * Varsayılan atama: bir önceki günün sabit kuryesi bu gün de GERÇEKTEN çalıştıysa (en az 10 paket ve
+ * o günün en çok paket atan kuryesinin en az yarısı kadar) aynı sabite. Boş kalan sabite o günün en çok
+ * paket atan (henüz atanmamış) kuryesi. Kalanlar havuz. (31.10: dünkü sabit 1 paket atınca sabit sayılıyor,
+ * 33 paketlik asıl sabit havuza düşüyordu.)
  */
-export function varsayilanAtama(kuryeler: RoketKurye[], oncekiSabit: Partial<Record<"s1" | "s2", string[]>> = {}): RoketKurye[] {
-  const sonuc = kuryeler.map(k => ({ ...k, atama: "havuz" as RoketAtama }));
+export function varsayilanAtama(kuryeler: RoketKurye[], oncekiSabit: Partial<Record<"s1" | "s2", string[]>> = {},
+  /** Elle doldurulmuş sabitler: bunlara otomatik kurye atanmaz */
+  dolu: RoketAtama[] = []): RoketKurye[] {
+  const sonuc = kuryeler.map(k => ({ ...k, atama: "havuz" as RoketAtama, elle: undefined as boolean | undefined }));
+  const enCok = Math.max(0, ...sonuc.map(k => k.paket));
+  const yeterli = (k: RoketKurye) => k.paket >= SABIT_ASGARI_PAKET && k.paket >= enCok / 2;
   for (const slot of ["s1", "s2"] as const) {
+    if (dolu.includes(slot)) continue;
     const adlar = (oncekiSabit[slot] || []).map(a => sade(a).toLocaleLowerCase("tr-TR"));
-    sonuc.forEach(k => { if (k.atama === "havuz" && adlar.includes(sade(k.ad).toLocaleLowerCase("tr-TR"))) k.atama = slot; });
+    sonuc.forEach(k => { if (k.atama === "havuz" && yeterli(k) && adlar.includes(sade(k.ad).toLocaleLowerCase("tr-TR"))) k.atama = slot; });
   }
   for (const slot of ["s1", "s2"] as const) {
-    if (sonuc.some(k => k.atama === slot)) continue;
+    if (dolu.includes(slot) || sonuc.some(k => k.atama === slot)) continue;
     const aday = sonuc.filter(k => k.atama === "havuz").sort((a, b) => b.paket - a.paket)[0];
     if (aday) aday.atama = slot;
   }
   return sonuc;
+}
+
+/**
+ * Yeniden çekilen günün atamaları: kullanıcının ELLE yaptığı atamalar (elle: true) korunur; kalan kuryeler
+ * varsayilanAtama ile o anki paket sayılarına göre yeniden atanır (gün içinde ilk çekişte 2 paketle sabit
+ * seçilen kurye gün boyu sabit kalmasın). Elle doldurulmuş sabite otomatik kurye eklenmez.
+ */
+export function atamaBirlestir(kuryeler: RoketKurye[], eski: Pick<RoketGun, "kuryeler"> | null | undefined,
+  oncekiSabit: Partial<Record<"s1" | "s2", string[]>> = {}): RoketKurye[] {
+  const elle = new Map<string, RoketAtama>();
+  (eski?.kuryeler || []).forEach(k => { if (k.elle) elle.set(k.ad, atamaBul(eski!, k)); });
+  const dolu = Array.from(elle.values()).filter(a => a !== "havuz");
+  const oto = varsayilanAtama(kuryeler.filter(k => !elle.has(k.ad)), oncekiSabit, dolu);
+  return kuryeler.map(k => elle.has(k.ad) ? { ...k, atama: elle.get(k.ad)!, elle: true } : oto.find(o => o.ad === k.ad)!);
 }
 
 /** Roket'e elle girilen (MagicPay kanalı olmayan) bir teslim edilmiş sipariş. */

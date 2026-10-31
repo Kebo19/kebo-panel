@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { roketExcelOku, isGunu, roketKanali, kuryeKarsilastir, roketTahsilat, adEslesir, varsayilanAtama, slotToplami } from "@/lib/roket";
+import { roketExcelOku, isGunu, roketKanali, kuryeKarsilastir, roketTahsilat, adEslesir, varsayilanAtama, atamaBirlestir, slotToplami } from "@/lib/roket";
 
 const B = ["Sipariş Tarihi", "İşletme Adı", "Alıcı Adı", "Kurye", "Durum", "Tutar", "Ödeme Yöntemi", "Telefon", "Mesafe", "İleri Tarih", "Yönlendiren"];
 const s = (t: string, kurye: string, tutar: string, odeme: string, yon: string, durum = "Teslim Edildi", km = "1.50 Km") =>
@@ -53,9 +53,28 @@ describe("Roket Paket Raporu", () => {
     expect(g.kuryeler.filter(k => k.atama === "s2").map(k => k.ad)).toEqual(["Furkan BİÇİCİ"]);
   });
   it("önceki günün sabit kuryeleri gelirse aynı sabite atanır, yerine gelen elle eklenebilir", () => {
-    const a = varsayilanAtama(g.kuryeler, { s1: ["Yahya SEÇER"] });
-    expect(a.find(k => k.ad === "Yahya SEÇER")!.atama).toBe("s1");
-    expect(a.find(k => k.ad === "MUSTAFA ÇETİN")!.atama).toBe("s2");
+    const kur = (ad: string, paket: number) => ({ ...g.kuryeler[0], ad, paket, atama: "havuz" as const });
+    const a = varsayilanAtama([kur("Mustafa", 33), kur("Yahya", 26), kur("Ali", 5)], { s1: ["Yahya"] });
+    expect(a.find(k => k.ad === "Yahya")!.atama).toBe("s1");
+    expect(a.find(k => k.ad === "Mustafa")!.atama).toBe("s2");
+    // 31.10: dünkü sabit Nizam bugün 1 paket attı → sabit sayılmaz; en çok atan Mustafa ve Yahya sabit olur
+    const b = varsayilanAtama([kur("Nizam", 1), kur("Mustafa", 33), kur("Yahya", 26), kur("Ali", 17)], { s1: ["Nizam"], s2: ["Yahya"] });
+    expect(b.find(k => k.ad === "Nizam")!.atama).toBe("havuz");
+    expect(b.find(k => k.ad === "Yahya")!.atama).toBe("s2");
+    expect(b.find(k => k.ad === "Mustafa")!.atama).toBe("s1");
+    expect(b.find(k => k.ad === "Ali")!.atama).toBe("havuz");
+    // Gün içinde yeniden çekiş: sabahki otomatik seçim (Nizam 2 pk) korunmaz, elle seçim korunur
+    const sabah = varsayilanAtama([kur("Nizam", 2), kur("Mustafa", 0)]);
+    expect(sabah.find(k => k.ad === "Nizam")!.atama).toBe("s1");
+    const aksam = atamaBirlestir([kur("Nizam", 2), kur("Mustafa", 33), kur("Yahya", 26)], { kuryeler: sabah });
+    expect(aksam.find(k => k.ad === "Mustafa")!.atama).toBe("s1");
+    expect(aksam.find(k => k.ad === "Yahya")!.atama).toBe("s2");
+    expect(aksam.find(k => k.ad === "Nizam")!.atama).toBe("havuz");
+    const elleli = atamaBirlestir([kur("Nizam", 2), kur("Mustafa", 33), kur("Yahya", 26)],
+      { kuryeler: [{ ...kur("Nizam", 2), atama: "s2", elle: true }] });
+    expect(elleli.find(k => k.ad === "Nizam")).toMatchObject({ atama: "s2", elle: true });
+    expect(elleli.find(k => k.ad === "Mustafa")!.atama).toBe("s1");
+    expect(elleli.find(k => k.ad === "Yahya")!.atama).toBe("havuz");
     // Mustafa 2 saat yok, yerine Semih geldi → ikisi de Sabit 1: toplanır
     const gun = { ...g, kuryeler: g.kuryeler.map(k => ({ ...k, atama: k.ad === "Semih Akça" ? "s1" as const : k.atama })) };
     const t = slotToplami(gun, "s1");

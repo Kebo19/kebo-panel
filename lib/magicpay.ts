@@ -395,8 +395,8 @@ export function indirimFarkliAlanlar(magic: Record<string, number>, form: Record
 // dükkân sadece sayabildiğini girer (nakit sayımı, giderler, kuryeler, Kıraloğlu Migros).
 //   • Platform satışları (marka × platform): brüt tutar ve paket → online sütunu.
 //     Platform "kapıda ödeme" (…_ON_DELIVERY) tutarı o platformun Kebo satırına kapıda olarak
-//     yazılır, online'dan düşülür (MagicPay kapıdayı markaya göre ayırmıyor; nakit/POS ayrımı
-//     da yok → nakit kutusuna yazılır, uyarı verilir).
+//     yazılır, online'dan düşülür (MagicPay kapıdayı markaya göre ayırmıyor; nakit/POS/yemek kartı
+//     ayrımı da yok → tek kapıda tutarı; türü kurye tahsilatından gelir, nakde yazılmaz — 31.10).
 //   • Alo Paket (LOCAL): kapıda nakit / POS (paket ödemelerindeki serbest adlardan), paket sayısı.
 //   • Kasa: POS (masa "card") ve türü belli yemek kartları. NAKİT SAYIMI DOLDURULMAZ (sayılır);
 //     MagicPay'e göre beklenen nakit (masa nakit − günlük gider) sadece ipucu olarak döner.
@@ -419,7 +419,7 @@ export const ELLE_KANALLAR: Exclude<Kanal, "alo" | "diger">[] = ["kir_migros"];
 export interface MpRaporDoldurma {
   /** os_* / ko_* alanı → { tutar, paket } (sadece MagicPay'in kapsadığı kanallar) */
   platform: Record<string, { tutar: number; paket: number }>;
-  /** Kebo satırlarındaki platform kapıda ödemesi (nakit/POS ayrımı bilinmiyor) */
+  /** Kebo satırlarındaki platform kapıda ödemesi (nakit/POS/yemek kartı ayrımı bilinmiyor; kurye tahsilatıyla karşılaştırılır) */
   kapidaKebo: { ys: number; trendyol: number; migros: number };
   alo: { nakit: number; pos: number; belirsiz: number; paket: number; tutar: number };
   indirimler: Record<string, number>;
@@ -488,7 +488,7 @@ export function mpRaporDoldurma(gun: MpGun): MpRaporDoldurma {
       kalan = kurus(kalan - al);
     }
     const ad = p === "ys" ? "Yemeksepeti" : p === "trendyol" ? "Trendyol" : "Migros";
-    uyarilar.push(`${ad} kapıda ödeme ${tl(kapida[p])}: MagicPay nakit/POS ayırmıyor, nakde yazıldı; kurye kartla aldıysa POS'a taşıyın.`);
+    uyarilar.push(`${ad} kapıda ödeme ${tl(kapida[p])}: MagicPay nakit / POS / yemek kartı ayırmıyor; kapıda tutarı olarak yazıldı, kuryelerin tahsilatıyla (3 · Kurye) karşılaştırılır.`);
   }
 
   // 4) Kasa (masa ödemeleri)

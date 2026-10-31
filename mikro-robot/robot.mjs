@@ -26,7 +26,7 @@
 
 import { chromium } from "playwright-core";
 import xlsx from "xlsx";
-import { roketExcelOku, varsayilanAtama, atamaBul } from "./roket-oku.mjs";
+import { roketExcelOku, atamaBirlestir, atamaBul } from "./roket-oku.mjs";
 import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync, statSync, unlinkSync, cpSync } from "node:fs";
 import { hostname } from "node:os";
 import { createServer, connect } from "node:net";
@@ -353,7 +353,7 @@ async function roketAktar(tarayici, ayar, { tarih = null, hazirSayfa = null } = 
     const gunler = okuma.gunler.filter((g) => tarih ? g.tarih === tarih : g.tarih > basIso);
     if (!gunler.length) return tarih ? `Roket: ${tarih.split("-").reverse().join(".")} için teslim edilmiş paket yok.` : "Roket: bu aralıkta teslim edilmiş paket yok.";
 
-    // Sabit kurye seçimleri: aynı gün daha önce seçildiyse korunur; yoksa bir önceki günün sabitleri.
+    // Sabit kurye seçimleri: elle seçildiyse korunur; yoksa önceki günün sabiti (yeterli paketle) ya da en çok paket atan.
     const { mevcut = {}, onceki: oncekiGun = null } = await rpc(ayar, "roket_pc_atamalar",
       { p_anahtar: ayar.anahtar, p_bas: gunler[0].tarih, p_bit: gunler[gunler.length - 1].tarih }) || {};
     const sabitAdlari = (g) => g ? {
@@ -363,10 +363,8 @@ async function roketAktar(tarayici, ayar, { tarih = null, hazirSayfa = null } = 
     let ref = sabitAdlari(oncekiGun);
     const gonder = gunler.map((g) => {
       const eski = mevcut[g.tarih];
-      const kuryeler = varsayilanAtama(g.kuryeler, eski ? sabitAdlari(eski) : ref).map((k) => {
-        const e = eski?.kuryeler?.find((x) => x.ad === k.ad);
-        return e ? { ...k, atama: atamaBul(eski, e) } : k;
-      });
+      // Elle yapılan atamalar korunur; diğerleri o anki paket sayısına göre yeniden (31.10)
+      const kuryeler = atamaBirlestir(g.kuryeler, eski, ref);
       const yeni = { ...g, kuryeler };
       ref = sabitAdlari(yeni);
       return yeni;

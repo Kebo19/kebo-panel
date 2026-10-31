@@ -13,7 +13,7 @@ import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import { useYetki } from "@/lib/useYetki";
 import { fmtTarih } from "@/lib/tarih";
-import { roketExcelOku, kuryeKarsilastir, paketKontrolu, roketTahsilat, varsayilanAtama, atamaBul, ATAMA_ADI, type RoketGun, type RoketAtama, type KuryeKarsilastirma } from "@/lib/roket";
+import { roketExcelOku, kuryeKarsilastir, paketKontrolu, roketTahsilat, atamaBirlestir, atamaBul, ATAMA_ADI, type RoketGun, type RoketAtama, type KuryeKarsilastirma } from "@/lib/roket";
 import { KANALLAR, mpKanalPaketleri, type MpRaporDoldurma, type Kanal } from "@/lib/magicpay";
 import { Lock, Loader2, Upload, AlertTriangle, CheckCircle2, Truck } from "lucide-react";
 
@@ -184,7 +184,7 @@ export default function KuryeKontrolPage() {
   const atamaDegistir = async (tarih: string, ad: string, atama: RoketAtama) => {
     const g = gunler.find(x => x.tarih === tarih);
     if (!g) return;
-    const yeni: RoketGun = { ...g, kuryeler: g.kuryeler.map(k => ({ ...k, atama: k.ad === ad ? atama : atamaBul(g, k) })) };
+    const yeni: RoketGun = { ...g, kuryeler: g.kuryeler.map(k => k.ad === ad ? { ...k, atama, elle: true } : { ...k, atama: atamaBul(g, k) }) };
     setGunler(l => l.map(x => x.tarih === tarih ? yeni : x));
     setAtamaKaydi(tarih);
     const { error } = await supabase.from("roket_gunluk").update({ veri: yeni }).eq("tarih", tarih);
@@ -229,8 +229,8 @@ export default function KuryeKontrolPage() {
       const satirlar = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: null, blankrows: false });
       const o = roketExcelOku(satirlar);
       if (!o.gunler.length) throw new Error(o.uyari[0] || "Dosyada teslim edilmiş paket bulunamadı.");
-      // Sabit atamaları: aynı gün daha önce yüklendiyse oradaki seçim korunur; yoksa bir önceki günün
-      // sabit kuryeleri varsayılır (izin / yerine gelen kurye Kurye Kontrol'den değiştirilir).
+      // Sabit atamaları: aynı gün elle seçildiyse korunur; yoksa bir önceki günün sabit kuryesi (yeterince
+      // paket attıysa), o da yoksa en çok paket atan (izin / yerine gelen kurye Kurye Kontrol'den değiştirilir).
       const ilk = o.gunler[0].tarih;
       const [{ data: onceki }, { data: mevcut }] = await Promise.all([
         supabase.from("roket_gunluk").select("tarih, veri").lt("tarih", ilk).order("tarih", { ascending: false }).limit(1),
@@ -243,10 +243,8 @@ export default function KuryeKontrolPage() {
       let ref = sabitAdlari(onceki?.[0]?.veri as RoketGun | undefined);
       const hazir = o.gunler.map(g => {
         const eski = (mevcut || []).find(m => m.tarih === g.tarih)?.veri as RoketGun | undefined;
-        const kuryeler = varsayilanAtama(g.kuryeler, eski ? sabitAdlari(eski) : ref).map(k => {
-          const e = eski?.kuryeler.find(x => x.ad === k.ad);
-          return e ? { ...k, atama: atamaBul(eski!, e) } : k;
-        });
+        // Elle yapılan atamalar korunur; diğerleri o günün paket sayısına göre yeniden (lib/roket atamaBirlestir)
+        const kuryeler = atamaBirlestir(g.kuryeler, eski, ref);
         const yeni = { ...g, kuryeler };
         ref = sabitAdlari(yeni);
         return yeni;

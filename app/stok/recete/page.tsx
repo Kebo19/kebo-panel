@@ -7,17 +7,19 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianG
 import { createClient } from "@/lib/supabase/client";
 import { useYetki } from "@/lib/useYetki";
 import { bugun, gunEkle, gunFarki, fmtTarih, aySonu } from "@/lib/tarih";
-import { fmt as fmtTL, fmt2 } from "@/lib/para";
+import { fmt as fmtTL } from "@/lib/para";
 import { donemOzeti, paketToplam, type RaporVerisi } from "@/lib/hesap";
-import { kullanimAnalizi, donemKullanimi, miktarOku, type StokHareketi } from "@/lib/stok";
+import { kullanimAnalizi, donemKullanimi, type StokHareketi } from "@/lib/stok";
 import {
-  normalAd, porsiyonMaliyeti, ortalamaSatisFiyati, maliyetOrani, teorikTuketim, tuketimKarsilastir,
-  foodCostYuzde, sonAylar, ayEtiketi, paketBasi, SUPHE_ESIGI, type ReceteSatiri,
+  normalAd, ortalamaSatisFiyati, teorikTuketim, tuketimKarsilastir,
+  foodCostYuzde, sonAylar, ayEtiketi, paketBasi, SUPHE_ESIGI,
 } from "@/lib/recete";
+import { baglamKur, duzReceteler, stokFiyati, type ReceteSatiriTam, type ReceteUrunu, type StokBilgi } from "@/lib/receteHesap";
 import UrunSatisYukle from "@/components/UrunSatisYukle";
+import ReceteDuzenleyici, { type MenuOzeti } from "@/components/ReceteDuzenleyici";
 import { hepsiniCek } from "@/lib/hepsiniCek";
 import {
-  ArrowLeft, ChefHat, Plus, Trash2, Loader2, Search, AlertTriangle, RefreshCw, FileSpreadsheet,
+  ArrowLeft, Loader2, AlertTriangle, RefreshCw, FileSpreadsheet,
   Scale, Percent, BookOpen, Info,
 } from "lucide-react";
 
@@ -25,8 +27,10 @@ import {
 // 1) Ürün satış raporu yükleme  2) Reçete düzenleyici (porsiyon maliyeti)
 // 3) Teorik (satış × reçete) ve gerçek (sayımlardan) tüketim  4) Food cost % ve paket başı tüketim
 
-interface StokUrun { id: string; urun_adi: string; birim: string; son_fiyat: number | null; durum: string; kategori: string | null; }
-interface Recete extends ReceteSatiri { id: string; }
+interface StokUrun { id: string; urun_adi: string; birim: string; son_fiyat: number | null; durum: string; kategori: string | null; adet_gram: number | null; }
+interface FiyatSatiri { urun_id: string; fatura_birim_fiyat: number | null; carpan: number | null; }
+const RECETE_ALANLARI = "id,menu_urun,stok_urun_id,ara_recete,malzeme_adi,miktar,birim,etiket,notlar,sira";
+const receteOku = (x: ReceteSatiriTam): ReceteSatiriTam => ({ ...x, miktar: Number(x.miktar), sira: Number(x.sira) || 0 });
 interface Satis { tarih: string; menu_urun: string; adet: number; tutar: number | null; }
 interface Fatura { fatura_tarihi: string; toplam_tutar: number | null; }
 
@@ -49,7 +53,10 @@ export default function ReceteMaliyetPage() {
   const [hata, setHata] = useState<string | null>(null);
 
   const [urunler, setUrunler] = useState<StokUrun[]>([]);
-  const [receteler, setReceteler] = useState<Recete[]>([]);
+  const [receteler, setReceteler] = useState<ReceteSatiriTam[]>([]);
+  const [receteUrunleri, setReceteUrunleri] = useState<ReceteUrunu[]>([]);
+  const [fiyatlar, setFiyatlar] = useState<FiyatSatiri[]>([]);
+  const [fiyatGorunur, setFiyatGorunur] = useState(false);
   const [satis90, setSatis90] = useState<Satis[]>([]);
   const [raporlar, setRaporlar] = useState<RaporVerisi[]>([]);
   const [faturalar, setFaturalar] = useState<Fatura[]>([]);
@@ -68,9 +75,12 @@ export default function ReceteMaliyetPage() {
   const temelVeri = useCallback(async () => {
     setHata(null);
     try {
-      const [u, r, s, rap, fat] = await Promise.all([
-        hepsiniCek<StokUrun>((a, b) => supabase.from("stok_urunler").select("id,urun_adi,birim,son_fiyat,durum,kategori").order("urun_adi").order("id").range(a, b)),
-        hepsiniCek<Recete>((a, b) => supabase.from("receteler").select("id,menu_urun,stok_urun_id,miktar").order("menu_urun").order("id").range(a, b)),
+      const [u, r, ru, fy, s, rap, fat] = await Promise.all([
+        hepsiniCek<StokUrun>((a, b) => supabase.from("stok_urunler").select("id,urun_adi,birim,son_fiyat,durum,kategori,adet_gram").order("urun_adi").order("id").range(a, b)),
+        hepsiniCek<ReceteSatiriTam>((a, b) => supabase.from("receteler").select(RECETE_ALANLARI).order("menu_urun").order("sira").order("id").range(a, b)),
+        hepsiniCek<ReceteUrunu>((a, b) => supabase.from("recete_urunleri").select("ad,tur,verim_miktar,verim_birim,satis_fiyati,grup,notlar,sira").order("sira").order("ad").range(a, b)),
+        // Fiyatlar "Stok değeri" yetkisi ister (RLS); yetki yoksa boş gelir.
+        hepsiniCek<FiyatSatiri>((a, b) => supabase.from("stok_fiyatlar").select("urun_id,fatura_birim_fiyat,carpan").order("urun_id").range(a, b)).catch(() => [] as FiyatSatiri[]),
         hepsiniCek<Satis>((a, b) => supabase.from("urun_satislari").select("tarih,menu_urun,adet,tutar").gte("tarih", gunEkle(bugunStr, -90)).order("tarih").order("id").range(a, b)),
         hepsiniCek<RaporVerisi>((a, b) => supabase.from("gunluk_raporlar").select("*").gte("tarih", altiAyBasi).order("tarih").order("id").range(a, b)),
         // Fatura okuma yetkisi yoksa food cost gösterilmez (boş veri 0 diye gösterilmesin)
@@ -78,7 +88,11 @@ export default function ReceteMaliyetPage() {
           ? hepsiniCek<Fatura>((a, b) => supabase.from("faturalar").select("fatura_tarihi,toplam_tutar").gte("fatura_tarihi", altiAyBasi).order("fatura_tarihi").order("id").range(a, b))
           : Promise.resolve([] as Fatura[]),
       ]);
-      setUrunler(u); setReceteler(r.map(x => ({ ...x, miktar: Number(x.miktar) })));
+      setUrunler(u.map(x => ({ ...x, adet_gram: x.adet_gram === null ? null : Number(x.adet_gram) })));
+      setReceteler(r.map(receteOku));
+      setReceteUrunleri(ru.map(x => ({ ...x, verim_miktar: Number(x.verim_miktar) || 1, satis_fiyati: x.satis_fiyati === null ? null : Number(x.satis_fiyati), sira: Number(x.sira) || 0 })));
+      setFiyatlar(fy);
+      setFiyatGorunur(fy.length > 0 || u.some(x => Number(x.son_fiyat) > 0));
       setSatis90(s.map(x => ({ ...x, adet: Number(x.adet), tutar: x.tutar === null ? null : Number(x.tutar) })));
       setRaporlar(rap); setFaturalar(fat);
     } catch (e) {
@@ -87,11 +101,6 @@ export default function ReceteMaliyetPage() {
       setYukleniyor(false);
     }
   }, [supabase, bugunStr, altiAyBasi, foodCostIzni]);
-
-  const recetelerCek = useCallback(async () => {
-    const r = await hepsiniCek<Recete>((a, b) => supabase.from("receteler").select("id,menu_urun,stok_urun_id,miktar").order("menu_urun").order("id").range(a, b));
-    setReceteler(r.map(x => ({ ...x, miktar: Number(x.miktar) })));
-  }, [supabase]);
 
   useEffect(() => {
     if (yetki.yukleniyor || !izinli) return;
@@ -122,94 +131,34 @@ export default function ReceteMaliyetPage() {
 
   const urunMap = useMemo(() => new Map(urunler.map(u => [u.id, u])), [urunler]);
 
-  // ─── MENÜ ÜRÜNLERİ ────────────────────────────────────────────────────────
-  const [ekMenuler, setEkMenuler] = useState<string[]>([]);
-  const [menuArama, setMenuArama] = useState("");
-  const [seciliMenu, setSeciliMenu] = useState<string | null>(null);
-
-  const menuler = useMemo(() => {
-    const m = new Map<string, { ad: string; adet: number; satislar: Satis[]; recete: Recete[] }>();
-    const al = (ad: string) => {
-      const k = normalAd(ad);
-      if (!m.has(k)) m.set(k, { ad, adet: 0, satislar: [], recete: [] });
-      return m.get(k)!;
-    };
-    satis90.forEach(s => { const o = al(s.menu_urun); o.adet += s.adet; o.satislar.push(s); });
-    receteler.forEach(r => { const o = al(r.menu_urun); o.recete.push(r); o.ad = r.menu_urun; });
-    ekMenuler.forEach(a => al(a));
-    return Array.from(m.entries()).map(([k, o]) => {
-      const { maliyet, fiyatsiz } = porsiyonMaliyeti(o.recete, urunler);
-      const satisFiyati = ortalamaSatisFiyati(o.satislar);
-      return { anahtar: k, ...o, maliyet, fiyatsiz, satisFiyati, oran: o.recete.length ? maliyetOrani(maliyet, satisFiyati) : null };
-    }).sort((a, b) => b.adet - a.adet || a.ad.localeCompare(b.ad, "tr"));
-  }, [satis90, receteler, ekMenuler, urunler]);
-
-  const gorunenMenuler = useMemo(() => {
-    const q = normalAd(menuArama);
-    return q ? menuler.filter(m => m.anahtar.includes(q)) : menuler;
-  }, [menuler, menuArama]);
-  const secili = menuler.find(m => m.anahtar === seciliMenu) || null;
-  const recetesizSayisi = menuler.filter(m => !m.recete.length && m.adet > 0).length;
-
-  const menuEkle = () => {
-    const ad = prompt("Menü ürününün adı (adisyon programındaki adıyla aynı yazın):")?.replace(/\s+/g, " ").trim();
-    if (!ad) return;
-    if (!menuler.some(m => m.anahtar === normalAd(ad))) setEkMenuler(x => [...x, ad]);
-    setSeciliMenu(normalAd(ad));
-  };
-
-  // ─── REÇETE SATIRLARI ─────────────────────────────────────────────────────
-  const [malzemeArama, setMalzemeArama] = useState("");
-  const [yeniUrunId, setYeniUrunId] = useState("");
-  const [yeniMiktar, setYeniMiktar] = useState("");
-  const [miktarTaslak, setMiktarTaslak] = useState<Record<string, string>>({});
-  const [islem, setIslem] = useState(false);
-
-  const aktifUrunler = useMemo(() => urunler.filter(u => u.durum !== "pasif"), [urunler]);
-  const malzemeSecenekleri = useMemo(() => {
-    const q = normalAd(malzemeArama);
-    const mevcut = new Set(secili?.recete.map(r => r.stok_urun_id) || []);
-    return aktifUrunler.filter(u => !mevcut.has(u.id) && (!q || normalAd(u.urun_adi).includes(q)));
-  }, [aktifUrunler, malzemeArama, secili]);
-
-  const satirEkle = async () => {
-    if (!secili || !yeniUrunId) return;
-    const m = miktarOku(yeniMiktar);
-    if (!Number.isFinite(m) || m <= 0) { alert("Geçerli bir miktar girin (ör. 0,18)."); return; }
-    setIslem(true);
-    const { error } = await supabase.from("receteler").insert([{ menu_urun: secili.ad, stok_urun_id: yeniUrunId, miktar: m }]);
-    setIslem(false);
-    if (error) { alert("Eklenemedi: " + error.message); return; }
-    setYeniUrunId(""); setYeniMiktar(""); setMalzemeArama("");
-    setEkMenuler(x => x.filter(a => normalAd(a) !== secili.anahtar));
-    recetelerCek();
-  };
-
-  const miktarKaydet = async (r: Recete) => {
-    const ham = miktarTaslak[r.id];
-    if (ham === undefined) return;
-    const m = miktarOku(ham);
-    if (!Number.isFinite(m) || m <= 0) { alert("Geçerli bir miktar girin."); return; }
-    if (m === r.miktar) { setMiktarTaslak(x => { const y = { ...x }; delete y[r.id]; return y; }); return; }
-    const { error } = await supabase.from("receteler").update({ miktar: m }).eq("id", r.id);
-    if (error) { alert("Kaydedilemedi: " + error.message); return; }
-    setReceteler(x => x.map(y => y.id === r.id ? { ...y, miktar: m } : y));
-    setMiktarTaslak(x => { const y = { ...x }; delete y[r.id]; return y; });
-  };
-
-  const satirSil = async (r: Recete) => {
-    if (!confirm(`${urunMap.get(r.stok_urun_id)?.urun_adi || "Malzeme"} reçeteden çıkarılsın mı?`)) return;
-    const { error } = await supabase.from("receteler").delete().eq("id", r.id);
-    if (error) { alert("Silinemedi: " + error.message); return; }
-    setReceteler(x => x.filter(y => y.id !== r.id));
-  };
+  // ─── REÇETE HESABI ────────────────────────────────────────────────────────
+  const stokBilgi = useMemo<StokBilgi[]>(() => {
+    const f = new Map(fiyatlar.map(x => [x.urun_id, x]));
+    return urunler.map(u => ({ id: u.id, urun_adi: u.urun_adi, birim: u.birim, adet_gram: u.adet_gram, fiyat: stokFiyati(f.get(u.id), u.son_fiyat) }));
+  }, [urunler, fiyatlar]);
+  const baglam = useMemo(() => baglamKur(receteler, receteUrunleri, stokBilgi), [receteler, receteUrunleri, stokBilgi]);
+  // Teorik tüketim için ara reçeteler açılmış, stok biriminde düz reçete
+  const duzRecete = useMemo(() => duzReceteler(baglam), [baglam]);
+  const satisOzeti = useMemo(() => {
+    const m = new Map<string, MenuOzeti & { satislar: Satis[] }>();
+    satis90.forEach(s => {
+      const k = normalAd(s.menu_urun);
+      if (!m.has(k)) m.set(k, { ad: s.menu_urun, adet: 0, satisFiyati: null, satislar: [] });
+      const o = m.get(k)!; o.adet += s.adet; o.satislar.push(s);
+    });
+    m.forEach(o => { o.satisFiyati = ortalamaSatisFiyati(o.satislar); });
+    return m;
+  }, [satis90]);
+  const receteliAdlar = useMemo(() => new Set(duzRecete.map(r => normalAd(r.menu_urun))), [duzRecete]);
+  const recetesizSayisi = Array.from(satisOzeti.keys()).filter(k => !receteliAdlar.has(k)).length;
+  const urunSayisi = new Set([...receteUrunleri.filter(u => u.tur === "menu").map(u => normalAd(u.ad)), ...satisOzeti.keys()]).size;
 
   // ─── TEORİK / GERÇEK TÜKETİM ──────────────────────────────────────────────
   const [sadeceReceteli, setSadeceReceteli] = useState(true);
   const tuketim = useMemo(() => {
     const donemGun = gunFarki(bas, bit) + 1;
     const satisGunleri = new Set(satisAralik.map(s => s.tarih));
-    const receteliUrunler = new Set(receteler.map(r => r.stok_urun_id));
+    const receteliUrunler = new Set(duzRecete.map(r => r.stok_urun_id));
     // Gerçek: lib/stok kullanım analizi; yalnızca satışı yüklü günler (teorikle aynı günler) sayılır.
     const gercek = new Map<string, number | null>();
     const kapsam = new Map<string, { gun: number; tahminiGun: number }>();
@@ -224,17 +173,17 @@ export default function ReceteMaliyetPage() {
         gunSetleri.set(u.id, new Set(ortak.gunler.filter(g => g.tarih >= bas && g.tarih <= bit).map(g => g.tarih)));
       } else if (receteliUrunler.has(u.id)) gercek.set(u.id, null);
     });
-    const tum = teorikTuketim(satisAralik, receteler);
-    const ortakTeorik = teorikTuketim(satisAralik, receteler, (id, t) => !!gunSetleri.get(id)?.has(t)).tuketim;
+    const tum = teorikTuketim(satisAralik, duzRecete);
+    const ortakTeorik = teorikTuketim(satisAralik, duzRecete, (id, t) => !!gunSetleri.get(id)?.has(t)).tuketim;
     // Sayımı olan üründe teorik aynı günler üzerinden; sayımı yoksa dönemin tamamı gösterilir.
     const teorik = new Map<string, number>();
     receteliUrunler.forEach(id => teorik.set(id, gunSetleri.has(id) ? (ortakTeorik.get(id) || 0) : (tum.tuketim.get(id) || 0)));
-    let satirlar = tuketimKarsilastir(teorik, gercek, urunler);
+    let satirlar = tuketimKarsilastir(teorik, gercek, stokBilgi.map(x => ({ id: x.id, son_fiyat: x.fiyat })));
     if (sadeceReceteli) satirlar = satirlar.filter(s => receteliUrunler.has(s.stok_urun_id));
     const recetesizAdlar = tum.recetesiz.map(k => satisAralik.find(s => normalAd(s.menu_urun) === k)?.menu_urun || k);
     const toplamFarkTL = satirlar.reduce((s, x) => s + (x.farkTutar && x.farkTutar > 0 ? x.farkTutar : 0), 0);
     return { donemGun, satisGunu: satisGunleri.size, satirlar, kapsam, recetesizAdlar, toplamFarkTL, receteliUrunler };
-  }, [bas, bit, satisAralik, receteler, urunler, hareketler, sadeceReceteli]);
+  }, [bas, bit, satisAralik, duzRecete, urunler, stokBilgi, hareketler, sadeceReceteli]);
 
   // ─── FOOD COST ────────────────────────────────────────────────────────────
   const foodCost = useMemo(() => aylar.map((ay, i) => {
@@ -285,7 +234,7 @@ export default function ReceteMaliyetPage() {
             <SayfaSimgesi />
             <div>
               <h1 className="text-sm font-black tracking-tight leading-none">Reçete & Maliyet</h1>
-              <p className="text-[10px] text-gray-600 leading-none mt-0.5">{menuler.length} menü ürünü · {recetesizSayisi} reçetesiz satılan</p>
+              <p className="text-[10px] text-gray-600 leading-none mt-0.5">{urunSayisi} menü ürünü · {recetesizSayisi} reçetesiz satılan</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -309,134 +258,8 @@ export default function ReceteMaliyetPage() {
 
         {/* ─── REÇETELER ─── */}
         {sekme === "recete" && (
-          <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4">
-            <div className={`${kutu} p-3 space-y-2 lg:max-h-[calc(100vh-140px)] lg:overflow-auto`}>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-                  <input value={menuArama} onChange={e => setMenuArama(e.target.value)} placeholder="Menü ürünü ara" className={`${inputCls} pl-8`}/>
-                </div>
-                <button onClick={menuEkle} className="flex items-center gap-1 text-[11px] font-bold text-emerald-300 border border-emerald-500/30 bg-emerald-500/10 px-2.5 h-9 rounded-xl whitespace-nowrap">
-                  <Plus size={13}/> Menü ürünü ekle
-                </button>
-              </div>
-              <p className="text-[10px] text-gray-500">Adetler son 90 günün satışıdır.</p>
-              {!gorunenMenuler.length && (
-                <div className="text-xs text-gray-500 p-3">Henüz ürün satışı yüklenmemiş. “Satış yükle” sekmesinden rapor yükleyin ya da elle menü ürünü ekleyin.</div>
-              )}
-              <div className="space-y-1">
-                {gorunenMenuler.map(m => (
-                  <button key={m.anahtar} onClick={() => setSeciliMenu(m.anahtar)}
-                    className={`w-full text-left px-3 py-2 rounded-xl border text-xs flex items-center justify-between gap-2 ${seciliMenu === m.anahtar ? "border-emerald-500 bg-emerald-500/10" : "border-transparent hover:bg-alan"}`}>
-                    <span className="min-w-0">
-                      <span className="block font-semibold truncate">{m.ad}</span>
-                      <span className="block text-[10px] text-gray-500">
-                        {sayi(m.adet, 1)} adet
-                        {m.recete.length > 0 && <> · maliyet ₺{fmt2(m.maliyet)}{m.oran !== null && <> · {yuzde(m.oran)}</>}</>}
-                      </span>
-                    </span>
-                    {!m.recete.length && <span className="text-[10px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full whitespace-nowrap">reçete yok</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className={`${kutu} p-4`}>
-              {!secili ? (
-                <div className="text-sm text-gray-500 py-10 text-center">Soldan bir menü ürünü seçin.</div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div>
-                      <h2 className="text-base font-black">{secili.ad}</h2>
-                      <p className="text-[11px] text-gray-500">Miktarlar stok ürününün biriminde (ör. tavuk kg ise 0,18).</p>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div className="bg-alan border border-cizgi rounded-xl px-3 py-2">
-                        <div className="text-[10px] text-gray-500">Porsiyon maliyeti</div>
-                        <div className="text-sm font-black">₺{fmt2(secili.maliyet)}</div>
-                      </div>
-                      <div className="bg-alan border border-cizgi rounded-xl px-3 py-2">
-                        <div className="text-[10px] text-gray-500">Ort. satış fiyatı (90 gün)</div>
-                        <div className="text-sm font-black">{secili.satisFiyati === null ? "—" : `₺${fmt2(secili.satisFiyati)}`}</div>
-                      </div>
-                      <div className="bg-alan border border-cizgi rounded-xl px-3 py-2">
-                        <div className="text-[10px] text-gray-500">Maliyet oranı</div>
-                        <div className="text-sm font-black">{yuzde(secili.oran)}</div>
-                      </div>
-                    </div>
-                  </div>
-                  {secili.fiyatsiz > 0 && (
-                    <div className="text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2 flex items-center gap-2">
-                      <AlertTriangle size={13}/> {secili.fiyatsiz} malzemenin son alış fiyatı yok; maliyete katılmadı.
-                    </div>
-                  )}
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-cizgi">
-                          <th className="py-2 pr-2">Malzeme</th><th className="py-2 px-2 w-32">Miktar</th>
-                          <th className="py-2 px-2 text-right">Son fiyat</th><th className="py-2 px-2 text-right">Tutar</th><th className="w-8"/>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {secili.recete.map(r => {
-                          const u = urunMap.get(r.stok_urun_id);
-                          const f = Number(u?.son_fiyat || 0);
-                          return (
-                            <tr key={r.id} className="border-b border-cizgi">
-                              <td className="py-2 pr-2 font-semibold">{u?.urun_adi || "(silinmiş ürün)"}</td>
-                              <td className="py-2 px-2">
-                                <div className="flex items-center gap-1">
-                                  <input value={miktarTaslak[r.id] ?? String(r.miktar).replace(".", ",")} inputMode="decimal"
-                                    onChange={e => setMiktarTaslak(x => ({ ...x, [r.id]: e.target.value }))}
-                                    onBlur={() => miktarKaydet(r)} onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                                    className={`${inputCls} h-8 w-20 text-right`}/>
-                                  <span className="text-[10px] text-gray-500">{u?.birim}</span>
-                                </div>
-                              </td>
-                              <td className="py-2 px-2 text-right text-gray-600">{f ? `₺${fmt2(f)}/${u?.birim}` : "—"}</td>
-                              <td className="py-2 px-2 text-right font-semibold">{f ? `₺${fmt2(r.miktar * f)}` : "—"}</td>
-                              <td className="py-2 text-right">
-                                <button onClick={() => satirSil(r)} className="p-1.5 text-gray-400 hover:text-red-400"><Trash2 size={13}/></button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {!secili.recete.length && (
-                          <tr><td colSpan={5} className="py-4 text-center text-gray-500">Bu ürünün reçetesi yok. Aşağıdan malzeme ekleyin.</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="bg-alan border border-cizgi rounded-xl p-3 grid grid-cols-1 sm:grid-cols-[1fr_1.4fr_120px_auto] gap-2 items-end">
-                    <label className="text-[11px] font-semibold text-gray-600 space-y-1">
-                      <span className="block">Malzeme ara</span>
-                      <input value={malzemeArama} onChange={e => { setMalzemeArama(e.target.value); setYeniUrunId(""); }} placeholder="ör. tavuk" className={`${inputCls} bg-kart`}/>
-                    </label>
-                    <label className="text-[11px] font-semibold text-gray-600 space-y-1">
-                      <span className="block">Stok ürünü ({malzemeSecenekleri.length})</span>
-                      <select value={yeniUrunId} onChange={e => setYeniUrunId(e.target.value)} className={`${inputCls} bg-kart`}>
-                        <option value="">— seçin —</option>
-                        {malzemeSecenekleri.map(u => <option key={u.id} value={u.id}>{u.urun_adi} ({u.birim})</option>)}
-                      </select>
-                    </label>
-                    <label className="text-[11px] font-semibold text-gray-600 space-y-1">
-                      <span className="block">Miktar {yeniUrunId && `(${urunMap.get(yeniUrunId)?.birim})`}</span>
-                      <input value={yeniMiktar} onChange={e => setYeniMiktar(e.target.value)} inputMode="decimal" placeholder="0,18"
-                        onKeyDown={e => { if (e.key === "Enter") satirEkle(); }} className={`${inputCls} bg-kart text-right`}/>
-                    </label>
-                    <button onClick={satirEkle} disabled={islem || !yeniUrunId || !yeniMiktar}
-                      className="flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 h-9 rounded-xl">
-                      {islem ? <Loader2 size={13} className="animate-spin"/> : <Plus size={13}/>} Ekle
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <ReceteDuzenleyici supabase={supabase} baglam={baglam} stok={stokBilgi} urunler={receteUrunleri} satirlar={receteler}
+            satislar={satisOzeti} fiyatGorunur={fiyatGorunur} onDegisti={temelVeri}/>
         )}
 
         {/* ─── TEORİK / GERÇEK ─── */}
@@ -460,7 +283,7 @@ export default function ReceteMaliyetPage() {
 
             <div className="space-y-1.5">
               {!satisAralik.length && <Uyari>Bu dönemde yüklenmiş ürün satışı yok — teorik tüketim hesaplanamaz. “Satış yükle” sekmesinden rapor yükleyin.</Uyari>}
-              {!receteler.length && <Uyari>Henüz hiç reçete girilmemiş — teorik tüketim hesaplanamaz.</Uyari>}
+              {!duzRecete.length && <Uyari>Henüz hiç reçete girilmemiş — teorik tüketim hesaplanamaz.</Uyari>}
               {satisAralik.length > 0 && tuketim.satisGunu < tuketim.donemGun && (
                 <Uyari>Dönemin {tuketim.donemGun} gününden yalnızca {tuketim.satisGunu} gününün satışı yüklü. Karşılaştırma sadece satışı yüklü günler üzerinden yapılır.</Uyari>
               )}

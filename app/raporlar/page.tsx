@@ -1002,6 +1002,12 @@ export default function RaporlarPage() {
     const set = k === "ys" ? setKoKeboYs : k === "trendyol" ? setKoKeboTrendyol : setKoKeboMigrosYemek;
     set(o => ({ tutar: t ? paraYaz(t) : "", paket: o.paket }));
   };
+  /** Platform kapıda ödemesi (31.10): MagicPay nakit/POS/kart ayırmıyor; tek tutar girilir, türü (nakit, POS,
+   *  Token Flex, Paye) kurye tahsilatından gelir ("Kapıda alınan para tuttu mu?"). Eski nakit/POS ayrımı silinir. */
+  const kapidaTutarYaz = (k: KapidaKanal, v: PlatformGiris) => {
+    setKapidaNP(o => ({ ...o, [k]: { nakit: "", pos: "" } }));
+    (k === "ys" ? setKoKeboYs : k === "trendyol" ? setKoKeboTrendyol : setKoKeboMigrosYemek)(v);
+  };
   const [koKeboAloNakit, setKoKeboAloNakit] = useState("");
   const [koKeboAloPos, setKoKeboAloPos] = useState("");
   const aloYaz = (nakit: string, pos: string, paket?: string) => {
@@ -1215,8 +1221,8 @@ export default function RaporlarPage() {
       ko_kir_ys: setKoKirYs, ko_kir_trendyol: setKoKirTrendyol,
     };
     for (const [alan, v] of Object.entries(d.platform)) ayarla[alan]?.(pg(v.tutar, v.paket));
-    // Kebo kapıda (nakit/POS ayrımı bilinmiyor → nakit), paket online sütununda
-    (["ys", "trendyol", "migros"] as const).forEach(k => kapidaNPYaz(k, d.kapidaKebo[k] ? paraYaz(d.kapidaKebo[k]) : "", ""));
+    // Kebo kapıda: tek tutar; türü (nakit/POS/yemek kartı) kuryeden gelir — nakde YAZILMAZ. Paket online sütununda.
+    (["ys", "trendyol", "migros"] as const).forEach(k => kapidaTutarYaz(k, { tutar: d.kapidaKebo[k] ? paraYaz(d.kapidaKebo[k]) : "", paket: "" }));
     setKoKeboYs(o => ({ ...o, paket: "" })); setKoKeboTrendyol(o => ({ ...o, paket: "" })); setKoKeboMigrosYemek(o => ({ ...o, paket: "" }));
     setOsKeboAlo(o => ({ ...o, tutar: "", paket: "" }));
     aloYaz(d.alo.nakit ? paraYaz(d.alo.nakit) : "", d.alo.pos ? paraYaz(d.alo.pos) : "", d.alo.paket ? String(d.alo.paket) : "");
@@ -1599,9 +1605,9 @@ export default function RaporlarPage() {
       setKoKeboTrendyol(pg(r.ko_kebo_trendyol, r.ko_kebo_trendyol_paket)); setKoKeboTrendyolIndirim(paraYaz(r.ko_kebo_trendyol_indirim));
       setKoKeboMigrosYemek(pg(r.ko_kebo_migros_yemek, r.ko_kebo_migros_yemek_paket));
       setKoKeboAlo(pg(r.ko_kebo_alo, r.ko_kebo_alo_paket));
-      // Kapıda nakit/POS: ayrım yoksa (eski kayıt) tamamı nakit sayılır
-      const np = (top: number, n?: number, p?: number) => ((n||0) + (p||0) > 0)
-        ? { nakit: paraYaz(n||0), pos: paraYaz(p||0) } : { nakit: top ? paraYaz(top) : "", pos: "" };
+      // Kapıda nakit/POS: eski kayıtta ayrım varsa korunur (sadece Kontrol özetinde görünür); yoksa türü kuryeden
+      const np = (_top: number, n?: number, p?: number) => ((n||0) + (p||0) > 0)
+        ? { nakit: paraYaz(n||0), pos: paraYaz(p||0) } : { nakit: "", pos: "" };
       setKapidaNP({ ys: np(r.ko_kebo_ys, r.ko_kebo_ys_nakit, r.ko_kebo_ys_pos), trendyol: np(r.ko_kebo_trendyol, r.ko_kebo_trendyol_nakit, r.ko_kebo_trendyol_pos),
         migros: np(r.ko_kebo_migros_yemek, r.ko_kebo_migros_yemek_nakit, r.ko_kebo_migros_yemek_pos) });
       // Nakit/POS ayrımı yoksa (eski kayıt) tamamı nakit sayılır
@@ -1798,14 +1804,45 @@ export default function RaporlarPage() {
     setKuryeler(l => l.map(k => k.id === id && k.parcalar
       ? parcaliToplam({ ...k, parcalar: k.parcalar.map((p, j) => j === i ? { ...p, [alan]: v } : p) }) : k));
   };
-  const parcaSil = (id: number, i: number) => setKuryeler(l => l.map(k => {
-    if (k.id !== id || !k.parcalar) return k;
-    const kalan = k.parcalar.filter((_, j) => j !== i);
-    const yeni = parcaliToplam({ ...k, parcalar: kalan });
-    if (kalan.length > 1) return yeni;
-    const { parcalar: _p, ...tek } = yeni; void _p;
-    return tek;
-  }));
+  /** Sabit satırdan bir kuryeyi çıkarır. Kurye Roket'te varsa (yanlışlıkla sabite yazılmış havuz kuryesi) paketi ve
+   *  parası havuz satırına geri eklenir, Roket kaydında da havuza alınır. Roket'te yoksa (elle eklenen) sadece silinir. */
+  const parcaSil = (id: number, i: number) => {
+    const satir = kuryeler.find(k => k.id === id);
+    const parca = satir?.parcalar?.[i];
+    const rk = parca && roketGun ? roketGun.kuryeler.find(r => parca.isim.trim() && adEslesir(r.ad, parca.isim)) : undefined;
+    const s2 = (v: number) => (v ? paraYaz(v) : "");
+    setKuryeler(l => {
+      let liste = l.map(k => {
+        if (k.id !== id || !k.parcalar) return k;
+        const kalan = k.parcalar.filter((_, j) => j !== i);
+        const yeni = parcaliToplam({ ...k, parcalar: kalan });
+        if (kalan.length > 1) return yeni;
+        const { parcalar: _p, ...tek } = yeni; void _p;
+        return tek;
+      });
+      if (rk && parca) {
+        const pk = parseInt(parca.paket, 10) || 0;
+        const arti = (a: string | undefined, b: string | undefined) => s2(Math.round((tv(a) + tv(b)) * 100) / 100);
+        const havuzVar = liste.some(k => k.tip === "havuz");
+        if (!havuzVar) liste = [...liste, { id: Date.now(), isim: "Havuz", nakit: "", pos: "", paketSayisi: "", uzakPaket: "", paket9km: "", tip: "havuz" }];
+        let eklendi = false;
+        liste = liste.map(k => {
+          if (eklendi || k.tip !== "havuz") return k;
+          eklendi = true;
+          return { ...k, paketSayisi: String((parseInt(k.paketSayisi, 10) || 0) + pk),
+            nakit: arti(k.nakit, parca.nakit), pos: arti(k.pos, parca.pos), paye: arti(k.paye, parca.paye), tokenflex: arti(k.tokenflex, parca.tokenflex) };
+        });
+      }
+      return liste;
+    });
+    if (rk && roketGun) {
+      const yeni: RoketGun = { ...roketGun, kuryeler: roketGun.kuryeler.map(k => k.ad === rk.ad ? { ...k, atama: "havuz" as const, elle: true } : { ...k, atama: atamaBul(roketGun, k) }) };
+      setRoketGun(yeni);
+      void supabase.from("roket_gunluk").update({ veri: yeni }).eq("tarih", yeni.tarih).then(({ error }) => {
+        if (error) setRoketNotu(n => [...n, `${rk.ad} Roket kaydında havuza alınamadı (${error.message}); Kurye Kontrol'den atayın.`]);
+      });
+    }
+  };
   /** Sabit satıra kurye ekler. Roket'teki bir havuz kuryesi seçildiyse paketi/parasıyla gelir, havuz satırından düşülür
    *  ve Roket kaydında o sabite atanır (Kurye Kontrol de aynı görsün). */
   const sabiteKuryeEkle = (id: number, slot: "s1" | "s2", roketKurye?: RoketGun["kuryeler"][number]) => {
@@ -1833,7 +1870,7 @@ export default function RaporlarPage() {
       });
     });
     if (roketKurye && roketGun) {
-      const yeni: RoketGun = { ...roketGun, kuryeler: roketGun.kuryeler.map(k => ({ ...k, atama: k.ad === roketKurye.ad ? slot : atamaBul(roketGun, k) })) };
+      const yeni: RoketGun = { ...roketGun, kuryeler: roketGun.kuryeler.map(k => k.ad === roketKurye.ad ? { ...k, atama: slot, elle: true } : { ...k, atama: atamaBul(roketGun, k) }) };
       setRoketGun(yeni);
       void supabase.from("roket_gunluk").update({ veri: yeni }).eq("tarih", yeni.tarih).then(({ error }) => {
         if (error) setRoketNotu(n => [...n, `${roketKurye.ad} Roket kaydında sabite atanamadı (${error.message}); Kurye Kontrol'den atayın.`]);
@@ -1906,7 +1943,7 @@ export default function RaporlarPage() {
       ([["ys", kk.ys], ["trendyol", kk.trendyol], ["migros", kk.migrosYemek]] as const).forEach(([k, o]) => {
         const x = o as { tutar?: number; nakit?: number; pos?: number } | undefined;
         if ((x?.nakit || 0) + (x?.pos || 0) > 0) kapidaNPYaz(k, nToStr(x!.nakit), nToStr(x!.pos));
-        else if (x?.tutar) kapidaNPYaz(k, nToStr(x.tutar), "");
+        else if (x?.tutar) kapidaTutarYaz(k, { tutar: nToStr(x.tutar), paket: "" });
       });
       // Alo Paket kapıda nakit / POS ayrı yazılmışsa
       if ((kk.alo?.nakit || 0) + (kk.alo?.pos || 0) > 0) aloYaz(nToStr(kk.alo.nakit), nToStr(kk.alo.pos), kk.alo?.paket ? String(kk.alo.paket) : undefined);
@@ -2517,6 +2554,27 @@ export default function RaporlarPage() {
                   placeholder="0" className="w-full h-16 rounded-xl border-2 border-altin/60 bg-alan text-yazi text-3xl font-black px-4 outline-none focus:border-altin disabled:opacity-50"/>
               </label>
             </div>
+            {/* Kasa yemek kartları (31.10): kasadaki cihaz/slip toplamları elle; MagicPay türünü bildiklerini doldurur */}
+            <div className="rounded-xl border border-pink-500/25 bg-kart p-4 space-y-2">
+              <div>
+                <p className="text-[15px] font-bold text-yazi">Kasa yemek kartları</p>
+                <p className="text-[12px] text-gray-500">Kasada (masada) yemek kartıyla alınan tutarlar. Gün sonu slip / cihaz toplamını yazın. MagicPay&apos;in türünü bildiği kartlar dolu gelir, kontrol edin.</p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {YEMEK_KARTLARI.map(k => (
+                  <label key={k.alan} className="block space-y-1">
+                    <span className="block text-[13px] font-semibold text-gray-700">{k.ad}</span>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-[14px] font-semibold">₺</span>
+                      <input type="text" inputMode="decimal" placeholder="0" disabled={isReadOnly} value={kartlar[k.alan]}
+                        onChange={e => kartYaz(k.alan, paraGirdisi(e.target.value))}
+                        className="w-full bg-alan border border-cizgi-guclu text-yazi text-[15px] h-11 pl-7 pr-3 rounded-lg text-right font-bold outline-none focus:border-altin/50 disabled:opacity-50"/>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {(() => { const t = YEMEK_KARTLARI.reduce((s, k) => s + tv(kartlar[k.alan]), 0); return t > 0 ? <p className="text-[13px] text-gray-700 text-right">Kasa yemek kartı toplamı <b className="text-yazi">₺{fmt(t)}</b></p> : null; })()}
+            </div>
             <div className="rounded-xl border border-teal-500/25 bg-kart p-3 space-y-1.5">
               <p className="text-[13px] font-bold text-teal-300">Kıraloğlu Migros <span className="font-medium text-[11px] text-gray-500">MagicPay&apos;de yok, elle girin (satış yoksa boş bırakın)</span></p>
               <div className={`hidden ${SATIS_IZGARA} text-[11px] font-bold text-gray-500 px-0.5`}>
@@ -2962,11 +3020,12 @@ export default function RaporlarPage() {
                             <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 space-y-1.5">
                               <p className="text-[13px] font-semibold text-amber-200">{ad}&apos;e hangi kurye eklensin?</p>
                               {adaylar.length > 0 ? (
-                                <div className="flex flex-wrap gap-1.5">
-                                  {adaylar.map(x => (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                                  {[...adaylar].sort((a, b) => b.paket - a.paket).map(x => (
                                     <button key={x.ad} type="button" onClick={() => sabiteKuryeEkle(k.id, slot, x)}
-                                      className="text-[13px] px-3 py-1.5 rounded-lg border border-cizgi-guclu hover:border-amber-400/60 text-gray-200">
-                                      <b>{x.ad}</b> · {x.paket} paket · ₺{fmt(x.nakit + x.pos + x.paye + x.bilinmeyen)}
+                                      className="text-left px-3 py-2 rounded-lg border border-cizgi-guclu bg-alan hover:border-amber-400 hover:bg-amber-500/10 text-yazi">
+                                      <span className="block text-[15px] font-bold text-yazi">{x.ad}</span>
+                                      <span className="block text-[13px] text-gray-700">{x.paket} paket · ₺{fmt(x.nakit + x.pos + x.paye + x.bilinmeyen)} tahsilat</span>
                                     </button>
                                   ))}
                                 </div>
@@ -3023,7 +3082,7 @@ export default function RaporlarPage() {
                       ))}
                       {turBilinmiyor && (
                         <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-center">
-                          <span className="text-gray-300">CNF / Kıraloğlu kapıda <span className="text-[12px] text-gray-500">(nakit-POS ayrımı yok)</span></span>
+                          <span className="text-gray-700">Platform kapıda ödeme <span className="text-[12px] text-gray-500">(MagicPay türünü ayırmıyor; kuryelerin nakit / POS / Token Flex / Paye tahsilatıyla karşılaştırılır)</span></span>
                           <span className="text-right text-yazi">₺{fmt(ch.kapidaTuruBilinmeyen)}</span><span/><span className="w-24"/>
                         </div>
                       )}
@@ -3208,12 +3267,9 @@ export default function RaporlarPage() {
                   <span className="text-center">Toplam</span>
                 </div>
                 <p className="text-[11px] font-bold text-amber-300 uppercase tracking-wide pt-1">🍔 Kebo</p>
-                <SatisSatiri ad="Yemeksepeti" online={osKeboYs} onOnline={setOsKeboYs} indirim={osKeboYsIndirim} onIndirim={setOsKeboYsIndirim} kapida={koKeboYs} onKapida={setKoKeboYs} disabled={isReadOnly}
-                  nakitPos={{ nakit: kapidaNP.ys.nakit, pos: kapidaNP.ys.pos, onNakit: v => kapidaNPYaz("ys", v, kapidaNP.ys.pos), onPos: v => kapidaNPYaz("ys", kapidaNP.ys.nakit, v) }}/>
-                <SatisSatiri ad="Trendyol" online={osKeboTrendyol} onOnline={setOsKeboTrendyol} indirim={osKeboTrendyolIndirim} onIndirim={setOsKeboTrendyolIndirim} kapida={koKeboTrendyol} onKapida={setKoKeboTrendyol} disabled={isReadOnly}
-                  nakitPos={{ nakit: kapidaNP.trendyol.nakit, pos: kapidaNP.trendyol.pos, onNakit: v => kapidaNPYaz("trendyol", v, kapidaNP.trendyol.pos), onPos: v => kapidaNPYaz("trendyol", kapidaNP.trendyol.nakit, v) }}/>
-                <SatisSatiri ad="Migros" online={osKeboMigros} onOnline={setOsKeboMigros} indirim={osKeboMigrosIndirim} onIndirim={setOsKeboMigrosIndirim} kapida={koKeboMigrosYemek} onKapida={setKoKeboMigrosYemek} disabled={isReadOnly}
-                  nakitPos={{ nakit: kapidaNP.migros.nakit, pos: kapidaNP.migros.pos, onNakit: v => kapidaNPYaz("migros", v, kapidaNP.migros.pos), onPos: v => kapidaNPYaz("migros", kapidaNP.migros.nakit, v) }}/>
+                <SatisSatiri ad="Yemeksepeti" online={osKeboYs} onOnline={setOsKeboYs} indirim={osKeboYsIndirim} onIndirim={setOsKeboYsIndirim} kapida={koKeboYs} onKapida={v => kapidaTutarYaz("ys", v)} disabled={isReadOnly}/>
+                <SatisSatiri ad="Trendyol" online={osKeboTrendyol} onOnline={setOsKeboTrendyol} indirim={osKeboTrendyolIndirim} onIndirim={setOsKeboTrendyolIndirim} kapida={koKeboTrendyol} onKapida={v => kapidaTutarYaz("trendyol", v)} disabled={isReadOnly}/>
+                <SatisSatiri ad="Migros" online={osKeboMigros} onOnline={setOsKeboMigros} indirim={osKeboMigrosIndirim} onIndirim={setOsKeboMigrosIndirim} kapida={koKeboMigrosYemek} onKapida={v => kapidaTutarYaz("migros", v)} disabled={isReadOnly}/>
                 <AloSatiri online={osKeboAlo} nakit={koKeboAloNakit} onNakit={v => aloYaz(v, koKeboAloPos)} pos={koKeboAloPos} onPos={v => aloYaz(koKeboAloNakit, v)}
                   kapida={koKeboAlo} onKapida={setKoKeboAlo} disabled={isReadOnly}/>
                 <p className="text-[11px] font-bold text-red-300 uppercase tracking-wide pt-2">🍗 Chick&apos;n Fride</p>
