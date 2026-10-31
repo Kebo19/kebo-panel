@@ -67,8 +67,12 @@ export default function StokGirisOnay({ urunler, onDegisti }: { urunler: StokUru
   const degistir = (id: string, alan: Partial<Secim>, o: Oneri) => setSecim(s => ({ ...s, [id]: { ...sec(o), ...alan } }));
 
   const yeniUrun = async (o: Oneri) => {
+    if (mesgul) return;
+    const ad = o.kalem_adi.toLocaleUpperCase("tr-TR").replace(/\s+/g, " ").trim();
+    // Aynı adla ürün zaten varsa yenisini açma, onu seç (çift kayıt olmasın)
+    const var_ = urunler.find(u => u.urun_adi.toLocaleUpperCase("tr-TR").replace(/\s+/g, " ").trim() === ad);
+    if (var_) { degistir(o.id, { urun_id: var_.id, carpan: "1" }, o); return; }
     setMesgul(o.id); setHata(null);
-    const ad = o.kalem_adi.toLocaleUpperCase("tr-TR");
     const { data, error } = await supabase.from("stok_urunler")
       .insert({ urun_adi: ad, birim: birimTahmin(o.fatura_birim), kategori: null, min_stok: 0, mevcut_stok: 0, durum: "aktif", sayim_periyodu: "haftalik" })
       .select("id").single();
@@ -78,7 +82,10 @@ export default function StokGirisOnay({ urunler, onDegisti }: { urunler: StokUru
     degistir(o.id, { urun_id: data.id as string, carpan: "1" }, o);
   };
 
-  const karar = async (liste: { o: Oneri; karar: "onayla" | "reddet" | "takip_etme" }[], anahtar: string) => {
+  const [bilgi, setBilgi] = useState<string | null>(null);
+  const karar = async (liste: { o: Oneri; karar: "onayla" | "reddet" | "takip_etme" }[], anahtar: string, bekleyen = 0) => {
+    setBilgi(null);
+    if (!liste.length) { setHata("Bu faturada stok ürünü seçilmiş kalem yok. Her satırda ürünü seçin, stokta tutmadıklarınız için \"Takip etme\" deyin."); return; }
     const eksik = liste.filter(x => x.karar === "onayla" && !sec(x.o).urun_id);
     if (eksik.length) { setHata(`Önce stok ürünü seçin: ${eksik.map(x => x.o.kalem_adi).join(", ")}`); return; }
     setMesgul(anahtar); setHata(null);
@@ -89,6 +96,7 @@ export default function StokGirisOnay({ urunler, onDegisti }: { urunler: StokUru
     if (error) { setHata(error.message); return; }
     const r = data as { onaylanan: number; urunu_eksik: number };
     if (r.urunu_eksik) setHata(`${r.urunu_eksik} kalem miktarı olmadığı için işlenmedi.`);
+    if (r.onaylanan) setBilgi(`${r.onaylanan} kalem stoğa işlendi.${bekleyen ? ` ${bekleyen} kalemde ürün seçilmediği için bekliyor.` : ""}`);
     setSecim({});
     await yukle();
     if (r.onaylanan) onDegisti();
@@ -112,9 +120,13 @@ export default function StokGirisOnay({ urunler, onDegisti }: { urunler: StokUru
         </h2>
         {acik ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
       </button>
-      {hata && <p className="text-[11px] text-red-400">{hata}</p>}
+      {hata && <p className="text-[13px] text-red-400">{hata}</p>}
+      {bilgi && <p className="text-[13px] text-emerald-300">{bilgi}</p>}
       {acik && faturalar.map(([gib, kalemler]) => {
         const f = kalemler[0];
+        const acikKalemler = kalemler.filter(o => !irsaliye[gib]?.satirlar.some(x => x.oneri_id === o.id));
+        const eslesen = acikKalemler.filter(o => sec(o).urun_id);
+        const eslesmeyen = acikKalemler.filter(o => !sec(o).urun_id);
         return (
           <div key={gib} className="rounded-xl border border-cizgi p-3 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -122,10 +134,18 @@ export default function StokGirisOnay({ urunler, onDegisti }: { urunler: StokUru
                 {f.iade && <span className="text-orange-300">İADE · </span>}{f.tedarikci} <span className="text-gray-500 font-normal">· {fmtTarih(f.tarih)} · {gib}</span>
               </p>
               <div className="flex gap-1.5">
-                <button disabled={!!mesgul} onClick={() => karar(kalemler.filter(o => sec(o).urun_id && !irsaliye[gib]?.satirlar.some(x => x.oneri_id === o.id)).map(o => ({ o, karar: "onayla" as const })), gib)}
+                <button disabled={!!mesgul || !eslesen.length} title={eslesen.length ? "" : "Önce satırlarda stok ürünü seçin"}
+                  onClick={() => karar(eslesen.map(o => ({ o, karar: "onayla" as const })), gib, eslesmeyen.length)}
                   className="flex items-center gap-1 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 px-3 py-1.5 rounded-lg">
-                  {mesgul === gib ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Eşleşenleri stoğa işle
+                  {mesgul === gib ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} {eslesen.length ? `Eşleşenleri stoğa işle (${eslesen.length})` : "Eşleşen kalem yok"}
                 </button>
+                {eslesmeyen.length > 0 && (
+                  <button disabled={!!mesgul} title="Stokta tutmadığınız kalemler (sebze, temizlik…): bu kalem adları bir daha sorulmaz"
+                    onClick={() => { if (confirm(`${eslesmeyen.length} kalem (${eslesmeyen.slice(0, 4).map(o => o.kalem_adi).join(", ")}${eslesmeyen.length > 4 ? "…" : ""}) stokta takip edilmesin mi? Bu adlar bir daha sorulmaz.`)) karar(eslesmeyen.map(o => ({ o, karar: "takip_etme" as const })), gib + "-t"); }}
+                    className="text-[11px] font-semibold text-gray-500 hover:text-yazi border border-cizgi px-2.5 py-1.5 rounded-lg">
+                    {mesgul === gib + "-t" ? "…" : `Seçilmeyenleri takip etme (${eslesmeyen.length})`}
+                  </button>
+                )}
                 <button disabled={!!mesgul} onClick={() => karar(kalemler.map(o => ({ o, karar: "reddet" as const })), gib + "-r")}
                   className="text-[11px] font-semibold text-gray-500 hover:text-red-300 border border-cizgi px-2.5 py-1.5 rounded-lg">Faturayı işleme</button>
               </div>

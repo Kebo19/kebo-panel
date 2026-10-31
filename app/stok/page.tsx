@@ -517,7 +517,8 @@ export default function StokPage() {
     }
   }, [duzenleUrun]);
 
-  if (loading) return (
+  // Sadece ilk yüklemede tam ekran bekleme; yenilemede sayfa (ve içindeki seçimler) yerinde kalır.
+  if (loading && !urunler.length) return (
     <div className="h-screen bg-zemin flex flex-col items-center justify-center gap-3">
       <div className="w-10 h-10 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"/>
       <span className="text-[10px] text-gray-600 uppercase tracking-[0.3em]">Mutfak Deposu Yükleniyor</span>

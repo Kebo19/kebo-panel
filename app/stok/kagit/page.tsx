@@ -7,7 +7,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useYetki } from "@/lib/useYetki";
 import { kagitBelgesi, grupUrunleri, PERIYOT_ADI, type SayimPeriyodu } from "@/lib/kasaFormu";
-import { ArrowLeft, Loader2, Printer } from "lucide-react";
+import { ArrowLeft, Loader2, Printer, RefreshCw } from "lucide-react";
 
 type Urun = { id: string; urun_adi: string; birim: string; kategori: string | null; sayim_periyodu: string | null; sira_no: number | null; sayim_yeri: string | null };
 
@@ -35,13 +35,22 @@ export default function KagitFormPage() {
     if (l && SECENEKLER.some(s => s.v === l)) setSecim(l as Secim);
   }, []);
 
+  // Liste her açılışta, "Yenile"de ve bu sekmeye dönüldüğünde stoktan yeniden okunur (başka sekmede
+  // Liste düzenle'de yapılan değişiklik kağıda/PDF'e hemen gelsin).
+  const [yenile, setYenile] = useState(0);
+  const [okundu, setOkundu] = useState<Date | null>(null);
+  useEffect(() => {
+    const don = () => { if (document.visibilityState === "visible") setYenile(x => x + 1); };
+    document.addEventListener("visibilitychange", don);
+    return () => document.removeEventListener("visibilitychange", don);
+  }, []);
   useEffect(() => {
     if (yetki.yukleniyor || !izinli) return;
     let iptal = false;
     supabase.from("stok_urunler").select("id,urun_adi,birim,kategori,sayim_periyodu,sira_no,sayim_yeri").eq("durum", "aktif")
-      .then(({ data, error }) => { if (iptal) return; if (error) setHata(error.message); else setUrunler((data || []) as Urun[]); });
+      .then(({ data, error }) => { if (iptal) return; if (error) setHata(error.message); else { setUrunler((data || []) as Urun[]); setOkundu(new Date()); } });
     return () => { iptal = true; };
-  }, [supabase, yetki.yukleniyor, izinli]);
+  }, [supabase, yetki.yukleniyor, izinli, yenile]);
 
   const periyot: SayimPeriyodu = secim === "kasa" ? "gunluk" : secim;
   const liste = useMemo(() => urunler ? grupUrunleri(urunler, periyot) : [], [urunler, periyot]);
@@ -63,10 +72,15 @@ export default function KagitFormPage() {
               <p className="text-[11px] text-gray-600">Ürünler Stok sayfasındaki sayım gruplarından gelir. Ürün ekleyince ya da grubu değişince yeniden yazdırın.</p>
             </div>
           </div>
-          <button onClick={yazdir} disabled={!urunler}
-            className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 px-4 py-2 rounded-xl">
-            <Printer size={14}/> Yazdır
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setYenile(x => x + 1)} className="flex items-center gap-1.5 text-xs font-bold text-gray-700 border border-cizgi px-3 py-2 rounded-xl hover:text-yazi">
+              <RefreshCw size={14}/> Yenile
+            </button>
+            <button onClick={yazdir} disabled={!urunler}
+              className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 px-4 py-2 rounded-xl">
+              <Printer size={14}/> Yazdır / PDF al
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -83,6 +97,8 @@ export default function KagitFormPage() {
         <p className="text-[11px] text-gray-600">
           {PERIYOT_ADI[periyot]} sayım listesinde <b className="text-yazi">{liste.length}</b> ürün var.
           {secim === "kasa" && " Yazıcıda “çift taraflı (uzun kenardan çevir)” seçin."}
+          {okundu && <> Liste {okundu.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}&apos;da stoktan okundu.</>}
+          {" "}PDF için yazdırma penceresinde yazıcı olarak <b className="text-yazi">“PDF olarak kaydet”</b> seçin.
           {" "}Doldurulan sayım kağıdını Stok → “Sayım kağıdı tara” ile telefondan sisteme girebilirsiniz.
         </p>
 

@@ -108,11 +108,12 @@ export default function StokListePage() {
 
   const geriAl = () => { setSatirlar([...orijinal.values()].sort((a, b) => (a.sira_no ?? 9999) - (b.sira_no ?? 9999))); setSecili(new Set()); };
 
-  const kaydet = async () => {
+  /** Kaydeder; başarılıysa true (Yazdır önce kaydeder ki kağıda son liste gelsin). */
+  const kaydet = async (): Promise<boolean> => {
     const bos = satirlar.filter(s => !s.yeni && !s.urun_adi.trim());
-    if (bos.length) { setMesaj({ tip: "hata", metin: "Adı boş bırakılan ürün var." }); return; }
+    if (bos.length) { setMesaj({ tip: "hata", metin: "Adı boş bırakılan ürün var." }); return false; }
     const hatali = degisenler.filter(s => s.min_stok.trim() && !(miktarOku(s.min_stok) >= 0));
-    if (hatali.length) { setMesaj({ tip: "hata", metin: `Minimum stok sayı olmalı: ${hatali.map(s => s.urun_adi).join(", ")}` }); return; }
+    if (hatali.length) { setMesaj({ tip: "hata", metin: `Minimum stok sayı olmalı: ${hatali.map(s => s.urun_adi).join(", ")}` }); return false; }
     setKaydediliyor(true); setMesaj(null);
     try {
       const alanlar = (s: Form) => ({
@@ -131,9 +132,16 @@ export default function StokListePage() {
       if (hata) throw hata;
       setMesaj({ tip: "ok", metin: `${degisenler.length} ürün kaydedildi.` });
       await yukle();
+      return true;
     } catch (e) {
       setMesaj({ tip: "hata", metin: e instanceof Error ? e.message : String((e as { message?: string })?.message || e) });
+      return false;
     } finally { setKaydediliyor(false); }
+  };
+  /** Yazdır / PDF: kaydedilmemiş değişiklik varsa önce kaydeder, sonra güncel listeyi kağıt sayfasında açar. */
+  const yazdir = async (p: SayimPeriyodu) => {
+    if (degisenler.length && !(await kaydet())) return;
+    window.location.assign(`/stok/kagit?liste=${p}`);
   };
 
   const kategoriler = useMemo(() => [...new Set(satirlar.map(s => (s.kategori || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "tr")), [satirlar]);
@@ -161,7 +169,7 @@ export default function StokListePage() {
               <button onClick={geriAl} className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-yazi border border-cizgi px-3 py-2 rounded-xl"><Undo2 size={13} /> Geri al</button>
             )}
             <button onClick={yeniSatir} className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-300 border border-emerald-500/40 px-3 py-2 rounded-xl hover:bg-emerald-500/10"><Plus size={13} /> Yeni malzeme</button>
-            <button onClick={kaydet} disabled={!degisenler.length || kaydediliyor}
+            <button onClick={() => { void kaydet(); }} disabled={!degisenler.length || kaydediliyor}
               className="flex items-center gap-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 px-4 py-2 rounded-xl">
               {kaydediliyor ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Kaydet{degisenler.length ? ` (${degisenler.length})` : ""}
             </button>
@@ -185,14 +193,16 @@ export default function StokListePage() {
               </div>
               <div className="flex items-center justify-between mt-2">
                 <span className="text-[10px] text-gray-600">{p !== "gunluk" && p !== "envanter" ? `bu grupta ${grupSayisi(p)} ürün` : "ürün"}</span>
-                <Link href={`/stok/kagit?liste=${p}`} className="flex items-center gap-1 text-[11px] font-semibold text-gray-400 hover:text-yazi border border-cizgi px-2 py-1 rounded-lg">
-                  <Printer size={11} /> Yazdır
-                </Link>
+                <button type="button" onClick={() => { void yazdir(p); }} disabled={kaydediliyor}
+                  title={degisenler.length ? "Önce değişiklikler kaydedilir, sonra güncel liste açılır" : "Güncel listeyi yazdır / PDF al"}
+                  className="flex items-center gap-1 text-[12px] font-semibold text-gray-700 hover:text-yazi border border-cizgi px-2 py-1 rounded-lg disabled:opacity-40">
+                  <Printer size={12} /> {degisenler.length ? "Kaydet + Yazdır / PDF" : "Yazdır / PDF"}
+                </button>
               </div>
             </div>
           ))}
         </div>
-        {degisenler.length > 0 && <p className="text-[11px] text-amber-300">Kaydedilmemiş değişiklik var; yazdırmadan önce kaydedin.</p>}
+        {degisenler.length > 0 && <p className="text-[12px] text-amber-300">Kaydedilmemiş {degisenler.length} değişiklik var. &quot;Kaydet + Yazdır / PDF&quot; önce kaydeder, kağıda son hali gelir.</p>}
 
         {/* Filtre */}
         <div className="flex flex-wrap items-center gap-2">

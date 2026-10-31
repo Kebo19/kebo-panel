@@ -2425,7 +2425,7 @@ export default function RaporlarPage() {
             </div>
             <div>
               <p className="text-xs font-bold text-indigo-300">Fişten Doldur</p>
-              <p className="text-[12px] text-gray-500">Giderler formunun fotoğrafını seçin: giderler, personel yemeği, iptal/iade, kesinti ve kurye yemek kartı doldurulur; nakit, satışlar ve kuryelere dokunulmaz. <a href="/stok/kagit" target="_blank" rel="noopener" className="text-indigo-400 font-semibold hover:underline">Boş formu yazdır</a> (arka yüzde güncel günlük sayım listesi) · <a href="/kebo-gunluk-kasa-formu.pdf" target="_blank" rel="noopener" className="text-indigo-400 hover:underline">PDF</a></p>
+              <p className="text-[12px] text-gray-500">Giderler formunun fotoğrafını seçin: giderler, personel yemeği, iptal/iade, kesinti ve kurye yemek kartı doldurulur; nakit, satışlar ve kuryelere dokunulmaz. <a href="/stok/kagit" target="_blank" rel="noopener" className="text-indigo-400 font-semibold hover:underline">Boş formu yazdır</a> (arka yüzde güncel günlük sayım listesi)</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">

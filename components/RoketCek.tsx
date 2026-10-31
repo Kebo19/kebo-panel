@@ -84,10 +84,10 @@ export default function RoketCek({ tarih, roketGun, onYuklendi, onDoldur }: {
   const sonuc = talep && !aktif ? talep : null;
 
   return (
-    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 space-y-1.5 text-[12px]">
+    <div className="rounded-xl border border-cizgi bg-kart px-4 py-2.5 space-y-1.5 text-[14px]">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-amber-200">
-          {roketGun ? <>Roket&apos;te bu gün: <b>{roketGun.toplamPaket} paket</b>, {roketGun.kuryeler.length} kurye</> : "Bu günün Roket verisi henüz panelde yok."}
+        <span className="text-yazi">
+          {roketGun ? <>Roket: <b>{roketGun.toplamPaket} paket</b> · {roketGun.kuryeler.length} kurye</> : "Roket verisi yok"}
         </span>
         <div className="flex items-center gap-2">
           {roketGun && !aktif && (
@@ -106,17 +106,16 @@ export default function RoketCek({ tarih, roketGun, onYuklendi, onDoldur }: {
       {aktif && (
         <p className="text-sky-300">
           {talep!.durum === "calisiyor"
-            ? `${talep!.bilgisayar || "Bilgisayar"} Roket'ten bu günün raporunu indiriyor (10-20 saniye). Bitince kuryeler kendiliğinden dolar.`
-            : pcAcik ? "İstek gönderildi; robot hemen başlıyor."
-              : "İstek gönderildi. Robotun açık olduğu bilgisayar görünmüyor; dükkân ya da ev bilgisayarı açılınca çalışır (30 dakika bekler)."}
+            ? "Roket'ten çekiliyor (10-20 sn)…"
+            : pcAcik ? "Robot başlıyor…"
+              : "Robot kapalı; bilgisayar açılınca çekilir."}
         </p>
       )}
       {sonuc && <p className={sonuc.durum === "hata" ? "text-red-400" : "text-emerald-300"}>{sonuc.mesaj}</p>}
       {hata && <p className="text-red-400">{hata}</p>}
-      {pcler && !aktif && (
-        <p className="text-[10px] text-gray-500 flex items-center gap-1">
-          <Monitor size={10} className={pcAcik ? "text-emerald-400" : "text-gray-600"} />
-          {pcAcik ? `Robot açık: ${pcler.join(", ")}` : "Şu an robotu açık bilgisayar yok (dükkân/ev bilgisayarında kurulu olmalı)."}
+      {pcler && !aktif && !pcAcik && (
+        <p className="text-[12px] text-gray-500 flex items-center gap-1">
+          <Monitor size={12} className="text-gray-600" /> Robot kapalı
         </p>
       )}
     </div>
