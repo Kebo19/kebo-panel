@@ -36,6 +36,8 @@ Son güncelleme: 31.10.2026 (13:00)
 - **İrsaliye ↔ fatura sorgusu**: Stok ve Faturalar sayfasında "İrsaliye ↔ fatura" arama kutusu; Telegram'da `/belge <no ya da firma>` ve serbest soru.
 
 ## Bekleyenler / sıradaki işler
+0000000000000000000000000. **31.10 22:00 — Toplu sayıma arama (YAYINLANMADI)**: Stok → Toplu sayım penceresinde sekmelerin altında arama kutusu (ad + kategori, Türkçe karakter ve büyük/küçük harf duyarsız, birden çok kelime). Aramayı değiştirince girilen miktarlar korunur, kaç ürüne miktar girildiği yazar. Pencere kapanınca arama temizlenir.
+
 000000000000000000000000. **31.10 22:20 — Sayım kağıdı sayfaları ölçülerek doldurulur (YAYINLANMADI)**: kagitBelgesi (tek başına sayım listeleri) sayfaya küçük bir betik ekler (DOLDUR): her sayfa sonraki sayfanın satırlarıyla sayfa sonuna kadar doldurulur, boşalan ara sayfa silinir, son sayfada liste bittikten sonra boş satırlar sayfa sonuna kadar uzar (sadece kural + 72 px not alanı kalır), sayfa numaraları (.sayfano) yeniden yazılır. Satırlar tr.bos; not alanı sabit. 85 ürünlü aylık PDF'le kontrol edildi (3 sayfa, hepsi dolu). Kullanıcıya önizleme gönderildi.
 
 00000000000000000000000. **31.10 22:05 — Sayım kağıdı son sayfa boş satırlarla sayfa sonuna kadar uzar (YAYINLANMADI)**: sayimSayfalari son sayfayı SAYFA_SATIR − 3 satıra kadar boş satırla doldurur (kural + kısa not alanı kalır); 85 ürünlü aylıkta 3. sayfa sonuna kadar dolu (PDF'le kontrol edildi).

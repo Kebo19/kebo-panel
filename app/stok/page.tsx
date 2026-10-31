@@ -140,6 +140,7 @@ export default function StokPage() {
   const [topluSayimTarih, setTopluSayimTarih] = useState(bugun());
   const [topluMiktarlar, setTopluMiktarlar] = useState<Record<string, string>>({});
   const [topluNotlar, setTopluNotlar] = useState<Record<string, string>>({});
+  const [topluArama, setTopluArama] = useState("");
 
   // Sıralama Düzenleme Modu
   const [siraDuzenleModu, setSiraDuzenleModu] = useState(false);
@@ -277,11 +278,14 @@ export default function StokPage() {
   }, [urunler, arama, filtreKategori, filtrePeriyot, sadeceKritik, durumlar, kritikMi, planlar]);
 
   const topluSayimSekmeFiltreliUrunler = useMemo(() => {
+    // Arama (31.10): ad ya da kategoride geçen, büyük/küçük harf ve Türkçe karakter duyarsız
+    const sade = (t: string) => t.toLocaleLowerCase("tr-TR").replace(/[ıi̇]/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c");
+    const q = sade(topluArama.trim());
     return urunler.filter(u => {
-      if (topluSayimSekme === "all") return true;
-      return listedeMi(topluSayimSekme, u.sayim_periyodu);
+      if (topluSayimSekme !== "all" && !listedeMi(topluSayimSekme, u.sayim_periyodu)) return false;
+      return !q || q.split(/\s+/).every(k => sade(`${u.urun_adi} ${u.kategori || ""}`).includes(k));
     });
-  }, [urunler, topluSayimSekme]);
+  }, [urunler, topluSayimSekme, topluArama]);
 
   const hiyerarsikUrunGruplari = useMemo(() => {
     const ağaç: Record<string, Record<string, Urun[]>> = {};
@@ -385,7 +389,7 @@ export default function StokPage() {
     try {
       const { error } = await supabase.from("stok_hareketler").insert(kayitlar);
       if (error) { alert("Hata: " + error.message); return; }
-      setTopluSayimAcik(false); setTopluMiktarlar({}); setTopluNotlar({}); setTopluSayimTarih(bugun());
+      setTopluSayimAcik(false); setTopluMiktarlar({}); setTopluNotlar({}); setTopluArama(""); setTopluSayimTarih(bugun());
       veriCek();
     } finally { setSaving(false); }
   };
@@ -865,7 +869,7 @@ export default function StokPage() {
                 <ClipboardCheck size={16} className="text-blue-400"/>
                 <h3 className="text-sm font-black text-yazi">Gelişmiş Çoklu Stok Sayım Listesi</h3>
               </div>
-              <button onClick={() => { setTopluSayimAcik(false); setTopluMiktarlar({}); setTopluNotlar({}); }} className="p-1 text-gray-600 hover:text-yazi"><X size={16}/></button>
+              <button onClick={() => { setTopluSayimAcik(false); setTopluMiktarlar({}); setTopluNotlar({}); setTopluArama(""); }} className="p-1 text-gray-600 hover:text-yazi"><X size={16}/></button>
             </div>
 
             <div className="p-4 bg-alan border-b border-cizgi space-y-3">
@@ -896,11 +900,21 @@ export default function StokPage() {
                   </button>
                 ))}
               </div>
+              <div className="relative">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/>
+                <input type="search" value={topluArama} onChange={e => setTopluArama(e.target.value)} autoFocus
+                  placeholder="Ürün ara (ör. tavuk, ayran)…"
+                  className="w-full bg-alan border border-cizgi-guclu text-yazi text-[15px] h-11 pl-9 pr-9 rounded-xl outline-none focus:border-altin"/>
+                {topluArama && <button type="button" aria-label="Aramayı temizle" onClick={() => setTopluArama("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-500 hover:text-yazi"><X size={15}/></button>}
+              </div>
+              {Object.values(topluMiktarlar).some(v => v.trim()) && (
+                <p className="text-[12px] text-gray-500">{Object.values(topluMiktarlar).filter(v => v.trim()).length} ürüne miktar girildi · aramayı değiştirince girdikleriniz silinmez</p>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-zemin/50">
               {topluSayimSekmeFiltreliUrunler.length === 0 ? (
-                <div className="text-center text-gray-600 text-xs py-8">Bu sayım periyoduna ait malzeme bulunmuyor.</div>
+                <div className="text-center text-gray-600 text-xs py-8">{topluArama.trim() ? `"${topluArama}" ile eşleşen ürün yok.` : "Bu sayım periyoduna ait malzeme bulunmuyor."}</div>
               ) : topluSayimSekmeFiltreliUrunler.map(urun => {
                 const mukerrer = tarihteSayimVarMi(urun.id, topluSayimTarih);
                 return (
@@ -940,7 +954,7 @@ export default function StokPage() {
             </div>
 
             <div className="px-5 py-4 border-t border-cizgi flex justify-end gap-2 bg-alan rounded-b-2xl">
-              <button onClick={() => { setTopluSayimAcik(false); setTopluMiktarlar({}); setTopluNotlar({}); }} className="text-xs font-semibold text-gray-500 border border-cizgi px-4 py-2 rounded-xl">Kapat</button>
+              <button onClick={() => { setTopluSayimAcik(false); setTopluMiktarlar({}); setTopluNotlar({}); setTopluArama(""); }} className="text-xs font-semibold text-gray-500 border border-cizgi px-4 py-2 rounded-xl">Kapat</button>
               <button onClick={gelişmişTopluSayımKaydet} disabled={saving} className="text-xs font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 px-6 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-altin/20">
                 {saving ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>} Sayımları Kaydet
               </button>
