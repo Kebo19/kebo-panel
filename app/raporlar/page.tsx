@@ -22,6 +22,7 @@ import {
 } from "@/lib/hesap";
 import { useYetki } from "@/lib/useYetki";
 import { slotToplami, atamaBul, adEslesir, paketKontrolu, type RoketGun } from "@/lib/roket";
+import { eksikGunler, gunAraligiYaz, raporUyarilari } from "@/lib/raporKontrol";
 import RoketCek from "@/components/RoketCek";
 import { esitPaylas, bankoCalisanlari } from "@/lib/kasaAcigi";
 import { IADE_FIS, IADE_MARKA, IADE_KANAL_AD, IADE_ODEME_AD, MARKA_KANALLARI, iadeOdemeSecenekleri, iadeDetayDuzelt, iadeEksikAdim, iadeEtiketi, iadeAciklamaYaz, iadeAciklamaOku, type IadeDetay } from "@/lib/iade";
@@ -1087,6 +1088,8 @@ export default function RaporlarPage() {
   const [adim, setAdim] = useState(1);
   /** Tek ekran (31.10): solda özet satırlar, sağda kontrol; tıklanan bölüm (1 kart/Migros, 2 gider, 3 kurye) solda açılır. */
   const [acikBolum, setAcikBolum] = useState<number | null>(null);
+  /** Kontrol listesinde ayrıntısı açık satır (tıklayınca açılır/kapanır). */
+  const [kontrolAcik, setKontrolAcik] = useState<string | null>(null);
   const [ayrinti, setAyrinti] = useState(false); // 4. adımda satış / kasa / nakit kasa ayrıntıları
   const [kayitOnay, setKayitOnay] = useState(false);
   const [nakitFarkOnay, setNakitFarkOnay] = useState(false); // kasa nakdi MagicPay'den ±100 ₺'den fazla farklıysa // "Raporu Kaydet"ten sonra son bir kez "Evet, kaydet" sorulur
@@ -1777,14 +1780,19 @@ export default function RaporlarPage() {
      kasaNakit,kasaPos,kartlar,giderler,iadeler,kuryeler]);
 
   // ── Table totals ──
+  // Arşiv kontrolleri (31.10): raporu olmayan günler ve kopya / paketsiz raporlar — lib/raporKontrol
+  const arsivEksik = useMemo(() => eksikGunler(raporlar.map(r => r.tarih), `${secilenYil}-${secilenAy}`, bugun()), [raporlar, secilenAy, secilenYil]);
+  const arsivUyari = useMemo(() => raporUyarilari(raporlar), [raporlar]);
   const tabloToplam = useMemo(()=>{
     const o = donemOzeti(raporlar);
     return {brut:o.brut, net:o.net, paket:o.paket, giderIade:o.gider+o.iade, paketOrt:o.paket>0?o.platformCiro/o.paket:0};
   },[raporlar]);
 
   // ── Handlers ──
-  const giderEkle = (tip: "normal"|"firma"|"personel" = "normal") =>
-    setGiderler([...giderler,{id:Date.now(),aciklama:"",tutar:"",tip}]);
+  const giderEkle = (tip: "normal"|"firma"|"personel"|"gecmis" = "normal") =>
+    setGiderler([...giderler, tip === "gecmis"
+      ? {id:Date.now(),aciklama:"",tutar:"",tip:"normal",odeme:"gecmis"}
+      : {id:Date.now(),aciklama:"",tutar:"",tip}]);
   const giderSil = (id:number)=>setGiderler(giderler.filter(g=>g.id!==id));
   const giderDegistir = (id:number, alanlar: Partial<SatirRaporu>) =>
     setGiderler(onceki => onceki.map(g=>g.id===id?{...g,...alanlar, ...(alanlar.tutar!==undefined?{tutar:paraGirdisi(alanlar.tutar)}:{})}:g));
@@ -2510,7 +2518,7 @@ export default function RaporlarPage() {
             {!isReadOnly && (() => {
               const kartTop = YEMEK_KARTLARI.reduce((t, k) => t + tv(kartlar[k.alan]), 0);
               const migros = tv(osKirMigrosYemek.tutar) + tv(koKirMigrosYemek.tutar);
-              const giderSay = giderler.filter(g => tv(g.tutar) > 0).length;
+              const giderSay = giderler.filter(g => tv(g.tutar) > 0 && odemeOf(g) !== "gecmis").length;
               const kuryeDolu = ch.kuryelerHesap.some(k => k.gercekPaket > 0 || tv(k.nakit) + tv(k.pos) > 0);
               let sNo = 0;
               const satir = (n: number, ad: string, deger: React.ReactNode) => (
@@ -2530,7 +2538,8 @@ export default function RaporlarPage() {
                   </label>
                   {satir(1, "Yemek kartı", `₺${fmt(kartTop)}`)}
                   {satir(1, "Kıraloğlu Migros", `₺${fmt(migros)}`)}
-                  {satir(2, "Gider", <>₺{fmt(ch.tGider + ch.tGiderGecmis)}{giderSay > 0 && <span className="text-[13px] font-normal text-gray-500">({giderSay})</span>}</>)}
+                  {satir(2, "Gider", <>₺{fmt(ch.tGider)}{giderSay > 0 && <span className="text-[13px] font-normal text-gray-500">({giderSay})</span>}</>)}
+                  {ch.tGiderGecmis > 0 && satir(2, "Eski nakitten ödenen", <span className="text-gray-600">₺{fmt(ch.tGiderGecmis)}</span>)}
                   {satir(3, "Kuryeler", kuryeDolu
                     ? <span className="text-[14px] font-semibold">{ch.kuryelerHesap.filter(k => k.gercekPaket > 0 || tv(k.nakit) + tv(k.pos) > 0)
                         .map(k => `${k.tip === "havuz" ? "Havuz" : `S${++sNo}`} ${k.gercekPaket}`).join(" · ")} pk</span>
@@ -2610,7 +2619,8 @@ export default function RaporlarPage() {
             {!isReadOnly && <div className="flex items-center justify-between pt-1"><h2 className="text-[16px] font-black text-yazi">Gider</h2><button type="button" onClick={() => setAcikBolum(null)} className="text-[14px] text-gray-500 hover:text-yazi px-2">Kapat ✕</button></div>}
               {/* ── GİDERLER: Açıklama · Ödeme yöntemi · Tutar ── */}
               {(() => {
-                const normalSatirlar = giderler.filter(g => g.tip !== "personel");
+                const normalSatirlar = giderler.filter(g => g.tip !== "personel" && odemeOf(g) !== "gecmis");
+                const gecmisSatirlar = giderler.filter(g => g.tip !== "personel" && odemeOf(g) === "gecmis");
                 const personelSatirlar = giderler.filter(g => g.tip === "personel");
                 const personelToplam = personelSatirlar.reduce((t, g) => t + tv(g.tutar), 0);
                 const kutu = "w-full bg-alan border border-cizgi-guclu text-yazi text-[14px] h-10 px-3 rounded-lg outline-none focus:border-altin/50 disabled:opacity-50";
@@ -2670,7 +2680,7 @@ export default function RaporlarPage() {
                             <select disabled={isReadOnly} value={od}
                               onChange={e => giderDegistir(g.id, { odeme: e.target.value as GiderOdeme })}
                               className={`${kutu} col-span-3 md:col-span-1 ${od === "nakit" ? "" : "border-sky-500/40 text-sky-200"}`}>
-                              {GIDER_ODEME.filter(o => g.tip !== "firma" || o.v !== "gecmis").map(o => <option key={o.v} value={o.v}>{o.ad}</option>)}
+                              {GIDER_ODEME.filter(o => o.v !== "gecmis").map(o => <option key={o.v} value={o.v}>{o.ad}</option>)}
                             </select>
                             <div className="col-span-2 md:col-span-1">{tutarKutusu(g)}</div>
                             {silDugmesi(g)}
@@ -2683,6 +2693,30 @@ export default function RaporlarPage() {
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+
+                {/* ── ESKİ GÜNLERİN NAKİTİNDEN ÖDENEN: bugünün kasasından çıkmadı → bugünün cirosunu etkilemez ── */}
+                <div className="rounded-xl border border-cizgi bg-kart">
+                  <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[15px] font-bold text-yazi flex items-center gap-2">Eski günlerin nakitinden ödenen
+                      {ch.tGiderGecmis > 0 && <span className="text-[13px] font-black">₺{fmt(ch.tGiderGecmis)}</span>}</span>
+                    {!isReadOnly && (
+                      <button type="button" onClick={() => giderEkle("gecmis")}
+                        className="text-[12px] font-semibold text-sky-200 border border-sky-500/30 hover:bg-sky-500/10 px-3 py-1.5 rounded-lg">+ Ekle</button>
+                    )}
+                  </div>
+                  <div className="p-3 space-y-2.5">
+                    <p className="text-[12px] text-gray-500">Bugünün cirosunu etkilemez.</p>
+                    {gecmisSatirlar.map(g => (
+                      <div key={g.id} className="grid grid-cols-[1fr_120px_28px] md:grid-cols-[1fr_150px_28px] gap-2 items-center">
+                        <div className="col-span-3 md:col-span-1 min-w-0">
+                          <AkilliGiderInput value={g.aciklama} onChange={v => giderDegistir(g.id, { aciklama: v })} disabled={isReadOnly} oneriListesi={giderOnerileri} inputClassName={kutu}/>
+                        </div>
+                        <div className="col-span-2 md:col-span-1">{tutarKutusu(g)}</div>
+                        {silDugmesi(g)}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -2726,13 +2760,12 @@ export default function RaporlarPage() {
                 <div className="rounded-xl border-2 border-altin/60 bg-kart px-4 py-3 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-[14px] font-bold text-yazi">Toplam gider</span>
-                    <span className="text-[19px] font-black text-red-300">₺{fmt(ch.tGider + ch.tGiderGecmis)}</span>
+                    <span className="text-[19px] font-black text-red-300">₺{fmt(ch.tGider)}</span>
                   </div>
-                  {(ch.tGiderGecmis > 0 || ch.tGiderNakitDisi > 0) && <p className="text-[13px] text-gray-500">
-                    Kasadan ₺{fmt(ch.tGiderNakit)}
-                    {ch.tGiderGecmis > 0 && <> · eski nakitten ₺{fmt(ch.tGiderGecmis)}</>}
-                    {ch.tGiderNakitDisi > 0 && <> · POS / diğer ₺{fmt(ch.tGiderNakitDisi)}</>}
+                  {ch.tGiderNakitDisi > 0 && <p className="text-[13px] text-gray-500">
+                    Kasadan ₺{fmt(ch.tGiderNakit)} · POS / diğer ₺{fmt(ch.tGiderNakitDisi)}
                   </p>}
+                  {ch.tGiderGecmis > 0 && <p className="text-[13px] text-gray-500">Ayrıca eski nakitten ₺{fmt(ch.tGiderGecmis)} (ciroya girmez)</p>}
                 </div>
                 </>);
               })()}
@@ -3196,8 +3229,13 @@ export default function RaporlarPage() {
               const sayimFark = beklenen != null && sayim != null ? Math.round((sayim - beklenen) * 100) / 100 : null;
               const indirimSorun = ch.indirimUyari || (!isReadOnly && (indirimFarklari.length > 0 || mpIndirimDurum === "hata"));
               type Durum = "tamam" | "uyari" | "bos";
-              const satir = (durum: Durum, baslik: string, deger: React.ReactNode, aciklama?: string, git?: () => void, gitAd?: string) => (
-                <div className={`flex items-start gap-3 px-4 py-3 border-b border-cizgi last:border-b-0 ${durum === "uyari" ? "bg-amber-500/5" : ""}`}>
+              const satir = (durum: Durum, baslik: string, deger: React.ReactNode, aciklama?: string, git?: () => void, gitAd?: string, detay?: React.ReactNode) => {
+                const acik = kontrolAcik === baslik;
+                const tiklanir = !!(detay || aciklama);
+                return (
+                <div key={baslik} className={`border-b border-cizgi last:border-b-0 ${durum === "uyari" ? "bg-amber-500/5" : ""}`}>
+                <div onClick={tiklanir ? () => setKontrolAcik(acik ? null : baslik) : undefined}
+                  className={`flex items-start gap-3 px-4 py-3 ${tiklanir ? "cursor-pointer hover:bg-alan/60" : ""}`}>
                   <span className={`mt-0.5 shrink-0 ${durum === "tamam" ? "text-emerald-400" : durum === "uyari" ? "text-amber-400" : "text-gray-600"}`}>
                     {durum === "uyari" ? <AlertTriangle size={18}/> : <CheckCircle2 size={18}/>}
                   </span>
@@ -3208,40 +3246,80 @@ export default function RaporlarPage() {
                     </div>
                     {aciklama && durum === "uyari" && <p className="text-[13px] mt-0.5 text-amber-300">{aciklama}</p>}
                   </div>
-                  {git && !isReadOnly && <button type="button" onClick={git} className="shrink-0 text-[12px] font-semibold text-altin hover:underline mt-0.5">{gitAd}</button>}
+                  {git && !isReadOnly && <button type="button" onClick={e => { e.stopPropagation(); git(); }} className="shrink-0 text-[12px] font-semibold text-altin hover:underline mt-0.5">{gitAd}</button>}
+                  {tiklanir && <span className="shrink-0 text-gray-500 mt-0.5">{acik ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}</span>}
+                </div>
+                {acik && (
+                  <div className="px-4 pb-3 pl-11 text-[14px] text-gray-700 space-y-1">
+                    {aciklama && durum !== "uyari" && <p>{aciklama}</p>}
+                    {detay}
+                  </div>
+                )}
+                </div>
+              );};
+              // Ayrıntı satırı: ad ............ tutar
+              const dS = (ad: React.ReactNode, tutar: number | string, k?: string) => (
+                <div key={k ?? String(ad)} className="flex justify-between gap-3 border-b border-cizgi/40 last:border-b-0 py-0.5">
+                  <span className="min-w-0 truncate">{ad}</span><span className="font-semibold text-yazi tabular-nums">{typeof tutar === "number" ? `₺${fmt(tutar)}` : tutar}</span>
                 </div>
               );
+              const odemeAdi: Record<string, string> = { nakit: "kasadan", gecmis: "eski nakitten", pos: "POS", diger: "diğer" };
+              const giderDetay = (<>
+                {giderler.filter(g => tv(g.tutar) > 0 && odemeOf(g) !== "gecmis").map(g => dS(<>{g.tip === "personel" ? `Personel yemeği · ${g.personelIsim || ""} ${g.aciklama ? "· " + g.aciklama : ""}` : g.aciklama || "(açıklamasız)"} <span className="text-gray-500 text-[12px]">({odemeAdi[odemeOf(g)] || odemeOf(g)})</span></>, tv(g.tutar), `g${g.id}`))}
+                {!giderler.some(g => tv(g.tutar) > 0 && odemeOf(g) !== "gecmis") && <p className="text-gray-500">Gider girilmemiş.</p>}
+              </>);
+              const gecmisDetay = (<>
+                {giderler.filter(g => tv(g.tutar) > 0 && odemeOf(g) === "gecmis").map(g => dS(g.aciklama || "(açıklamasız)", tv(g.tutar), `e${g.id}`))}
+              </>);
+              const kartDetay = (<>
+                {YEMEK_KARTLARI.filter(k => tv(kartlar[k.alan]) > 0).map(k => dS(`Kasa · ${k.ad}`, tv(kartlar[k.alan]), k.alan))}
+                {ch.tKuryeTokenFlex > 0 && dS("Kurye · Token Flex", ch.tKuryeTokenFlex)}
+                {ch.tKuryePaye > 0 && dS("Kurye · Paye", ch.tKuryePaye)}
+              </>);
+              let sN = 0;
+              const kuryeDetay = (<>
+                {ch.kuryelerHesap.filter(k => k.gercekPaket > 0 || tv(k.nakit) + tv(k.pos) > 0).map(k =>
+                  dS(`${k.tip === "havuz" ? "Havuz" : `Sabit ${++sN}`}${k.isim ? " · " + k.isim : ""} — ${k.gercekPaket} pk`, `nakit ₺${fmt(tv(k.nakit))} · POS ₺${fmt(tv(k.pos))}${tv(k.tokenflex) + tv(k.paye) > 0 ? ` · kart ₺${fmt(tv(k.tokenflex) + tv(k.paye))}` : ""}`, `k${k.id}`))}
+                <div className="pt-1 font-semibold">{dS("Kapıda satış (MagicPay / tablo)", ch.tKapida, "ks")}{dS("Kuryelerin getirdiği", ch.tKuryeNakit + ch.tKuryePos + ch.tKuryeKart, "kg")}</div>
+              </>);
               const ayrintiAc = () => { setAyrinti(true); setTimeout(() => document.getElementById(isReadOnly ? "adim-1" : "adim-4-ayrinti")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); };
               return (<>
                 <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
                   {satir(mpDoldurma || isReadOnly ? "tamam" : "uyari", "Satışlar", `₺${fmt(ch.tOnline + ch.tKapida)}`,
                     `${isReadOnly ? "" : mpDoldurma ? "MagicPay'den geldi · " : "MagicPay'den gelmedi — ayrıntılardan elle girin · "}Online ₺${fmt(ch.tOnline)} · Kapıda ₺${fmt(ch.tKapida)} · ${paket} paket`,
-                    mpDoldurma ? undefined : ayrintiAc, "Aç")}
+                    mpDoldurma ? undefined : ayrintiAc, "Aç",
+                    <>{dS("Online (platform)", ch.tOnline)}{dS("· Kebo", ch.tOnlineKebo)}{dS("· Chick'N", ch.tOnlineCnf)}{dS("· Kıraloğlu", ch.tOnlineKir)}
+                      {dS("Kapıda", ch.tKapida)}{dS("Paket", `${paket}`)}</>)}
                   {satir(indirimSorun ? "uyari" : "tamam", "Platform indirimi", `₺${fmt(ch.tIndirim)}`,
                     !isReadOnly && mpIndirimDurum === "hata" ? "MagicPay'den alınamadı — elle girin"
                       : !isReadOnly && indirimFarklari.length > 0 ? "MagicPay'deki değerden farklı girildi"
                       : ch.indirimUyari ? `Online cironun %${ch.indirimOrani.toFixed(1)}'i — %15'i geçti, kontrol edin`
                       : `Online cironun %${ch.indirimOrani.toFixed(1)}'i`,
-                    indirimSorun ? ayrintiAc : undefined, "Bak")}
+                    indirimSorun ? ayrintiAc : undefined, "Bak",
+                    <>{dS("Yemeksepeti", ch.tIndirimYS)}{dS("Trendyol", ch.tIndirimTrendyol)}{dS("Diğer", Math.max(0, ch.tIndirim - ch.tIndirimYS - ch.tIndirimTrendyol))}</>)}
                   {satir(nakitFarkVar ? "uyari" : "tamam", "Kasa", `₺${fmt(ch.tKasa)}`,
                     `Nakit ₺${fmt(tv(kasaNakit))} · POS ₺${fmt(tv(kasaPos))}` + (nakitFarkVar && nakitFarki != null
                       ? ` · Nakit, MagicPay'e göre ₺${fmt(Math.abs(nakitFarki))} ${nakitFarki < 0 ? "EKSİK" : "FAZLA"} (nakit giderler düşüldü)` : ""),
-                    () => adimaGit(1), nakitFarkVar ? "Nakde git" : "Düzelt")}
-                  {satir("tamam", "Gider", `₺${fmt(ch.tGider + ch.tGiderGecmis)}`,
-                    [`Nakit ₺${fmt(ch.tGiderNakit)}`, ch.tGiderGecmis > 0 ? `geçmiş günlerin nakiti ₺${fmt(ch.tGiderGecmis)}` : "", ch.tGiderNakitDisi > 0 ? `POS / diğer ₺${fmt(ch.tGiderNakitDisi)}` : ""].filter(Boolean).join(" · "),
-                    () => adimaGit(2), "Düzelt")}
+                    () => adimaGit(1), nakitFarkVar ? "Nakde git" : "Düzelt",
+                    <>{dS("Nakit (sayılan)", tv(kasaNakit))}{dS("POS", tv(kasaPos))}{kartDetay}</>)}
+                  {satir("tamam", "Gider", `₺${fmt(ch.tGider)}`,
+                    [`Nakit ₺${fmt(ch.tGiderNakit)}`, ch.tGiderNakitDisi > 0 ? `POS / diğer ₺${fmt(ch.tGiderNakitDisi)}` : ""].filter(Boolean).join(" · "),
+                    () => adimaGit(2), "Düzelt", giderDetay)}
+                  {ch.tGiderGecmis > 0 && satir("tamam", "Eski nakitten ödenen", `₺${fmt(ch.tGiderGecmis)}`,
+                    "Bugünün cirosunu etkilemez", () => adimaGit(2), "Düzelt", gecmisDetay)}
                   {satir(ch.kuryeFark === 0 ? "tamam" : "uyari", "Kurye", ch.kuryeFark === 0 ? "Dengede" : ch.kuryeFark > 0 ? `₺${fmt(ch.kuryeFark)} eksik` : `₺${fmt(Math.abs(ch.kuryeFark))} fazla`,
                     ch.kuryeFark === 0 ? "Kapıda toplanan para kuryelerin teslim ettiğiyle aynı" : "Kapıda satış ile kuryelerin getirdiği tutmuyor",
-                    () => adimaGit(3), ch.kuryeFark === 0 ? "Düzelt" : "Kuryeye git")}
+                    () => adimaGit(3), ch.kuryeFark === 0 ? "Düzelt" : "Kuryeye git", kuryeDetay)}
                   {ch.tIade > 0 && (() => {
                     const dolu = iadeler.filter(i => tv(i.tutar) > 0);
                     const eksikSayi = dolu.filter(i => iadeEksikAdim(i.iade || {}) !== null).length;
                     const ozet = dolu.map(i => `${iadeEtiketi(i.iade || {}) || "ayrıntısız"} ₺${fmt(tv(i.tutar))}`).join(" · ");
                     return satir(eksikSayi > 0 ? "uyari" : "tamam", "İptal / iade", `₺${fmt(ch.tIade)}`,
                       eksikSayi > 0 ? `${eksikSayi} fişin ayrıntısı seçilmemiş (fiş / marka / kanal / ödeme) · ${ozet}` : ozet,
-                      () => adimaGit(2), "Düzelt");
+                      () => adimaGit(2), "Düzelt",
+                      <>{dolu.map(i => dS(iadeEtiketi(i.iade || {}) || i.aciklama || "ayrıntısız", tv(i.tutar), `i${i.id}`))}</>);
                   })()}
-                  {yemekKarti > 0 && satir("tamam", "Yemek kartı", `₺${fmt(yemekKarti)}`, "Dükkân + kuryelerin aldığı kartlar · bankaya yatar")}
+                  {yemekKarti > 0 && satir("tamam", "Yemek kartı", `₺${fmt(yemekKarti)}`, "Dükkân + kuryelerin aldığı kartlar · bankaya yatar", undefined, undefined, kartDetay)}
                   {satir(sayimFark == null ? "bos" : Math.abs(sayimFark) < 1 || oncekiSayimVar === false ? "tamam" : "uyari", "Biriken nakit sayımı",
                     sayim == null ? "—" : `₺${fmt(sayim)}`,
                     sayim == null ? "Sayılmadıysa boş bırakın (isteğe bağlı)"
@@ -3460,7 +3538,7 @@ export default function RaporlarPage() {
                     )}
                     {nakitHareketYuklendi && (
                       <div className="space-y-2">
-                        <p className="text-[12px] font-semibold text-gray-700">Bankaya yatırılan <span className="font-normal text-gray-500">(eski nakitten ödemeler Gider adımında &quot;Geçmiş günlerin nakiti&quot; ile girilir{ch.tGiderGecmis > 0 ? `: ₺${fmt(ch.tGiderGecmis)}` : ""})</span></p>
+                        <p className="text-[12px] font-semibold text-gray-700">Bankaya yatırılan <span className="font-normal text-gray-500">(eski nakitten ödemeler Gider adımında &quot;Eski günlerin nakitinden ödenen&quot; bölümüne girilir{ch.tGiderGecmis > 0 ? `: ₺${fmt(ch.tGiderGecmis)}` : ""})</span></p>
                         {nakitHareketleri.map(h => (
                           <div key={h.id} className="grid grid-cols-[1fr_110px] md:grid-cols-[1fr_150px_140px_28px] gap-2 items-center">
                             <input type="text" placeholder="Kime / ne için" disabled={isReadOnly} value={h.aciklama}
@@ -3751,8 +3829,9 @@ export default function RaporlarPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-gray-800">Kapanış Arşivi</h3>
-                  <p className="text-[10px] text-gray-600">
+                  <p className="text-[12px] text-gray-600">
                     {AYLAR.find(m=>m.value===secilenAy)?.label} {secilenYil} · {raporlar.length} rapor
+                    {arsivEksik.length > 0 && <span className="text-amber-300 font-semibold"> · ⚠ {arsivEksik.length} gün rapor yok: {gunAraligiYaz(arsivEksik)} (toplamlara girmez)</span>}
                   </p>
                 </div>
               </div>
@@ -3804,6 +3883,7 @@ export default function RaporlarPage() {
                         <td className="px-4 py-3.5 font-semibold text-gray-700 group-hover:text-blue-400 transition-colors">
                           {fmtTarih(rapor.tarih)}
                           {(rapor.gider_aciklama?.includes("|| NOT:") || rapor.gider_aciklama?.startsWith("NOT:")) && <span className="ml-1.5 text-[9px] text-blue-700/60 bg-blue-500/10 px-1.5 py-0.5 rounded-full">Not</span>}
+                          {arsivUyari.get(rapor.tarih) && <span title={arsivUyari.get(rapor.tarih)!.join(" · ")} className="ml-1.5 text-[11px] font-semibold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded-full">⚠ {arsivUyari.get(rapor.tarih)!.join(" · ")}</span>}
                         </td>
                         <td className="px-4 py-3.5 text-blue-400 font-semibold">₺{fmt(brutCiro)}</td>
                         <td className="px-4 py-3.5 text-emerald-400 font-black">₺{fmt(net)}</td>

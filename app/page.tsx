@@ -1,5 +1,6 @@
 "use client";
 
+import { eksikGunler, gunAraligiYaz } from "@/lib/raporKontrol";
 import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
@@ -54,7 +55,7 @@ export default function Anasayfa() {
   const [d, setD] = useState({
     aktifPersonel: 0, kurye: 0, mutfak: 0, banko: 0, eksikBelge: 0,
     bugunRapor: false, bugunCiro: 0, bugunNet: 0, bugunPaket: 0, bugunTarih: "",
-    aylikCiro: 0, aylikNet: 0, aylikIade: 0, aylikGider: 0, donemRapor: 0,
+    aylikCiro: 0, aylikNet: 0, aylikIade: 0, aylikGider: 0, donemRapor: 0, eksikGun: [] as string[],
     enYuksek: 0, gunOrt: 0,
     cariOdenecek: 0, cariGeciken: 0, cariVade: "",
   });
@@ -140,6 +141,7 @@ export default function Anasayfa() {
         bugunRapor: !!bugunData, bugunTarih: gunRapor?.tarih || "",
         bugunCiro: g?.brut || 0, bugunNet: g?.net || 0, bugunPaket: g?.paket || 0,
         aylikCiro: ay.brut, aylikNet: ay.net, aylikIade: ay.iade, aylikGider: ay.gider, donemRapor: ay.gunSayisi,
+        eksikGun: eksikGunler(((aylik || []) as RaporVerisi[]).map(r => r.tarih), bugunStr.slice(0, 7), bugunStr),
         enYuksek: ay.enYuksekBrut, gunOrt: ay.gunSayisi > 0 ? Math.round(ay.brut / ay.gunSayisi) : 0,
         cariOdenecek, cariGeciken, cariVade: donem.vadeStr,
       });
@@ -170,12 +172,14 @@ export default function Anasayfa() {
   const degisim = (a?: number, b?: number) => (a != null && b != null && b > 0 ? ((a - b) / b) * 100 : null);
 
   const kpiler: Kpi[] = [
-    { ad: "Aylık Brüt Ciro", deger: d.aylikCiro, renk: "#d9b866", simge: BarChart3, seri: seri.map(x => x.brut),
-      yuzde: degisim(son?.brut, onceki?.brut), alt: onceki ? `Önceki gün: ₺${fmt(onceki.brut)}` : `${d.donemRapor} rapor` },
-    { ad: "Aylık Net Ciro", deger: d.aylikNet, renk: "#60a5fa", simge: Wallet, seri: seri.map(x => x.net),
-      yuzde: degisim(son?.net, onceki?.net), alt: onceki ? `Önceki gün: ₺${fmt(onceki.net)}` : `Ort. ${fmtK(d.gunOrt)}/gün` },
+    { ad: `Bu ay brüt ciro · ${d.donemRapor} gün`, deger: d.aylikCiro, renk: "#d9b866", simge: BarChart3, seri: seri.map(x => x.brut),
+      yuzde: degisim(son?.brut, onceki?.brut),
+      alt: d.eksikGun.length ? `⚠ ${d.eksikGun.length} gün rapor yok (${gunAraligiYaz(d.eksikGun)})` : onceki ? `Son gün ₺${fmt(son!.brut)} · önceki ₺${fmt(onceki.brut)}` : `${d.donemRapor} rapor`,
+      altUyari: d.eksikGun.length > 0 },
+    { ad: `Bu ay net ciro · ${d.donemRapor} gün`, deger: d.aylikNet, renk: "#60a5fa", simge: Wallet, seri: seri.map(x => x.net),
+      yuzde: degisim(son?.net, onceki?.net), alt: onceki ? `Son gün ₺${fmt(son!.net)} · önceki ₺${fmt(onceki.net)}` : `Ort. ${fmtK(d.gunOrt)}/gün` },
     { ad: "Aktif Kadro", deger: d.aktifPersonel, renk: "#c084fc", simge: Users, birim: " kişi",
-      alt: `${d.kurye} kurye · ${d.mutfak} mutfak · ${d.banko} banko` },
+      alt: `${d.kurye} kurye · ${d.mutfak} mutfak · ${d.banko} banko${d.aktifPersonel - d.kurye - d.mutfak - d.banko > 0 ? ` · ${d.aktifPersonel - d.kurye - d.mutfak - d.banko} bölümsüz` : ""}` },
     ...(cariOkundu ? [{ ad: "Cari Ödenecek", deger: d.cariOdenecek, renk: "#f87171", simge: Building2,
       alt: d.cariGeciken > 0 ? `${fmtK(d.cariGeciken)} gecikmiş` : `Vade: ${d.cariVade}`, uyari: d.cariGeciken > 0 }] : []),
   ];
@@ -338,7 +342,7 @@ export default function Anasayfa() {
               <div className="mt-5 grid grid-cols-2 gap-2.5">
                 {[
                   { l: "En Yüksek Gün", v: d.enYuksek, s: TrendingUp },
-                  { l: "Günlük Ortalama", v: d.gunOrt, s: CalendarDays },
+                  { l: `Günlük ortalama (${d.donemRapor} rapor)`, v: d.gunOrt, s: CalendarDays },
                 ].map(i => (
                   <div key={i.l} className="flex items-center gap-2.5 rounded-xl border border-cizgi bg-white/[0.02] px-3 py-2.5">
                     <i.s className="h-4 w-4 text-gray-500 shrink-0" />
@@ -432,7 +436,7 @@ const OGE: Variants = {
 
 interface Kpi {
   ad: string; deger: number; renk: string; simge: typeof Users; alt: string;
-  seri?: number[]; yuzde?: number | null; birim?: string; uyari?: boolean;
+  seri?: number[]; yuzde?: number | null; birim?: string; uyari?: boolean; altUyari?: boolean;
 }
 
 function KpiKarti({ k }: { k: Kpi }) {
@@ -456,7 +460,7 @@ function KpiKarti({ k }: { k: Kpi }) {
             {k.yuzde >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}%{Math.abs(k.yuzde).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}
           </span>
         )}
-        <span className={`text-[11px] truncate ${k.uyari ? "text-red-300" : "text-gray-500"}`}>{k.alt}</span>
+        <span title={k.alt} className={`text-[11px] truncate ${k.uyari ? "text-red-300" : k.altUyari ? "text-amber-300 font-semibold" : "text-gray-500"}`}>{k.alt}</span>
       </div>
     </motion.div>
   );
