@@ -4,7 +4,7 @@
 // Bu dosyadaki fonksiyonlar saf (yan etkisiz) — veritabanı erişimi bileşende yapılır.
 //
 // İş kuralları (kullanıcıdan):
-// - POS satışı ERTESİ GÜN VakıfBank'a %1,99 komisyon düşülerek yatar. Hafta sonu/tatil
+// - POS satışı ERTESİ GÜN VakıfBank'a %2 komisyon düşülerek yatar (31.10: kullanıcı %2 dedi). Hafta sonu/tatil
 //   kuralı bilinmediğinden beklenen tarih = ertesi takvim günü, eşleştirmede ±2 gün tolerans.
 //   Hafta sonu satışlarının pazartesi tek kalemde yatması ihtimaline karşı ardışık 2-3 günün
 //   toplamı da tek yatışla eşleştirilebilir.
@@ -14,7 +14,7 @@
 import { gunEkle, gunFarki } from "@/lib/tarih";
 import { YEMEK_KARTI_ADLARI, yemekKartiSatislari, type YemekKartiAdi } from "@/lib/hesap";
 
-export const POS_KOMISYON_ORANI = 0.0199;
+export const POS_KOMISYON_ORANI = 0.02;
 export const POS_BANKA_HESABI = "VakıfBank";
 export const POS_KATEGORI = "POS / Kart Tahsilatı";
 export const YEMEK_KARTI_KATEGORI = "Yemek Kartı Tahsilatı";

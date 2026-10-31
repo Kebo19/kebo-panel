@@ -21,6 +21,7 @@ import {
   ROADRUNNER_GECIS_GUNU, KENDI_POS_GECIS_GUNU, kuryeTahsilati, roadrunnerTahsilati, roadrunnerGunOzeti, RR_POS_KOMISYON_ORANI, KURYE_GARANTI_PAKET, YEMEK_KARTLARI, type YemekKartiAlani,
 } from "@/lib/hesap";
 import { POS_KOMISYON_ORANI } from "@/lib/mutabakat";
+import { KASA_BASLANGIC } from "@/lib/devir";
 import { useYetki } from "@/lib/useYetki";
 import { slotToplami, atamaBul, adEslesir, paketKontrolu, type RoketGun } from "@/lib/roket";
 import { eksikGunler, gunAraligiYaz, raporUyarilari } from "@/lib/raporKontrol";
@@ -1172,13 +1173,15 @@ export default function RaporlarPage() {
     if (!tarih || !/^\d{4}-\d{2}-\d{2}$/.test(tarih)) { setNakitDevredenSistem(null); setOncekiSayimVar(null); return; }
     let iptal = false;
     (async () => {
-      const [{ data: bakiye }, { data: onceki }] = await Promise.all([
+      const [{ data: bakiye }, { data: onceki }, { data: acilis }] = await Promise.all([
         supabase.rpc("nakit_kasa_bakiyesi", { p_tarih: tarih }),
-        supabase.from("gunluk_raporlar").select("id").not("nakit_kasa_sayim", "is", null).lt("tarih", tarih).limit(1),
+        supabase.from("gunluk_raporlar").select("id").not("nakit_kasa_sayim", "is", null).gte("tarih", KASA_BASLANGIC).lt("tarih", tarih).limit(1),
+        supabase.from("kasa_manuel_islemler").select("id").eq("hesap", "Nakit").in("kategori", ["Açılış bakiyesi", "Nakit kasa açılış", "Kasa sayım farkı"]).gte("islem_tarihi", KASA_BASLANGIC).lte("islem_tarihi", tarih).limit(1),
       ]);
       if (iptal) return;
       setNakitDevredenSistem(bakiye == null ? null : Number(bakiye));
-      setOncekiSayimVar(!!onceki?.length);
+      // 31.10: 1 Kasım açılışı girildiyse ilk sayım değildir (bakiye zaten açılışla başladı)
+      setOncekiSayimVar(!!onceki?.length || !!acilis?.length);
     })();
     return () => { iptal = true; };
   }, [tarih, supabase]);

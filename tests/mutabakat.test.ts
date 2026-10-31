@@ -6,8 +6,8 @@ import {
 const h = (id: number, tarih: string, tutar: number, aciklama = "") => ({ id, tarih, tutar, aciklama });
 
 describe("POS temel hesaplar", () => {
-  it("beklenen yatış %1,99 komisyon düşülür", () => {
-    expect(posBeklenenYatis(10000)).toBe(9801);
+  it("beklenen yatış %2 komisyon düşülür", () => {
+    expect(posBeklenenYatis(10000)).toBe(9800);
   });
   it("tutar toleransı ±%0,5 veya ±5 TL", () => {
     expect(tutarTutarMi(9805, 9801)).toBe(true);    // 4 TL
@@ -19,11 +19,11 @@ describe("POS temel hesaplar", () => {
 
 describe("posMutabakati", () => {
   it("ertesi gün yatan tutarı eşleştirir, komisyonu hesaplar", () => {
-    const s = posMutabakati([{ tarih: "2026-09-01", pos: 10000 }], [h(1, "2026-09-02", 9801)], "2026-09-10");
+    const s = posMutabakati([{ tarih: "2026-09-01", pos: 10000 }], [h(1, "2026-09-02", 9800)], "2026-09-10");
     expect(s.satirlar[0].durum).toBe("tuttu");
     expect(s.satirlar[0].fark).toBe(0);
-    expect(s.toplamYatan).toBe(9801);
-    expect(s.gerceklesenKomisyon).toBe(199);
+    expect(s.toplamYatan).toBe(9800);
+    expect(s.gerceklesenKomisyon).toBe(200);
     expect(s.hareketVar).toBe(true);
   });
 
@@ -58,7 +58,7 @@ describe("posMutabakati", () => {
   it("düşük yatış → Eksik, fark negatif", () => {
     const s = posMutabakati([{ tarih: "2026-09-01", pos: 10000 }], [h(1, "2026-09-02", 9000)], "2026-09-10");
     expect(s.satirlar[0].durum).toBe("eksik");
-    expect(s.satirlar[0].fark).toBe(-801);
+    expect(s.satirlar[0].fark).toBe(-800);
   });
 
   it("yatış yoksa: süre dolmadıysa Bekliyor, dolduysa Kayıt yok", () => {

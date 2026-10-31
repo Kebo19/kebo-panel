@@ -13,6 +13,10 @@
 // 300 bini de ödedi → borç 0'a indi (300 bin azaldı) → elde kalan 400 − 300 = 100 bin.
 
 export const KULLANIM_BASLANGIC = "2026-10-01";
+/** Kasa ve banka bakiyelerinin sayıldığı ilk gün (31.10.2026: Ekim deneme ayı, canlı geçiş 1 Kasım).
+ *  Bu tarihten önceki kasa raporları ve kasa hareketleri arşivde kalır, bakiyeye girmez.
+ *  Veritabanındaki karşılığı: public.kasa_baslangic(). */
+export const KASA_BASLANGIC = "2026-11-01";
 export const BASLANGIC_AYI = KULLANIM_BASLANGIC.slice(0, 7);
 
 /** "YYYY-AA" program kullanımdayken mi? (başlangıç ayı ve sonrası) */

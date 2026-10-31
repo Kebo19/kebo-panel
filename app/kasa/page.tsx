@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 import { tv, paraGirdisi } from "@/lib/para";
 import { bugun, buAyYil, gunEkle, fmtTarih as tarihYaz } from "@/lib/tarih";
 import { donemOzeti as raporDonemOzeti, yemekKartiToplam, kuryeTahsilati, type RaporVerisi } from "@/lib/hesap";
-import { KASA_GIDER_KATEGORILERI, TUM_KASA_GIDER_KATEGORILERI, KASA_GELIR_KATEGORILERI, TAHSILAT_KATS, TRANSFER_KATEGORISI } from "@/lib/karZarar";
+import { KASA_GIDER_KATEGORILERI, TUM_KASA_GIDER_KATEGORILERI, KASA_GELIR_KATEGORILERI, TAHSILAT_KATS, TRANSFER_KATEGORISI, ACILIS_KATS, ACILIS_KATEGORISI } from "@/lib/karZarar";
+import { KASA_BASLANGIC } from "@/lib/devir";
+import KasaAcilisi from "@/components/KasaAcilisi";
 import { hepsiniCek } from "@/lib/hepsiniCek";
 import SabitGiderler from "@/components/SabitGiderler";
 import EkstreYukle from "@/components/EkstreYukle";
@@ -14,7 +16,7 @@ import { KrediKartlariPaneli, KartAyarPenceresi, YemekKartiPaneli } from "@/comp
 import StokDegerPaneli from "@/components/StokDegerPaneli";
 import { krediKartiDurumu, yemekKartiAlacaklari, VARSAYILAN_KARTLAR, type KrediKarti } from "@/lib/kasaHesaplari";
 import { YEMEK_KARTI_ADLARI } from "@/lib/hesap";
-import { YEMEK_KARTI_KATEGORI, yemekKartiBul } from "@/lib/mutabakat";
+import { YEMEK_KARTI_KATEGORI, yemekKartiBul, posMutabakati, POS_KATEGORI, POS_BANKA_HESABI } from "@/lib/mutabakat";
 import Link from "next/link";
 import {
   PlusCircle, Building2, Coins,
@@ -52,7 +54,7 @@ const HESAP_LABEL: Record<string, string> = { Nakit: "Nakit Kasa", TEB: "TEB", V
 const HESAP_COLOR: Record<string, string> = { Nakit: "#3B82F6", TEB: "#10B981", VakıfBank: "#F59E0B", Enpara: "#8B5CF6",
   "TEB Kredi Kartı": "#34d399", "Enpara Kredi Kartı": "#c084fc" };
 /** Kredi kartı borç/limit takibinin başladığı gün (yemek kartı alacakları da bu günden sayılır) */
-const KART_BASLANGIC = "2026-10-01";
+const KART_BASLANGIC = KASA_BASLANGIC;
 const varsayilanKart = (ad: string, i: number): KrediKarti => ({
   id: "", ad, banka: ad.split(" ")[0], kart_limiti: 0, hesap_kesim_gunu: null, son_odeme_gunu: null,
   acilis_borcu: 0, acilis_tarihi: KART_BASLANGIC, aktif: true, sira: i,
@@ -217,6 +219,24 @@ export default function KasaPage() {
     return true;
   }), [manuelIslemler,secilenAy,secilenYil,tipFiltre,aramaMetni]);
 
+  // ── POS: bankaya henüz yatışı görünmeyen (ekstre yüklenmemiş) günlerin beklenen tutarı ──
+  // 31 Ekim'in POS'u 1 Kasım'da yatar → başlangıçtan bir gün öncesinin raporu da dahil.
+  const posBekleyen = useMemo(() => {
+    const ilk = gunEkle(KASA_BASLANGIC, -1);
+    const m = posMutabakati(
+      raporlar.filter(r => r.tarih >= ilk).map(r => ({ tarih: r.tarih, pos: (Number(r.kasa_pos) || 0) + kuryeTahsilati(r as unknown as RaporVerisi).pos })),
+      manuelIslemler.filter(i => i.tip === "gelir" && i.kategori === POS_KATEGORI && i.hesap === POS_BANKA_HESABI && i.islem_tarihi >= KASA_BASLANGIC)
+        .map(i => ({ id: i.id, tarih: i.islem_tarihi, tutar: Number(i.tutar) || 0, hesap: i.hesap, kategori: i.kategori })),
+      bugun(),
+    );
+    const bekleyen = m.satirlar.filter(x => x.gerceklesen === null);
+    // Tarihi/tutarı tutmadığı için eşleşmeyen POS yatışları da bekleyenden düşülür (geç ya da birleşik
+    // yatış iki kez sayılmasın); fark POS mutabakatında görünür.
+    const eslesmeyenYatis = m.eslesmeyenHareketler.reduce((t, h) => t + h.tutar, 0);
+    const toplam = Math.max(0, bekleyen.reduce((t, x) => t + x.beklenen, 0) - eslesmeyenYatis);
+    return { toplam: Math.round(toplam * 100) / 100, gun: bekleyen.length };
+  }, [raporlar, manuelIslemler]);
+
   // ── Bakiyeler ──
   // Nakit Kasa = raporlardaki nakit sayımları (günlük giderler zaten ödenmiş halde) + manuel hareketler.
   // Banka hesapları = manuel hareketler. Personel avansı ve cari ödemeleri bir hesaptan
@@ -224,9 +244,14 @@ export default function KasaPage() {
   // POS ve yemek kartı tutarları bankaya geçene kadar hiçbir hesaba eklenmez.
   const bakiyeler = useMemo(() => {
     const b: Record<string, number> = { Nakit: 0, TEB: 0, VakıfBank: 0, Enpara: 0 };
-    // 28.09'dan itibaren kuryelerin kapıda topladığı nakit de kasaya girer.
-    raporlar.forEach(r => { b.Nakit += (Number(r.kasa_nakit)||0) + kuryeTahsilati(r as unknown as RaporVerisi).nakit; });
+    // 31.10: bakiyeler KASA_BASLANGIC'tan (1 Kasım) sayılır; Ekim deneme verisi arşivde.
+    // Sabit kuryelerin kapıda topladığı nakit de kasaya girer.
+    raporlar.forEach(r => { if (r.tarih >= KASA_BASLANGIC) b.Nakit += (Number(r.kasa_nakit)||0) + kuryeTahsilati(r as unknown as RaporVerisi).nakit; });
+    // POS (dükkân + sabit kuryeler) ertesi gün %2 komisyonla VakıfBank'a otomatik işlenir. Ekstre yüklenip
+    // gerçek yatış eşleşince beklenen tutar yerine gerçek tutar sayılır → çift kayıt olmaz.
+    b[POS_BANKA_HESABI] += posBekleyen.toplam;
     manuelIslemler.forEach(i => {
+      if (i.islem_tarihi < KASA_BASLANGIC) return;
       const m = Number(i.tutar)||0;
       if (i.tip==="gelir" && i.hesap in b) b[i.hesap] += m;
       else if (i.tip==="gider" && i.hesap in b) b[i.hesap] -= m;
@@ -236,7 +261,7 @@ export default function KasaPage() {
       }
     });
     return b as {Nakit:number;TEB:number;VakıfBank:number;Enpara:number};
-  }, [raporlar,manuelIslemler]);
+  }, [raporlar,manuelIslemler,posBekleyen]);
 
   // ── Kredi kartları ve yemek kartı alacakları ──
   const kartDurumlari = useMemo(() => krediKartlari.map(k => krediKartiDurumu(k, manuelIslemler, bugun())), [krediKartlari, manuelIslemler]);
@@ -255,7 +280,7 @@ export default function KasaPage() {
   // "Nakit kasa açılış": ilk gün sonu sayımında geçmiş bakiyenin düzeltilmesidir; gerçek gelir/gider
   // değildir, bakiyeyi düzeltir ama kâr/zarar ve gider dağılımına girmez.
   // "Hesaplar arası transfer" (ekstreden gelir/gider olarak gelen kendi hesaplarımız arası hareket) de kâr/zarar dışı.
-  const karHaric = (i: { kategori?: string }) => i.kategori === "Nakit kasa açılış" || i.kategori === TRANSFER_KATEGORISI;
+  const karHaric = (i: { kategori?: string }) => ACILIS_KATS.has(i.kategori || "") || i.kategori === TRANSFER_KATEGORISI;
   const aylikSonuc = useMemo(() => {
     const o = raporDonemOzeti(filtreliRaporlar);
     const aylikManuel = manuelIslemler.filter(i => i.islem_tarihi?.slice(0,7) === `${secilenYil}-${secilenAy}`);
@@ -333,8 +358,8 @@ export default function KasaPage() {
     try {
       const [{ data: bakiye, error }, { data: oncekiKasa }, { data: oncekiRapor }] = await Promise.all([
         supabase.rpc("nakit_kasa_bakiyesi", { p_tarih: gunEkle(sTarih, 1) }),
-        supabase.from("kasa_manuel_islemler").select("id").in("kategori", ["Kasa sayım farkı", "Nakit kasa açılış"]).lte("islem_tarihi", sTarih).limit(1),
-        supabase.from("gunluk_raporlar").select("id").not("nakit_kasa_sayim", "is", null).lte("tarih", sTarih).limit(1),
+        supabase.from("kasa_manuel_islemler").select("id").eq("hesap", "Nakit").in("kategori", ["Kasa sayım farkı", "Nakit kasa açılış", ACILIS_KATEGORISI]).gte("islem_tarihi", KASA_BASLANGIC).lte("islem_tarihi", sTarih).limit(1),
+        supabase.from("gunluk_raporlar").select("id").not("nakit_kasa_sayim", "is", null).gte("tarih", KASA_BASLANGIC).lte("tarih", sTarih).limit(1),
       ]);
       if (error) { alert("Hata: " + error.message); return; }
       const beklenen = Number(bakiye) || 0;
@@ -464,6 +489,9 @@ export default function KasaPage() {
 
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-5 space-y-5">
 
+        {/* ── 1 KASIM AÇILIŞI: hesap bakiyeleri + kredi kartı borçları (bir kez girilir, düzeltilebilir) ── */}
+        <KasaAcilisi islemler={manuelIslemler} kartlar={krediKartlari.filter(k => k.id)} onKaydedildi={() => veriCek(true)}/>
+
         {/* ── HESAP BAKİYE KARTLARI ── */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           {HESAPLAR.map(h => {
@@ -483,7 +511,7 @@ export default function KasaPage() {
                   <div className="flex items-end justify-between gap-2">
                     <div>
                       <p className="text-lg font-black tracking-tight" style={{color}}>₺{fmt2(bakiye)}</p>
-                      <p className="text-[9px] text-gray-600 mt-0.5">{h==="Nakit"?"kasada olması gereken":"hesap hareketleri"}</p>
+                      <p className="text-[9px] text-gray-600 mt-0.5">{h==="Nakit"?"kasada olması gereken":h===POS_BANKA_HESABI && posBekleyen.toplam > 0 ? `₺${fmt2(posBekleyen.toplam)} POS dahil (ekstre gelince kesinleşir)` : "hesap hareketleri"}</p>
                     </div>
                     <Sparkline values={sparkVals.filter(v=>v>0)} color={color}/>
                   </div>
