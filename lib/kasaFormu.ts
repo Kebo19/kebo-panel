@@ -272,6 +272,11 @@ export function sayimSayfalari(urunler: KagitUrunu[], periyot: SayimPeriyodu, to
   for (let i = 0; i < satirlar.length; i += SAYFA_SATIR) sayfalar.push(satirlar.slice(i, i + SAYFA_SATIR));
   // Son sayfada kural + notlar için yer kalsın
   if (sayfalar.length && sayfalar[sayfalar.length - 1].length > SAYFA_SATIR - 6) sayfalar.push([]);
+  // Son sayfa boş satırlarla sayfa sonuna kadar uzar (kural + kısa not alanına yer bırakır) — 31.10
+  const son = sayfalar[sayfalar.length - 1];
+  const bosSatirHtml = `<tr><td class="no"></td><td class="ad"></td><td class="br"></td>${bosHucre}</tr>`;
+  if (son && !son.length) son.push(`<tr class="marka"><td colspan="${sutun}">LİSTEDE OLMAYANLAR (devam)</td></tr>`);
+  while (son && son.length < SAYFA_SATIR - 3) son.push(bosSatirHtml);
   const ad = PERIYOT_ADI[periyot];
   const kural = env ? "Her demirbaşın kaç adet olduğunu ve arızalı/kayıp olanları yazın. Listede olmayanı boş satırlara ekleyin."
     : "Sabah ya da akşam sayımından en az biri yeterlidir. Koli/kova sayıyorsanız birime çevirin (ör. 2 koli tavuk döner = 20 kg). Sayılmayan ürünün kutusunu boş bırakın — sıfır yazmayın (0 = stok bitti demektir). Listede olmayan ürünü boş satırlara adı ve birimiyle yazın. Rakamları net yazın; her sayfa ayrı fotoğraflanıp sisteme girilir.";

@@ -6,7 +6,7 @@
 // Değişiklikler önce ekranda tutulur, "Kaydet" ile tek seferde yazılır.
 // Sayım listeleri birikimlidir: haftalık liste = günlük + haftalık, aylık = günlük + haftalık + aylık.
 // Envanter (demirbaş) ayrı listedir; tüketim/sipariş hesaplarına girmez, ara sıra sayılır.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useYetki } from "@/lib/useYetki";
@@ -69,6 +69,14 @@ export default function StokListePage() {
 
   // Değişiklik takibi
   const degisenler = useMemo(() => satirlar.filter(s => s.yeni ? s.urun_adi.trim() : !ayni(s, orijinal.get(s.id)!)), [satirlar, orijinal]);
+  // Kaydedilmemiş değişiklikle sayfadan çıkılırsa tarayıcı uyarsın (31.10: düzenlemeler kaydedilmeden kalıyordu)
+  const cikisSerbest = useRef(false);
+  useEffect(() => {
+    if (!degisenler.length) return;
+    const uyar = (e: BeforeUnloadEvent) => { if (cikisSerbest.current) return; e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", uyar);
+    return () => window.removeEventListener("beforeunload", uyar);
+  }, [degisenler.length]);
   const degisti = useCallback((id: string) => {
     const s = satirlar.find(x => x.id === id);
     return !!s && (s.yeni || !ayni(s, orijinal.get(id)!));
@@ -141,6 +149,7 @@ export default function StokListePage() {
   /** Yazdır / PDF: kaydedilmemiş değişiklik varsa önce kaydeder, sonra güncel listeyi kağıt sayfasında açar. */
   const yazdir = async (p: SayimPeriyodu) => {
     if (degisenler.length && !(await kaydet())) return;
+    cikisSerbest.current = true;
     window.location.assign(`/stok/kagit?liste=${p}`);
   };
 
