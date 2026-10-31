@@ -1085,6 +1085,8 @@ export default function RaporlarPage() {
   const [mpFormaYazildi, setMpFormaYazildi] = useState(false);
   // Adım adım giriş: 1 Kasa → 2 Gider → 3 Kurye → 4 Kontrol ve kaydet
   const [adim, setAdim] = useState(1);
+  /** Tek ekran (31.10): solda özet satırlar, sağda kontrol; tıklanan bölüm (1 kart/Migros, 2 gider, 3 kurye) solda açılır. */
+  const [acikBolum, setAcikBolum] = useState<number | null>(null);
   const [ayrinti, setAyrinti] = useState(false); // 4. adımda satış / kasa / nakit kasa ayrıntıları
   const [kayitOnay, setKayitOnay] = useState(false);
   const [nakitFarkOnay, setNakitFarkOnay] = useState(false); // kasa nakdi MagicPay'den ±100 ₺'den fazla farklıysa // "Raporu Kaydet"ten sonra son bir kez "Evet, kaydet" sorulur
@@ -1234,11 +1236,13 @@ export default function RaporlarPage() {
   const mpIndirimHazir = mpIndirimDurum === "hazir" && !!mpIndirim;
   // Adım adım: ekranda tek adım görünür. Kaydedilmiş raporu görüntülerken sade özet (4. adım) görünür,
   // "Ayrıntılar" açılınca bütün bölümler. Adım çubuğundan istenen adıma geçilir.
-  const goster = (n: number) => isReadOnly ? (n === 4 || ayrinti) : adim === n;
+  const goster = (n: number) => isReadOnly ? (n === 4 || ayrinti) : (n === 4 || acikBolum === n);
   const adimaGit = (n: number) => {
     setKayitOnay(false);
     setAdim(Math.min(4, Math.max(1, n)));
-    setTimeout(() => formAlaniRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
+    const yeni = n >= 4 ? null : n;
+    setAcikBolum(yeni);
+    setTimeout(() => document.getElementById(yeni ? `adim-${yeni}` : "tek-ekran")?.scrollIntoView({ behavior: "smooth", block: "start" }), 40);
   };
   const adimTamam = [
     !!kasaNakit.trim(),
@@ -2399,11 +2403,11 @@ export default function RaporlarPage() {
                 : "border-cizgi focus:border-amber-500/60"
               }`} required/>
             {duplikaTarihHata && <p className="text-[11px] font-semibold text-orange-400 flex items-center gap-1"><AlertTriangle size={11}/> Bu tarih mevcut</p>}
-            {enSonRaporTarihi && <p className="text-[11px] text-gray-500 font-medium">Son rapor: <span className="text-gray-700 font-bold">{fmtTarih(enSonRaporTarihi)}</span></p>}
+            {enSonRaporTarihi && isReadOnly && <p className="text-[11px] text-gray-500 font-medium">Son rapor: <span className="text-gray-700 font-bold">{fmtTarih(enSonRaporTarihi)}</span></p>}
           </div>
           )}
         </div>
-        {[
+        {isReadOnly && [
           {label:"Brüt Ciro", value:`₺${fmt(ch.brutCiro)}`, color:"text-blue-400", border:"border-blue-500/10 bg-blue-500/5"},
           {label:"Net Ciro",  value:`₺${fmt(ch.netCiro)}`,  color:"text-emerald-400", border:"border-emerald-500/10 bg-emerald-500/5"},
           {label:"Paket",     value:`${fmt(ch.tKuryeGercekPaket)}`, color:"text-amber-400", border:"border-amber-500/10 bg-amber-500/5"},
@@ -2418,15 +2422,11 @@ export default function RaporlarPage() {
 
       {/* FİŞTEN DOLDUR (AI Tarama) */}
       {!isReadOnly && (
-        <div className="rounded-xl border-2 border-indigo-500/30 bg-indigo-500/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="rounded-xl border border-cizgi bg-kart px-4 py-2 flex flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center shrink-0">
-              {taramaYukleniyor ? <Loader2 size={14} className="text-indigo-400 animate-spin"/> : <Camera size={14} className="text-indigo-400"/>}
-            </div>
-            <div>
-              <p className="text-xs font-bold text-indigo-300">Fişten Doldur</p>
-              <p className="text-[12px] text-gray-500">Giderler formunun fotoğrafını seçin: giderler, personel yemeği, iptal/iade, kesinti ve kurye yemek kartı doldurulur; nakit, satışlar ve kuryelere dokunulmaz. <a href="/stok/kagit" target="_blank" rel="noopener" className="text-indigo-400 font-semibold hover:underline">Boş formu yazdır</a> (arka yüzde güncel günlük sayım listesi)</p>
-            </div>
+            {taramaYukleniyor ? <Loader2 size={16} className="text-indigo-400 animate-spin"/> : <Camera size={16} className="text-indigo-400"/>}
+            <p className="text-[14px] font-bold text-yazi">Gider formu</p>
+            <a href="/stok/kagit" target="_blank" rel="noopener" className="text-[13px] text-gray-500 hover:text-yazi hover:underline">boş form</a>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <input ref={dosyaInputRef} type="file" accept="image/*,application/pdf" multiple className="hidden"
@@ -2504,40 +2504,62 @@ export default function RaporlarPage() {
       <div ref={formAlaniRef} className="scroll-mt-4">
 
         {(
-          <div className="space-y-3">
+          <div className={isReadOnly ? "space-y-3" : "grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-3 lg:gap-y-0 items-start"}>
 
-            {/* ── ADIM ÇUBUĞU: 1 Kasa → 2 Gider → 3 Kurye → 4 Kontrol ── */}
-            {!isReadOnly && (
-              <nav aria-label="Rapor bölümleri" className="sticky top-0 z-30 grid grid-cols-4 gap-1.5 bg-zemin/95 backdrop-blur py-2">
-                {ADIMLAR.map((ad, i) => {
-                  const no = i + 1, aktif = adim === no, gecti = !aktif && (adimTamam[i] || adim > no);
-                  return (
-                    <button key={ad} type="button" onClick={() => adimaGit(no)} aria-current={aktif ? "step" : undefined}
-                      className="flex flex-col gap-1.5 text-left">
-                      <span className={`h-1.5 rounded-full ${aktif || gecti ? "bg-altin" : "bg-cizgi-guclu"}`}/>
-                      <span className={`text-[12px] font-bold ${aktif ? "text-altin" : gecti ? "text-gray-400" : "text-gray-600"}`}>{gecti ? "✓ " : `${no} `}{ad}</span>
-                    </button>
-                  );
-                })}
-              </nav>
-            )}
-            {goster(1) && <section id="adim-1" className="space-y-3 scroll-mt-14">
-            {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">1 · Kasa <span className="font-medium text-[12px] text-gray-500">kasadaki nakit ve Kıraloğlu Migros</span></h2>}
+            {/* ── TEK EKRAN: GİRİLECEKLER (sol). Satıra tıklayınca bölüm altında açılır. ── */}
+            {!isReadOnly && (() => {
+              const kartTop = YEMEK_KARTLARI.reduce((t, k) => t + tv(kartlar[k.alan]), 0);
+              const migros = tv(osKirMigrosYemek.tutar) + tv(koKirMigrosYemek.tutar);
+              const giderSay = giderler.filter(g => tv(g.tutar) > 0).length;
+              const kuryeDolu = ch.kuryelerHesap.some(k => k.gercekPaket > 0 || tv(k.nakit) + tv(k.pos) > 0);
+              let sNo = 0;
+              const satir = (n: number, ad: string, deger: React.ReactNode) => (
+                <button type="button" onClick={() => acikBolum === n ? setAcikBolum(null) : adimaGit(n)}
+                  className={`w-full flex items-center justify-between gap-3 px-4 h-14 border-b border-cizgi last:border-b-0 text-left hover:bg-alan ${acikBolum === n ? "bg-alan" : ""}`}>
+                  <span className="text-[16px] font-semibold text-yazi">{ad}</span>
+                  <span className="flex items-center gap-2 text-[16px] font-bold text-yazi">{deger}<span className="text-gray-500 text-[20px] leading-none">{acikBolum === n ? "‹" : "›"}</span></span>
+                </button>
+              );
+              return (
+                <div id="tek-ekran" className="lg:col-start-1 lg:mb-3 rounded-xl border border-cizgi bg-kart overflow-hidden scroll-mt-4">
+                  <p className="px-4 pt-3 pb-1 text-[12px] font-bold text-gray-500 uppercase tracking-wider">Girilecek</p>
+                  <label className="flex items-center justify-between gap-3 px-4 py-2 border-b border-cizgi">
+                    <span className="text-[16px] font-semibold text-yazi">Kasadaki nakit</span>
+                    <input type="text" inputMode="decimal" value={kasaNakit} onChange={e => setKasaNakit(paraGirdisi(e.target.value))}
+                      placeholder="0" className="w-44 h-12 rounded-lg border-2 border-altin/60 bg-alan text-yazi text-[22px] font-black px-3 text-right outline-none focus:border-altin"/>
+                  </label>
+                  {satir(1, "Yemek kartı", `₺${fmt(kartTop)}`)}
+                  {satir(1, "Kıraloğlu Migros", `₺${fmt(migros)}`)}
+                  {satir(2, "Gider", <>₺{fmt(ch.tGider + ch.tGiderGecmis)}{giderSay > 0 && <span className="text-[13px] font-normal text-gray-500">({giderSay})</span>}</>)}
+                  {satir(3, "Kuryeler", kuryeDolu
+                    ? <span className="text-[14px] font-semibold">{ch.kuryelerHesap.filter(k => k.gercekPaket > 0 || tv(k.nakit) + tv(k.pos) > 0)
+                        .map(k => `${k.tip === "havuz" ? "Havuz" : `S${++sNo}`} ${k.gercekPaket}`).join(" · ")} pk</span>
+                    : <span className="text-[14px] text-amber-300">{roketGun ? "Roket'ten doldurun" : "boş"}</span>)}
+                  {!kuryeDolu && roketGun && (
+                    <div className="px-4 py-2 border-t border-cizgi">
+                      <button type="button" onClick={() => roketleDoldur(roketGun)}
+                        className="w-full h-11 rounded-lg kebo-btn-altin text-[#1a1408] text-[15px] font-black">Kuryeleri Roket&apos;ten doldur ({roketGun.toplamPaket} paket)</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            {goster(1) && <section id="adim-1" className="space-y-3 scroll-mt-4 lg:col-start-1 lg:mb-3">
+            {!isReadOnly && <div className="flex items-center justify-between pt-1"><h2 className="text-[16px] font-black text-yazi">Yemek kartı · Kıraloğlu Migros</h2><button type="button" onClick={() => setAcikBolum(null)} className="text-[14px] text-gray-500 hover:text-yazi px-2">Kapat ✕</button></div>}
                 {!isReadOnly && mpDoldurma && (
-                  <div className={`text-[12px] rounded-lg px-3 py-2.5 border space-y-1.5 ${mpFormaYazildi ? "text-emerald-200 bg-emerald-500/10 border-emerald-500/25" : "text-sky-200 bg-sky-500/10 border-sky-500/25"}`}>
+                  <div className={`text-[13px] rounded-lg px-3 py-2 border space-y-1 ${mpFormaYazildi ? "text-emerald-200 bg-emerald-500/10 border-emerald-500/25" : "text-sky-200 bg-sky-500/10 border-sky-500/25"}`}>
                     {mpFormaYazildi ? (
-                      <p className="font-bold">✓ MagicPay&apos;den dolduruldu: platform satışları ve paketler, Alo Paket, kasa POS, yemek kartları, indirimler.</p>
+                      <p className="font-bold">✓ Satışlar MagicPay&apos;den geldi</p>
                     ) : (
                       <p className="font-bold">Bu günün satışları MagicPay&apos;de hazır.</p>
                     )}
-                    <p>
-                      Sizin girmeniz gerekenler: <b>kasa nakit sayımı</b>
-                      , <b>giderler</b>, <b>kuryeler</b> ve <b>Kıraloğlu Migros</b> (MagicPay&apos;de yok).
-                    </p>
                     {mpDoldurma.uyarilar.length > 0 && (
-                      <ul className="list-disc pl-4 space-y-0.5 text-amber-200">
-                        {mpDoldurma.uyarilar.map((u, i) => <li key={i}>{u}</li>)}
-                      </ul>
+                      <details className="text-amber-200">
+                        <summary className="cursor-pointer font-semibold">⚠ {mpDoldurma.uyarilar.length} not</summary>
+                        <ul className="list-disc pl-4 space-y-0.5 mt-1">
+                          {mpDoldurma.uyarilar.map((u, i) => <li key={i}>{u}</li>)}
+                        </ul>
+                      </details>
                     )}
                     <button type="button" onClick={() => magicleDoldur(mpDoldurma)}
                       className="text-[11px] font-semibold border border-current/40 rounded-md px-2 py-1 hover:bg-white/5">
@@ -2546,20 +2568,16 @@ export default function RaporlarPage() {
                   </div>
                 )}
             {/* ── 1. ADIM: KASA SAYIMI + Kıraloğlu Migros ── */}
-            <div className="rounded-xl border border-cizgi bg-kart p-4 space-y-3">
+            {isReadOnly && <div className="rounded-xl border border-cizgi bg-kart p-4 space-y-3">
               <label className="block space-y-1.5">
                 <span className="block text-[15px] font-bold text-yazi">Kasadaki nakit</span>
-                <span className="block text-[12px] text-gray-500">Gün sonu saydığınız para (giderler ödendikten sonra)</span>
                 <input type="text" inputMode="decimal" value={kasaNakit} onChange={e => setKasaNakit(paraGirdisi(e.target.value))} disabled={isReadOnly}
                   placeholder="0" className="w-full h-16 rounded-xl border-2 border-altin/60 bg-alan text-yazi text-3xl font-black px-4 outline-none focus:border-altin disabled:opacity-50"/>
               </label>
-            </div>
+            </div>}
             {/* Kasa yemek kartları (31.10): kasadaki cihaz/slip toplamları elle; MagicPay türünü bildiklerini doldurur */}
-            <div className="rounded-xl border border-pink-500/25 bg-kart p-4 space-y-2">
-              <div>
-                <p className="text-[15px] font-bold text-yazi">Kasa yemek kartları</p>
-                <p className="text-[12px] text-gray-500">Kasada (masada) yemek kartıyla alınan tutarlar. Gün sonu slip / cihaz toplamını yazın. MagicPay&apos;in türünü bildiği kartlar dolu gelir, kontrol edin.</p>
-              </div>
+            <div className="rounded-xl border border-cizgi bg-kart p-4 space-y-2">
+              <p className="text-[15px] font-bold text-yazi">Yemek kartları</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {YEMEK_KARTLARI.map(k => (
                   <label key={k.alan} className="block space-y-1">
@@ -2575,8 +2593,8 @@ export default function RaporlarPage() {
               </div>
               {(() => { const t = YEMEK_KARTLARI.reduce((s, k) => s + tv(kartlar[k.alan]), 0); return t > 0 ? <p className="text-[13px] text-gray-700 text-right">Kasa yemek kartı toplamı <b className="text-yazi">₺{fmt(t)}</b></p> : null; })()}
             </div>
-            <div className="rounded-xl border border-teal-500/25 bg-kart p-3 space-y-1.5">
-              <p className="text-[13px] font-bold text-teal-300">Kıraloğlu Migros <span className="font-medium text-[11px] text-gray-500">MagicPay&apos;de yok, elle girin (satış yoksa boş bırakın)</span></p>
+            <div className="rounded-xl border border-cizgi bg-kart p-4 space-y-1.5">
+              <p className="text-[15px] font-bold text-yazi">Kıraloğlu Migros</p>
               <div className={`hidden ${SATIS_IZGARA} text-[11px] font-bold text-gray-500 px-0.5`}>
                 <span/>
                 <span className="text-right pr-3">Online ₺</span><span className="text-center">Paket</span>
@@ -2588,8 +2606,8 @@ export default function RaporlarPage() {
             </div>
             </section>}
 
-            {goster(2) && <section id="adim-2" className="space-y-3 scroll-mt-14">
-            {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">2 · Gider <span className="font-medium text-[12px] text-gray-500">giderler, kesinti, iade</span></h2>}
+            {goster(2) && <section id="adim-2" className="space-y-3 scroll-mt-4 lg:col-start-1 lg:mb-3">
+            {!isReadOnly && <div className="flex items-center justify-between pt-1"><h2 className="text-[16px] font-black text-yazi">Gider</h2><button type="button" onClick={() => setAcikBolum(null)} className="text-[14px] text-gray-500 hover:text-yazi px-2">Kapat ✕</button></div>}
               {/* ── GİDERLER: Açıklama · Ödeme yöntemi · Tutar ── */}
               {(() => {
                 const normalSatirlar = giderler.filter(g => g.tip !== "personel");
@@ -2608,9 +2626,9 @@ export default function RaporlarPage() {
                   <button type="button" onClick={() => giderSil(g.id)} aria-label="Satırı sil" className="h-10 text-gray-500 hover:text-red-400 flex items-center justify-center"><Trash2 size={15}/></button>
                 );
                 return (<>
-                <div className="rounded-xl border border-red-500/20 bg-kart">
-                  <div className="px-4 py-3 border-b border-red-500/15 flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[15px] font-bold text-red-200">Giderler</span>
+                <div className="rounded-xl border border-cizgi bg-kart">
+                  <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[15px] font-bold text-yazi">Giderler</span>
                     {!isReadOnly && (
                       <div className="flex items-center gap-2">
                         <button type="button" onClick={() => giderEkle("normal")}
@@ -2669,9 +2687,9 @@ export default function RaporlarPage() {
                 </div>
 
                 {/* ── PERSONEL YEMEĞİ / ISMARLAMA: fiş çıktı, para kasaya girmedi → maaştan düşülür (avans) ── */}
-                <div className="rounded-xl border border-teal-500/25 bg-kart">
-                  <div className="px-4 py-3 border-b border-teal-500/15 flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[15px] font-bold text-teal-200 flex items-center gap-2"><Users2 size={15}/> Personel yemeği / ısmarlama
+                <div className="rounded-xl border border-cizgi bg-kart">
+                  <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[15px] font-bold text-yazi flex items-center gap-2">Personel yemeği / ısmarlama
                       {personelToplam > 0 && <span className="text-[13px] font-black">₺{fmt(personelToplam)}</span>}</span>
                     {!isReadOnly && (
                       <button type="button" onClick={() => giderEkle("personel")}
@@ -2679,7 +2697,6 @@ export default function RaporlarPage() {
                     )}
                   </div>
                   <div className="p-3 space-y-2.5">
-                    <p className="text-[12px] text-gray-500">Personel yedi ya da ısmarladı, fiş çıktı ama ödemedi: buraya yazın. Kasadan nakit çıkmış gibi sayılır, personelin hesabına <b className="text-teal-300">avans</b> olarak işlenir ve ay sonu maaşından düşülür.</p>
                     {personelSatirlar.map(g => {
                       const listedeYok = !!g.personelIsim?.trim() && !personelIdBul(g.personelIsim.trim());
                       return (
@@ -2711,11 +2728,11 @@ export default function RaporlarPage() {
                     <span className="text-[14px] font-bold text-yazi">Toplam gider</span>
                     <span className="text-[19px] font-black text-red-300">₺{fmt(ch.tGider + ch.tGiderGecmis)}</span>
                   </div>
-                  <p className="text-[12px] text-gray-500">
-                    Bugünün kasasından (nakit) ₺{fmt(ch.tGiderNakit)}
-                    {ch.tGiderGecmis > 0 && <> · geçmiş günlerin nakitinden ₺{fmt(ch.tGiderGecmis)}</>}
+                  {(ch.tGiderGecmis > 0 || ch.tGiderNakitDisi > 0) && <p className="text-[13px] text-gray-500">
+                    Kasadan ₺{fmt(ch.tGiderNakit)}
+                    {ch.tGiderGecmis > 0 && <> · eski nakitten ₺{fmt(ch.tGiderGecmis)}</>}
                     {ch.tGiderNakitDisi > 0 && <> · POS / diğer ₺{fmt(ch.tGiderNakitDisi)}</>}
-                  </p>
+                  </p>}
                 </div>
                 </>);
               })()}
@@ -2729,8 +2746,8 @@ export default function RaporlarPage() {
                     </button>
                   )
                 ) : (
-                <div className="rounded-xl border border-rose-500/15 bg-kart overflow-hidden">
-                  <div className="px-3 py-2 border-b border-rose-500/15 flex items-center justify-between">
+                <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
+                  <div className="px-3 py-2 border-b border-cizgi flex items-center justify-between">
                     <span className="text-[13px] font-bold text-rose-300 flex items-center gap-1.5"><Users2 size={13}/>Personel kesintisi <span className="font-normal text-[11px] text-gray-500">ceza · kasayı etkilemez, maaştan düşülür</span></span>
                     {!isReadOnly && (
                       <button type="button" onClick={()=>setKesintiSatirlari([...kesintiSatirlari,{id:Date.now(),personelIsim:"",tutar:"",aciklama:""}])}
@@ -2761,7 +2778,6 @@ export default function RaporlarPage() {
                           className="w-full bg-alan border border-cizgi text-yazi text-[11px] h-6 px-2 rounded-lg outline-none focus:border-rose-500/40 disabled:opacity-40 placeholder:text-gray-700"/>
                       </div>
                     ))}
-                    <p className="text-[11px] text-gray-500">Kaydedince personelin profilindeki Kesinti geçmişine işlenir; ay sonu maaş hesabında görünür.</p>
                   </div>
                 </div>
                 )}
@@ -2781,9 +2797,9 @@ export default function RaporlarPage() {
                   );
                   const doluIade = iadeler.filter(i => tv(i.tutar) > 0);
                   return (
-                <div className="rounded-xl border border-orange-500/20 bg-kart">
-                  <div className="px-4 py-3 border-b border-orange-500/15 flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[15px] font-bold text-orange-200 flex items-center gap-2"><RotateCcw size={15}/> İptal / iade
+                <div className="rounded-xl border border-cizgi bg-kart">
+                  <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[15px] font-bold text-yazi flex items-center gap-2">İptal / iade
                       {ch.tIade > 0 && <span className="text-[13px] font-black">₺{fmt(ch.tIade)}</span>}</span>
                     {!isReadOnly && (
                       <button type="button" onClick={iadeEkle}
@@ -2800,7 +2816,6 @@ export default function RaporlarPage() {
                         </div>
                       ))
                     ) : (<>
-                    <p className="text-[12px] text-gray-500">Fiş kesildi ama iptal edildi ya da para iade edildiyse girin. Sırayla seçin: hangi fiş, paketse hangi marka ve kanal, nasıl ödenmişti.</p>
                     {iadeler.map((item, idx) => {
                       const d = item.iade || {};
                       const eksik = iadeEksikAdim(d);
@@ -2837,8 +2852,8 @@ export default function RaporlarPage() {
 
             </section>}
 
-            {goster(3) && <section id="adim-3" className="space-y-3 scroll-mt-14">
-            {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">3 · Kurye <span className="font-medium text-[12px] text-gray-500">kuryeler ve bugün çalışanlar</span></h2>}
+            {goster(3) && <section id="adim-3" className="space-y-3 scroll-mt-4 lg:col-start-1 lg:mb-3">
+            {!isReadOnly && <div className="flex items-center justify-between pt-1"><h2 className="text-[16px] font-black text-yazi">Kuryeler</h2><button type="button" onClick={() => setAcikBolum(null)} className="text-[14px] text-gray-500 hover:text-yazi px-2">Kapat ✕</button></div>}
                 {/* ── KURYELER: Roket'ten çek → paket kontrolü → kurye kartları → tahsilat özeti ── */}
                 {(() => {
                   const kutu = "w-full bg-alan border border-cizgi-guclu text-yazi text-[14px] h-10 px-3 rounded-lg outline-none focus:border-altin/50 disabled:opacity-80 disabled:bg-transparent";
@@ -2890,15 +2905,18 @@ export default function RaporlarPage() {
                 {pkK && (
                   <div className={`rounded-xl border px-4 py-3 space-y-1.5 ${pkK.fark === 0 ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/40 bg-amber-500/5"}`}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-[15px] font-bold text-yazi flex items-center gap-2"><Package size={15}/> Paket sayısı</span>
+                      <span className="text-[15px] font-bold text-yazi">Paket sayısı</span>
                       {pkK.fark === 0
                         ? <span className="text-[14px] font-bold text-emerald-300 flex items-center gap-1"><CheckCircle2 size={14}/> Aynı</span>
                         : <span className="text-[14px] font-bold text-amber-300 flex items-center gap-1"><AlertTriangle size={14}/> Roket&apos;te {Math.abs(pkK.fark)} paket {pkK.fark > 0 ? "fazla" : "eksik"}</span>}
                     </div>
-                    <p className="text-[14px] text-gray-300">
-                      Roket <b className="text-yazi">{pkK.roket}</b> · {mpDoldurma ? "MagicPay" : "Satış tablosu"} <b className="text-yazi">{pkK.bizde - pkK.kirMigros}</b>
-                      {" + "}Kıraloğlu Migros <b className="text-yazi">{pkK.kirMigros}</b> = <b className="text-yazi">{pkK.bizde}</b>
+                    <p className="text-[15px] text-gray-700">
+                      Roket <b className="text-yazi">{pkK.roket}</b> · {mpDoldurma ? "MagicPay" : "Satış"} <b className="text-yazi">{pkK.bizde}</b>
                     </p>
+                    {pkK.fark !== 0 && (pkK.rokettenEk > 0 || pkK.farkliKanallar.length > 0) && (
+                    <details>
+                    <summary className="cursor-pointer text-[13px] font-semibold text-gray-700">Ayrıntı</summary>
+                    <div className="space-y-1.5 mt-1.5">
                     {pkK.rokettenEk > 0 && (
                       <div className="rounded-lg border border-cizgi bg-alan/40 px-3 py-2 text-[13px] space-y-1">
                         <p className="font-semibold text-gray-300">Roket&apos;e elle girilen {pkK.rokettenEk} sipariş <span className="font-normal text-gray-500">(fiş tarandı / Roket Adisyon — Roket&apos;te platformu görünmez)</span></p>
@@ -2922,17 +2940,19 @@ export default function RaporlarPage() {
                         {pkK.farkliKanallar.some(k => k.kanal === "kir_migros") && <p>· Kıraloğlu Migros paket sayısı 1 · Kasa adımında girilir.</p>}
                       </div>
                     )}
+                    </div>
+                    </details>
+                    )}
                   </div>
                 )}
 
-                <div className="rounded-xl border border-amber-500/20 bg-kart">
-                  <div className="px-4 py-3 border-b border-amber-500/15 flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[15px] font-bold text-amber-200 flex items-center gap-2"><Truck size={15}/> Kuryeler</span>
+                <div className="rounded-xl border border-cizgi bg-kart">
+                  <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[15px] font-bold text-yazi">Kuryeler</span>
                     {!isReadOnly && <button type="button" onClick={kuryeEkle}
                       className="text-[12px] font-semibold text-purple-200 border border-purple-500/30 hover:bg-purple-500/10 px-3 py-1.5 rounded-lg">+ Havuz kurye</button>}
                   </div>
                   <div className="p-3 space-y-3">
-                    <p className="text-[12px] text-gray-500">Her kurye için paket sayısını ve kapıda aldığı parayı yazın. Sabit kuryelerde günde en az {KURYE_GARANTI_PAKET} paket ödenir; havuzda garanti yok.</p>
                     {ch.kuryelerHesap.map(k => {
                       const h = kuryeler.find(x => x.id === k.id)!; // ham giriş (metin)
                       const havuz = k.tip === "havuz";
@@ -2961,7 +2981,7 @@ export default function RaporlarPage() {
                               ? <span className="flex-1 min-w-[140px] text-[14px] font-semibold text-yazi">{k.isim || "—"} <span className="text-[12px] font-normal text-gray-500">· {h.parcalar!.length} kurye</span></span>
                               : <input type="text" placeholder={havuz ? "İsim (isteğe bağlı)" : "Kurye adı"} disabled={isReadOnly} value={k.isim}
                                   onChange={e => kuryeDegistir(k.id, "isim", e.target.value)} className={`${kutu} h-9 flex-1 min-w-[140px]`}/>}
-                            <span className="text-[12px] text-gray-500">{havuz ? "parası Roadrunner'da kalır" : yeniDuzen ? "parayı kasaya teslim eder" : ""}</span>
+                            
                             {!isReadOnly && k.tip !== "sabit" && (
                               <button type="button" onClick={() => kuryeSil(k.id)} aria-label="Kuryeyi sil" className="ml-auto text-gray-500 hover:text-red-400"><Trash2 size={15}/></button>
                             )}
@@ -2993,7 +3013,6 @@ export default function RaporlarPage() {
                                   )}
                                 </div>
                               ))}
-                              <p className="text-[12px] text-gray-500">Paket: her kuryenin attığı toplam paket (uzak dahil). Garanti {KURYE_GARANTI_PAKET} paket, bu satırın toplamına uygulanır.</p>
                             </div>
                           ) : (
                           <div className="grid grid-cols-3 gap-2">
@@ -3030,7 +3049,6 @@ export default function RaporlarPage() {
                                   ))}
                                 </div>
                               ) : <p className="text-[12px] text-gray-500">{roketGun ? "Roket'te havuzda başka kurye yok." : "Roket verisi yok; elle ekleyin."}</p>}
-                              <p className="text-[12px] text-gray-500">Roket&apos;ten seçilen kurye paketi ve parasıyla gelir, havuzdan düşülür; sonra düzeltebilirsiniz.</p>
                               <div className="flex gap-3 text-[13px]">
                                 <button type="button" onClick={() => sabiteKuryeEkle(k.id, slot)} className="text-altin hover:underline">Elle ekle (boş satır)</button>
                                 <button type="button" onClick={() => setKuryeEkleAcik(null)} className="text-gray-500 hover:underline">Vazgeç</button>
@@ -3038,12 +3056,12 @@ export default function RaporlarPage() {
                             </div>
                           )}
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
-                            {!isReadOnly && slot && kuryeEkleAcik !== k.id && <button type="button" onClick={() => setKuryeEkleAcik(k.id)} className="text-amber-300 hover:underline">+ Kurye ekle (yerine gelen)</button>}
-                            {!isReadOnly && !kartGoster && <button type="button" onClick={() => setKuryeAcik(o => ({ ...o, [k.id]: { ...o[k.id], kart: true } }))} className="text-pink-300/90 hover:underline">+ Yemek kartı (Token Flex / Paye)</button>}
+                            {!isReadOnly && slot && kuryeEkleAcik !== k.id && <button type="button" onClick={() => setKuryeEkleAcik(k.id)} className="text-amber-300 hover:underline">+ Kurye</button>}
+                            {!isReadOnly && !kartGoster && <button type="button" onClick={() => setKuryeAcik(o => ({ ...o, [k.id]: { ...o[k.id], kart: true } }))} className="text-pink-300/90 hover:underline">+ Yemek kartı</button>}
                             {!isReadOnly && !uzakGoster && <button type="button" onClick={() => setKuryeAcik(o => ({ ...o, [k.id]: { ...o[k.id], uzak: true } }))} className="text-orange-300/90 hover:underline">+ Uzak paket</button>}
                             <span className="ml-auto text-gray-400">
-                              {k.gercekPaket} paket{uzakVar && <> (uzak {k.uzakPaket}, 9 km+ {k.paket9km})</>} · ₺{fmt(para)}
-                              {k.garantiUygulandi && <span className="text-amber-300 font-semibold"> · ödemede {k.uygulananPaket} paket sayılır (garanti)</span>}
+                              {k.gercekPaket} pk · ₺{fmt(para)}
+                              {k.garantiUygulandi && <span className="text-amber-300 font-semibold" title="Garanti: ödemede bu kadar paket sayılır"> → {k.uygulananPaket} pk</span>}
                             </span>
                           </div>
                         </div>
@@ -3060,7 +3078,7 @@ export default function RaporlarPage() {
                 {(ch.tKapida > 0 || ch.tKuryeNakit + ch.tKuryePos + ch.tKuryeKart > 0) && (
                   <div className={`rounded-xl border bg-kart ${ch.kuryeFark === 0 ? "border-emerald-500/30" : "border-red-500/40"}`}>
                     <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-[15px] font-bold text-yazi">Kapıda alınan para tuttu mu?</span>
+                      <span className="text-[15px] font-bold text-yazi">Kapıda tahsilat</span>
                       {ch.kuryeFark === 0
                         ? <span className="text-[14px] font-bold text-emerald-300 flex items-center gap-1"><CheckCircle2 size={14}/> Tuttu</span>
                         : <span className="text-[14px] font-bold text-red-300 flex items-center gap-1"><AlertTriangle size={14}/> {ch.kuryeFark > 0 ? `₺${fmt(ch.kuryeFark)} eksik` : `₺${fmt(-ch.kuryeFark)} fazla`}</span>}
@@ -3082,13 +3100,13 @@ export default function RaporlarPage() {
                       ))}
                       {turBilinmiyor && (
                         <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-center">
-                          <span className="text-gray-700">Platform kapıda ödeme <span className="text-[12px] text-gray-500">(MagicPay türünü ayırmıyor; kuryelerin nakit / POS / Token Flex / Paye tahsilatıyla karşılaştırılır)</span></span>
+                          <span className="text-gray-700" title="MagicPay türünü ayırmıyor; toplamda kuryelerin tahsilatıyla karşılaştırılır">Platform kapıda</span>
                           <span className="text-right text-yazi">₺{fmt(ch.kapidaTuruBilinmeyen)}</span><span/><span className="w-24"/>
                         </div>
                       )}
                       {ch.tKuryeKart > 0 && (
                         <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-center">
-                          <span className="text-gray-300">Yemek kartı <span className="text-[12px] text-gray-500">(Token Flex ₺{fmt(ch.tKuryeTokenFlex)} · Paye ₺{fmt(ch.tKuryePaye)} — bankaya yatar)</span></span>
+                          <span className="text-gray-700" title={`Token Flex ₺${fmt(ch.tKuryeTokenFlex)} · Paye ₺${fmt(ch.tKuryePaye)}`}>Yemek kartı</span>
                           <span/><span className="text-right text-yazi">₺{fmt(ch.tKuryeKart)}</span><span className="w-24"/>
                         </div>
                       )}
@@ -3104,13 +3122,13 @@ export default function RaporlarPage() {
                       const rr = roadrunnerTahsilati({ tarih, kurye_raporlari: kuryeler });
                       return (
                         <div className="px-4 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[13px]">
-                          <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-3 py-2">
-                            <p className="font-semibold text-emerald-300">Kasaya gelecek (sabit kuryeler)</p>
+                          <div className="rounded-lg border border-cizgi bg-alan px-3 py-2">
+                            <p className="font-semibold text-gray-700">Kasaya gelecek</p>
                             <p className="text-yazi font-bold">Nakit ₺{fmt(teslim.nakit)} · POS ₺{fmt(teslim.pos)}</p>
                           </div>
-                          <div className="rounded-lg border border-purple-500/25 bg-purple-500/5 px-3 py-2">
-                            <p className="font-semibold text-purple-300">Roadrunner&apos;da kalan (havuz)</p>
-                            <p className="text-yazi font-bold">₺{fmt(rr.nakit + rr.pos)} <span className="font-normal text-gray-400">· borcumuzdan düşülür</span></p>
+                          <div className="rounded-lg border border-cizgi bg-alan px-3 py-2">
+                            <p className="font-semibold text-gray-700">Roadrunner&apos;da kalan</p>
+                            <p className="text-yazi font-bold">₺{fmt(rr.nakit + rr.pos)}</p>
                           </div>
                         </div>
                       );
@@ -3123,7 +3141,7 @@ export default function RaporlarPage() {
             {/* ── BUGÜN ÇALIŞANLAR (puantaj) ── */}
             <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
               <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[14px] font-bold text-yazi flex items-center gap-1.5"><Users2 size={14} className="text-blue-400"/>Bugün Çalışanlar <span className="font-medium text-[11px] text-gray-500">puantaj · varsayılan herkes çalıştı</span></span>
+                <span className="text-[15px] font-bold text-yazi">Bugün çalışanlar</span>
                 <span className="text-[12px] font-semibold text-gray-700">{gunlukOzetMetni(puantajPersonelleri.map(p => puantajSatiri(p.id).durum))}</span>
               </div>
               <div className="p-3 space-y-1.5">
@@ -3161,8 +3179,8 @@ export default function RaporlarPage() {
 
             </section>}
 
-            {goster(4) && <section id="adim-4" className="space-y-3 scroll-mt-14">
-            {!isReadOnly && <h2 className="text-[15px] font-black text-yazi pt-2">4 · Kontrol <span className="font-medium text-[12px] text-gray-500">her satır ✓ ise kaydedin</span></h2>}
+            {goster(4) && <section id="adim-4" className={`space-y-3 scroll-mt-4 ${isReadOnly ? "" : "lg:col-start-2 lg:row-start-1 lg:row-span-6 lg:mb-3"}`}>
+            {!isReadOnly && <p className="text-[12px] font-bold text-gray-500 uppercase tracking-wider">Kontrol</p>}
             {/* ── KONTROL LİSTESİ: her şey tek bakışta; ayrıntılar aşağıda kapalı ── */}
             {(() => {
               const pk = (...l: PlatformGiris[]) => l.reduce((t, x) => t + sayi(x.paket), 0);
@@ -3188,7 +3206,7 @@ export default function RaporlarPage() {
                       <span className="text-[14px] font-bold text-yazi">{baslik}</span>
                       <span className="text-[14px] font-black text-yazi">{deger}</span>
                     </div>
-                    {aciklama && <p className={`text-[12px] mt-0.5 ${durum === "uyari" ? "text-amber-300" : "text-gray-500"}`}>{aciklama}</p>}
+                    {aciklama && durum === "uyari" && <p className="text-[13px] mt-0.5 text-amber-300">{aciklama}</p>}
                   </div>
                   {git && !isReadOnly && <button type="button" onClick={git} className="shrink-0 text-[12px] font-semibold text-altin hover:underline mt-0.5">{gitAd}</button>}
                 </div>
@@ -3243,7 +3261,7 @@ export default function RaporlarPage() {
                 </div>
                 <button type="button" onClick={() => ayrinti ? setAyrinti(false) : ayrintiAc()}
                   className="w-full flex items-center justify-between rounded-xl border border-cizgi bg-kart px-4 py-3 text-[13px] font-semibold text-gray-400 hover:text-yazi">
-                  <span>Ayrıntılar <span className="font-normal text-gray-500">— {isReadOnly ? "kasa, giderler, kuryeler, satış tablosu, nakit kasa" : "satış tablosu, POS ve yemek kartları, nakit kasa"}</span></span>
+                  <span>Ayrıntılar</span>
                   {ayrinti ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
                 </button>
               </>);
@@ -3252,7 +3270,7 @@ export default function RaporlarPage() {
             {/* ── SATIŞLAR (4. adım; MagicPay'den dolar) ── */}
             <div className="rounded-xl border border-cizgi bg-kart overflow-hidden">
               <div className="px-4 py-3 border-b border-cizgi flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[14px] font-bold text-yazi">Satışlar <span className="font-medium text-[11px] text-gray-500">MagicPay&apos;den</span></span>
+                <span className="text-[15px] font-bold text-yazi">Satışlar</span>
                 <span title={ch.kapidaKasada ? "13.08.2026 öncesi: kendi kuryelerimizin topladığı para kasa sayımının içinde" : tarih >= KENDI_POS_GECIS_GUNU ? "28.09.2026'dan itibaren: kapıda ödemenin tamamı brüte eklenir. Kurye 1 ve 2 parayı gün sonu kasaya / POS'a teslim eder; havuz kuryelerininki Roadrunner'da kalır, borcumuzdan düşülür" : "Roadrunner'da kalır, haftalık mutabakatla mahsup edilir"}
                   className="text-[10px] font-semibold text-purple-300 bg-purple-500/10 border border-purple-500/25 px-2 py-0.5 rounded-full">
                   Kapıda: {ch.kapidaKasada ? "kasa sayımına dahil" : tarih >= KENDI_POS_GECIS_GUNU ? "brüte eklenir · havuzunki Roadrunner'da" : "Roadrunner'da, brüte ayrıca eklenir"}
@@ -3584,15 +3602,15 @@ export default function RaporlarPage() {
                  Düğmelerin key'i ayrı: "İleri" ile "Kaydet" aynı yerde olduğu için tarayıcı tıklamayı
                  kayıt sanmasın (Kurye → Kontrol'e geçerken rapor kendiliğinden kaydediliyordu). */}
             {!isReadOnly && (
-              <div className="sticky bottom-0 z-30 bg-zemin/95 backdrop-blur py-3 space-y-2">
-                {adim === 4 && kayitOnay && (
+              <div className="sticky bottom-0 z-30 bg-zemin/95 backdrop-blur py-3 space-y-2 lg:col-span-2">
+                {kayitOnay && (
                   <div key="onay" className="rounded-xl border-2 border-altin/60 bg-kart px-4 py-3">
                     <p className="text-[15px] font-black text-yazi">{fmtTarih(tarih)} raporu kaydedilsin mi?</p>
                     <p className="text-[13px] text-gray-400 mt-0.5">Net ciro <b className="text-emerald-300">₺{fmt(ch.netCiro)}</b> · Kasa ₺{fmt(ch.tKasa)} · Gider ₺{fmt(ch.tGider)}. Emin değilseniz Vazgeç deyip kontrol edin.</p>
                   </div>
                 )}
                 <div className="flex gap-2.5">
-                  {adim === 4 && kayitOnay ? (<>
+                  {kayitOnay ? (<>
                     <button key="vazgec" type="button" onClick={() => setKayitOnay(false)}
                       className="flex-1 h-14 rounded-xl border border-cizgi text-gray-300 hover:text-yazi text-[15px] font-semibold">Vazgeç</button>
                     <button key="evet" type="submit" disabled={saving || !!kayitEngeli}
@@ -3600,16 +3618,7 @@ export default function RaporlarPage() {
                       {saving ? <Loader2 size={16} className="animate-spin"/> : <Save size={16}/>} Evet, kaydet
                     </button>
                   </>) : (<>
-                    {adim > 1 && (
-                      <button key="geri" type="button" onClick={() => adimaGit(adim - 1)}
-                        className="flex-1 h-14 rounded-xl border border-cizgi text-gray-400 hover:text-yazi text-[15px] font-semibold">← Geri: {ADIMLAR[adim - 2]}</button>
-                    )}
-                    {adim < 4 ? (
-                      <button key={`ileri-${adim}`} type="button" onClick={() => adimaGit(adim + 1)}
-                        className="flex-[2] h-14 rounded-xl kebo-btn-altin text-[#1a1408] text-[16px] font-black hover:brightness-110">
-                        İleri: {ADIMLAR[adim]}
-                      </button>
-                    ) : (
+                    {(
                       <button key="kaydet" type="button" onClick={() => setKayitOnay(true)} disabled={saving || !!kayitEngeli} title={kayitEngeli || undefined}
                         className="flex-[2] h-14 rounded-xl kebo-btn-altin text-[#1a1408] text-[16px] font-black hover:brightness-110 disabled:opacity-40 flex items-center justify-center gap-2">
                         <Save size={16}/> {selectedRapor ? "Kaydet" : "Raporu Kaydet"}

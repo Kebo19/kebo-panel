@@ -12,7 +12,7 @@ import { PackageCheck, Loader2, Check, X, EyeOff, AlertTriangle, ChevronDown, Ch
 import type { IrsaliyeEslesme } from "@/lib/telegram/ozet";
 
 interface Oneri {
-  id: string; gib_no: string; sira: number | null; tarih: string; tedarikci: string | null; iade: boolean;
+  id: string; gib_no: string; sira: number | null; tarih: string; tedarikci: string | null; vkn: string | null; iade: boolean;
   kalem_adi: string; fatura_miktar: number | null; fatura_birim: string | null; fatura_birim_fiyat: number | null;
   urun_id: string | null; carpan: number;
 }
@@ -43,7 +43,7 @@ export default function StokGirisOnay({ urunler, onDegisti }: { urunler: StokUru
 
   const yukle = useCallback(async () => {
     const [{ data }, { data: c }, { data: ie }] = await Promise.all([
-      supabase.from("stok_giris_onerileri").select("id,gib_no,sira,tarih,tedarikci,iade,kalem_adi,fatura_miktar,fatura_birim,fatura_birim_fiyat,urun_id,carpan")
+      supabase.from("stok_giris_onerileri").select("id,gib_no,sira,tarih,tedarikci,vkn,iade,kalem_adi,fatura_miktar,fatura_birim,fatura_birim_fiyat,urun_id,carpan")
         .eq("durum", "bekliyor").order("tarih").order("gib_no").order("sira"),
       supabase.rpc("stok_giris_cift_kontrol"),
       supabase.rpc("irsaliye_eslesmeleri"),
@@ -102,6 +102,19 @@ export default function StokGirisOnay({ urunler, onDegisti }: { urunler: StokUru
     if (r.onaylanan) onDegisti();
   };
 
+  /** Tedarikçi stokla ilgisiz (Trendyol komisyonu, elektrik…): bekleyen ve gelecek bütün faturaları stokta sorulmaz. */
+  const tedarikciTakipEtme = async (o: Oneri) => {
+    if (!o.vkn) { setHata("Bu faturada vergi numarası yok."); return; }
+    const kac = new Set(oneriler.filter(x => x.vkn === o.vkn).map(x => x.gib_no)).size;
+    if (!confirm(`${o.tedarikci || "Bu firma"} stokla ilgili değil mi?\n\nBekleyen ${kac} faturası kaldırılacak, bundan sonra gelen faturaları da stokta hiç sorulmayacak.`)) return;
+    setMesgul("t-" + o.vkn); setHata(null); setBilgi(null);
+    const { data, error } = await supabase.rpc("stok_tedarikci_takip", { p_vkn: o.vkn, p_takip: false, p_tedarikci: o.tedarikci });
+    setMesgul(null);
+    if (error) { setHata(error.message); return; }
+    setBilgi(`${o.tedarikci}: ${data ?? 0} kalem kaldırıldı; bu firmanın faturaları artık stokta sorulmayacak.`);
+    await yukle();
+  };
+
   const bagla = async (baglar: { oneri_id: string; irsaliye_kalem_id: string; fark_isle: boolean }[], anahtar: string) => {
     if (!baglar.length) return;
     setMesgul(anahtar); setHata(null);
@@ -148,6 +161,12 @@ export default function StokGirisOnay({ urunler, onDegisti }: { urunler: StokUru
                 )}
                 <button disabled={!!mesgul} onClick={() => karar(kalemler.map(o => ({ o, karar: "reddet" as const })), gib + "-r")}
                   className="text-[11px] font-semibold text-gray-500 hover:text-red-300 border border-cizgi px-2.5 py-1.5 rounded-lg">Faturayı işleme</button>
+                {f.vkn && (
+                  <button disabled={!!mesgul} onClick={() => tedarikciTakipEtme(f)} title="Bu firmanın bütün faturaları (şimdiki ve gelecek) stokta sorulmaz"
+                    className="text-[11px] font-semibold text-gray-500 hover:text-red-300 border border-cizgi px-2.5 py-1.5 rounded-lg">
+                    {mesgul === "t-" + f.vkn ? "…" : "Firma stokla ilgisiz"}
+                  </button>
+                )}
               </div>
             </div>
             {irsaliye[gib] && irsaliye[gib].satirlar.length > 0 && (() => {

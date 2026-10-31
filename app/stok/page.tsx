@@ -13,6 +13,7 @@ import {
 } from "@/lib/stok";
 import VakitSecici from "@/components/VakitSecici";
 import IrsaliyePaneli, { type IrsaliyeKalemi } from "@/components/IrsaliyePaneli";
+import MalGeldi from "@/components/MalGeldi";
 import SayimKagidiTara from "@/components/SayimKagidiTara";
 import StokGirisOnay from "@/components/StokGirisOnay";
 import BelgeAra from "@/components/BelgeAra";
@@ -30,7 +31,7 @@ import {
   Package, PlusCircle, Search, AlertTriangle, TrendingDown,
   Truck, ClipboardCheck, Loader2, X, Save, Edit3, Trash2,
   RefreshCw, Layers, Box, Clock, BrainCircuit, CheckSquare, Square,
-  ListOrdered, Calendar, ArrowUp, ArrowDown, PackageMinus, ShoppingCart, ChefHat, Camera, Printer, ListChecks,
+  ListOrdered, Calendar, ArrowUp, ArrowDown, PackageMinus, ShoppingCart, ChefHat, Camera, Printer, ListChecks, PackagePlus,
 } from "lucide-react";
 
 interface Urun {
@@ -115,6 +116,7 @@ export default function StokPage() {
   const [sayimVakti, setSayimVakti] = useState<SayimVakti>("sabah");
   const [topluVakit, setTopluVakit] = useState<SayimVakti>("sabah");
   const [topluSayimAcik, setTopluSayimAcik] = useState(false);
+  const [malGeldiAcik, setMalGeldiAcik] = useState(false);
   const [kagitTaraAcik, setKagitTaraAcik] = useState(false);
 
   // Form Verileri
@@ -571,6 +573,10 @@ export default function StokPage() {
               className="flex items-center gap-1.5 text-[11px] font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 border border-altin/40 px-3 py-2 rounded-xl transition-all shadow-lg shadow-altin/20">
               <ClipboardCheck size={13}/> Toplu Sayım
             </button>
+            <button onClick={() => setMalGeldiAcik(true)}
+              className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-300 bg-kart border border-emerald-500/40 px-3 py-2 rounded-xl hover:bg-emerald-500/10">
+              <PackagePlus size={13}/> Mal geldi
+            </button>
             <button onClick={() => setKagitTaraAcik(true)}
               className="flex items-center gap-1.5 text-[11px] font-bold text-blue-300 bg-kart border border-blue-500/40 px-3 py-2 rounded-xl hover:bg-blue-500/10">
               <Camera size={13}/> Sayım kağıdı tara
@@ -640,6 +646,7 @@ export default function StokPage() {
         <StokGirisOnay urunler={urunler.map(u => ({ id: u.id, urun_adi: u.urun_adi, birim: u.birim }))} onDegisti={veriCek} />
 
         {/* İRSALİYE / YOLDAKİ MAL */}
+        <div id="irsaliye-paneli" className="scroll-mt-4" />
         <IrsaliyePaneli
           urunler={urunler.map(u => ({ id: u.id, urun_adi: u.urun_adi, birim: u.birim, son_fiyat: u.son_fiyat }))}
           bekleyenler={bekleyenIrsaliye}
@@ -844,6 +851,12 @@ export default function StokPage() {
         />
       )}
 
+      {malGeldiAcik && (
+        <MalGeldi supabase={supabase} kullanici={yetki.kullaniciAdi || userEmail.split("@")[0]}
+          urunler={urunler.filter(u => u.durum !== "pasif").map(u => ({ id: u.id, urun_adi: u.urun_adi, birim: u.birim, kategori: u.kategori ?? null }))}
+          onKapat={() => setMalGeldiAcik(false)} onKaydedildi={veriCek}
+          onIrsaliye={() => { setMalGeldiAcik(false); setTimeout(() => document.getElementById("irsaliye-paneli")?.scrollIntoView({ behavior: "smooth" }), 50); }}/>
+      )}
       {topluSayimAcik && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-kart border border-blue-500/30 rounded-2xl w-full max-w-3xl shadow-2xl max-h-[85vh] flex flex-col">
