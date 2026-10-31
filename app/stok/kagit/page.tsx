@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useYetki } from "@/lib/useYetki";
-import { kagitBelgesi, grupUrunleri, PERIYOT_ADI, type SayimPeriyodu } from "@/lib/kasaFormu";
+import { kagitBelgesi, grupUrunleri, PERIYOT_ADI, AYLIK_TOPLAM_SATIR, type SayimPeriyodu } from "@/lib/kasaFormu";
 import { ArrowLeft, Loader2, Printer, RefreshCw } from "lucide-react";
 
 type Urun = { id: string; urun_adi: string; birim: string; kategori: string | null; sayim_periyodu: string | null; sira_no: number | null; sayim_yeri: string | null };
@@ -95,7 +95,7 @@ export default function KagitFormPage() {
 
         {hata && <p className="text-xs text-red-400">{hata}</p>}
         <p className="text-[11px] text-gray-600">
-          {PERIYOT_ADI[periyot]} sayım listesinde <b className="text-yazi">{liste.length}</b> ürün var.
+          {PERIYOT_ADI[periyot]} sayım listesinde <b className="text-yazi">{liste.length}</b> ürün var{secim === "aylik" && liste.length < AYLIK_TOPLAM_SATIR ? <>; kağıtta toplam {AYLIK_TOPLAM_SATIR} satır olur, {AYLIK_TOPLAM_SATIR - liste.length} boş satıra listede olmayanlar elle yazılır</> : ""}{secim !== "kasa" && <> · {(html.match(/<section class="sayfa/g) || []).length} sayfa</>}.
           {secim === "kasa" && " Yazıcıda “çift taraflı (uzun kenardan çevir)” seçin."}
           {okundu && <> Liste {okundu.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}&apos;da stoktan okundu.</>}
           {" "}PDF için yazdırma penceresinde yazıcı olarak <b className="text-yazi">“PDF olarak kaydet”</b> seçin.
@@ -106,7 +106,7 @@ export default function KagitFormPage() {
           <div className="h-64 flex items-center justify-center"><Loader2 className="animate-spin text-emerald-400"/></div>
         ) : (
           <iframe ref={cerceve} srcDoc={html} title="Kağıt önizleme"
-            className="w-full bg-white rounded-xl border border-cizgi" style={{ height: secim === "kasa" ? 2300 : 1150 }}/>
+            className="w-full bg-white rounded-xl border border-cizgi" style={{ height: Math.max(1, (html.match(/<section class="sayfa/g) || []).length) * 1165 }}/>
         )}
       </div>
     </div>

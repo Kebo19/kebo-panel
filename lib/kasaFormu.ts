@@ -115,6 +115,13 @@ const CSS = `
   table.iade .kt { margin: 0 1px 0 4px; }
   .aciklama { font-size: 7.5pt; color: #333; margin: 2px 0 0; }
   .kod { font-size: 7pt; color: #555; letter-spacing: 1px; text-align: right; margin-top: 2px; }
+  /* Çok sayfalı okunaklı sayım */
+  .sayfa.ara { page-break-after: always; break-after: page; }
+  table.sayim.okunakli td { height: 24px; }
+  table.sayim.okunakli td.ad { font-size: 10pt; }
+  table.sayim.okunakli td.br, table.sayim.okunakli td.no { font-size: 9.5pt; }
+  table.sayim.okunakli tr.marka td { height: 18px; font-size: 8.5pt; }
+  @media screen { .sayfa.cok { border-bottom: 3px dashed #bbb; margin-bottom: 12px; } }
 `;
 
 const ON_YUZ = `
@@ -238,8 +245,64 @@ ${satirlar}
 </section>`;
 }
 
+/** Aylık sayımda kağıttaki toplam satır (listede olmayanlar boş satırlara elle yazılır). 31.10.2026 */
+export const AYLIK_TOPLAM_SATIR = 90;
+/** Çok sayfalı sayımda bir A4'e düşen satır (okunaklı, sabit yükseklik). */
+export const SAYFA_SATIR = 36;
+
+/**
+ * Okunaklı, çok sayfalı sayım listesi (31.10.2026): satırlar küçülmez (24 px, 9.5 pt), sayfa dolunca
+ * yenisine geçer. Her sayfada başlık + sütun adları tekrar eder; kural ve notlar son sayfada.
+ */
+export function sayimSayfalari(urunler: KagitUrunu[], periyot: SayimPeriyodu, toplamSatir: number): string {
+  const env = periyot === "envanter";
+  const bosHucre = env ? "<td></td><td></td>" : "<td></td><td></td><td></td><td></td>";
+  const sutun = env ? 5 : 7;
+  const yerVar = urunler.some(u => u.sayim_yeri);
+  const satirlar: string[] = [];
+  let sonYer: string | null | undefined;
+  for (const u of urunler) {
+    if (yerVar && u.sayim_yeri !== sonYer) { sonYer = u.sayim_yeri; satirlar.push(`<tr class="marka"><td colspan="${sutun}">${kacis(u.sayim_yeri || "Diğer")}</td></tr>`); }
+    satirlar.push(`<tr><td class="no">${u.no}</td><td class="ad">${kacis(u.urun_adi)}</td><td class="br">${kacis(u.birim)}</td>${bosHucre}</tr>`);
+  }
+  const bos = Math.max(3, toplamSatir - urunler.length);
+  if (bos) satirlar.push(`<tr class="marka"><td colspan="${sutun}">LİSTEDE OLMAYANLAR — adını ve birimini yazın</td></tr>`);
+  for (let i = 0; i < bos; i++) satirlar.push(`<tr><td class="no"></td><td class="ad"></td><td class="br"></td>${bosHucre}</tr>`);
+  const sayfalar: string[][] = [];
+  for (let i = 0; i < satirlar.length; i += SAYFA_SATIR) sayfalar.push(satirlar.slice(i, i + SAYFA_SATIR));
+  // Son sayfada kural + notlar için yer kalsın
+  if (sayfalar.length && sayfalar[sayfalar.length - 1].length > SAYFA_SATIR - 6) sayfalar.push([]);
+  const ad = PERIYOT_ADI[periyot];
+  const kural = env ? "Her demirbaşın kaç adet olduğunu ve arızalı/kayıp olanları yazın. Listede olmayanı boş satırlara ekleyin."
+    : "Sabah ya da akşam sayımından en az biri yeterlidir. Koli/kova sayıyorsanız birime çevirin (ör. 2 koli tavuk döner = 20 kg). Sayılmayan ürünün kutusunu boş bırakın — sıfır yazmayın (0 = stok bitti demektir). Listede olmayan ürünü boş satırlara adı ve birimiyle yazın. Rakamları net yazın; her sayfa ayrı fotoğraflanıp sisteme girilir.";
+  const baslik = env ? `<tr><th style="width:5%">No</th><th>Ürün / demirbaş</th><th style="width:8%">Birim</th><th style="width:13%">Sayılan</th><th style="width:30%">Durum / not</th></tr>`
+    : `<tr><th style="width:5%">No</th><th>Ürün</th><th style="width:7%">Birim</th><th style="width:12%">Sabah sayım<br><small>(gün başı)</small></th><th style="width:12%">Akşam sayım<br><small>(gün sonu)</small></th><th style="width:9%">Fire<br><small>(bozuk/SKT)</small></th><th style="width:11%">Not</th></tr>`;
+  return sayfalar.map((sf, i) => {
+    const son = i === sayfalar.length - 1;
+    return `<section class="sayfa arka cok${son ? "" : " ara"}">
+  <div class="ust">
+    <h1>KEBO <small>${ad} Sayım Listesi · Sayfa ${i + 1}/${sayfalar.length}</small></h1>
+    <div class="alanlar">
+      <div>Tarih: <span class="cizgi" style="width:32px"></span> / <span class="cizgi" style="width:32px"></span> / 20<span class="cizgi" style="width:24px"></span></div>
+      <div>Sayan: <span class="cizgi" style="width:150px"></span></div>
+    </div>
+  </div>
+  ${i === 0 ? `<h2>${env ? "ENVANTER (DEMİRBAŞ) SAYIMI" : `${ad.toLocaleUpperCase("tr-TR")} SAYILAN ÜRÜNLER`} <small>${KAPSAM_NOTU[periyot]}</small></h2>` : ""}
+  ${sf.length ? `<table class="sayim esit okunakli">${baslik}\n${sf.join("\n")}</table>` : ""}
+  ${son ? `<div class="kural">${kural}</div>
+  <h2 style="margin-top:6px">NOTLAR <small>Eksik, bozuk, iade edilen ürünler</small></h2>
+  <div class="not"></div>` : ""}
+  <div class="kod">KEBO-SAYIM · ${periyot.toLocaleUpperCase("tr-TR")} · ${urunler.length} ÜRÜN · SAYFA ${i + 1}/${sayfalar.length}</div>
+</section>`;
+  }).join("\n");
+}
+
 /** Yazdırılacak tam HTML belgesi. kasaFormu=true ise ön yüz kasa formu, arka yüz sayım listesi. */
 export function kagitBelgesi(urunler: KagitUrunu[], periyot: SayimPeriyodu, kasaFormu: boolean): string {
   const on = kasaFormu ? `<section class="sayfa on">${ON_YUZ}</section>` : "";
-  return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><title>KEBO ${kasaFormu ? "Kasa Formu + " : ""}${PERIYOT_ADI[periyot]} Sayım</title><style>${CSS}</style></head><body>${on}${sayimSayfasi(urunler, periyot)}</body></html>`;
+  // Kasa formunun arkası tek sayfa kalır (çift taraflı). Tek başına sayım listeleri okunaklı ve gerekirse
+  // çok sayfalı; aylık sayım toplam AYLIK_TOPLAM_SATIR satır (eksikler elle yazılır).
+  const sayim = kasaFormu ? sayimSayfasi(urunler, periyot)
+    : sayimSayfalari(urunler, periyot, periyot === "aylik" ? AYLIK_TOPLAM_SATIR : urunler.length + 5);
+  return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><title>KEBO ${kasaFormu ? "Kasa Formu + " : ""}${PERIYOT_ADI[periyot]} Sayım</title><style>${CSS}</style></head><body>${on}${sayim}</body></html>`;
 }
