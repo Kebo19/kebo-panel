@@ -9,7 +9,7 @@ import { geminiIstek } from "@/lib/gemini";
 import { bugun, gunEkle, fmtTarih } from "@/lib/tarih";
 import { grupUrunleri, PERIYOT_ADI, type SayimPeriyodu } from "@/lib/kasaFormu";
 import { sayimKagidiOku, type SayimOkunanSatir } from "@/lib/sayimOku";
-import { sabahOzeti, odemeBolumu, odemeOzeti, stokBolumu, robotBolumu, asistanBaglami, html, stokFaturaMetni, belgeSatiri, type TgVeri, type StokFatura, type BelgeEslesmesi } from "@/lib/telegram/ozet";
+import { sabahOzeti, sabahButonlari, raporBolumuMetni, raporButonlari, gunRaporuKisa, type RaporBolumu, odemeBolumu, odemeOzeti, stokBolumu, robotBolumu, asistanBaglami, html, stokFaturaMetni, belgeSatiri, type TgVeri, type StokFatura, type BelgeEslesmesi } from "@/lib/telegram/ozet";
 import { rpc, mesajGonder, mesajDuzenle, tg, yaziyor, dosyaIndir, panelAdresi, type Buton } from "@/lib/telegram/sunucu";
 
 interface TgKullanici { user_id: string; ad: string; kisa_ad: string; rol: string; yetkiler: string[]; onayci: boolean }
@@ -112,7 +112,7 @@ export async function guncellemeIsle(g: TgGuncelleme): Promise<unknown> {
     if (komut === "/odemeler") t = odemeMetni(v, b) || "Cari/fatura görme yetkiniz yok.";
     if (komut === "/stok") t = stokBolumu(v, b, 25).join("\n") || "Stok görme yetkiniz yok.";
     if (komut === "/robot") t = robotBolumu(v, b).join("\n") || "Stok yetkiniz yok.";
-    return mesajGonder(chat, t);
+    return mesajGonder(chat, t, komut === "/ozet" ? sabahButonlari(v, b) : undefined);
   }
   if (!metin) return;
   return soruCevapla(chat, k, metin);
@@ -313,6 +313,17 @@ async function butonIsle(q: NonNullable<TgGuncelleme["callback_query"]>) {
     const sonuc = karar === "no" ? `✖️ ${r.reddedilen} kalem stoğa işlenmedi.` : `✅ ${r.onaylanan} kalem stoğa işlendi${r.kalan ? `; ${r.kalan} kalem eşleştirilmeyi bekliyor (panel → Stok)` : ""}.`;
     if (mesajId) return mesajDuzenle(chat, mesajId, `${m.metin}\n\n${sonuc}`, r.kalan ? [[{ text: "Panelde eşleştir", url: `${panelAdresi()}/stok` }]] : []);
     return mesajGonder(chat, sonuc);
+  }
+
+  // Kasa raporu ayrıntısı (rd:<bölüm>:<tarih>) — sabah özetindeki butonlar
+  if (data.startsWith("rd:")) {
+    const [, bolum, tarih] = data.split(":");
+    const v = await rpc<TgVeri>("tg_veri", { p_chat: chat });
+    if (!v.raporlar) return mesajGonder(chat, "Kasa raporlarını görme yetkiniz yok.");
+    const r = v.raporlar.find(x => x.tarih === tarih);
+    if (!r) return mesajGonder(chat, `${fmtTarih(tarih)} raporu bulunamadı.`);
+    if (bolum === "ozet") return mesajGonder(chat, [`<b>💰 ${fmtTarih(tarih)}</b>`, ...gunRaporuKisa(r)].join("\n"), raporButonlari(tarih));
+    return mesajGonder(chat, raporBolumuMetni(r, bolum as RaporBolumu));
   }
 
   if (data.startsWith("bil:")) {

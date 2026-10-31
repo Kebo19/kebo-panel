@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { sabahOzeti, oglenUyarisi, odemeOzeti, buCuma, asistanBaglami, type TgVeri } from "@/lib/telegram/ozet";
+import { sabahOzeti, oglenUyarisi, odemeOzeti, buCuma, asistanBaglami, type TgVeri, sabahButonlari, raporBolumuMetni } from "@/lib/telegram/ozet";
 
 const KEBO = "11111111-1111-1111-1111-111111111111";
 const YS = "22222222-2222-2222-2222-222222222222";
@@ -65,7 +65,7 @@ describe("telegram özet", () => {
   it("yetkisi olmayan bölüm gösterilmez", () => {
     const t = sabahOzeti({ raporlar: veri().raporlar }, "Elif", "2026-10-27");
     expect(t).toContain("Dün (26.10)");
-    expect(t).toContain("Brüt");
+    expect(t).toContain("Girdi");
     expect(t).not.toContain("Ödemeler");
     expect(t).not.toContain("Stok");
   });
@@ -236,9 +236,15 @@ describe("faturadan stok girişi mesajı", () => {
     const r = { ...(rapor("2026-10-26", 50000) as object), kasa_nakit: 7650, kasa_pos: 17816, os_kebo_trendyol: 22051, os_kebo_trendyol_indirim: 6490,
       kurye_raporlari: [{ isim: "A", tip: "sabit", paketSayisi: "36", nakit: "1437", pos: "1816" }, { isim: "Havuz", tip: "havuz", paketSayisi: "27", nakit: "0", pos: "488" }] } as never;
     const t = sabahOzeti({ raporlar: [r] }, "Murat", "2026-10-27");
-    expect(t).toContain("Roadrunner'a 63 pk");
-    expect(t).toContain("nakit 9.087 ₺");
-    expect(t).toContain("Havuzdan: 464 ₺");
-    expect(t).toContain("İndirim %");
+    expect(t).toContain("Roadrunner'a <b>63</b>");
+    expect(t).toContain("nakit <b>9.087 ₺</b>");
+    expect(t).toContain("Havuzda: <b>464 ₺</b>");
+    expect(t).toContain("İndirim: <b>%");
+    expect(sabahButonlari({ raporlar: [r] }, "2026-10-27")?.[0][0].callback_data).toBe("rd:girdi:2026-10-26");
+    const ind = raporBolumuMetni(r, "indirim");
+    expect(ind).toContain("Trendyol");
+    expect(ind).toContain("%29");
+    expect(raporBolumuMetni(r, "havuz")).toContain("Borçtan düşülecek: 464 ₺");
+    expect(raporBolumuMetni(r, "kasa")).toContain("Nakit: 9.087 ₺");
   });
 });

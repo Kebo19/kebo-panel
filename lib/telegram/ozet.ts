@@ -2,7 +2,7 @@
 // tg_veri RPC'sinin döndürdüğü ham veriden (kullanıcının yetkisi olan bölümler) Telegram
 // mesajları üretir. Hesaplar panelle aynı kütüphanelerden gelir (hesap, cariEkstre, stok),
 // böylece Telegram'daki rakam paneldekiyle aynı olur. Saf fonksiyonlar: test edilebilir.
-import { raporOzeti, donemOzeti, platformKirilimi, kuryeTahsilati, kuryeKartToplami, roadrunnerGunOzeti, ROADRUNNER_GECIS_GUNU, type RaporVerisi } from "@/lib/hesap";
+import { raporOzeti, donemOzeti, platformKirilimi, kuryeTahsilati, kuryeKartToplami, roadrunnerGunOzeti, roadrunnerKuryeUcreti, yemekKartiToplam, nakitGiderToplam, kapidaKasadaMi, ROADRUNNER_GECIS_GUNU, RR_POS_KOMISYON_ORANI, type RaporVerisi } from "@/lib/hesap";
 import { POS_KOMISYON_ORANI } from "@/lib/mutabakat";
 import { vadeTakvimi, type TakvimFatura } from "@/lib/cariEkstre";
 import { stokDurumu, siparisPlani, sayimGecikti, VARSAYILAN_SIPARIS, type StokHareketi } from "@/lib/stok";
@@ -43,27 +43,127 @@ export function buCuma(bugunStr: string): string {
   return gunEkle(bugunStr, (5 - g + 7) % 7);
 }
 
-// ── Ciro (31.10.2026: kısa, panelin rapor detayıyla aynı mantık) ──
-/** Raporda bakılması gerekenler: indirim %15 üstü (en yüksek platformla), kurye tutmuyor. */
+// ── Ciro (31.10.2026: kısa özet + her satırın ayrıntısı butonla, panelin rapor detayıyla aynı mantık) ──
+const N = (v: unknown) => Number(v) || 0;
+const MARKALAR = [["kebo", "Kebo"], ["cnf", "Chick'N"], ["kir", "Kıraloğlu"]] as const;
+
+/** Platform → marka: ciro (online + kapıda), indirim. En çok indirim yapılan platform önce. */
+export function indirimKirilimi(r: RaporVerisi) {
+  const x = r as unknown as Record<string, unknown>;
+  const pl = (ad: string, satir: (m: string) => [number, number]) => {
+    const markalar = MARKALAR.map(([m, mAd]) => { const [c, i] = satir(m); return { ad: mAd, ciro: c, indirim: i }; }).filter(m => m.ciro > 0 || m.indirim > 0);
+    return { ad, markalar, ciro: markalar.reduce((t, m) => t + m.ciro, 0), indirim: markalar.reduce((t, m) => t + m.indirim, 0) };
+  };
+  return [
+    pl("Yemeksepeti", m => [N(x[`os_${m}_ys`]) + N(x[`ko_${m}_ys`]), N(x[`os_${m}_ys_indirim`]) + N(x[`ko_${m}_ys_indirim`])]),
+    pl("Trendyol", m => [N(x[`os_${m}_trendyol`]) + N(x[`ko_${m}_trendyol`]), N(x[`os_${m}_trendyol_indirim`]) + N(x[`ko_${m}_trendyol_indirim`])]),
+    pl("Migros", m => m === "kebo"
+      ? [N(x.os_kebo_migros) + N(x.ko_kebo_migros_yemek), N(x.os_kebo_migros_indirim)]
+      : [N(x[`os_${m}_migros_yemek`]) + N(x[`ko_${m}_migros_yemek`]), N(x[`os_${m}_migros_yemek_indirim`]) + N(x[`os_${m}_migros_indirim`])]),
+    pl("Alo Paket", m => [N(x[`os_${m}_alo`]) + N(x[`ko_${m}_alo`]), N(x[`os_${m}_alo_indirim`])]),
+  ].filter(p => p.markalar.length).sort((a, b) => b.indirim - a.indirim);
+}
+const yz = (i: number, c: number) => (c > 0 ? `%${Math.round((i / c) * 100)}` : "—");
+
+/** Raporda bakılması gerekenler: kurye tutmuyor, paket girilmemiş. (İndirim ayrı satırda.) */
 export function raporUyarilariKisa(r: RaporVerisi): string[] {
   const out: string[] = [];
   const o = raporOzeti(r);
-  const ciro = o.online + o.kapida;
-  if (ciro > 0 && o.indirim / ciro > 0.15) {
-    const k = platformKirilimi(r);
-    const rec = r as unknown as Record<string, unknown>;
-    const ind = (p: string) => Object.keys(rec).filter(x => new RegExp(`^(os|ko)_(kebo|cnf|kir)_${p}(_yemek)?_indirim$`).test(x)).reduce((t, x) => t + (Number(rec[x]) || 0), 0);
-    const pl = ([["Yemeksepeti", "ys"], ["Trendyol", "trendyol"], ["Migros", "migros"]] as const)
-      .map(([ad, kod]) => ({ ad, i: ind(kod), c: k.online[ad] + k.kapida[ad] })).filter(x => x.c > 0).sort((a, b) => b.i - a.i)[0];
-    out.push(`İndirim %${Math.round(o.indirim / ciro * 100)}${pl ? ` (en çok ${pl.ad} %${Math.round(pl.i / pl.c * 100)})` : ""}`);
-  }
   if (r.tarih >= ROADRUNNER_GECIS_GUNU && (r.kurye_raporlari || []).length) {
-    const getirilen = (r.kurye_raporlari || []).reduce((t, x) => t + (Number(x.nakit) || 0) + (Number(x.pos) || 0) + kuryeKartToplami(x), 0);
+    const getirilen = (r.kurye_raporlari || []).reduce((t, k) => t + N(k.nakit) + N(k.pos) + kuryeKartToplami(k), 0);
     const fark = Math.round(o.kapida - getirilen);
     if (Math.abs(fark) >= 1) out.push(`Kurye ${tl(Math.abs(fark))} ${fark > 0 ? "eksik" : "fazla"}`);
   }
   if (o.brut > 0 && o.paket === 0) out.push("Paket girilmemiş");
   return out;
+}
+
+/** Bir günün kısa raporu (sıra: girdi, çıktı, paket, kasa, havuz, indirim). */
+export function gunRaporuKisa(d: RaporVerisi): string[] {
+  const o = raporOzeti(d);
+  const cikti = o.gider + o.iade + o.indirim;
+  const rr = roadrunnerGunOzeti(d);
+  const kt = kuryeTahsilati(d);
+  const ciro = o.online + o.kapida;
+  const enCok = indirimKirilimi(d)[0];
+  const s = [
+    `📥 Girdi: <b>${tl(o.brut)}</b> (brüt)`,
+    `📤 Çıktı: ${tl(cikti)} → Net <b>${tl(o.net)}</b>`,
+    `📦 Paket: <b>${o.paket}</b>${d.tarih >= ROADRUNNER_GECIS_GUNU ? ` · Roadrunner'a <b>${rr.odenecekPaket}</b>` : ""}`,
+    `💵 Kasada: nakit <b>${tl(N(d.kasa_nakit) + kt.nakit)}</b> · POS <b>${tl(N(d.kasa_pos) + kt.pos)}</b>`,
+  ];
+  if (rr.havuzNakit + rr.havuzPos > 0) s.push(`🛵 Havuzda: <b>${tl(rr.havuzTahsilat)}</b>`);
+  s.push(`🏷 İndirim: <b>${yz(o.indirim, ciro)}</b>${o.indirim / (ciro || 1) > 0.15 ? " ⚠️" : ""}${enCok && enCok.indirim > 0 ? ` (en çok ${enCok.ad} ${yz(enCok.indirim, enCok.ciro)})` : ""}`);
+  const u = raporUyarilariKisa(d);
+  if (u.length) s.push(`⚠️ ${u.join(" · ")}`);
+  return s;
+}
+
+export type RaporBolumu = "girdi" | "cikti" | "paket" | "kasa" | "havuz" | "indirim";
+/** Kısa raporun altındaki butonlar: tıklayınca o satırın ayrıntısı gelir. */
+export function raporButonlari(tarih: string): { text: string; callback_data: string }[][] {
+  const b = (text: string, k: RaporBolumu) => ({ text, callback_data: `rd:${k}:${tarih}` });
+  return [[b("📥 Girdiler", "girdi"), b("📤 Çıktılar", "cikti"), b("📦 Paket", "paket")],
+    [b("💵 Kasa", "kasa"), b("🛵 Havuz", "havuz"), b("🏷 İndirim", "indirim")]];
+}
+
+/** Butona basılınca gönderilen ayrıntı. */
+export function raporBolumuMetni(d: RaporVerisi, bolum: RaporBolumu): string {
+  const o = raporOzeti(d);
+  const t = `${fmtTarih(d.tarih).slice(0, 5)}`;
+  const sat = (ad: string, v: number) => `${html(ad)}: ${tl(v)}`;
+  const kt = kuryeTahsilati(d);
+  const rr = roadrunnerGunOzeti(d);
+  const kuryeler = (d.kurye_raporlari || []).filter(k => N(k.paketSayisi) + N(k.uzakPaket) + N(k.paket9km) + N(k.nakit) + N(k.pos) > 0);
+  const kAd = (k: (typeof kuryeler)[number], i: number) => k.isim && !/^(Havuz|Kurye \d)/.test(k.isim) ? k.isim : k.tip === "havuz" ? "Havuz" : `Kurye ${i + 1}`;
+  if (bolum === "girdi") {
+    const k = platformKirilimi(d);
+    const s = [`<b>📥 Girdiler · ${t}</b>`];
+    (Object.keys(k.online) as (keyof typeof k.online)[]).forEach(p => { if (k.online[p] > 0) s.push(sat(p, k.online[p])); });
+    if (!kapidaKasadaMi(d.tarih) && o.kapida > 0) s.push(sat("Kapıda ödeme (kurye)", o.kapida));
+    s.push(sat("Kasa nakit", N(d.kasa_nakit)), sat("Kasa POS", N(d.kasa_pos)));
+    if (yemekKartiToplam(d) > 0) s.push(sat("Kasa yemek kartı", yemekKartiToplam(d)));
+    if (nakitGiderToplam(d) > 0) s.push(sat("Kasadan ödenen gider", nakitGiderToplam(d)));
+    s.push(`<b>Brüt ciro: ${tl(o.brut)}</b>`);
+    return s.join("\n");
+  }
+  if (bolum === "cikti") {
+    const s = [`<b>📤 Çıktılar · ${t}</b>`, sat("Platform indirimi", o.indirim), sat("Gider", o.gider)];
+    String((d as unknown as { gider_aciklama?: string }).gider_aciklama || "").split("||")[0].split("|").map(x => x.trim()).filter(Boolean).forEach(x => s.push(`  • ${html(x.replace(/^\[Personel Avans\]\s*/, ""))}`));
+    s.push(sat("İade", o.iade), `<b>Net ciro: ${tl(o.net)}</b>`);
+    return s.join("\n");
+  }
+  if (bolum === "paket") {
+    const s = [`<b>📦 Paket · ${t}</b>`, `Asıl paket: <b>${o.paket}</b>`];
+    if (d.tarih >= ROADRUNNER_GECIS_GUNU) {
+      s.push(`Roadrunner'a ödenecek: <b>${rr.odenecekPaket}</b>`);
+      kuryeler.forEach((k, i) => { const u = roadrunnerKuryeUcreti(k); s.push(`  • ${html(kAd(k, i))}: ${u.gercek}${u.garantiFarki > 0 ? ` → ${u.uygulanan} (30 garanti)` : ""}`); });
+    }
+    if (o.paket > 0) s.push(`Ortalama sepet: ${tl((o.online + o.kapida) / o.paket)}`);
+    return s.join("\n");
+  }
+  if (bolum === "kasa") {
+    const pos = N(d.kasa_pos) + kt.pos, kom = pos * POS_KOMISYON_ORANI;
+    const s = [`<b>💵 Kasada olması gereken · ${t}</b>`, `<b>Nakit: ${tl(N(d.kasa_nakit) + kt.nakit)}</b>`, `  • Dükkân: ${tl(N(d.kasa_nakit))}`];
+    kuryeler.filter(k => k.tip !== "havuz" && N(k.nakit) > 0).forEach((k, i) => s.push(`  • ${html(kAd(k, i))}: ${tl(N(k.nakit))}`));
+    s.push(`<b>POS: ${tl(pos)}</b>`, `  • Kasa: ${tl(N(d.kasa_pos))}`);
+    kuryeler.filter(k => k.tip !== "havuz" && N(k.pos) > 0).forEach((k, i) => s.push(`  • ${html(kAd(k, i))}: ${tl(N(k.pos))}`));
+    s.push(`POS komisyonu %${(POS_KOMISYON_ORANI * 100).toLocaleString("tr-TR")}: −${tl(kom)} → hesaba ${tl(pos - kom)}`);
+    if (yemekKartiToplam(d) > 0) s.push(`Yemek kartı (kasa): ${tl(yemekKartiToplam(d))}`);
+    return s.join("\n");
+  }
+  if (bolum === "havuz") {
+    if (d.tarih < ROADRUNNER_GECIS_GUNU) return "Bu tarihte Roadrunner yok.";
+    return [`<b>🛵 Havuzda biriken (Roadrunner'da) · ${t}</b>`, `Nakit: ${tl(rr.havuzNakit)}`, `POS: ${tl(rr.havuzPos)}`,
+      `POS komisyonu %${RR_POS_KOMISYON_ORANI * 100}: −${tl(rr.havuzKomisyon)}`, `<b>Borçtan düşülecek: ${tl(rr.havuzTahsilat)}</b>`].join("\n");
+  }
+  const s = [`<b>🏷 İndirim · ${t}</b>`, "<i>ciro · indirim · yüzde</i>"];
+  indirimKirilimi(d).forEach(p => {
+    s.push(`<b>${p.ad}</b>: ${tl(p.ciro)} · ${tl(p.indirim)} · ${yz(p.indirim, p.ciro)}${p.ciro > 0 && p.indirim / p.ciro > 0.15 ? " ⚠️" : ""}`);
+    if (p.markalar.length > 1) p.markalar.forEach(m => s.push(`  • ${html(m.ad)}: ${tl(m.ciro)} · ${tl(m.indirim)} · ${yz(m.indirim, m.ciro)}`));
+  });
+  s.push(`<b>Toplam: ${tl(o.online + o.kapida)} · ${tl(o.indirim)} · ${yz(o.indirim, o.online + o.kapida)}</b>`, "%15 üstü ⚠️");
+  return s.join("\n");
 }
 
 export function ciroBolumu(v: TgVeri, bugunStr: string): string[] {
@@ -73,18 +173,9 @@ export function ciroBolumu(v: TgVeri, bugunStr: string): string[] {
   const s: string[] = [];
   const d = harita.get(dun);
   if (d) {
-    const o = raporOzeti(d);
     const gecen = harita.get(gunEkle(dun, -7));
-    s.push(`<b>💰 Dün (${fmtTarih(dun).slice(0, 5)})</b>`);
-    s.push(`Brüt <b>${tl(o.brut)}</b>${gecen ? ok(yuzde(o.brut, raporOzeti(gecen).brut)) : ""} · Net <b>${tl(o.net)}</b>`);
-    const rr = roadrunnerGunOzeti(d);
-    s.push(`${o.paket} paket${d.tarih >= ROADRUNNER_GECIS_GUNU && rr.odenecekPaket ? ` · Roadrunner'a ${rr.odenecekPaket} pk` : ""}`);
-    const kt = kuryeTahsilati(d);
-    const pos = (Number(d.kasa_pos) || 0) + kt.pos;
-    s.push(`Kasada: nakit ${tl((Number(d.kasa_nakit) || 0) + kt.nakit)} · POS ${tl(pos)} (komisyon sonrası ${tl(pos * (1 - POS_KOMISYON_ORANI))})`);
-    if (rr.havuzNakit + rr.havuzPos > 0) s.push(`Havuzdan: ${tl(rr.havuzTahsilat)} (borçtan düşülür)`);
-    const u = raporUyarilariKisa(d);
-    if (u.length) s.push(`⚠️ Bak: ${u.join(" · ")}`);
+    s.push(`<b>💰 Dün (${fmtTarih(dun).slice(0, 5)})</b>${gecen ? ` brüt${ok(yuzde(raporOzeti(d).brut, raporOzeti(gecen).brut))} geçen haftaya göre` : ""}`);
+    s.push(...gunRaporuKisa(d));
   } else {
     s.push(`<b>💰 Ciro</b>`, `⚠️ Dünün (${fmtTarih(dun)}) kasa raporu girilmemiş.`);
   }
@@ -98,6 +189,12 @@ export function ciroBolumu(v: TgVeri, bugunStr: string): string[] {
   for (let i = 1; i <= 7; i++) { const t = gunEkle(bugunStr, -i); if (!harita.has(t)) eksik.push(fmtTarih(t).slice(0, 5)); }
   if (eksik.length > 1) s.push(`Rapor yok: ${eksik.reverse().join(", ")}`);
   return s;
+}
+
+/** Sabah özetinde dünün raporu varsa ayrıntı butonları. */
+export function sabahButonlari(v: TgVeri, bugunStr: string) {
+  const dun = gunEkle(bugunStr, -1);
+  return v.raporlar?.some(x => x.tarih === dun) ? raporButonlari(dun) : undefined;
 }
 
 // ── Ödemeler ──

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { bugun } from "@/lib/tarih";
 import { botToken, rpc, mesajGonder } from "@/lib/telegram/sunucu";
-import { sabahOzeti, oglenUyarisi, type TgVeri } from "@/lib/telegram/ozet";
+import { sabahOzeti, sabahButonlari, oglenUyarisi, type TgVeri } from "@/lib/telegram/ozet";
 
 // Günlük Telegram bildirimleri (Vercel Cron, vercel.json):
 //   ?tur=sabah → her bağlı kullanıcıya sabah özeti (kendi yetkisindeki bölümlerle)
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
         if (!k) continue;
         const v = await rpc<TgVeri>("tg_veri", { p_chat: chat_id });
         const metin = tur === "sabah" ? sabahOzeti(v, k.ad, b) : oglenUyarisi(v, b);
-        if (metin) { await mesajGonder(chat_id, metin); gonderilen++; }
+        if (metin) { await mesajGonder(chat_id, metin, tur === "sabah" ? sabahButonlari(v, b) : undefined); gonderilen++; }
       } catch (e) { hatalar.push(e instanceof Error ? e.message : String(e)); }
     }
   } catch (e) {
