@@ -117,7 +117,7 @@ function roketExcelOku(satirlar) {
     const tarih = isGunu(r[iTarih]);
     if (!tarih) continue;
     satir++;
-    const g = gunler.get(tarih) ?? { kurye: /* @__PURE__ */ new Map(), kanallar: {}, diger: 0, iptal: 0, digerler: [] };
+    const g = gunler.get(tarih) ?? { kurye: /* @__PURE__ */ new Map(), kanallar: {}, diger: 0, iptal: 0, digerler: [], kapida: [] };
     gunler.set(tarih, g);
     const durum = sade2(String(r[iDurum] ?? "")).toLocaleLowerCase("tr-TR");
     if (/iptal/.test(durum)) {
@@ -154,13 +154,40 @@ function roketExcelOku(satirlar) {
       });
     }
     const odeme = sade2(String(r[iOdeme] ?? "")).toLocaleLowerCase("tr-TR");
-    if (/nakit/.test(odeme)) k.nakit += tutar;
-    else if (/^pos|kredi|kart[ıi]? ?ile/.test(odeme)) k.pos += tutar;
-    else if (/paye/.test(odeme)) k.paye += tutar;
-    else if (/token/.test(odeme)) k.yemek += tutar;
-    else if (/yemek/.test(odeme)) {
-      if (kanal === "alo" || !kanal) k.yemek += tutar;
-    } else if (/bilinmeyen/.test(odeme)) k.bilinmeyen += tutar;
+    let tur = null;
+    if (/nakit/.test(odeme)) {
+      k.nakit += tutar;
+      tur = "nakit";
+    } else if (/^pos|kredi|kart[ıi]? ?ile/.test(odeme)) {
+      k.pos += tutar;
+      tur = "pos";
+    } else if (/paye/.test(odeme)) {
+      k.paye += tutar;
+      tur = "paye";
+    } else if (/token/.test(odeme)) {
+      k.yemek += tutar;
+      tur = "token";
+    } else if (/yemek/.test(odeme)) {
+      if (kanal === "alo" || !kanal) {
+        k.yemek += tutar;
+        tur = "yemek";
+      }
+    } else if (/bilinmeyen/.test(odeme)) {
+      k.bilinmeyen += tutar;
+      tur = "bilinmeyen";
+    }
+    if (tur && tutar > 0) {
+      const no = iNo >= 0 ? sade2(String(r[iNo] ?? "")) : "";
+      g.kapida.push({
+        saat: /\s(\d{2}:\d{2})/.exec(String(r[iTarih] ?? ""))?.[1] || "",
+        kurye: ad,
+        kanal,
+        kaynak: (iYon >= 0 ? sade2(String(r[iYon] ?? "")) : "") || "Roket",
+        odeme: tur,
+        tutar: kurus(tutar),
+        ...no ? { no } : {}
+      });
+    }
   }
   const sonuc = [...gunler.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([tarih, g]) => {
     const kuryeler = [...g.kurye.values()].map((k) => ({
@@ -178,6 +205,7 @@ function roketExcelOku(satirlar) {
       kanallar: g.kanallar,
       digerPaket: g.diger,
       digerSiparisler: [...g.digerler].sort((a, b) => sirala(a.saat).localeCompare(sirala(b.saat))),
+      kapidaSiparisler: [...g.kapida].sort((a, b) => sirala(a.saat).localeCompare(sirala(b.saat))),
       iptal: g.iptal,
       toplamPaket: kuryeler.reduce((t, k) => t + k.paket, 0)
     };
@@ -270,6 +298,19 @@ function paketKontrolu(g, bizdeKanal) {
     farkliKanallar: satirlar.filter((k) => k.roket !== k.bizde)
   };
 }
+function kapidaKanalKarsilastir(siparisler, mpKapida) {
+  const satirlar = [];
+  const ekle = (anahtar, ad, mp, l) => {
+    const roket = kurus(l.reduce((t, x) => t + x.tutar, 0));
+    if (!roket && !mp) return;
+    const fark = kurus(roket - (mp || 0));
+    const adaylar = Math.abs(fark) >= 1 ? l.filter((x) => Math.abs(x.tutar - Math.abs(fark)) <= 1) : [];
+    satirlar.push({ anahtar, ad, mp, roket, fark, siparisler: l, adaylar });
+  };
+  for (const { kanal, ad } of KANALLAR) ekle(kanal, ad, mpKapida[kanal] || 0, siparisler.filter((x) => x.kanal === kanal));
+  ekle("elle", "Roket'e elle girilen (Fi\u015F Tarand\u0131 / Adisyon)", null, siparisler.filter((x) => !x.kanal));
+  return satirlar;
+}
 export {
   ATAMA_ADI,
   SABIT_ASGARI_PAKET,
@@ -277,6 +318,7 @@ export {
   atamaBirlestir,
   atamaBul,
   isGunu,
+  kapidaKanalKarsilastir,
   kuryeKarsilastir,
   paketKontrolu,
   roketExcelOku,

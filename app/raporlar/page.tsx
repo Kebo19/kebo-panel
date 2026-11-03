@@ -23,7 +23,7 @@ import {
 import { POS_KOMISYON_ORANI } from "@/lib/mutabakat";
 import { KASA_BASLANGIC } from "@/lib/devir";
 import { useYetki } from "@/lib/useYetki";
-import { slotToplami, atamaBul, adEslesir, paketKontrolu, type RoketGun } from "@/lib/roket";
+import { slotToplami, atamaBul, adEslesir, paketKontrolu, kapidaKanalKarsilastir, type RoketGun } from "@/lib/roket";
 import { eksikGunler, gunAraligiYaz, raporUyarilari } from "@/lib/raporKontrol";
 import RoketCek from "@/components/RoketCek";
 import { esitPaylas, bankoCalisanlari } from "@/lib/kasaAcigi";
@@ -3319,6 +3319,46 @@ export default function RaporlarPage() {
                     <div className={`${h} font-bold text-yazi pt-0.5`}><span>Toplam</span><span className="text-right tabular-nums">{fmt(ch.tKapida)}</span><span className="text-right tabular-nums">{fmt(ch.tKapida + fark)}</span></div>
                     <p className={`pt-1 font-semibold ${yakin(fark, 0) ? "text-emerald-300" : "text-amber-300"}`}>{teshis}</p>
                     {bilinmeyen > 0 && <p className="text-amber-300">Roket&apos;te türü seçilmemiş ₺{fmt(bilinmeyen)} var (nakit sayıldı).</p>}
+                    {/* Kanal kanal + sipariş sipariş (03.11): Roket'teki her kapıda tahsilat MagicPay'in kapıda tutarıyla */}
+                    {roketGun?.tarih === tarih && (roketGun.kapidaSiparisler ? (() => {
+                      const mpKapida = {
+                        kebo_ys: tv(koKeboYs.tutar), kebo_trendyol: tv(koKeboTrendyol.tutar), kebo_migros: tv(koKeboMigrosYemek.tutar),
+                        cnf_ys: tv(koCnfYs.tutar), cnf_trendyol: tv(koCnfTrendyol.tutar), cnf_migros: tv(koCnfMigrosYemek.tutar),
+                        kir_ys: tv(koKirYs.tutar), kir_trendyol: tv(koKirTrendyol.tutar), kir_migros: tv(koKirMigrosYemek.tutar),
+                        alo: tv(koKeboAlo.tutar) + tv(koCnfAlo.tutar) + tv(koKirAlo.tutar),
+                      };
+                      const kanallar = kapidaKanalKarsilastir(roketGun.kapidaSiparisler, mpKapida);
+                      const odemeAdi: Record<string, string> = { nakit: "nakit", pos: "POS", paye: "Paye", token: "Token", yemek: "yemek kartı", bilinmeyen: "türü yok" };
+                      const sip = (x: { saat: string; kurye: string; odeme: string; tutar: number; no?: string }, vurgu: boolean, k: string) => (
+                        <div key={k} className={`flex justify-between gap-2 text-[13px] ${vurgu ? "text-amber-300 font-bold" : "text-gray-600"}`}>
+                          <span>{x.saat} · {x.kurye.split(" ")[0]} · {odemeAdi[x.odeme] || x.odeme}{x.no ? ` · ${x.no}` : ""}</span><span className="tabular-nums">{fmt(x.tutar)}</span>
+                        </div>
+                      );
+                      return (
+                        <div className="mt-2 pt-2 border-t border-cizgi">
+                          <p className="font-bold text-yazi pb-1">Kanal kanal (Roket siparişleri)</p>
+                          <div className={`${h} text-[12px] font-bold text-gray-500`}><span/><span className="text-right">MagicPay</span><span className="text-right">Roket</span></div>
+                          {kanallar.map(kk => {
+                            const farkli = Math.abs(kk.fark) >= 1;
+                            return (
+                              <details key={kk.anahtar} open={farkli && kk.anahtar !== "elle"} className="border-b border-cizgi/40">
+                                <summary className={`${h} py-0.5 cursor-pointer ${farkli ? "text-amber-300 font-semibold" : ""}`}>
+                                  <span>{kk.ad}{farkli && kk.mp != null ? ` · ${kk.fark > 0 ? "+" : ""}${fmt(kk.fark)}` : ""} <span className="text-gray-500 font-normal">({kk.siparisler.length} sipariş)</span></span>
+                                  <span className="text-right tabular-nums">{kk.mp == null ? "—" : fmt(kk.mp)}</span>
+                                  <span className="text-right tabular-nums">{fmt(kk.roket)}</span>
+                                </summary>
+                                <div className="pl-3 pb-1.5 space-y-0.5">
+                                  {kk.adaylar.length > 0 && <p className="text-[12px] text-amber-300">Farka denk gelen sipariş{kk.adaylar.length > 1 ? "ler" : ""} (önce bunlara bakın):</p>}
+                                  {kk.adaylar.map((x, i) => sip(x, true, `a${i}`))}
+                                  {kk.siparisler.filter(x => !kk.adaylar.includes(x)).map((x, i) => sip(x, false, `s${i}`))}
+                                </div>
+                              </details>
+                            );
+                          })}
+                          <p className="text-[12px] text-gray-500 pt-1">Fark varsa: o kanaldaki siparişleri Roket&apos;te açıp ödeme türüne bakın. Online ödenmiş bir sipariş kuryede &quot;nakit&quot; seçilmiş olabilir.</p>
+                        </div>
+                      );
+                    })() : <p className="text-[12px] text-gray-500 pt-1">Sipariş sipariş karşılaştırma için bu günü Roket&apos;ten yeniden çekin (dükkân robotu güncellendikten sonra).</p>)}
                   </div>
                 );
               })();

@@ -13,6 +13,7 @@ import { fmt, fmtK } from "@/lib/para";
 import { bugun, aySonu } from "@/lib/tarih";
 import { hepsiniCek } from "@/lib/hepsiniCek";
 import type { RaporVerisi } from "@/lib/hesap";
+import { eksikGunler, eksikGunMetni } from "@/lib/raporKontrol";
 import {
   karZararHesapla, sonAylar, ayEtiketi, AY_ADLARI,
   type KarZararSonuc, type KasaIslemiKZ, type FaturaKZ, type CariOdemeKZ,
@@ -160,7 +161,8 @@ export default function KarZararPage() {
             {s.eksikGun > 0 && (
               <div className="flex items-start gap-2 rounded-xl bg-amber-500/10 border border-amber-500/25 px-4 py-3 text-[12px] text-amber-100">
                 <AlertTriangle size={15} className="shrink-0 mt-0.5" />
-                <p><b>{AY_ADLARI[Number(ay.slice(5, 7)) - 1]}: {s.eksikGun} gün rapor eksik</b> — ciro eksik olduğu için kâr olduğundan düşük görünür. ({s.raporGunSayisi} gün rapor girildi.)</p>
+                <p><b>{AY_ADLARI[Number(ay.slice(5, 7)) - 1]}: {s.eksikGun} gün rapor eksik</b>
+                  {veri && <> ({eksikGunMetni(eksikGunler(veri.raporlar.map(r => r.tarih), ay, bugun()))})</>} — ciro eksik olduğu için kâr olduğundan düşük görünür. ({s.raporGunSayisi} gün rapor girildi.)</p>
               </div>
             )}
 

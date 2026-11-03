@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { roketExcelOku, isGunu, roketKanali, kuryeKarsilastir, roketTahsilat, adEslesir, varsayilanAtama, atamaBirlestir, slotToplami } from "@/lib/roket";
+import { roketExcelOku, kapidaKanalKarsilastir, isGunu, roketKanali, kuryeKarsilastir, roketTahsilat, adEslesir, varsayilanAtama, atamaBirlestir, slotToplami } from "@/lib/roket";
 
 const B = ["Sipariş Tarihi", "İşletme Adı", "Alıcı Adı", "Kurye", "Durum", "Tutar", "Ödeme Yöntemi", "Telefon", "Mesafe", "İleri Tarih", "Yönlendiren"];
 const s = (t: string, kurye: string, tutar: string, odeme: string, yon: string, durum = "Teslim Edildi", km = "1.50 Km") =>
@@ -124,5 +124,23 @@ describe("paket kontrolü: Roket ↔ MagicPay + Kıraloğlu Migros", () => {
     const k3 = paketKontrolu(g, { kebo_ys: 9, alo: 5 });
     expect(k3.fark).toBe(4);
     expect(k3.farkliKanallar.map(s => s.kanal)).toEqual(["kebo_ys", "kir_migros"]);
+  });
+});
+
+describe("Kapıda siparişler (03.11)", () => {
+  it("kurye tahsilatı olan siparişler tek tek tutulur, online olanlar hariç", () => {
+    const g = roketExcelOku(satirlar).gunler.find(x => x.tarih === "2026-10-16")!;
+    const k = g.kapidaSiparisler!;
+    expect(k.map(x => `${x.odeme}:${x.tutar}`)).toEqual(["nakit:359", "yemek:886", "pos:1014", "paye:564", "nakit:668", "bilinmeyen:100"]);
+    expect(k.find(x => x.tutar === 668)!.kanal).toBe("kebo_trendyol");
+  });
+  it("kanal kanal MagicPay ile karşılaştırır, farka denk gelen siparişi aday gösterir", () => {
+    const g = roketExcelOku(satirlar).gunler.find(x => x.tarih === "2026-10-16")!;
+    // MagicPay: Trendyol kapıda sadece 564 (Paye) → Roket 564 + 668 nakit = 668 fazla
+    const t = kapidaKanalKarsilastir(g.kapidaSiparisler!, { kebo_trendyol: 564, alo: 359 + 886 + 1014 + 100 });
+    const ty = t.find(x => x.anahtar === "kebo_trendyol")!;
+    expect(ty.fark).toBe(668);
+    expect(ty.adaylar.map(x => x.tutar)).toEqual([668]);
+    expect(t.find(x => x.anahtar === "alo")!.fark).toBe(0);
   });
 });

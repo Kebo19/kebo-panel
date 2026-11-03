@@ -9,7 +9,7 @@ import { geminiIstek } from "@/lib/gemini";
 import { bugun, gunEkle, fmtTarih } from "@/lib/tarih";
 import { grupUrunleri, PERIYOT_ADI, type SayimPeriyodu } from "@/lib/kasaFormu";
 import { sayimKagidiOku, type SayimOkunanSatir } from "@/lib/sayimOku";
-import { sabahOzeti, sabahButonlari, raporBolumuMetni, raporButonlari, gunRaporuKisa, type RaporBolumu, odemeBolumu, odemeOzeti, stokBolumu, robotBolumu, asistanBaglami, html, stokFaturaMetni, belgeSatiri, type TgVeri, type StokFatura, type BelgeEslesmesi } from "@/lib/telegram/ozet";
+import { sabahOzeti, sabahButonlari, raporBolumuMetni, raporButonlari, gunRaporuKisa, type RaporBolumu, odemeBolumu, odemeOzeti, stokBolumu, robotBolumu, asistanBaglami, html, kisaAd, stokFaturaMetni, belgeSatiri, type TgVeri, type StokFatura, type BelgeEslesmesi } from "@/lib/telegram/ozet";
 import { rpc, mesajGonder, mesajDuzenle, tg, yaziyor, dosyaIndir, panelAdresi, type Buton } from "@/lib/telegram/sunucu";
 
 interface TgKullanici { user_id: string; ad: string; kisa_ad: string; rol: string; yetkiler: string[]; onayci: boolean }
@@ -307,11 +307,19 @@ async function butonIsle(q: NonNullable<TgGuncelleme["callback_query"]>) {
   if (data.startsWith("sg:")) {
     const [, karar, gib] = data.split(":");
     if (!izin(k, "stok")) return mesajGonder(chat, "Stok yetkiniz yok.");
+    if (karar === "tf") {
+      // "Bu firmayı hiç sorma": tedarikçi stok takibi dışına alınır (cari etkilenmez)
+      const t = await rpc<{ tedarikci: string | null; kapanan: number }>("tg_stok_tedarikci_takipsiz", { p_chat: chat, p_gib: gib });
+      const f = await rpc<StokFatura>("tg_stok_fatura", { p_chat: chat, p_gib: gib });
+      const sonuc = `🚫 ${html(kisaAd(t.tedarikci || "Bu firma"))} artık stok için sorulmayacak (${t.kapanan} kalem kapandı). Cari kaydı etkilenmez.`;
+      if (mesajId) return mesajDuzenle(chat, mesajId, `${stokFaturaMetni(f).metin}\n\n${sonuc}`, []);
+      return mesajGonder(chat, sonuc);
+    }
     const r = await rpc<{ onaylanan: number; reddedilen: number; kalan: number }>("tg_stok_giris_onayla", { p_chat: chat, p_gib: gib, p_karar: karar === "no" ? "reddet" : "onayla" });
     const f = await rpc<StokFatura>("tg_stok_fatura", { p_chat: chat, p_gib: gib });
     const m = stokFaturaMetni(f);
     const sonuc = karar === "no" ? `✖️ ${r.reddedilen} kalem stoğa işlenmedi.` : `✅ ${r.onaylanan} kalem stoğa işlendi${r.kalan ? `; ${r.kalan} kalem eşleştirilmeyi bekliyor (panel → Stok)` : ""}.`;
-    if (mesajId) return mesajDuzenle(chat, mesajId, `${m.metin}\n\n${sonuc}`, r.kalan ? [[{ text: "Panelde eşleştir", url: `${panelAdresi()}/stok` }]] : []);
+    if (mesajId) return mesajDuzenle(chat, mesajId, `${m.metin}\n\n${sonuc}`, r.kalan ? [[{ text: "✖️ Kalanları işleme", callback_data: `sg:no:${gib}` }], [{ text: "🚫 Bu firmayı hiç sorma (stok dışı)", callback_data: `sg:tf:${gib}` }]] : []);
     return mesajGonder(chat, sonuc);
   }
 
@@ -354,7 +362,9 @@ export function stokFaturaButonlari(gib: string, eslesen: number, eslesmeyen: nu
     b.push([{ text: "Panelde incele", url: `${panelAdresi()}/stok` }]);
     return b;
   }
-  if (eslesen) b.push([{ text: `✅ Stoğa işle (${eslesen})`, callback_data: `sg:ok:${gib}` }, { text: "✖️ İşleme", callback_data: `sg:no:${gib}` }]);
-  if (eslesmeyen || !eslesen) b.push([{ text: "Panelde aç", url: `${panelAdresi()}/stok` }]);
+  // Evet / Hayır her zaman Telegram'dan verilebilir; eşleşmemiş kalem varsa "firmayı hiç sorma" da çıkar.
+  if (eslesen) b.push([{ text: `✅ Evet, stoğa işle (${eslesen})`, callback_data: `sg:ok:${gib}` }, { text: "✖️ Hayır, işleme", callback_data: `sg:no:${gib}` }]);
+  else if (eslesmeyen) b.push([{ text: "✖️ Hayır, stoğa işleme", callback_data: `sg:no:${gib}` }]);
+  if (eslesmeyen) b.push([{ text: "🚫 Bu firmayı hiç sorma (stok dışı)", callback_data: `sg:tf:${gib}` }]);
   return b;
 }

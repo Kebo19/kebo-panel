@@ -17,6 +17,23 @@ export function eksikGunler(tarihler: string[], ay: string, bugun: string): stri
   return out;
 }
 
+/** [bas, bit] aralığında (dünden sonrası sayılmaz) raporu olmayan günler. */
+export function eksikGunlerAralik(tarihler: string[], bas: string, bit: string, bugun: string): string[] {
+  const son = bit < bugun ? bit : gunEkle(bugun, -1);
+  const var_ = new Set(tarihler);
+  const out: string[] = [];
+  for (let t = bas; t <= son; t = gunEkle(t, 1)) if (!var_.has(t)) out.push(t);
+  return out;
+}
+
+const AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+/** Ay ay gruplar: ["2026-10-06","2026-10-07","2026-11-01"] → "6-7 Ekim, 1 Kasım" */
+export function eksikGunMetni(tarihler: string[]): string {
+  const aylar = new Map<string, string[]>();
+  [...tarihler].sort().forEach(t => { const a = t.slice(0, 7); aylar.set(a, [...(aylar.get(a) || []), t]); });
+  return [...aylar.entries()].map(([a, l]) => `${gunAraligiYaz(l)} ${AYLAR[Number(a.slice(5, 7)) - 1]}`).join(", ");
+}
+
 /** Ardışık günleri aralık yapar: [06,07,17,18,19] → "6-7, 17-19" */
 export function gunAraligiYaz(tarihler: string[]): string {
   const gunler = [...tarihler].sort().map(t => Number(t.slice(8, 10)));

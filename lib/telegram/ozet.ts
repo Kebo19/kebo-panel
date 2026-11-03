@@ -30,7 +30,7 @@ export interface TgVeri {
 const tl = (v: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(Math.round(v || 0)) + " ₺";
 const sayi = (v: number, d = 1) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: d }).format(v || 0);
 export const html = (s: string) => String(s ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
-const kisaAd = (unvan: string) => {
+export const kisaAd = (unvan: string) => {
   const s = (unvan || "").replace(/\s+(Anonim|Limited|Ltd\.?|A\.?Ş\.?|Şti\.?|Sanayi|Ticaret|Gıda|Elektronik|İletişim|Hizmetleri?).*$/i, "").trim();
   return (s || unvan || "").slice(0, 34);
 };
@@ -427,7 +427,7 @@ export function stokFaturaMetni(f: StokFatura): { metin: string; eslesen: number
     `${html(kisaAd(f.tedarikci || ""))} · ${fmtTarih(f.tarih)} · ${html(f.gib_no)}`, ""];
   eslesen.forEach(k => s.push(`• ${sayi(Number(k.miktar), 2)} ${html((k.birim || "").toLowerCase())} ${html(k.kalem)} → <b>${sayi(Number(k.stok_miktar), 2)} ${html(k.urun_birim || "")} ${html((k.urun || "").replace(/\s*\(.*$/, ""))}</b>`));
   if (eslesmeyen.length) {
-    s.push("", `❓ Stok ürünüyle eşleşmemiş ${eslesmeyen.length} kalem (panelden bir kez eşleştirin, sonra otomatik gelir):`);
+    s.push("", `❓ Stok ürünüyle eşleşmemiş ${eslesmeyen.length} kalem (stoğa girmeyecekse ✖️ ya da 🚫; girecekse panelden bir kez eşleştirin):`);
     eslesmeyen.slice(0, 8).forEach(k => s.push(`• ${sayi(Number(k.miktar), 2)} ${html((k.birim || "").toLowerCase())} ${html(k.kalem)}`));
   }
   if (!bekleyen.length) s.push("Bu faturanın kalemleri işlendi.");

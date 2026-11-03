@@ -109,6 +109,20 @@ export interface RoketDigerSiparis {
   km?: number;
 }
 
+/** Kuryenin kapıda para aldığı teslim edilmiş sipariş (03.11.2026). Müşteri adı / telefon / adres tutulmaz. */
+export type KapidaOdeme = "nakit" | "pos" | "paye" | "token" | "yemek" | "bilinmeyen";
+export interface RoketKapidaSiparis {
+  saat: string;
+  kurye: string;
+  /** MagicPay kanalı; Roket'e elle girilen sipariş (Fiş Tarandı / Roket Adisyon) için null */
+  kanal: Kanal | null;
+  /** Roket'teki "Yönlendiren" ("Trendyol / KEBO", "LOCAL SIPARIS", "Fiş Tarandı") */
+  kaynak: string;
+  odeme: KapidaOdeme;
+  tutar: number;
+  no?: string;
+}
+
 export interface RoketGun {
   tarih: string; // YYYY-AA-GG
   kuryeler: RoketKurye[];
@@ -118,6 +132,8 @@ export interface RoketGun {
   digerPaket: number;
   /** Bu girişlerin ayrıntısı (29.10.2026'dan önce yüklenen günlerde yok). Telefon/adres yok. */
   digerSiparisler?: RoketDigerSiparis[];
+  /** Kapıda tahsil edilen siparişler tek tek (03.11.2026'dan önce yüklenen günlerde yok) */
+  kapidaSiparisler?: RoketKapidaSiparis[];
   iptal: number;
   toplamPaket: number;
 }
@@ -169,13 +185,13 @@ export function roketExcelOku(satirlar: unknown[][]): RoketOkuma {
   if ([iTarih, iKurye, iDurum, iTutar, iOdeme].some(i => i < 0)) {
     return { gunler: [], satir: 0, hatali: 0, uyari: ["Bu dosya Roket Paket Raporu'na benzemiyor (Sipariş Tarihi / Kurye / Durum / Tutar / Ödeme Yöntemi sütunları bulunamadı)."] };
   }
-  const gunler = new Map<string, { kurye: Map<string, RoketKurye>; kanallar: Partial<Record<Kanal, number>>; diger: number; iptal: number; digerler: RoketDigerSiparis[] }>();
+  const gunler = new Map<string, { kurye: Map<string, RoketKurye>; kanallar: Partial<Record<Kanal, number>>; diger: number; iptal: number; digerler: RoketDigerSiparis[]; kapida: RoketKapidaSiparis[] }>();
   let satir = 0, hatali = 0;
   for (const r of satirlar.slice(1)) {
     const tarih = isGunu(r[iTarih]);
     if (!tarih) continue; // toplam / özet satırları
     satir++;
-    const g = gunler.get(tarih) ?? { kurye: new Map<string, RoketKurye>(), kanallar: {} as Partial<Record<Kanal, number>>, diger: 0, iptal: 0, digerler: [] as RoketDigerSiparis[] };
+    const g = gunler.get(tarih) ?? { kurye: new Map<string, RoketKurye>(), kanallar: {} as Partial<Record<Kanal, number>>, diger: 0, iptal: 0, digerler: [] as RoketDigerSiparis[], kapida: [] as RoketKapidaSiparis[] };
     gunler.set(tarih, g);
     const durum = sade(String(r[iDurum] ?? "")).toLocaleLowerCase("tr-TR");
     if (/iptal/.test(durum)) { g.iptal++; continue; }
@@ -202,21 +218,28 @@ export function roketExcelOku(satirlar: unknown[][]): RoketOkuma {
       });
     }
     const odeme = sade(String(r[iOdeme] ?? "")).toLocaleLowerCase("tr-TR");
-    if (/nakit/.test(odeme)) k.nakit += tutar;
-    else if (/^pos|kredi|kart[ıi]? ?ile/.test(odeme)) k.pos += tutar;
-    else if (/paye/.test(odeme)) k.paye += tutar;
+    let tur: KapidaOdeme | null = null;
+    if (/nakit/.test(odeme)) { k.nakit += tutar; tur = "nakit"; }
+    else if (/^pos|kredi|kart[ıi]? ?ile/.test(odeme)) { k.pos += tutar; tur = "pos"; }
+    else if (/paye/.test(odeme)) { k.paye += tutar; tur = "paye"; }
     // Token (Token Flex): kapıda yemek kartı — Trendyol kapıda da açık (31.10), her kanalda kurye tahsilatıdır
-    else if (/token/.test(odeme)) k.yemek += tutar;
-    else if (/yemek/.test(odeme)) { if (kanal === "alo" || !kanal) k.yemek += tutar; }
-    else if (/bilinmeyen/.test(odeme)) k.bilinmeyen += tutar;
+    else if (/token/.test(odeme)) { k.yemek += tutar; tur = "token"; }
+    else if (/yemek/.test(odeme)) { if (kanal === "alo" || !kanal) { k.yemek += tutar; tur = "yemek"; } }
+    else if (/bilinmeyen/.test(odeme)) { k.bilinmeyen += tutar; tur = "bilinmeyen"; }
     // "online ödeme" → kurye tahsilatı değil
+    if (tur && tutar > 0) {
+      const no = iNo >= 0 ? sade(String(r[iNo] ?? "")) : "";
+      g.kapida.push({ saat: /\s(\d{2}:\d{2})/.exec(String(r[iTarih] ?? ""))?.[1] || "", kurye: ad, kanal,
+        kaynak: (iYon >= 0 ? sade(String(r[iYon] ?? "")) : "") || "Roket", odeme: tur, tutar: kurus(tutar), ...(no ? { no } : {}) });
+    }
   }
   const sonuc: RoketGun[] = [...gunler.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([tarih, g]) => {
     const kuryeler: RoketKurye[] = [...g.kurye.values()].map(k => ({
       ...k, nakit: kurus(k.nakit), pos: kurus(k.pos), paye: kurus(k.paye), yemek: kurus(k.yemek), bilinmeyen: kurus(k.bilinmeyen), km: kurus(k.km),
     })).sort((a, b) => b.paket - a.paket || a.ad.localeCompare(b.ad, "tr"));
     return { tarih, kuryeler: varsayilanAtama(kuryeler), kanallar: g.kanallar, digerPaket: g.diger,
-      digerSiparisler: [...g.digerler].sort((a, b) => sirala(a.saat).localeCompare(sirala(b.saat))), iptal: g.iptal, toplamPaket: kuryeler.reduce((t, k) => t + k.paket, 0) };
+      digerSiparisler: [...g.digerler].sort((a, b) => sirala(a.saat).localeCompare(sirala(b.saat))),
+      kapidaSiparisler: [...g.kapida].sort((a, b) => sirala(a.saat).localeCompare(sirala(b.saat))), iptal: g.iptal, toplamPaket: kuryeler.reduce((t, k) => t + k.paket, 0) };
   });
   if (hatali) uyari.push(`${hatali} teslim edilmiş paketin kuryesi belli değil (Kurye Yok / Planlandı); hesaba katılmadı.`);
   return { gunler: sonuc, satir, hatali, uyari };
@@ -343,4 +366,31 @@ export function paketKontrolu(g: Pick<RoketGun, "kanallar" | "digerPaket" | "top
     fark: g.toplamPaket - bizde, rokettenEk: g.digerPaket, fisEslesme, eslesmeyenFis: kalan,
     farkliKanallar: satirlar.filter(k => k.roket !== k.bizde),
   };
+}
+
+// ─── KAPIDA ÖDEME: MAGICPAY ↔ ROKET, KANAL KANAL (03.11.2026) ────────────────
+export interface KapidaKanalSatiri {
+  anahtar: string;           // kanal ya da "elle"
+  ad: string;
+  mp: number | null;         // MagicPay kapıda tutarı (Roket'e elle girilende null)
+  roket: number;
+  fark: number;              // roket − mp
+  siparisler: RoketKapidaSiparis[];
+  /** Tutarı farka denk gelen siparişler (önce bunlara bakılır) */
+  adaylar: RoketKapidaSiparis[];
+}
+
+/** mpKapida: kanal → MagicPay kapıda tutarı (kasa raporundaki ko_* alanları). */
+export function kapidaKanalKarsilastir(siparisler: RoketKapidaSiparis[], mpKapida: Partial<Record<Kanal, number>>): KapidaKanalSatiri[] {
+  const satirlar: KapidaKanalSatiri[] = [];
+  const ekle = (anahtar: string, ad: string, mp: number | null, l: RoketKapidaSiparis[]) => {
+    const roket = kurus(l.reduce((t, x) => t + x.tutar, 0));
+    if (!roket && !mp) return;
+    const fark = kurus(roket - (mp || 0));
+    const adaylar = Math.abs(fark) >= 1 ? l.filter(x => Math.abs(x.tutar - Math.abs(fark)) <= 1) : [];
+    satirlar.push({ anahtar, ad, mp, roket, fark, siparisler: l, adaylar });
+  };
+  for (const { kanal, ad } of KANALLAR) ekle(kanal, ad, mpKapida[kanal] || 0, siparisler.filter(x => x.kanal === kanal));
+  ekle("elle", "Roket'e elle girilen (Fiş Tarandı / Adisyon)", null, siparisler.filter(x => !x.kanal));
+  return satirlar;
 }

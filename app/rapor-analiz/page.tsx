@@ -13,6 +13,7 @@ import {
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, YAxis } from "recharts";
 import { fmt } from "@/lib/para";
 import { bugun, ayBasi, gunEkle, gunFarki, fmtTarih } from "@/lib/tarih";
+import { eksikGunlerAralik, eksikGunMetni } from "@/lib/raporKontrol";
 import {
   raporOzeti, donemOzeti, platformKirilimi, PLATFORMLAR, PLATFORM_RENK, type RaporVerisi, type PlatformAdi,
   RR_PAKET_UCRETI, RR_UZAK_KATSAYI, RR_KM9_KATSAYI, RR_POS_KOMISYON_ORANI, KURYE_GARANTI_PAKET as RR_KURYE_GARANTI,
@@ -481,6 +482,17 @@ ${isletmeOzeti}`,
           </div>
         ) : (
           <>
+            {/* ── Eksik gün uyarısı (31.10): toplamlar sadece girilen raporlardan ── */}
+            {(() => {
+              const eksik = eksikGunlerAralik(raporlar.map(r => r.tarih), baslangic, bitis, bugun());
+              return eksik.length > 0 && (
+                <div className="flex items-start gap-2 rounded-xl bg-amber-500/10 border border-amber-500/25 px-4 py-3 text-[13px] text-amber-100">
+                  <AlertTriangle size={15} className="shrink-0 mt-0.5" />
+                  <p><b>{eksik.length} gün rapor yok:</b> {eksikGunMetni(eksik)} — bu günler toplamlara ve ortalamalara girmez, ciro olduğundan düşük görünür.</p>
+                </div>
+              );
+            })()}
+
             {/* ── ÖZET (genel özet + kasa dağılımı) ── */}
             {raporTuru === "ozet" && (
               <div className="space-y-4">
