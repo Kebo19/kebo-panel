@@ -109,12 +109,17 @@ export default function GelirGiderPage() {
 
       <div className="max-w-screen-md mx-auto px-4 sm:px-6 py-5 space-y-4">
         {/* Kasa */}
-        <div className="bg-kart border border-cizgi rounded-2xl p-4">
-          <p className="text-[12px] text-gray-600 font-semibold">Kasada toplam</p>
-          <p className={`text-3xl font-black tabular-nums mt-1 ${toplam < 0 ? "text-red-400" : ""}`}>{fmt2(toplam)} ₺</p>
-          <p className="text-[12px] text-gray-600 mt-2 tabular-nums">
-            {HESAPLAR.map(h => `${h} ${fmt2(bakiye[h])} ₺`).join("  ·  ")}
-          </p>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div className="col-span-2 sm:col-span-1 bg-kart border border-altin/40 rounded-xl px-3 py-2.5">
+            <p className="text-[11px] text-gray-600 font-semibold">Toplam</p>
+            <p className={`text-[15px] font-black tabular-nums mt-0.5 ${toplam < 0 ? "text-red-400" : "text-altin"}`}>{fmt2(toplam)} ₺</p>
+          </div>
+          {HESAPLAR.map(h => (
+            <div key={h} className="bg-kart border border-cizgi rounded-xl px-3 py-2.5">
+              <p className="text-[11px] text-gray-600 font-semibold">{h}</p>
+              <p className={`text-[15px] font-bold tabular-nums mt-0.5 ${bakiye[h] < 0 ? "text-red-400" : ""}`}>{fmt2(bakiye[h])} ₺</p>
+            </div>
+          ))}
         </div>
 
         {/* Yeni kayıt */}
