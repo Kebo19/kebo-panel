@@ -21,7 +21,7 @@ const HESAPLAR = ["Nakit", "TEB", "VakıfBank", "Enpara"] as const;
 const YEMEK_CEKLERI = YEMEK_KARTI_ADLARI;
 type Hesap = (typeof HESAPLAR)[number] | (typeof YEMEK_CEKLERI)[number];
 const PARA_HESABI = new Set<string>(HESAPLAR);
-interface Kayit { id: string; tarih: string; tip: Tip; hesap: Hesap; hedef_hesap: Hesap | null; aciklama: string; tutar: number; created_at: string }
+interface Kayit { id: string; tarih: string; tip: Tip; hesap: Hesap; hedef_hesap: Hesap | null; aciklama: string; tutar: number; ekleyen: string | null; created_at: string }
 
 const kutu = "bg-alan border border-cizgi focus:border-altin/50 text-yazi text-[14px] h-11 px-3 rounded-xl outline-none";
 
@@ -48,7 +48,7 @@ export default function GelirGiderPage() {
     setYukleniyor(true); setHata("");
     try {
       const d = await hepsiniCek<Kayit>((a, b) => supabase.from("gelir_gider")
-        .select("id,tarih,tip,hesap,hedef_hesap,aciklama,tutar,created_at")
+        .select("id,tarih,tip,hesap,hedef_hesap,aciklama,tutar,ekleyen,created_at")
         .order("tarih").order("created_at").order("id").range(a, b));
       setListe(d.map(k => ({ ...k, tutar: Number(k.tutar) || 0 })));
     } catch (e) {
@@ -223,6 +223,7 @@ export default function GelirGiderPage() {
                     <td className="px-3 py-2.5">
                       <span className="font-semibold">{k.aciklama}</span>
                       <span className="text-[11px] text-gray-600"> · {k.tip === "transfer" ? `${k.hesap} → ${k.hedef_hesap}` : k.hesap}</span>
+                      {k.ekleyen && <span className="text-[11px] text-gray-600"> · <span className="text-altin/80">{k.ekleyen}</span></span>}
                     </td>
                     {k.tip === "transfer" ? (
                       <td colSpan={2} className="px-3 py-2.5 text-right tabular-nums text-sky-400 whitespace-nowrap">⇄ {fmt2(k.tutar)}</td>
