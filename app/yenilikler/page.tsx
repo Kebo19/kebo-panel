@@ -4,6 +4,15 @@ import { Sparkles } from "lucide-react";
 // başına bir öğe eklemek yeterli.
 const SURUMLER: { tarih: string; baslik: string; maddeler: string[] }[] = [
   {
+    tarih: "05.11.2026",
+    baslik: "Gelir Gider defteri",
+    maddeler: [
+      "Yeni Gelir Gider sayfası: tarih, ne için ve tutar yazıp \"Para girdi\" ya da \"Para çıktı\" diye kaydedin.",
+      "Üstte o ayın girenini, çıkanını ve kalanını görürsünüz; oklarla aylar arasında geçilir.",
+      "Bu defter kasa bakiyesini ve Kâr / Zarar'ı değiştirmez. Kasa yetkisi olanlar görür.",
+    ],
+  },
+  {
     tarih: "28.10.2026",
     baslik: "Kullanıcı yönetimi ve şifreler",
     maddeler: [

@@ -53,7 +53,7 @@ export const YETKILER: YetkiTanimi[] = [
   { anahtar: "rapor_duzenle", etiket: "Rapor düzenleme", aciklama: "Girilmiş raporu düzenleme (onaya gider), tarih ve toplam uyarılarını geçme", grup: "Günlük işler", sayfalar: [] },
   { anahtar: "rapor_onay", etiket: "Rapor onaylama", aciklama: "Rapor değişikliklerini onaylama; raporu onaysız düzenleme ve silme", grup: "Günlük işler", sayfalar: [] },
   { anahtar: "rapor_analiz", etiket: "Rapor Analizi", aciklama: "Dönemsel satış ve platform analizleri", grup: "Günlük işler", sayfalar: ["/rapor-analiz"] },
-  { anahtar: "kasa", etiket: "Kasa", aciklama: "Kasa hareketleri, sabit giderler, banka ekstresi", grup: "Finans", sayfalar: ["/kasa"] },
+  { anahtar: "kasa", etiket: "Kasa", aciklama: "Kasa hareketleri, sabit giderler, banka ekstresi, gelir gider defteri", grup: "Finans", sayfalar: ["/kasa", "/gelir-gider"] },
   { anahtar: "cari", etiket: "Cariler & Faturalar", aciklama: "Tedarikçiler, faturalar, ödemeler; irsaliyeden fatura oluşturma", grup: "Finans", sayfalar: ["/cariler", "/faturalar"] },
   { anahtar: "magicpay", etiket: "MagicPay karşılaştırma", aciklama: "Kasa raporunu adisyon programıyla gün gün karşılaştırma", grup: "Finans", sayfalar: ["/magicpay"] },
   { anahtar: "kar_zarar", etiket: "Kâr / Zarar", aciklama: "Aylık kâr/zarar ve nakit akışı", grup: "Finans", sayfalar: ["/kar-zarar"] },

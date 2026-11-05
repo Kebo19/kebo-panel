@@ -5,9 +5,10 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { tv, paraGirdisi } from "@/lib/para";
 import { bugun, buAyYil, gunEkle, fmtTarih as tarihYaz } from "@/lib/tarih";
-import { donemOzeti as raporDonemOzeti, yemekKartiToplam, kuryeTahsilati, type RaporVerisi } from "@/lib/hesap";
+import { donemOzeti as raporDonemOzeti, yemekKartiToplam, type RaporVerisi } from "@/lib/hesap";
 import { KASA_GIDER_KATEGORILERI, TUM_KASA_GIDER_KATEGORILERI, KASA_GELIR_KATEGORILERI, TAHSILAT_KATS, TRANSFER_KATEGORISI, ACILIS_KATS, ACILIS_KATEGORISI, otomatikKomisyonlar, OTOMATIK_POS_KOMISYONU, HAVUZ_POS_KOMISYONU } from "@/lib/karZarar";
 import { KASA_BASLANGIC } from "@/lib/devir";
+import { posBekleyenHesapla, hesapBakiyeleri, type BakiyeRaporu } from "@/lib/kasaBakiye";
 import KasaAcilisi from "@/components/KasaAcilisi";
 import { hepsiniCek } from "@/lib/hepsiniCek";
 import SabitGiderler from "@/components/SabitGiderler";
@@ -16,7 +17,7 @@ import { KrediKartlariPaneli, KartAyarPenceresi, YemekKartiPaneli } from "@/comp
 import StokDegerPaneli from "@/components/StokDegerPaneli";
 import { krediKartiDurumu, yemekKartiAlacaklari, VARSAYILAN_KARTLAR, type KrediKarti } from "@/lib/kasaHesaplari";
 import { YEMEK_KARTI_ADLARI } from "@/lib/hesap";
-import { YEMEK_KARTI_KATEGORI, yemekKartiBul, posMutabakati, POS_KATEGORI, POS_BANKA_HESABI } from "@/lib/mutabakat";
+import { YEMEK_KARTI_KATEGORI, yemekKartiBul, POS_BANKA_HESABI } from "@/lib/mutabakat";
 import Link from "next/link";
 import {
   PlusCircle, Building2, Coins,
@@ -219,49 +220,11 @@ export default function KasaPage() {
     return true;
   }), [manuelIslemler,secilenAy,secilenYil,tipFiltre,aramaMetni]);
 
-  // ── POS: bankaya henüz yatışı görünmeyen (ekstre yüklenmemiş) günlerin beklenen tutarı ──
-  // 31 Ekim'in POS'u 1 Kasım'da yatar → başlangıçtan bir gün öncesinin raporu da dahil.
-  const posBekleyen = useMemo(() => {
-    const ilk = gunEkle(KASA_BASLANGIC, -1);
-    const m = posMutabakati(
-      raporlar.filter(r => r.tarih >= ilk).map(r => ({ tarih: r.tarih, pos: (Number(r.kasa_pos) || 0) + kuryeTahsilati(r as unknown as RaporVerisi).pos })),
-      manuelIslemler.filter(i => i.tip === "gelir" && i.kategori === POS_KATEGORI && i.hesap === POS_BANKA_HESABI && i.islem_tarihi >= KASA_BASLANGIC)
-        .map(i => ({ id: i.id, tarih: i.islem_tarihi, tutar: Number(i.tutar) || 0, hesap: i.hesap, kategori: i.kategori })),
-      bugun(),
-    );
-    const bekleyen = m.satirlar.filter(x => x.gerceklesen === null);
-    // Tarihi/tutarı tutmadığı için eşleşmeyen POS yatışları da bekleyenden düşülür (geç ya da birleşik
-    // yatış iki kez sayılmasın); fark POS mutabakatında görünür.
-    const eslesmeyenYatis = m.eslesmeyenHareketler.reduce((t, h) => t + h.tutar, 0);
-    const toplam = Math.max(0, bekleyen.reduce((t, x) => t + x.beklenen, 0) - eslesmeyenYatis);
-    return { toplam: Math.round(toplam * 100) / 100, gun: bekleyen.length };
-  }, [raporlar, manuelIslemler]);
-
-  // ── Bakiyeler ──
-  // Nakit Kasa = raporlardaki nakit sayımları (günlük giderler zaten ödenmiş halde) + manuel hareketler.
-  // Banka hesapları = manuel hareketler. Personel avansı ve cari ödemeleri bir hesaptan
-  // yapıldığında veritabanı bunları otomatik olarak manuel hareket olarak ekler.
-  // POS ve yemek kartı tutarları bankaya geçene kadar hiçbir hesaba eklenmez.
-  const bakiyeler = useMemo(() => {
-    const b: Record<string, number> = { Nakit: 0, TEB: 0, VakıfBank: 0, Enpara: 0 };
-    // 31.10: bakiyeler KASA_BASLANGIC'tan (1 Kasım) sayılır; Ekim deneme verisi arşivde.
-    // Sabit kuryelerin kapıda topladığı nakit de kasaya girer.
-    raporlar.forEach(r => { if (r.tarih >= KASA_BASLANGIC) b.Nakit += (Number(r.kasa_nakit)||0) + kuryeTahsilati(r as unknown as RaporVerisi).nakit; });
-    // POS (dükkân + sabit kuryeler) ertesi gün %2 komisyonla VakıfBank'a otomatik işlenir. Ekstre yüklenip
-    // gerçek yatış eşleşince beklenen tutar yerine gerçek tutar sayılır → çift kayıt olmaz.
-    b[POS_BANKA_HESABI] += posBekleyen.toplam;
-    manuelIslemler.forEach(i => {
-      if (i.islem_tarihi < KASA_BASLANGIC) return;
-      const m = Number(i.tutar)||0;
-      if (i.tip==="gelir" && i.hesap in b) b[i.hesap] += m;
-      else if (i.tip==="gider" && i.hesap in b) b[i.hesap] -= m;
-      else if (i.tip==="transfer") {
-        if (i.hesap in b) b[i.hesap] -= m;
-        if (i.hedef_hesap && i.hedef_hesap in b) b[i.hedef_hesap] += m;
-      }
-    });
-    return b as {Nakit:number;TEB:number;VakıfBank:number;Enpara:number};
-  }, [raporlar,manuelIslemler,posBekleyen]);
+  // ── POS bekleyen ve bakiyeler (lib/kasaBakiye; Gelir Gider sayfası da aynısını kullanır) ──
+  // POS (dükkân + sabit kuryeler) ertesi gün %2 komisyonla VakıfBank'a eklenir; ekstreden gerçek yatış
+  // eşleşince beklenen yerine gerçek sayılır. Bakiyeler 1 Kasım'dan (KASA_BASLANGIC) sayılır.
+  const posBekleyen = useMemo(() => posBekleyenHesapla(raporlar as unknown as BakiyeRaporu[], manuelIslemler, bugun()), [raporlar, manuelIslemler]);
+  const bakiyeler = useMemo(() => hesapBakiyeleri(raporlar as unknown as BakiyeRaporu[], manuelIslemler, posBekleyen.toplam), [raporlar, manuelIslemler, posBekleyen]);
 
   // ── Kredi kartları ve yemek kartı alacakları ──
   const kartDurumlari = useMemo(() => krediKartlari.map(k => krediKartiDurumu(k, manuelIslemler, bugun())), [krediKartlari, manuelIslemler]);
