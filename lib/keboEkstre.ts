@@ -266,15 +266,20 @@ export function mutabakatPlani(ekstre: EkstreSonuc, faturalar: SistemFatura[], o
 
   // Bakiye eşitleme: cari bakiye = faturalar − ödemeler (fatura durumları veritabanında bu bakiyeden otomatik
   // hesaplanır). Eklemelerden sonra kalan fark, tek bir "bakiye düzeltmesi" kaydıyla ekstre bakiyesine eşitlenir.
-  const fToplam = faturalar.reduce((t, f) => t + (Number(f.toplam_tutar) || 0), 0);
-  const oToplam = odemeler.reduce((t, o) => t + (Number(o.tutar) || 0), 0);
+  // 05.11.2026 düzeltme: ekstrenin son tarihinden SONRA kesilen fatura / yapılan ödeme ekstrede olamaz → karşılaştırmaya
+  // girmez (eskiden girdiği için 29.10 faturaları kadar fazla düzeltme yazılıyordu).
+  const sonTarih = ekstre.satirlar.reduce((m, s) => (s.tarih > m ? s.tarih : m), "");
+  const donemde = (t: string) => !sonTarih || t <= sonTarih;
+  const fToplam = faturalar.filter(f => donemde(f.fatura_tarihi)).reduce((t, f) => t + (Number(f.toplam_tutar) || 0), 0);
+  const oToplam = odemeler.filter(o => donemde(o.tarih) || o.aciklama === DUZELTME_ACIKLAMA).reduce((t, o) => t + (Number(o.tutar) || 0), 0);
   const eskiDuzeltme = odemeler.filter(o => o.aciklama === DUZELTME_ACIKLAMA).reduce((t, o) => t + (Number(o.tutar) || 0), 0);
   const tutarFarki = tutarFarklari.reduce((t, x) => t + x.satir.borc - (Number(x.fatura.toplam_tutar) || 0), 0);
   const eklemeSonrasiBorc = yuvarla(fToplam + tutarFarki + yeniFaturalar.reduce((t, s) => t + s.borc, 0)
     - (oToplam - eskiDuzeltme) - yeniOdemeler.reduce((t, s) => t + s.alacak, 0));
   return {
     yeniFaturalar, tutarFarklari, ekstredeOlmayan, yeniOdemeler, atlananOdemeler,
-    mevcutBorc: yuvarla(fToplam - oToplam), eklemeSonrasiBorc,
+    mevcutBorc: yuvarla(faturalar.reduce((t, f) => t + (Number(f.toplam_tutar) || 0), 0) - odemeler.reduce((t, o) => t + (Number(o.tutar) || 0), 0)),
+    eklemeSonrasiBorc,
     duzeltme: yuvarla(eklemeSonrasiBorc - ekstre.sonBakiye), hedefBakiye: ekstre.sonBakiye,
   };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 // ─── GELİR GİDER ────────────────────────────────────────────────────────────
-// Tamamen elle tutulan basit defter (kullanıcı kararı 05.11): kasa raporu, POS, açılış bakiyesi vb.
+// Yetki: "gelir_gider" (Kasa yetkisinden ayrı). Tamamen elle tutulan basit defter (kullanıcı kararı 05.11): kasa raporu, POS, açılış bakiyesi vb.
 // HİÇBİR ŞEY otomatik gelmez; bakiyeler sıfırdan başlar. Tablo: public.gelir_gider (kasa yetkisi).
 // Kasa & Finans ve Kâr / Zarar'dan bağımsızdır.
 
@@ -19,7 +19,9 @@ type Tip = "gelir" | "gider" | "transfer";
 // Para hesapları (Toplam'a girer) ve yemek çekleri (alacak; Toplam'a girmez, üstte tek "Yemek Çeki" kutusu)
 const HESAPLAR = ["Nakit", "TEB", "VakıfBank", "Enpara"] as const;
 const YEMEK_CEKLERI = YEMEK_KARTI_ADLARI;
-type Hesap = (typeof HESAPLAR)[number] | (typeof YEMEK_CEKLERI)[number];
+// Kredi kartları borç hesabıdır: karttan harcama borcu artırır, bankadan karta virman borcu kapatır. Toplam'a girmez.
+const KREDI_KARTLARI = ["TEB Kredi Kartı", "Enpara Kredi Kartı"] as const;
+type Hesap = (typeof HESAPLAR)[number] | (typeof YEMEK_CEKLERI)[number] | (typeof KREDI_KARTLARI)[number];
 const PARA_HESABI = new Set<string>(HESAPLAR);
 interface Kayit { id: string; tarih: string; tip: Tip; hesap: Hesap; hedef_hesap: Hesap | null; aciklama: string; tutar: number; ekleyen: string | null; created_at: string }
 
@@ -28,7 +30,7 @@ const kutu = "bg-alan border border-cizgi focus:border-altin/50 text-yazi text-[
 export default function GelirGiderPage() {
   const supabase = createClient();
   const yetki = useYetki();
-  const izinli = yetki.izin("kasa");
+  const izinli = yetki.izin("gelir_gider");
 
   const [liste, setListe] = useState<Kayit[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
@@ -43,6 +45,7 @@ export default function GelirGiderPage() {
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [silinecek, setSilinecek] = useState<string | null>(null);
   const [cekAcik, setCekAcik] = useState(false);
+  const [kartAcik, setKartAcik] = useState(false);
 
   const yukle = useCallback(async () => {
     setYukleniyor(true); setHata("");
@@ -60,8 +63,8 @@ export default function GelirGiderPage() {
   useEffect(() => { if (izinli) yukle(); }, [izinli, yukle]);
 
   // Eskiden yeniye yürüyen bakiye, sonra en yeni üstte gösterilir
-  const { satirlar, bakiye, toplam, cekToplam } = useMemo(() => {
-    const b = Object.fromEntries([...HESAPLAR, ...YEMEK_CEKLERI].map(h => [h, 0])) as Record<Hesap, number>;
+  const { satirlar, bakiye, toplam, cekToplam, kartBorcu } = useMemo(() => {
+    const b = Object.fromEntries([...HESAPLAR, ...YEMEK_CEKLERI, ...KREDI_KARTLARI].map(h => [h, 0])) as Record<Hesap, number>;
     const sirali = [...liste].sort((x, y) => x.tarih.localeCompare(y.tarih) || x.created_at.localeCompare(y.created_at));
     const s: (Kayit & { kalan: number })[] = [];
     let t = 0;
@@ -79,7 +82,8 @@ export default function GelirGiderPage() {
       }
       s.push({ ...k, kalan: t });
     }
-    return { satirlar: s.reverse(), bakiye: b, toplam: t, cekToplam: YEMEK_CEKLERI.reduce((x, h) => x + b[h], 0) };
+    return { satirlar: s.reverse(), bakiye: b, toplam: t, cekToplam: YEMEK_CEKLERI.reduce((x, h) => x + b[h], 0),
+      kartBorcu: KREDI_KARTLARI.reduce((x, h) => x - b[h], 0) };
   }, [liste]);
 
   const kaydet = async (e: React.FormEvent) => {
@@ -127,7 +131,7 @@ export default function GelirGiderPage() {
       <div className="max-w-screen-md mx-auto px-4 sm:px-6 py-5 space-y-4">
         {/* Kasa */}
         <div className="space-y-2">
-        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
           <div className="col-span-2 sm:col-span-1 bg-kart border border-altin/40 rounded-xl px-3 py-2.5">
             <p className="text-[11px] text-gray-600 font-semibold">Toplam</p>
             <p className={`text-[15px] font-black tabular-nums mt-0.5 ${toplam < 0 ? "text-red-400" : "text-altin"}`}>{fmt2(toplam)} ₺</p>
@@ -138,14 +142,33 @@ export default function GelirGiderPage() {
               <p className={`text-[15px] font-bold tabular-nums mt-0.5 ${bakiye[h] < 0 ? "text-red-400" : ""}`}>{fmt2(bakiye[h])} ₺</p>
             </div>
           ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={() => setCekAcik(a => !a)} aria-expanded={cekAcik}
-            className={`col-span-2 sm:col-span-1 text-left bg-kart border rounded-xl px-3 py-2.5 hover:border-altin/40 ${cekAcik ? "border-altin/40" : "border-cizgi"}`}>
+            className={`text-left bg-kart border rounded-xl px-3 py-2.5 hover:border-altin/40 ${cekAcik ? "border-altin/40" : "border-cizgi"}`}>
             <p className="text-[11px] text-gray-600 font-semibold flex items-center justify-between">
               Yemek Çeki {cekAcik ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
             </p>
             <p className={`text-[15px] font-bold tabular-nums mt-0.5 ${cekToplam < 0 ? "text-red-400" : ""}`}>{fmt2(cekToplam)} ₺</p>
           </button>
+          <button type="button" onClick={() => setKartAcik(a => !a)} aria-expanded={kartAcik}
+            className={`text-left bg-kart border rounded-xl px-3 py-2.5 hover:border-altin/40 ${kartAcik ? "border-altin/40" : "border-cizgi"}`}>
+            <p className="text-[11px] text-gray-600 font-semibold flex items-center justify-between">
+              Kredi Kartı borcu {kartAcik ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </p>
+            <p className={`text-[15px] font-bold tabular-nums mt-0.5 ${kartBorcu > 0 ? "text-red-400" : ""}`}>{fmt2(kartBorcu)} ₺</p>
+          </button>
         </div>
+        {kartAcik && (
+          <div className="grid grid-cols-2 gap-2">
+            {KREDI_KARTLARI.map(h => (
+              <div key={h} className="bg-alan border border-cizgi rounded-xl px-3 py-2">
+                <p className="text-[11px] text-gray-600 font-semibold">{h}</p>
+                <p className={`text-[14px] font-bold tabular-nums ${-bakiye[h] > 0 ? "text-red-400" : ""}`}>{fmt2(-bakiye[h])} ₺</p>
+              </div>
+            ))}
+          </div>
+        )}
         {cekAcik && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {YEMEK_CEKLERI.map(h => (
@@ -156,7 +179,7 @@ export default function GelirGiderPage() {
             ))}
           </div>
         )}
-        <p className="text-[10px] text-gray-600">Yemek çekleri Toplam&apos;a katılmaz.</p>
+        <p className="text-[10px] text-gray-600">Yemek çekleri ve kredi kartı borcu Toplam&apos;a katılmaz. Kart borcunu ödemek için: ⇄ Virman, bankadan karta.</p>
         </div>
 
         {/* Yeni kayıt */}
@@ -256,6 +279,9 @@ function HesapSec({ deger, degistir, etiket, haric }: { deger: Hesap; degistir: 
   return (
     <select value={deger} onChange={e => degistir(e.target.value as Hesap)} className={`${kutu} w-full min-w-0`} aria-label={etiket}>
       {HESAPLAR.map(h => <option key={h} value={h} disabled={h === haric}>{h}</option>)}
+      <optgroup label="Kredi kartı">
+        {KREDI_KARTLARI.map(h => <option key={h} value={h} disabled={h === haric}>{h}</option>)}
+      </optgroup>
       <optgroup label="Yemek çeki">
         {YEMEK_CEKLERI.map(h => <option key={h} value={h} disabled={h === haric}>{h}</option>)}
       </optgroup>

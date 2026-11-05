@@ -11,6 +11,8 @@ const SURUMLER: { tarih: string; baslik: string; maddeler: string[] }[] = [
       "Üstte küçük kutucuklar: Toplam, Nakit, TEB, VakıfBank, Enpara ve Yemek Çeki (tıklayınca kart kart açılır). Yemek çekleri Toplam'a katılmaz. Altta defter (Giren / Çıkan / Toplam).",
       "\"⇄ Virman\" ile hesaplar arası para aktarın (ör. Nakit → TEB, Multinet → VakıfBank); yemek çeki bankaya yatınca Toplam artar.",
       "Tamamen elle tutulur: kasa raporları ve bankalar buraya kendiliğinden gelmez, sıfırdan başlar. Kasa & Finans'ı ve Kâr / Zarar'ı değiştirmez.",
+      "Kredi kartları da hesap olarak seçilebilir: karttan ödeme yapınca kart borcu artar, bankadan karta virmanla borç kapanır. Üstte \"Kredi Kartı borcu\" kutusu.",
+      "Her satırda kaydı kimin girdiği yazar. Sayfa ayrı bir yetkiyle açılır: Ayarlar → Kullanıcılar ve yetkiler → \"Gelir Gider defteri\".",
     ],
   },
   {

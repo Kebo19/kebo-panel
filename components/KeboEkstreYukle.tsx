@@ -259,12 +259,12 @@ export default function KeboEkstreYukle({ cari, faturalar, odemeler, onKapat, on
               <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 space-y-1.5">
                 <p className="text-sm font-bold text-amber-300">Bakiye eşitleme</p>
                 <p className="text-xs text-gray-400">
-                  Sistemdeki borç şu an <b className="text-yazi">₺{fmt(plan.mevcutBorc)}</b>; eklemelerden sonra <b className="text-yazi">₺{fmt(plan.eklemeSonrasiBorc)}</b> olur.
+                  Sistemdeki borç şu an <b className="text-yazi">₺{fmt(plan.mevcutBorc)}</b>; eklemelerden sonra ekstrenin son gününe kadarki borç <b className="text-yazi">₺{fmt(plan.eklemeSonrasiBorc)}</b> olur (sonra kesilen faturalar karşılaştırmaya girmez).
                   {Math.abs(plan.duzeltme) > 0.01
                     ? <> Kebo bakiyesiyle aradaki <b className="text-yazi">₺{fmt(Math.abs(plan.duzeltme))}</b> fark tek bir &quot;bakiye düzeltmesi&quot; kaydıyla kapatılır (kasaya yansımaz).</>
                     : <> Kebo bakiyesiyle birebir tutuyor, düzeltme gerekmiyor.</>}
                 </p>
-                <p className="text-xs text-gray-400">İşlemden sonra cari ekranındaki <b className="text-yazi">Toplam Borç = ₺{fmt(ekstre.sonBakiye)}</b> olur; ödemeler en eski faturaları kapatır, fatura durumları kendiliğinden güncellenir.</p>
+                <p className="text-xs text-gray-400">İşlemden sonra ekstre tarihine kadarki borç <b className="text-yazi">₺{fmt(ekstre.sonBakiye)}</b> olur (cari ekranındaki Toplam Borç'a sonradan kesilen faturalar eklenir); ödemeler en eski faturaları kapatır, fatura durumları kendiliğinden güncellenir.</p>
               </div>
 
               {plan.ekstredeOlmayan.length > 0 && (

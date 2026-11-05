@@ -80,6 +80,13 @@ describe("Kebo mutabakat planı", () => {
     expect(p.mevcutBorc).toBe(750); expect(p.duzeltme).toBe(-100);
   });
 
+  it("ekstrenin son gününden sonra kesilen fatura düzeltmeyi değiştirmez", () => {
+    const sonra = [...faturalar, { id: "z", fatura_no: "KBE2026000009999", fatura_tarihi: "2026-12-31", toplam_tutar: 5000, durum: "bekliyor" }];
+    const p = mutabakatPlani(ekstre, sonra, [], "0000-00-00");
+    expect(p.duzeltme).toBe(-100);
+    expect(p.mevcutBorc).toBe(6000);
+  });
+
   it("başlangıç tarihinden önceki tahsilatları atlar, ekstre kayıtlarını tekrar eklemez", () => {
     const odemeler = [
       { id: "o1", tarih: "2026-01-06", tutar: 999, aciklama: "Manuel ödeme", fatura_idleri: null },

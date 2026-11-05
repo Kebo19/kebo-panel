@@ -39,7 +39,7 @@ export const MENU: { ust: MenuOgesi[]; finans: MenuOgesi[]; alt: MenuOgesi[]; ay
   ],
   finans: [
     { name: "Kasa", icon: Wallet, href: "/kasa", izin: "kasa", renk: "#34d399", aciklama: "Bakiye ve işlemler", anahtar: "kasa banka nakit teb vakıfbank enpara bakiye" },
-    { name: "Gelir Gider", icon: ArrowLeftRight, href: "/gelir-gider", izin: "kasa", renk: "#4ade80", aciklama: "Giren ve çıkan para", anahtar: "gelir gider defter para girdi çıktı harcama masraf" },
+    { name: "Gelir Gider", icon: ArrowLeftRight, href: "/gelir-gider", izin: "gelir_gider", renk: "#4ade80", aciklama: "Giren ve çıkan para", anahtar: "gelir gider defter para girdi çıktı harcama masraf" },
     { name: "Cariler", icon: Building2, href: "/cariler", izin: "cari", renk: "#f87171", aciklama: "Tedarikçi hesapları", anahtar: "cari tedarikçi borç ekstre" },
     { name: "Faturalar", icon: FileText, href: "/faturalar", izin: "cari", renk: "#fb7185", aciklama: "Alış faturaları", anahtar: "fatura irsaliye kdv" },
     // Sadece Murat ve Bülent görür (lib/stokDeger.ts).
