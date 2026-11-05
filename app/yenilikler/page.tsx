@@ -7,9 +7,9 @@ const SURUMLER: { tarih: string; baslik: string; maddeler: string[] }[] = [
     tarih: "05.11.2026",
     baslik: "Gelir Gider defteri",
     maddeler: [
-      "Yeni Gelir Gider sayfası: tarih, ne için ve tutar yazıp \"Para girdi\" ya da \"Para çıktı\" diye kaydedin.",
-      "Üstte o ayın girenini, çıkanını ve kalanını görürsünüz; oklarla aylar arasında geçilir.",
-      "Bu defter kasa bakiyesini ve Kâr / Zarar'ı değiştirmez. Kasa yetkisi olanlar görür.",
+      "Yeni Gelir Gider sayfası (Finans → Gelir Gider): \"Para girdi\" ya da \"Para çıktı\" seçin, ne için olduğunu, tarihi, hesabı ve tutarı yazıp kaydedin.",
+      "Üstte kasadaki toplam ve hesap hesap bakiye; altta defter (Giren / Çıkan / Kasa).",
+      "Tamamen elle tutulur: kasa raporları ve bankalar buraya kendiliğinden gelmez, sıfırdan başlar. Kasa & Finans'ı ve Kâr / Zarar'ı değiştirmez.",
     ],
   },
   {
