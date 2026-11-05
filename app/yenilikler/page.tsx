@@ -8,7 +8,7 @@ const SURUMLER: { tarih: string; baslik: string; maddeler: string[] }[] = [
     baslik: "Gelir Gider defteri",
     maddeler: [
       "Yeni Gelir Gider sayfası (Finans → Gelir Gider): \"Para girdi\" ya da \"Para çıktı\" seçin, ne için olduğunu, tarihi, hesabı ve tutarı yazıp kaydedin.",
-      "Üstte kasadaki toplam ve hesap hesap bakiye; altta defter (Giren / Çıkan / Kasa).",
+      "Üstte küçük kutucuklar: Toplam, Nakit, TEB, VakıfBank, Enpara ve Yemek Çeki (tıklayınca kart kart açılır). Yemek çekleri Toplam'a katılmaz. Altta defter (Giren / Çıkan / Toplam).",
       "Tamamen elle tutulur: kasa raporları ve bankalar buraya kendiliğinden gelmez, sıfırdan başlar. Kasa & Finans'ı ve Kâr / Zarar'ı değiştirmez.",
     ],
   },
