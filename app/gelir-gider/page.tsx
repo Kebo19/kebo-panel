@@ -15,13 +15,13 @@ import { hepsiniCek } from "@/lib/hepsiniCek";
 import { YEMEK_KARTI_ADLARI } from "@/lib/hesap";
 import { Lock, Loader2, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 
-type Tip = "gelir" | "gider";
+type Tip = "gelir" | "gider" | "transfer";
 // Para hesapları (Toplam'a girer) ve yemek çekleri (alacak; Toplam'a girmez, üstte tek "Yemek Çeki" kutusu)
 const HESAPLAR = ["Nakit", "TEB", "VakıfBank", "Enpara"] as const;
 const YEMEK_CEKLERI = YEMEK_KARTI_ADLARI;
 type Hesap = (typeof HESAPLAR)[number] | (typeof YEMEK_CEKLERI)[number];
 const PARA_HESABI = new Set<string>(HESAPLAR);
-interface Kayit { id: string; tarih: string; tip: Tip; hesap: Hesap; aciklama: string; tutar: number; created_at: string }
+interface Kayit { id: string; tarih: string; tip: Tip; hesap: Hesap; hedef_hesap: Hesap | null; aciklama: string; tutar: number; created_at: string }
 
 const kutu = "bg-alan border border-cizgi focus:border-altin/50 text-yazi text-[14px] h-11 px-3 rounded-xl outline-none";
 
@@ -37,6 +37,7 @@ export default function GelirGiderPage() {
   const [tip, setTip] = useState<Tip>("gider");
   const [tarih, setTarih] = useState(() => bugun());
   const [hesap, setHesap] = useState<Hesap>("Nakit");
+  const [hedef, setHedef] = useState<Hesap>("TEB");
   const [aciklama, setAciklama] = useState("");
   const [tutar, setTutar] = useState("");
   const [kaydediliyor, setKaydediliyor] = useState(false);
@@ -47,7 +48,7 @@ export default function GelirGiderPage() {
     setYukleniyor(true); setHata("");
     try {
       const d = await hepsiniCek<Kayit>((a, b) => supabase.from("gelir_gider")
-        .select("id,tarih,tip,hesap,aciklama,tutar,created_at")
+        .select("id,tarih,tip,hesap,hedef_hesap,aciklama,tutar,created_at")
         .order("tarih").order("created_at").order("id").range(a, b));
       setListe(d.map(k => ({ ...k, tutar: Number(k.tutar) || 0 })));
     } catch (e) {
@@ -65,9 +66,17 @@ export default function GelirGiderPage() {
     const s: (Kayit & { kalan: number })[] = [];
     let t = 0;
     for (const k of sirali) {
-      const d = k.tip === "gelir" ? k.tutar : -k.tutar;
-      if (k.hesap in b) b[k.hesap] += d;
-      if (PARA_HESABI.has(k.hesap)) t += d;
+      if (k.tip === "transfer") {
+        // Virman: kaynaktan düşer, hedefe eklenir. Toplam sadece para hesabı ↔ yemek çeki arasında değişir.
+        if (k.hesap in b) b[k.hesap] -= k.tutar;
+        if (k.hedef_hesap && k.hedef_hesap in b) b[k.hedef_hesap] += k.tutar;
+        if (PARA_HESABI.has(k.hesap)) t -= k.tutar;
+        if (k.hedef_hesap && PARA_HESABI.has(k.hedef_hesap)) t += k.tutar;
+      } else {
+        const d = k.tip === "gelir" ? k.tutar : -k.tutar;
+        if (k.hesap in b) b[k.hesap] += d;
+        if (PARA_HESABI.has(k.hesap)) t += d;
+      }
       s.push({ ...k, kalan: t });
     }
     return { satirlar: s.reverse(), bakiye: b, toplam: t, cekToplam: YEMEK_CEKLERI.reduce((x, h) => x + b[h], 0) };
@@ -76,12 +85,15 @@ export default function GelirGiderPage() {
   const kaydet = async (e: React.FormEvent) => {
     e.preventDefault();
     const tl = tv(tutar);
-    if (!aciklama.trim()) { setHata("Ne için olduğunu yazın."); return; }
+    const virman = tip === "transfer";
+    if (!virman && !aciklama.trim()) { setHata("Ne için olduğunu yazın."); return; }
+    if (virman && hesap === hedef) { setHata("Aynı hesaba aktarılamaz."); return; }
     if (tl <= 0) { setHata("Tutarı yazın."); return; }
     if (!tarih) { setHata("Tarihi seçin."); return; }
     setKaydediliyor(true); setHata("");
     const { error } = await supabase.from("gelir_gider").insert([{
-      tip, tarih, hesap, aciklama: aciklama.trim(), tutar: tl, ekleyen: yetki.kullaniciAdi || null,
+      tip, tarih, hesap, hedef_hesap: virman ? hedef : null,
+      aciklama: aciklama.trim() || "Hesaplar arası", tutar: tl, ekleyen: yetki.kullaniciAdi || null,
     }]);
     setKaydediliyor(false);
     if (error) { setHata("Kaydedilemedi: " + error.message); return; }
@@ -149,7 +161,7 @@ export default function GelirGiderPage() {
 
         {/* Yeni kayıt */}
         <form onSubmit={kaydet} className="bg-kart border border-cizgi rounded-2xl p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button type="button" onClick={() => setTip("gelir")}
               className={`h-11 rounded-xl border text-[14px] font-bold ${tip === "gelir" ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300" : "border-cizgi bg-alan text-gray-600"}`}>
               + Para girdi
@@ -158,20 +170,25 @@ export default function GelirGiderPage() {
               className={`h-11 rounded-xl border text-[14px] font-bold ${tip === "gider" ? "border-red-500/60 bg-red-500/10 text-red-300" : "border-cizgi bg-alan text-gray-600"}`}>
               − Para çıktı
             </button>
+            <button type="button" onClick={() => { setTip("transfer"); if (hedef === hesap) setHedef(hesap === "Nakit" ? "TEB" : "Nakit"); }}
+              className={`h-11 rounded-xl border text-[14px] font-bold ${tip === "transfer" ? "border-sky-500/60 bg-sky-500/10 text-sky-300" : "border-cizgi bg-alan text-gray-600"}`}>
+              ⇄ Virman
+            </button>
           </div>
           <input value={aciklama} onChange={e => setAciklama(e.target.value)} maxLength={200}
-            placeholder="Ne için? (örn. tüp gaz)" className={`${kutu} w-full`} />
+            placeholder={tip === "transfer" ? "Açıklama (isteğe bağlı)" : "Ne için? (örn. tüp gaz)"} className={`${kutu} w-full`} />
           <div className="grid grid-cols-3 gap-2">
             <input type="date" value={tarih} onChange={e => setTarih(e.target.value)} className={`${kutu} w-full min-w-0`} aria-label="Tarih" />
-            <select value={hesap} onChange={e => setHesap(e.target.value as Hesap)} className={`${kutu} w-full min-w-0`} aria-label="Hesap">
-              {HESAPLAR.map(h => <option key={h} value={h}>{h}</option>)}
-              <optgroup label="Yemek çeki">
-                {YEMEK_CEKLERI.map(h => <option key={h} value={h}>{h}</option>)}
-              </optgroup>
-            </select>
+            <HesapSec deger={hesap} degistir={setHesap} etiket={tip === "transfer" ? "Nereden" : "Hesap"} />
             <input value={tutar} onChange={e => setTutar(paraGirdisi(e.target.value))} inputMode="decimal"
               placeholder="Tutar ₺" className={`${kutu} w-full min-w-0 text-right tabular-nums`} aria-label="Tutar" />
           </div>
+          {tip === "transfer" && (
+            <div className="grid grid-cols-[auto_1fr] items-center gap-2">
+              <span className="text-[12px] text-gray-600 font-semibold">{hesap} →</span>
+              <HesapSec deger={hedef} degistir={setHedef} etiket="Nereye" haric={hesap} />
+            </div>
+          )}
           {hata && <p className="text-[12px] text-red-300">{hata}</p>}
           <button type="submit" disabled={kaydediliyor}
             className="w-full flex items-center justify-center gap-2 h-11 text-[14px] font-bold text-[#1a1408] kebo-btn-altin hover:brightness-110 disabled:opacity-40 rounded-xl">
@@ -205,11 +222,15 @@ export default function GelirGiderPage() {
                     <td className="px-3 py-2.5 whitespace-nowrap text-gray-700">{fmtTarih(k.tarih)}</td>
                     <td className="px-3 py-2.5">
                       <span className="font-semibold">{k.aciklama}</span>
-                      <span className="text-[11px] text-gray-600"> · {k.hesap}</span>
+                      <span className="text-[11px] text-gray-600"> · {k.tip === "transfer" ? `${k.hesap} → ${k.hedef_hesap}` : k.hesap}</span>
                     </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-emerald-400 whitespace-nowrap">{k.tip === "gelir" ? fmt2(k.tutar) : ""}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-red-400 whitespace-nowrap">{k.tip === "gider" ? fmt2(k.tutar) : ""}</td>
-                    <td className={`px-3 py-2.5 text-right tabular-nums whitespace-nowrap ${PARA_HESABI.has(k.hesap) ? "font-bold" : "text-gray-600"}`}>{fmt2(k.kalan)}</td>
+                    {k.tip === "transfer" ? (
+                      <td colSpan={2} className="px-3 py-2.5 text-right tabular-nums text-sky-400 whitespace-nowrap">⇄ {fmt2(k.tutar)}</td>
+                    ) : (<>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-emerald-400 whitespace-nowrap">{k.tip === "gelir" ? fmt2(k.tutar) : ""}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-red-400 whitespace-nowrap">{k.tip === "gider" ? fmt2(k.tutar) : ""}</td>
+                    </>)}
+                    <td className={`px-3 py-2.5 text-right tabular-nums whitespace-nowrap ${PARA_HESABI.has(k.hesap) || (k.hedef_hesap && PARA_HESABI.has(k.hedef_hesap)) ? "font-bold" : "text-gray-600"}`}>{fmt2(k.kalan)}</td>
                     <td className="pr-2 text-right whitespace-nowrap">
                       {silinecek === k.id ? (
                         <button onClick={() => sil(k.id)} className="px-2 h-7 rounded-lg bg-red-500/15 border border-red-500/40 text-red-300 text-[11px] font-bold">Sil</button>
@@ -227,5 +248,16 @@ export default function GelirGiderPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function HesapSec({ deger, degistir, etiket, haric }: { deger: Hesap; degistir: (h: Hesap) => void; etiket: string; haric?: Hesap }) {
+  return (
+    <select value={deger} onChange={e => degistir(e.target.value as Hesap)} className={`${kutu} w-full min-w-0`} aria-label={etiket}>
+      {HESAPLAR.map(h => <option key={h} value={h} disabled={h === haric}>{h}</option>)}
+      <optgroup label="Yemek çeki">
+        {YEMEK_CEKLERI.map(h => <option key={h} value={h} disabled={h === haric}>{h}</option>)}
+      </optgroup>
+    </select>
   );
 }
