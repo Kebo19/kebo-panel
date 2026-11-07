@@ -427,7 +427,7 @@ export function stokFaturaMetni(f: StokFatura): { metin: string; eslesen: number
     `${html(kisaAd(f.tedarikci || ""))} · ${fmtTarih(f.tarih)} · ${html(f.gib_no)}`, ""];
   eslesen.forEach(k => s.push(`• ${sayi(Number(k.miktar), 2)} ${html((k.birim || "").toLowerCase())} ${html(k.kalem)} → <b>${sayi(Number(k.stok_miktar), 2)} ${html(k.urun_birim || "")} ${html((k.urun || "").replace(/\s*\(.*$/, ""))}</b>`));
   if (eslesmeyen.length) {
-    s.push("", `❓ Stok ürünüyle eşleşmemiş ${eslesmeyen.length} kalem (stoğa girmeyecekse ✖️ ya da 🚫; girecekse panelden bir kez eşleştirin):`);
+    s.push("", `❓ Stok ürünüyle eşleşmemiş ${eslesmeyen.length} kalem (girecekse ✅ / 🔗 ile ürünü bir kez seçin, sonra kendiliğinden eşleşir; girmeyecekse ✖️ ya da 🚫):`);
     eslesmeyen.slice(0, 8).forEach(k => s.push(`• ${sayi(Number(k.miktar), 2)} ${html((k.birim || "").toLowerCase())} ${html(k.kalem)}`));
   }
   if (!bekleyen.length) s.push("Bu faturanın kalemleri işlendi.");

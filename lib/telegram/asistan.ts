@@ -115,6 +115,11 @@ export async function guncellemeIsle(g: TgGuncelleme): Promise<unknown> {
     return mesajGonder(chat, t, komut === "/ozet" ? sabahButonlari(v, b) : undefined);
   }
   if (!metin) return;
+  // Faturadan stok eşleştirmesi sürüyorsa yazılan metin ürün adı / çarpan olarak alınır
+  if (!metin.startsWith("/") && izin(k, "stok")) {
+    const b = await rpc<Bekleyen | null>("tg_bekleyen_oku", { p_chat: chat });
+    if (b?.islem === "sg_eslestir" || b?.islem === "sg_carpan") return eslestirmeYazisi(chat, b, metin);
+  }
   return soruCevapla(chat, k, metin);
 }
 
@@ -319,8 +324,39 @@ async function butonIsle(q: NonNullable<TgGuncelleme["callback_query"]>) {
     const f = await rpc<StokFatura>("tg_stok_fatura", { p_chat: chat, p_gib: gib });
     const m = stokFaturaMetni(f);
     const sonuc = karar === "no" ? `✖️ ${r.reddedilen} kalem stoğa işlenmedi.` : `✅ ${r.onaylanan} kalem stoğa işlendi${r.kalan ? `; ${r.kalan} kalem eşleştirilmeyi bekliyor (panel → Stok)` : ""}.`;
-    if (mesajId) return mesajDuzenle(chat, mesajId, `${m.metin}\n\n${sonuc}`, r.kalan ? [[{ text: "✖️ Kalanları işleme", callback_data: `sg:no:${gib}` }], [{ text: "🚫 Bu firmayı hiç sorma (stok dışı)", callback_data: `sg:tf:${gib}` }]] : []);
+    if (mesajId) return mesajDuzenle(chat, mesajId, `${m.metin}\n\n${sonuc}`, r.kalan ? [[{ text: `🔗 Kalanları eşleştir (${r.kalan})`, callback_data: `se:${gib}` }], [{ text: "✖️ Kalanları işleme", callback_data: `sg:no:${gib}` }], [{ text: "🚫 Bu firmayı hiç sorma (stok dışı)", callback_data: `sg:tf:${gib}` }]] : []);
     return mesajGonder(chat, sonuc);
+  }
+
+  // ── Eşleşmemiş kalemleri Telegram'dan eşleştirme ──
+  if (data.startsWith("se:") || data.startsWith("sek:") || data.startsWith("seu:") || data.startsWith("sec:")) {
+    if (!izin(k, "stok")) return mesajGonder(chat, "Stok yetkiniz yok.");
+    if (data.startsWith("se:")) {
+      if (mesajId) await tg("editMessageReplyMarkup", { chat_id: chat, message_id: mesajId, reply_markup: { inline_keyboard: [] } }).catch(() => {});
+      return siradakiKalem(chat, data.slice(3));
+    }
+    const b = await rpc<Bekleyen | null>("tg_bekleyen_oku", { p_chat: chat });
+    const kapat = () => mesajId ? tg("editMessageReplyMarkup", { chat_id: chat, message_id: mesajId, reply_markup: { inline_keyboard: [] } }).catch(() => {}) : Promise.resolve();
+    if (data === "sek:x") {
+      await rpc("tg_bekleyen_yaz", { p_chat: chat, p_islem: null, p_veri: null }); await kapat();
+      return mesajGonder(chat, "Tamam, eşleştirme bırakıldı. Kalan kalemler bekliyor: /stokgiris");
+    }
+    if (b?.islem !== "sg_eslestir" && b?.islem !== "sg_carpan") { await kapat(); return mesajGonder(chat, "Bu eşleştirme zaten bitti ya da süresi doldu. /stokgiris ile yeniden başlayın."); }
+    const v = b.veri as unknown as EslestirmeVeri;
+    await kapat();
+    if (data === "sek:t") {
+      // Bu kalem stoğa girmez; aynı firmadan aynı kalem bir daha sorulmaz
+      await rpc("tg_stok_kalem_karar", { p_chat: chat, p_oneri: v.oneri, p_karar: "takip_etme" });
+      return siradakiKalem(chat, v.gib, `🚫 <i>${html(v.kalem)}</i> stoğa girmeyecek, bir daha sorulmayacak.`);
+    }
+    if (data.startsWith("seu:")) {
+      const u = (v.urunler || []).find(x => x.id === data.slice(4));
+      if (!u) return mesajGonder(chat, "Ürün bulunamadı, adını tekrar yazın.");
+      const ayni = birimKok(v.birim) && birimKok(v.birim) === birimKok(u.birim);
+      if (ayni) return kalemOnayla(chat, v, u, 1);
+      return carpanSor(chat, v, u);
+    }
+    if (data.startsWith("sec:") && b.islem === "sg_carpan" && v.urun) return kalemOnayla(chat, v, v.urun, Number(data.slice(4)));
   }
 
   // Kasa raporu ayrıntısı (rd:<bölüm>:<tarih>) — sabah özetindeki butonlar
@@ -362,9 +398,88 @@ export function stokFaturaButonlari(gib: string, eslesen: number, eslesmeyen: nu
     b.push([{ text: "Panelde incele", url: `${panelAdresi()}/stok` }]);
     return b;
   }
-  // Evet / Hayır her zaman Telegram'dan verilebilir; eşleşmemiş kalem varsa "firmayı hiç sorma" da çıkar.
+  // Evet / Hayır her zaman Telegram'dan verilebilir. Eşleşmemiş kalem varsa ürün Telegram'dan seçilerek
+  // stoğa işlenebilir (bir kez eşleşen kalem sonraki faturalarda kendiliğinden gelir); "firmayı hiç sorma" da çıkar.
   if (eslesen) b.push([{ text: `✅ Evet, stoğa işle (${eslesen})`, callback_data: `sg:ok:${gib}` }, { text: "✖️ Hayır, işleme", callback_data: `sg:no:${gib}` }]);
-  else if (eslesmeyen) b.push([{ text: "✖️ Hayır, stoğa işleme", callback_data: `sg:no:${gib}` }]);
+  if (eslesmeyen) b.push([{ text: eslesen ? `🔗 Eşleşmeyenleri eşleştir (${eslesmeyen})` : `✅ Stoğa işle — ürün seç (${eslesmeyen})`, callback_data: `se:${gib}` }]);
+  if (!eslesen && eslesmeyen) b.push([{ text: "✖️ Hayır, stoğa işleme", callback_data: `sg:no:${gib}` }]);
   if (eslesmeyen) b.push([{ text: "🚫 Bu firmayı hiç sorma (stok dışı)", callback_data: `sg:tf:${gib}` }]);
   return b;
+}
+
+// ── Faturadan stok girişi: eşleşmemiş kalemi Telegram'dan eşleştirme ──
+// se:<gib> → kalem sorulur → kullanıcı ürün adı yazar → seu:<ürün> → (birimler farklıysa çarpan) → stoğa işlenir.
+type UrunSecenek = { id: string; urun_adi: string; birim: string | null };
+interface EslestirmeVeri { gib: string; oneri: string; kalem: string; miktar: number; birim: string | null; urunler?: UrunSecenek[]; urun?: UrunSecenek }
+
+const BIRIM_KOK: Record<string, string> = { adet: "adet", ad: "adet", c62: "adet", ade: "adet", kg: "kg", kgm: "kg", kilo: "kg", kilogram: "kg",
+  lt: "lt", l: "lt", ltr: "lt", litre: "lt", gr: "gr", g: "gr", grm: "gr", gram: "gr", paket: "paket", pk: "paket", koli: "koli", kl: "koli" };
+const birimKok = (b: string | null | undefined) => { const s = (b || "").toLocaleLowerCase("tr-TR").replace(/[.\s]/g, ""); return BIRIM_KOK[s] || s; };
+const sayiOku = (s: string) => { const t = s.trim().replace(/\s/g, ""); const n = Number(/,/.test(t) ? t.replace(/\./g, "").replace(",", ".") : t); return Number.isFinite(n) && n > 0 ? n : null; };
+const vazgecButonu: Buton[] = [{ text: "✖️ Vazgeç", callback_data: "sek:x" }];
+
+async function siradakiKalem(chat: number, gib: string, onceki = ""): Promise<unknown> {
+  const f = await rpc<StokFatura>("tg_stok_fatura", { p_chat: chat, p_gib: gib });
+  const bekleyen = (f?.kalemler || []).filter(x => x.durum === "bekliyor");
+  const eslesmeyen = bekleyen.filter(x => !x.urun);
+  if (!eslesmeyen.length) {
+    await rpc("tg_bekleyen_yaz", { p_chat: chat, p_islem: null, p_veri: null });
+    let ek = "";
+    if (bekleyen.length) {
+      const r = await rpc<{ onaylanan: number }>("tg_stok_giris_onayla", { p_chat: chat, p_gib: gib, p_karar: "onayla" });
+      if (r.onaylanan) ek = `\n✅ Eşleşmiş ${r.onaylanan} kalem de stoğa işlendi.`;
+    }
+    return mesajGonder(chat, `${onceki ? onceki + "\n\n" : ""}🎉 ${html(gib)} faturası tamamlandı.${ek}`);
+  }
+  const x = eslesmeyen[0];
+  const veri: EslestirmeVeri = { gib, oneri: x.id, kalem: x.kalem, miktar: Number(x.miktar) || 0, birim: x.birim };
+  await rpc("tg_bekleyen_yaz", { p_chat: chat, p_islem: "sg_eslestir", p_veri: veri });
+  return mesajGonder(chat, [
+    onceki, onceki ? "" : null,
+    `🔗 <b>${html(kisaAd(f.tedarikci || ""))}</b> · ${html(gib)} — eşleşmemiş ${eslesmeyen.length} kalem`,
+    `• <b>${tl(veri.miktar)} ${html((x.birim || "").toLowerCase())} ${html(x.kalem)}</b>`, "",
+    "Bu hangi stok ürünü? <b>Ürün adını yazın</b> (ör. <i>ayran</i>, <i>döner</i>).",
+    "Stoğa girmeyecekse (hizmet, kira, ücret…) aşağıdaki 🚫'ye basın.",
+  ].filter(s => s !== null).join("\n"), [
+    [{ text: "🚫 Bu kalem stoğa girmesin", callback_data: "sek:t" }],
+    vazgecButonu,
+  ]);
+}
+
+async function eslestirmeYazisi(chat: number, b: Bekleyen, metin: string): Promise<unknown> {
+  const v = b.veri as unknown as EslestirmeVeri;
+  if (b.islem === "sg_carpan" && v.urun) {
+    const n = sayiOku(metin);
+    if (n) return kalemOnayla(chat, v, v.urun, n);
+    // Sayı değilse yeni ürün araması say
+  }
+  const urunler = await rpc<UrunSecenek[]>("tg_stok_urun_ara", { p_chat: chat, p_q: metin.slice(0, 60) });
+  if (!urunler.length) return mesajGonder(chat, `"${html(metin)}" adında stok ürünü bulamadım. Daha kısa yazmayı deneyin (ör. sadece <i>döner</i>).`, [vazgecButonu]);
+  await rpc("tg_bekleyen_yaz", { p_chat: chat, p_islem: "sg_eslestir", p_veri: { ...v, urun: undefined, urunler } });
+  return mesajGonder(chat, `<i>${html(v.kalem)}</i> → hangisi?`, [
+    ...urunler.map(u => [{ text: `${u.urun_adi}${u.birim ? ` · ${u.birim}` : ""}`.slice(0, 64), callback_data: `seu:${u.id}` }]),
+    [{ text: "🚫 Bu kalem stoğa girmesin", callback_data: "sek:t" }],
+    vazgecButonu,
+  ]);
+}
+
+async function carpanSor(chat: number, v: EslestirmeVeri, u: UrunSecenek): Promise<unknown> {
+  await rpc("tg_bekleyen_yaz", { p_chat: chat, p_islem: "sg_carpan", p_veri: { ...v, urun: u } });
+  const fb = (v.birim || "birim").toLowerCase(), ub = u.birim || "birim";
+  // Ürün adında "(1 KOLİ 8 KG)" gibi bir paket bilgisi varsa öneri olarak sun
+  const p = u.urun_adi.match(/\(\s*1\s+[^\d)]*?([\d.,]+)\s*[^)]*\)/);
+  const oneri = p ? sayiOku(p[1]) : null;
+  const btn: Buton[] = [{ text: `1 ${fb} = 1 ${ub}`, callback_data: "sec:1" }];
+  if (oneri && oneri !== 1) btn.unshift({ text: `1 ${fb} = ${tl(oneri)} ${ub}`, callback_data: `sec:${oneri}` });
+  return mesajGonder(chat, `Faturada <b>${html(fb)}</b>, stokta <b>${html(ub)}</b>.\n1 ${html(fb)} <i>${html(v.kalem)}</i> kaç ${html(ub)} <b>${html(u.urun_adi)}</b>?\nSayıyı yazın ya da seçin:`,
+    [btn, vazgecButonu]);
+}
+
+async function kalemOnayla(chat: number, v: EslestirmeVeri, u: UrunSecenek, carpan: number): Promise<unknown> {
+  if (!(carpan > 0)) return mesajGonder(chat, "Çarpan sıfırdan büyük olmalı.");
+  const r = await rpc<{ onaylanan: number; urunu_eksik: number }>("tg_stok_kalem_karar", { p_chat: chat, p_oneri: v.oneri, p_karar: "onayla", p_urun: u.id, p_carpan: carpan });
+  const sonuc = r.onaylanan
+    ? `✅ ${tl(v.miktar)} ${html((v.birim || "").toLowerCase())} ${html(v.kalem)} → <b>${tl(Math.round(v.miktar * carpan * 1000) / 1000)} ${html(u.birim || "")} ${html(u.urun_adi)}</b> stoğa işlendi. Bu firmadan bu kalem artık kendiliğinden eşleşir.`
+    : r.urunu_eksik ? "⚠️ Kalemin miktarı yok, panelden işleyin." : "Bu kalem zaten işlenmiş.";
+  return siradakiKalem(chat, v.gib, sonuc);
 }

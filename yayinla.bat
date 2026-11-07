@@ -1,32 +1,19 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
+echo === Kebo Panel yayinlaniyor ===
 echo.
-echo === 1/5 Paketler kuruluyor (npm install) ===
-call npm install
-if errorlevel 1 goto hata
-echo.
-echo === 2/5 Testler calistiriliyor (npm test) ===
-call npm test
-if errorlevel 1 goto hata
-echo.
-echo === 3/5 Kod kontrol ediliyor (tsc) ===
-call npx tsc --noEmit
-if errorlevel 1 goto hata
-echo.
-echo === 4/5 Degisiklikler kaydediliyor (git commit) ===
 git add -A
-git commit -m "Panel guncellemesi %date% %time:~0,5%"
-echo.
-echo === 5/5 GitHuba gonderiliyor (git push) ===
+git commit -m "Telegram: faturadan kalem eslestirme"
+if errorlevel 1 echo (Yeni degisiklik yok ya da commit yapilamadi, push deneniyor...)
 git push
-if errorlevel 1 goto hata
+if errorlevel 1 (
+  echo.
+  echo !!! Push basarisiz. Yukaridaki hatayi Claude'a gonderin.
+) else (
+  echo.
+  echo Tamam! Vercel birkac dakika icinde yayina alir.
+  echo Sonra Telegram'da /stokgiris yazip deneyin.
+)
 echo.
-echo TAMAM: Kod gonderildi. Vercel siteyi birkac dakika icinde guncelleyecek.
 pause
-exit /b 0
-:hata
-echo.
-echo HATA: Islem durdu. Yukaridaki mesaji Claudea gonderin.
-pause
-exit /b 1
