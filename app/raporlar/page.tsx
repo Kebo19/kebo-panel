@@ -2079,7 +2079,9 @@ export default function RaporlarPage() {
   const handleRaporKaydet = async (e: React.FormEvent) => {
     e.preventDefault();
     // Kontrol adımına gelmeden (ör. bir kutuda Enter'a basınca) kayıt yapılmaz; bir sonraki adıma geçilir.
-    if (!isReadOnly && adim < 4) { adimaGit(adim + 1); return; }
+    // 10.11.2026: "Evet, kaydet" (kayitOnay açık) her adımda gerçekten kaydeder; eskiden 1–3. adımda
+    // sadece Kontrol'e geçiyordu ve kullanıcı kaydedildi sanıp sayfayı yenileyince girdiği kayboluyordu.
+    if (!isReadOnly && adim < 4 && !kayitOnay) { adimaGit(adim + 1); return; }
     // Son onay: önce "Raporu Kaydet", sonra "Evet, kaydet"
     if (!kayitOnay) { setKayitOnay(true); return; }
     setKayitOnay(false);
@@ -3956,7 +3958,7 @@ export default function RaporlarPage() {
                     </button>
                   </>) : (<>
                     {(
-                      <button key="kaydet" type="button" onClick={() => setKayitOnay(true)} disabled={saving || !!kayitEngeli} title={kayitEngeli || undefined}
+                      <button key="kaydet" type="button" onClick={() => { if (adim < 4) adimaGit(4); setKayitOnay(true); }} disabled={saving || !!kayitEngeli} title={kayitEngeli || undefined}
                         className="flex-[2] h-14 rounded-xl kebo-btn-altin text-[#1a1408] text-[16px] font-black hover:brightness-110 disabled:opacity-40 flex items-center justify-center gap-2">
                         <Save size={16}/> {selectedRapor ? "Kaydet" : "Raporu Kaydet"}
                       </button>
