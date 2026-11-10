@@ -39,7 +39,8 @@ export default function TelegramGelenler({ tur, onSec, devreDisi }: {
   }, [fotolar]);
 
   const isaretle = async (g: Grup) => {
-    await supabase.from("telegram_fotolar").update({ durum: "islendi" }).in("id", g.fotolar.map(f => f.id));
+    const { error } = await supabase.from("telegram_fotolar").update({ durum: "islendi" }).in("id", g.fotolar.map(f => f.id));
+    if (error) alert("İşlendi olarak işaretlenemedi: " + error.message);
   };
 
   const ac = async (g: Grup) => {

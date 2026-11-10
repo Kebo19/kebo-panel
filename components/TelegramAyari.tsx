@@ -52,11 +52,13 @@ export default function TelegramAyari() {
 
   const ayir = async (chat: number) => {
     if (!confirm("Bu Telegram hesabının panel bağlantısı kaldırılsın mı?")) return;
-    await supabase.from("telegram_baglantilar").delete().eq("chat_id", chat);
+    const { error } = await supabase.from("telegram_baglantilar").delete().eq("chat_id", chat);
+    if (error) alert("Bağlantı kaldırılamadı: " + error.message);
     yukle();
   };
   const degistir = async (chat: number, alan: "sabah_ozeti" | "oglen_uyarisi", deger: boolean) => {
-    await supabase.from("telegram_baglantilar").update({ [alan]: deger }).eq("chat_id", chat);
+    const { error } = await supabase.from("telegram_baglantilar").update({ [alan]: deger }).eq("chat_id", chat);
+    if (error) alert("Ayar kaydedilemedi: " + error.message);
     yukle();
   };
 

@@ -350,7 +350,8 @@ export default function StokPage() {
             urun_id: id, tarih: bugun(), tip: "sayim" as const, miktar: miktarNum,
             kaynak: "manuel", kullanici: ekleyen, aciklama: "Çoklu Toplu Stok Ataması"
           }));
-          await supabase.from("stok_hareketler").insert(kayitlar);
+          const { error: hErr } = await supabase.from("stok_hareketler").insert(kayitlar);
+          if (hErr) { alert("Stok miktarları kaydedilemedi: " + hErr.message); return; }
         }
       }
 
@@ -359,7 +360,11 @@ export default function StokPage() {
       if (cokluPeriyot) guncellemeObj.sayim_periyodu = cokluPeriyot;
 
       if (Object.keys(guncellemeObj).length > 0) {
-        await Promise.all(idsArray.map(id => supabase.from("stok_urunler").update(guncellemeObj).eq("id", id)));
+        const sonuc = await Promise.all(idsArray.map(id => supabase.from("stok_urunler").update(guncellemeObj).eq("id", id).select("id")));
+        const hata = sonuc.find(r => r.error)?.error;
+        const kaydedilmeyen = sonuc.filter(r => !r.error && !(r.data && r.data.length)).length;
+        if (hata) { alert("Bazı ürünler güncellenemedi: " + hata.message); veriCek(); return; }
+        if (kaydedilmeyen) { alert(`${kaydedilmeyen} ürün güncellenemedi (yetki yok ya da ürün silinmiş).`); veriCek(); return; }
       }
 
       setCokluStokMiktar(""); setCokluKategori(""); setCokluPeriyot("");
@@ -429,11 +434,12 @@ export default function StokPage() {
         if (error || !yeni) { alert("Hata: " + (error?.message || "Bilinmeyen")); return; }
         
         if (ilkStokNum > 0) {
-          await supabase.from("stok_hareketler").insert([{
+          const { error: sErr } = await supabase.from("stok_hareketler").insert([{
             urun_id: yeni.id, tarih: bugun(), tip: "sayim",
             miktar: ilkStokNum, kaynak: "manuel", kullanici: ekleyen,
             aciklama: "İlk açılış sayımı",
           }]);
+          if (sErr) alert("Ürün eklendi ama ilk stok miktarı kaydedilemedi: " + sErr.message);
         }
       }
       yeniUrunReset();
@@ -484,7 +490,8 @@ export default function StokPage() {
       }]);
       if (error) { alert("Hata: " + error.message); return; }
       if (!isNaN(fiyat) && fiyat > 0) {
-        await supabase.from("stok_urunler").update({ son_fiyat: fiyat }).eq("id", malGirisUrun.id);
+        const { error: fErr } = await supabase.from("stok_urunler").update({ son_fiyat: fiyat }).eq("id", malGirisUrun.id);
+        if (fErr) alert("Mal girişi kaydedildi ama son alış fiyatı güncellenemedi: " + fErr.message);
       }
       setMalGirisUrun(null); setGirisMiktar(""); setGirisFiyat(""); setGirisTarih(bugun());
       veriCek();

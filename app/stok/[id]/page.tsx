@@ -129,7 +129,8 @@ export default function StokDetayPage() {
     if (modal === "sayim") kayit.vakit = vakit;
     const { error } = await supabase.from("stok_hareketler").insert([kayit]);
     if (!error && modal === "giris" && !isNaN(f) && f > 0) {
-      await supabase.from("stok_urunler").update({ son_fiyat: f }).eq("id", urun.id);
+      const { error: fErr } = await supabase.from("stok_urunler").update({ son_fiyat: f }).eq("id", urun.id);
+      if (fErr) alert("Giriş kaydedildi ama son alış fiyatı güncellenemedi: " + fErr.message);
     }
     setSaving(false);
     if (error) { alert("Hata: " + error.message); return; }

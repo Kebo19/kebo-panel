@@ -256,8 +256,9 @@ export default function FaturalarPage() {
   const topluGecikti = async () => {
     if (seciliFaturalar.size === 0) return;
     setTopluIslemYukleniyor(true);
-    await supabase.from("faturalar").update({ durum: "gecikti" }).in("id", Array.from(seciliFaturalar));
-    showToast("basari", `${seciliFaturalar.size} fatura gecikti olarak işaretlendi.`);
+    const { data: guncel, error } = await supabase.from("faturalar").update({ durum: "gecikti" }).in("id", Array.from(seciliFaturalar)).select("id");
+    if (error || !guncel?.length) { showToast("hata", "Faturalar güncellenemedi" + (error ? ": " + error.message : " (yetki yok).")); setTopluIslemYukleniyor(false); return; }
+    showToast("basari", `${guncel.length} fatura gecikti olarak işaretlendi.`);
     setTopluIslemYukleniyor(false);
     veriCek();
   };
@@ -266,8 +267,9 @@ export default function FaturalarPage() {
     if (seciliFaturalar.size === 0) return;
     if (!confirm(`${seciliFaturalar.size} fatura silinecek. Onaylıyor musunuz?`)) return;
     setTopluIslemYukleniyor(true);
-    await supabase.from("faturalar").delete().in("id", Array.from(seciliFaturalar));
-    showToast("basari", `${seciliFaturalar.size} fatura silindi.`);
+    const { data: silinen, error } = await supabase.from("faturalar").delete().in("id", Array.from(seciliFaturalar)).select("id");
+    if (error || !silinen?.length) { showToast("hata", "Faturalar silinemedi" + (error ? ": " + error.message : " (yetki yok).")); setTopluIslemYukleniyor(false); return; }
+    showToast("basari", `${silinen.length} fatura silindi.`);
     setTopluIslemYukleniyor(false);
     veriCek();
   };
@@ -363,13 +365,15 @@ export default function FaturalarPage() {
 
   // durumGuncelle — sadece "gecikti" ve "bekliyor" için kullanılır artık
   const durumGuncelle = async (id: string, durum: string) => {
-    await supabase.from("faturalar").update({ durum, islendi: false }).eq("id", id);
+    const { data: guncel, error } = await supabase.from("faturalar").update({ durum, islendi: false }).eq("id", id).select("id");
+    if (error || !guncel?.length) showToast("hata", "Fatura güncellenemedi" + (error ? ": " + error.message : " (yetki yok)."));
     veriCek();
   };
 
   const sil = async (id: string) => {
     if (!confirm("Bu faturayı silmek istiyor musunuz?")) return;
-    await supabase.from("faturalar").delete().eq("id", id);
+    const { data: silinen, error } = await supabase.from("faturalar").delete().eq("id", id).select("id");
+    if (error || !silinen?.length) { showToast("hata", "Fatura silinemedi" + (error ? ": " + error.message : " (yetki yok).")); return; }
     veriCek();
   };
 

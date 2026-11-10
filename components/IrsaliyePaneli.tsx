@@ -221,7 +221,8 @@ export default function IrsaliyePaneli({ urunler, bekleyenler, varsayilanTarih, 
 
     // Teslim modalında cari seçildi/değiştirildiyse kalemlere de yaz.
     if (teslimCariId && b.kalemler.some(k => k.cari_id !== teslimCariId)) {
-      await supabase.from("stok_fatura_kalemleri").update({ cari_id: teslimCariId }).in("id", b.kalemler.map(k => k.id));
+      const { error: cErr } = await supabase.from("stok_fatura_kalemleri").update({ cari_id: teslimCariId }).in("id", b.kalemler.map(k => k.id));
+      if (cErr) alert("Mal teslim alındı ama firma bilgisi irsaliyeye yazılamadı: " + cErr.message);
     }
 
     // Teslimden SONRA: cariye fatura olarak işle (aynı belge_id'li fatura varsa tekrar oluşturma).

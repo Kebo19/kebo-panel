@@ -13,7 +13,7 @@ if errorlevel 1 (
   exit /b 1
 )
 git add -A
-git commit -m "Kasa raporu Kaydet duzeltmesi + yeni Kebo simgesi (10.11)"
+git commit -m "Kayit hatalari, carpan duzeltmesi, fiyat uyarisi, Kebo simgesi (10.11)"
 if errorlevel 1 echo (Yeni degisiklik yok ya da commit yapilamadi, push deneniyor...)
 git push
 if errorlevel 1 (

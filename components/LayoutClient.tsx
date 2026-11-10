@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import Sidebar from "@/components/Sidebar";
 import KomutPaleti from "@/components/kabuk/KomutPaleti";
 import SorunBildir from "@/components/SorunBildir";
+import FiyatUyarisi from "@/components/FiyatUyarisi";
 import { hataKaydet } from "@/lib/hataKaydi";
 
 const SIDEBAR_YOK = ["/login", "/register", "/reset-password"];
@@ -38,6 +39,8 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
     <div className="flex min-h-screen">
       <Sidebar />
       <main className="flex-1 min-w-0 overflow-x-hidden pt-14 pb-20 lg:pt-0 lg:pb-0">
+        {/* Yüksek fiyat değişimi uyarısı: her sayfanın en üstünde, kişi başına "Gördüm" ile kalkar */}
+        <FiyatUyarisi />
         {/* Sayfa geçişi: yeni sayfa hafifçe yukarı kayarak belirir */}
         <motion.div key={pathname} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: [0.2, 0.8, 0.2, 1] }}>

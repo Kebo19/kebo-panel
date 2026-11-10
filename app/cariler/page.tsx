@@ -306,7 +306,10 @@ export default function CarilerPage() {
     setLocalDurumlar(yeniDurumlar);
 
     setTopluIslemYukleniyor(true);
-    await supabase.from("faturalar").update({ durum, islendi: durum === "odendi", ...(durum !== "odendi" ? { hatir_faturasi: false } : {}) }).in("id", Array.from(seciliFaturalar));
+    const { data: guncel, error: tErr } = await supabase.from("faturalar").update({ durum, islendi: durum === "odendi", ...(durum !== "odendi" ? { hatir_faturasi: false } : {}) }).in("id", Array.from(seciliFaturalar)).select("id");
+    if (tErr || !guncel?.length) {
+      showToast("hata", "Faturalar güncellenemedi" + (tErr ? ": " + tErr.message : " (yetki yok).")); setTopluIslemYukleniyor(false); veriCek(); return;
+    }
     showToast("basari", `${seciliFaturalar.size} fatura ${durum === "odendi" ? "ödendi" : durum === "gecikti" ? "gecikti" : "bekliyor"} olarak işaretlendi.`);
     setTopluIslemYukleniyor(false);
     setSeciliFaturalar(new Set());
@@ -318,8 +321,11 @@ export default function CarilerPage() {
     if (seciliFaturalar.size === 0) return;
     if (!confirm(`${seciliFaturalar.size} fatura silinecek. Onaylıyor musunuz?`)) return;
     setTopluIslemYukleniyor(true);
-    await supabase.from("faturalar").delete().in("id", Array.from(seciliFaturalar));
-    showToast("basari", `${seciliFaturalar.size} fatura silindi.`);
+    const { data: silinen, error: sErr } = await supabase.from("faturalar").delete().in("id", Array.from(seciliFaturalar)).select("id");
+    if (sErr || !silinen?.length) {
+      showToast("hata", "Faturalar silinemedi" + (sErr ? ": " + sErr.message : " (yetki yok).")); setTopluIslemYukleniyor(false); return;
+    }
+    showToast("basari", `${silinen.length} fatura silindi.`);
     setTopluIslemYukleniyor(false);
     if (seciliCari) cariDetayAc(seciliCari);
     veriCek();
@@ -362,7 +368,8 @@ export default function CarilerPage() {
     const { error } = await supabase.from("cari_odemeler").delete().eq("id", o.id);
     if (error) { showToast("hata", "Silme hatası: " + error.message); return; }
     if (o.fatura_idleri?.length) {
-      await supabase.from("faturalar").update({ durum: "bekliyor", islendi: false, hatir_faturasi: false }).in("id", o.fatura_idleri);
+      const { error: fErr } = await supabase.from("faturalar").update({ durum: "bekliyor", islendi: false, hatir_faturasi: false }).in("id", o.fatura_idleri);
+      if (fErr) showToast("hata", "Ödeme silindi ama bağlı faturalar 'bekliyor'a alınamadı: " + fErr.message);
     }
     showToast("basari", "Ödeme silindi.");
     if (seciliCari) cariDetayAc(seciliCari);
@@ -371,7 +378,8 @@ export default function CarilerPage() {
 
   const sil = async (id: string) => {
     if (!confirm("Bu cariyi silmek istiyor musunuz?")) return;
-    await supabase.from("cariler").delete().eq("id", id);
+    const { data: silinen, error } = await supabase.from("cariler").delete().eq("id", id).select("id");
+    if (error || !silinen?.length) { showToast("hata", "Cari silinemedi" + (error ? ": " + error.message : " (yetki yok).")); return; }
     if (seciliCari?.id === id) setSeciliCari(null);
     veriCek();
   };
@@ -386,12 +394,13 @@ export default function CarilerPage() {
     if (!duzenleModal.fatura) return;
     setFormSaving(true);
     const durum = duzenleForm.durum === "odendi" ? duzenleModal.fatura.durum : duzenleForm.durum;
-    await supabase.from("faturalar").update({
+    const { data: guncel, error } = await supabase.from("faturalar").update({
       toplam_tutar: tv(duzenleForm.tutar) || duzenleModal.fatura.toplam_tutar,
       durum,
       islendi: durum === "odendi",
-    }).eq("id", duzenleModal.fatura.id);
+    }).eq("id", duzenleModal.fatura.id).select("id");
     setFormSaving(false);
+    if (error || !guncel?.length) { showToast("hata", "Fatura kaydedilemedi" + (error ? ": " + error.message : " (yetki yok).")); return; }
     showToast("basari", "Fatura güncellendi.");
     setDuzenleModal({ acik: false, fatura: null });
     buAyVeriCek();
@@ -400,7 +409,8 @@ export default function CarilerPage() {
 
   const buAyTekDurumGuncelle = async (faturaId: string, durum: string) => {
     if (durum === "odendi") { const fat = buAyFaturalar.find(x => x.id === faturaId); if (fat) buAyOde(fat); return; }
-    await supabase.from("faturalar").update({ durum, islendi: durum === "odendi" }).eq("id", faturaId);
+    const { data: guncel, error } = await supabase.from("faturalar").update({ durum, islendi: durum === "odendi" }).eq("id", faturaId).select("id");
+    if (error || !guncel?.length) { showToast("hata", "Fatura güncellenemedi" + (error ? ": " + error.message : " (yetki yok).")); return; }
     setBuAyFaturalar(prev => prev.map(f => f.id === faturaId ? { ...f, durum } : f));
     showToast("basari", `Fatura ${durum === "odendi" ? "ödendi" : durum === "gecikti" ? "gecikti" : "bekliyor"} olarak işaretlendi.`);
     veriCek();

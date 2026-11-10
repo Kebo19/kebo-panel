@@ -264,7 +264,7 @@ export default function KeboEkstreYukle({ cari, faturalar, odemeler, onKapat, on
                     ? <> Kebo bakiyesiyle aradaki <b className="text-yazi">₺{fmt(Math.abs(plan.duzeltme))}</b> fark tek bir &quot;bakiye düzeltmesi&quot; kaydıyla kapatılır (kasaya yansımaz).</>
                     : <> Kebo bakiyesiyle birebir tutuyor, düzeltme gerekmiyor.</>}
                 </p>
-                <p className="text-xs text-gray-400">İşlemden sonra ekstre tarihine kadarki borç <b className="text-yazi">₺{fmt(ekstre.sonBakiye)}</b> olur (cari ekranındaki Toplam Borç'a sonradan kesilen faturalar eklenir); ödemeler en eski faturaları kapatır, fatura durumları kendiliğinden güncellenir.</p>
+                <p className="text-xs text-gray-400">İşlemden sonra ekstre tarihine kadarki borç <b className="text-yazi">₺{fmt(ekstre.sonBakiye)}</b> olur (cari ekranındaki Toplam Borç&apos;a sonradan kesilen faturalar eklenir); ödemeler en eski faturaları kapatır, fatura durumları kendiliğinden güncellenir.</p>
               </div>
 
               {plan.ekstredeOlmayan.length > 0 && (

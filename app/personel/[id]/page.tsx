@@ -190,8 +190,10 @@ export default function PersonelDetayPage() {
       // İsim değiştiyse bağlı kayıtlardaki isim de güncellensin (eski, id'siz kayıtlar id'ye bağlanır).
       if (orijinal && orijinal.isim !== veri.isim) {
         for (const tablo of ["avanslar", "kesintiler"] as const) {
-          await supabase.from(tablo).update({ personel_isim: veri.isim }).eq("personel_id", String(veri.id));
-          await supabase.from(tablo).update({ personel_isim: veri.isim, personel_id: String(veri.id) }).is("personel_id", null).eq("personel_isim", orijinal.isim);
+          const r1 = await supabase.from(tablo).update({ personel_isim: veri.isim }).eq("personel_id", String(veri.id));
+          const r2 = await supabase.from(tablo).update({ personel_isim: veri.isim, personel_id: String(veri.id) }).is("personel_id", null).eq("personel_isim", orijinal.isim);
+          const e = r1.error || r2.error;
+          if (e) showToast("hata", `Personel kaydedildi ama ${tablo === "avanslar" ? "avans" : "kesinti"} kayıtlarındaki isim güncellenemedi: ${e.message}`);
         }
       }
       setOrijinal(veri);
@@ -269,14 +271,16 @@ export default function PersonelDetayPage() {
     const a = avanslar.find(x => x.id === id);
     if (a?.rapor_id) { showToast("hata", "Bu avans günlük rapordan geliyor; raporu düzenleyerek değiştirin."); return; }
     if (!confirm("Bu avans kaydını silmek istiyor musunuz? (Kasa'daki karşılığı da silinir.)")) return;
-    await supabase.from("avanslar").delete().eq("id", id);
+    const { data: silinen, error } = await supabase.from("avanslar").delete().eq("id", id).select("id");
+    if (error || !silinen?.length) { showToast("hata", "Avans silinemedi" + (error ? ": " + error.message : " (yetki yok).")); return; }
     if (personel) finansalVeriCek(personel);
   };
   const kesintiKaldir = async (id: string) => {
     const k = kesintiler.find(x => x.id === id);
     if (k?.rapor_id) { showToast("hata", "Bu kesinti günlük rapordan geliyor; raporu düzenleyerek değiştirin."); return; }
     if (!confirm("Bu kesinti kaydını silmek istiyor musunuz?")) return;
-    await supabase.from("kesintiler").delete().eq("id", id);
+    const { data: silinen, error } = await supabase.from("kesintiler").delete().eq("id", id).select("id");
+    if (error || !silinen?.length) { showToast("hata", "Kesinti silinemedi" + (error ? ": " + error.message : " (yetki yok).")); return; }
     if (personel) finansalVeriCek(personel);
   };
 

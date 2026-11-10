@@ -198,7 +198,8 @@ export default function ReceteDuzenleyici({ supabase, baglam, stok, urunler, sat
     if (k.tur === "ara" && anahtar(k.ad) === sec.anahtar) { alert("Reçete kendini içeremez."); return; }
     setIslem(true);
     if (!baglam.urunler.has(sec.anahtar)) {
-      await supabase.from("recete_urunleri").upsert({ ad: sec.ad, tur: "menu", grup: sec.grup === "Satılan, reçetesi yok" ? "Diğer" : sec.grup }, { onConflict: "ad" });
+      const { error: uErr } = await supabase.from("recete_urunleri").upsert({ ad: sec.ad, tur: "menu", grup: sec.grup === "Satılan, reçetesi yok" ? "Diğer" : sec.grup }, { onConflict: "ad" });
+      if (uErr) { setIslem(false); alert("Menü ürünü kaydedilemedi: " + uErr.message); return; }
     }
     const { error } = await supabase.from("receteler").insert({
       menu_urun: sec.ad, etiket,

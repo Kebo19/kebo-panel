@@ -1515,7 +1515,8 @@ export default function RaporlarPage() {
       if (error) { alert("Onaylanırken hata: " + error.message); return; }
       const yeniTarih = typeof birlesik.tarih === "string" ? birlesik.tarih : null;
       if (yeniTarih && yeniTarih !== talep.rapor_tarihi && puantajOnayli.length) {
-        await supabase.from("puantaj").delete().eq("rapor_id", talep.rapor_id).eq("tarih", talep.rapor_tarihi);
+        const { error: pErr } = await supabase.from("puantaj").delete().eq("rapor_id", talep.rapor_id).eq("tarih", talep.rapor_tarihi);
+        if (pErr) alert("Talep onaylandı ama eski tarihin puantaj kayıtları silinemedi: " + pErr.message);
       }
       setTalepReddedilen(o => { const y = { ...o }; delete y[talep.id]; return y; });
       veriCek();
