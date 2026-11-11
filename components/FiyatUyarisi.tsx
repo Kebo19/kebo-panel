@@ -24,6 +24,11 @@ interface Uyari {
   karar_gerekli: boolean; stok_fiyati: number | string | null;
 }
 
+interface GecmisSatir {
+  tarih: string; gib_no: string; tedarikci: string | null; kalem_adi: string; miktar: number | string | null; birim: string | null;
+  fatura_birim_fiyat: number | string; iskonto_orani: number | string | null; net_fiyat: number | string; stok_birim_fiyat: number | string;
+}
+
 const ad = (s: string | null) => (s ? s.charAt(0).toLocaleUpperCase("tr-TR") + s.slice(1) : "");
 const yuzde = (n: number) => "%" + Math.abs(n).toLocaleString("tr-TR", { maximumFractionDigits: 1 });
 
@@ -32,6 +37,18 @@ export default function FiyatUyarisi() {
   const yetki = useYetki();
   const [uyarilar, setUyarilar] = useState<Uyari[]>([]);
   const [islem, setIslem] = useState<string | null>(null);
+  // Tıklanan uyarının altında o ürünün bütün geçmiş alış fiyatları (public.fiyat_gecmisi)
+  const [acik, setAcik] = useState<string | null>(null);
+  const [gecmis, setGecmis] = useState<Record<string, GecmisSatir[] | "yukleniyor" | { hata: string }>>({});
+
+  const gecmisAc = async (u: Uyari) => {
+    if (acik === u.id) { setAcik(null); return; }
+    setAcik(u.id);
+    if (Array.isArray(gecmis[u.urun_id])) return;
+    setGecmis(g => ({ ...g, [u.urun_id]: "yukleniyor" }));
+    const { data, error } = await createClient().rpc("fiyat_gecmisi", { p_urun_id: u.urun_id });
+    setGecmis(g => ({ ...g, [u.urun_id]: error ? { hata: error.message } : ((data as GecmisSatir[]) || []) }));
+  };
 
   const yukle = useCallback(async () => {
     const { data, error } = await createClient().rpc("fiyat_uyarilari");
@@ -88,18 +105,24 @@ export default function FiyatUyarisi() {
           const cok = Math.abs(oran) > 30;
           return (
             <div key={u.id} className={`rounded-xl bg-black/30 border px-3.5 py-3 ${u.karar_gerekli ? "border-red-500/70" : "border-amber-500/25"}`}>
-              <p className="text-[17px] lg:text-[19px] font-black uppercase text-white leading-snug">
-                {u.urun_adi.toLocaleUpperCase("tr-TR")}:{" "}
-                <span className={artis ? "text-red-300" : "text-emerald-300"}>
-                  {yuzde(oran)} {artis ? "ZAM" : "İNDİRİM"}{cok ? " (ÇOK)" : ""}
-                </span>
-              </p>
-              <p className="text-[15px] lg:text-[16px] font-bold text-amber-50 mt-0.5">
-                ₺{fmt2(Number(u.eski_fiyat))} → ₺{fmt2(Number(u.yeni_fiyat))}{u.birim ? ` / ${u.birim}` : ""}
-                <span className="font-normal text-amber-100/75">
-                  {" "}· {kisaUnvan(u.tedarikci)} · fatura {fmtTarih(u.yeni_tarih)}{u.eski_tarih ? ` (önceki ${fmtTarih(u.eski_tarih)})` : ""}
-                </span>
-              </p>
+              <button type="button" onClick={() => gecmisAc(u)} className="block w-full text-left group" aria-expanded={acik === u.id}>
+                <p className="text-[17px] lg:text-[19px] font-black uppercase text-white leading-snug">
+                  {u.urun_adi.toLocaleUpperCase("tr-TR")}:{" "}
+                  <span className={artis ? "text-red-300" : "text-emerald-300"}>
+                    {yuzde(oran)} {artis ? "ZAM" : "İNDİRİM"}{cok ? " (ÇOK)" : ""}
+                  </span>
+                </p>
+                <p className="text-[15px] lg:text-[16px] font-bold text-amber-50 mt-0.5">
+                  ₺{fmt2(Number(u.eski_fiyat))} → ₺{fmt2(Number(u.yeni_fiyat))}{u.birim ? ` / ${u.birim}` : ""}
+                  <span className="font-normal text-amber-100/75">
+                    {" "}· {kisaUnvan(u.tedarikci)} · fatura {fmtTarih(u.yeni_tarih)}{u.eski_tarih ? ` (önceki ${fmtTarih(u.eski_tarih)})` : ""}
+                  </span>
+                </p>
+                <p className="text-[13px] font-semibold text-amber-300 mt-1 group-hover:underline">
+                  {acik === u.id ? "▲ Geçmiş fiyatları kapat" : "▼ Geçmiş bütün alış fiyatlarını gör"}
+                </p>
+              </button>
+              {acik === u.id && <GecmisTablo veri={gecmis[u.urun_id]} birim={u.birim} />}
               <div className="flex flex-wrap items-center gap-2 mt-2.5">
                 {u.karar ? (
                   <span className="text-[13px] font-semibold text-amber-50/90">
@@ -136,6 +159,77 @@ export default function FiyatUyarisi() {
         })}
       </div>
       <p className="text-[12px] text-amber-100/60">“Gördüm” sadece sizin ekranınızdan kaldırır; diğer kullanıcılar girdiklerinde kendileri görür.</p>
+    </div>
+  );
+}
+
+// ─── Geçmiş alış fiyatları tablosu ──────────────────────────────────────────
+function GecmisTablo({ veri, birim }: { veri: GecmisSatir[] | "yukleniyor" | { hata: string } | undefined; birim: string | null }) {
+  if (!veri || veri === "yukleniyor") return <p className="mt-3 text-[13px] text-amber-50/70">Geçmiş fiyatlar yükleniyor…</p>;
+  if (!Array.isArray(veri)) return <p className="mt-3 text-[13px] text-red-300">Geçmiş fiyatlar alınamadı: {veri.hata}</p>;
+  if (!veri.length) return <p className="mt-3 text-[13px] text-amber-50/70">Bu ürün için fatura kaydı bulunamadı.</p>;
+
+  const fiyatlar = veri.map(r => Number(r.stok_birim_fiyat));
+  const enDusuk = Math.min(...fiyatlar), enYuksek = Math.max(...fiyatlar);
+  const ilk = fiyatlar[fiyatlar.length - 1], son = fiyatlar[0];
+  const toplamDegisim = ilk > 0 ? ((son - ilk) / ilk) * 100 : 0;
+  // Fatura birimi stok biriminden farklıysa (ör. teneke → lt) iki fiyat da gösterilir
+  const ikiFiyat = veri.some(r => Math.abs(Number(r.net_fiyat) - Number(r.stok_birim_fiyat)) > 0.005);
+  const bu = birim ? ` / ${birim}` : "";
+
+  return (
+    <div className="mt-3 rounded-lg bg-black/30 border border-white/10 overflow-hidden">
+      <div className="flex flex-wrap gap-x-5 gap-y-1 px-3 py-2 text-[13px] text-amber-50 border-b border-white/10">
+        <span>{veri.length} alış · {fmtTarih(veri[veri.length - 1].tarih)} – {fmtTarih(veri[0].tarih)}</span>
+        <span>En düşük <b>₺{fmt2(enDusuk)}</b>{bu}</span>
+        <span>En yüksek <b>₺{fmt2(enYuksek)}</b>{bu}</span>
+        {veri.length > 1 && (
+          <span>Baştan bugüne <b className={toplamDegisim > 0 ? "text-red-300" : "text-emerald-300"}>
+            {toplamDegisim > 0 ? "+" : "−"}{yuzde(toplamDegisim)}</b></span>
+        )}
+      </div>
+      <div className="max-h-80 overflow-y-auto">
+        <table className="w-full text-[13px]">
+          <thead className="sticky top-0 bg-[#1a1408] text-amber-200/80">
+            <tr>
+              <th className="text-left font-semibold px-3 py-1.5">Tarih</th>
+              <th className="text-left font-semibold px-2 py-1.5 hidden sm:table-cell">Firma</th>
+              <th className="text-right font-semibold px-2 py-1.5">Miktar</th>
+              {ikiFiyat && <th className="text-right font-semibold px-2 py-1.5">Fatura fiyatı</th>}
+              <th className="text-right font-semibold px-2 py-1.5">Fiyat{bu}</th>
+              <th className="text-right font-semibold px-3 py-1.5">Değişim</th>
+            </tr>
+          </thead>
+          <tbody>
+            {veri.map((r, i) => {
+              const f = Number(r.stok_birim_fiyat);
+              const onceki = i + 1 < veri.length ? Number(veri[i + 1].stok_birim_fiyat) : null;
+              const d = onceki && onceki > 0 ? ((f - onceki) / onceki) * 100 : null;
+              const isk = Number(r.iskonto_orani) || 0;
+              return (
+                <tr key={r.gib_no + i} className="border-t border-white/5 text-amber-50/90">
+                  <td className="px-3 py-1.5 whitespace-nowrap">{fmtTarih(r.tarih)}</td>
+                  <td className="px-2 py-1.5 hidden sm:table-cell">{kisaUnvan(r.tedarikci)}</td>
+                  <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                    {r.miktar != null ? Number(r.miktar).toLocaleString("tr-TR") : "—"} {(r.birim || "").toLocaleLowerCase("tr-TR")}
+                  </td>
+                  {ikiFiyat && (
+                    <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                      ₺{fmt2(Number(r.net_fiyat))}{isk ? <span className="text-amber-200/60"> (−%{isk.toLocaleString("tr-TR")})</span> : null}
+                    </td>
+                  )}
+                  <td className="px-2 py-1.5 text-right font-bold whitespace-nowrap">
+                    ₺{fmt2(f)}{!ikiFiyat && isk ? <span className="font-normal text-amber-200/60"> (−%{isk.toLocaleString("tr-TR")})</span> : null}
+                  </td>
+                  <td className={`px-3 py-1.5 text-right whitespace-nowrap ${d == null || Math.abs(d) < 0.5 ? "text-amber-50/40" : d > 0 ? "text-red-300" : "text-emerald-300"}`}>
+                    {d == null ? "—" : Math.abs(d) < 0.5 ? "=" : `${d > 0 ? "+" : "−"}${yuzde(d)}`}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
